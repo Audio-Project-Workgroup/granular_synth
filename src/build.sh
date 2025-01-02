@@ -2,6 +2,7 @@
 
 CFLAGS="-g -Wall -Wno-writable-strings -Wno-missing-braces -fno-exceptions -fno-rtti -std=gnu++11"
 
+mkdir -p ../build
 pushd ../build
 
 #clang -c ../src/miniaudio_impl.c -o miniaudio.o
