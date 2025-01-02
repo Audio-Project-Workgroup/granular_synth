@@ -1,0 +1,10 @@
+#!/bin/bash
+
+CFLAGS="-g -Wall -Wno-writable-strings -Wno-missing-braces -fno-exceptions -fno-rtti -std=gnu++11"
+
+#clang -c miniaudio_impl.c -o miniaudio.o
+#ar rcs libminiaudio.a miniaudio.o
+
+clang $CFLAGS plugin.cpp -o plugin.so -shared -fPIC -lm
+clang $CFLAGS main.cpp -o test -L. -lGL -lglfw -lminiaudio -ldl -lpthread -lm
+
