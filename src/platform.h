@@ -1,6 +1,6 @@
 // operating-system-dependent functions/types
 
-#ifdef __WIN32__
+#ifdef _WIN32
 
 #include <windows.h>
 
@@ -8,6 +8,24 @@
   FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM, \
 		 NULL, (code), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), \
 		 (LPSTR)&(string), 0, NULL)
+
+inline u64
+u64FromFILETIME(FILETIME filetime)
+{
+  u64 result = (u64)filetime.dwHighDateTime << 32;
+  result |= filetime.dwLowDateTime;
+
+  return(result);
+}
+
+inline s64
+s64FromLARGE_INTEGER(LARGE_INTEGER largeInt)
+{
+  s64 result = (s64)largeInt.HighPart << 32;
+  result |= largeInt.LowPart;
+
+  return(result);
+}
 
 inline FILETIME
 getLastWriteTime(char *filename)
@@ -25,6 +43,15 @@ getLastWriteTime(char *filename)
   return(result);
 }
 
+inline u64
+getLastWriteTimeU64(char *filename)
+{
+  FILETIME filetime = getLastWriteTime(filename);
+  u64 result = u64FromFILETIME(filetime);
+
+  return(result);
+}
+
 inline void
 msecWait(u32 msecsToWait)
 {
@@ -35,7 +62,7 @@ struct PluginCode
 {
   bool isValid;
 
-  FILETIME lastWriteTime;
+  u64 lastWriteTime;
 
   HMODULE pluginCode;
   RenderNewFrame *renderNewFrame;
@@ -46,14 +73,23 @@ static PluginCode
 loadPluginCode(char *filename)
 {
   PluginCode result = {};
-  result.lastWriteTime = getLastWriteTime(filename);
+  
+  FILETIME filetime = getLastWriteTime(filename);
+  result.lastWriteTime = u64FromFILETIME(filetime);
   if(result.lastWriteTime)
     {
-      result.pluginCode = LoadLibraryA(filename);
+      char filepath[32] = {};
+      char extension[8] = {};
+      separateExtensionAndFilepath(filename, filepath, extension);
+
+      char tempFilename[64] = {};
+      snprintf(tempFilename, ARRAY_COUNT(tempFilename), "%s_temp.%s", filepath, extension);
+      CopyFile(filename, tempFilename, FALSE);
+      result.pluginCode = LoadLibraryA(tempFilename);
       if(result.pluginCode)
 	{
-	  result.renderNewFrame = (renderNewFrame *)GetProcAddress(result.pluginCode, "renderNewFrame");
-	  result.audioProcess = (audioProcess *)GetProcAddress(result.pluginCode, "audioProcess");
+	  result.renderNewFrame = (RenderNewFrame *)GetProcAddress(result.pluginCode, "renderNewFrame");
+	  result.audioProcess = (AudioProcess *)GetProcAddress(result.pluginCode, "audioProcess");
 	  result.isValid = result.renderNewFrame && result.audioProcess;
 	}
       else
@@ -99,7 +135,9 @@ PLATFORM_READ_ENTIRE_FILE(platformReadEntireFile)
       LARGE_INTEGER fileSize;
       if(GetFileSizeEx(fileHandle, &fileSize))
 	{
-	  result.contentsSize = fileSize;
+	  s64 fileSizeInt = s64FromLARGE_INTEGER(fileSize);
+	  ASSERT(fileSizeInt > 0);
+	  result.contentsSize = fileSizeInt;
 	  result.contents = arenaPushSize(allocator, result.contentsSize + 1);
 	  
 	  u8 *dest = result.contents;
@@ -107,7 +145,7 @@ PLATFORM_READ_ENTIRE_FILE(platformReadEntireFile)
 	  u32 bytesToRead = MIN(totalBytesToRead, U32_MAX);
 	  while(totalBytesToRead)
 	    {
-	      u32 bytesRead;
+	      DWORD bytesRead;
 	      if(ReadFile(fileHandle, dest, bytesToRead, &bytesRead, 0))
 		{
 		  dest += bytesRead;
@@ -139,7 +177,7 @@ PLATFORM_READ_ENTIRE_FILE(platformReadEntireFile)
 	  fprintf(stderr, "ERROR: GetFileSizeEx failed: %s\n", errorMessage);
 	}
 
-      close(fileHandle);
+      CloseHandle(fileHandle);
     }
   else
     {
@@ -175,6 +213,15 @@ getLastWriteTime(char *filename)
   return(result);
 }
 
+inline u64
+getLastWriteTimeU64(char *filename)
+{
+  time_t writeTime = getLastWriteTime(filename);
+  u64 result = (u64)writeTime;
+
+  return(result);
+}
+
 inline void
 msecWait(u32 msecsToWait)
 {
@@ -184,7 +231,7 @@ msecWait(u32 msecsToWait)
 struct PluginCode
 {
   bool isValid;
-  time_t lastWriteTime;
+  u64 lastWriteTime;
   
   void *pluginCode;
   RenderNewFrame *renderNewFrame;

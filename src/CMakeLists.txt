@@ -5,7 +5,13 @@ set(CMAKE_BUILD_TYPE Debug)
 
 project(GranularSynthTest VERSION 0.0.1)
 
-set(JUCE_COPY_PLUGIN_AFTER_BUILD ON)
+if(WIN32)
+	message("juce fucks up automatically installing plugins on windows. you have to do it yourself :(")
+	#set(JUCE_VST3_COPY_DIR ${USER_ROOT}AppData/Local/Programs/Common/VST3)
+	#set(JUCE_COPY_PLUGIN_AFTER_BUILD ON)	
+else()
+	set(JUCE_COPY_PLUGIN_AFTER_BUILD ON)	
+endif()
 
 add_subdirectory(JUCE)
 

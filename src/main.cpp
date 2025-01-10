@@ -55,7 +55,7 @@ glfwMouseButtonCallback(GLFWwindow *window, int button, int action, int mods)
 			     action == GLFW_PRESS);
     }
 }
-
+ 
 #define SR 48000
 #define CHANNELS 2
 
@@ -131,7 +131,7 @@ main(int argc, char **argv)
 
 	  // plugin setup
 	  
-#ifdef __WIN32__
+#ifdef _WIN32
 	  char *pluginName = "../build/plugin.dll";
 #else
 	  char *pluginName = "../build/plugin.so";
@@ -184,7 +184,7 @@ main(int argc, char **argv)
 		    {
 		      // reload plugin
 		      
-		      time_t newWriteTime = getLastWriteTime(pluginName);
+		      u64 newWriteTime = getLastWriteTimeU64(pluginName);
 		      if(newWriteTime != plugin.lastWriteTime)
 			{
 			  unloadPluginCode(&plugin);
@@ -243,8 +243,8 @@ main(int argc, char **argv)
 			{
 			  void *writePtr = 0;
 			  u32 framesToWrite = framesRemaining;
-			  ma_result result = ma_pcm_rb_acquire_write(&maRingBuffer, &framesToWrite, &writePtr);
-			  if(result == MA_SUCCESS)
+			  ma_result maResult = ma_pcm_rb_acquire_write(&maRingBuffer, &framesToWrite, &writePtr);
+			  if(maResult == MA_SUCCESS)
 			    {
 			      if(plugin.audioProcess)
 				{
@@ -253,8 +253,8 @@ main(int argc, char **argv)
 				  plugin.audioProcess(&pluginMemory, &audioBuffer);
 				}
 
-			      result = ma_pcm_rb_commit_write(&maRingBuffer, framesToWrite);
-			      if(result == MA_SUCCESS)
+			      maResult = ma_pcm_rb_commit_write(&maRingBuffer, framesToWrite);
+			      if(maResult == MA_SUCCESS)
 				{
 				  //fprintf(stdout, "wrote %u frames\n", framesToWrite);
 				  framesRemaining -= framesToWrite;
@@ -262,13 +262,13 @@ main(int argc, char **argv)
 			      else
 				{
 				  fprintf(stderr, "ERROR: ma_pcm_rb_commit_write failed: %s\n",
-					  ma_result_description(result));
+					  ma_result_description(maResult));
 				}
 			    }
 			  else
 			    {
 			      fprintf(stderr, "ERROR: ma_pcm_rb_acquire_write failed: %s\n",
-				      ma_result_description(result));
+				      ma_result_description(maResult));
 			    }
 			}
 

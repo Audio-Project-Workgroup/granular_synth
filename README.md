@@ -19,28 +19,38 @@
 ## Requirements
 
 * GLFW: https://github.com/glfw/glfw
+* OpenGL (mac and linux)
 * clang (mac and linux)
+* msvc (windows)
 
 ## Building
 
-### Windows(untested)
+### Windows 
 
+* from your downloaded GLFW folder, copy the `GLFW` folder to `src\include`, and from the `lib-vc[YEAR]` folder (corresponding to your version of Visual Studio), copy `glfw3_mt.lib` and `glfw3.lib` to `src\libs`
+* configure your shell to be able to call a C compiler from the command line. This can be done by calling `vcvarsall.bat x64`, which you can find in `C:\Program Files\Microsoft Visual Studio\[YEAR]\Community\VC\Auxiliary\Build`, or something similar
 * navigate to the src directory
-* open main.cpp and uncomment the line with #define MINIAUDIO_IMPLEMENTATION
-* run build.bat to build the native host application and the dynamic library plugin. These will be located in a new directory called build
-* run build_juce.bat to build the vst3 plugin with JUCE and install it
+* open `build.bat` and uncomment the two lines to compile miniaudio to a static library
+* run `build` to build the native host application and the dynamic library plugin. These will be located in a new directory called `build` (with names `main.exe` and `plugin.dll`)
+  * recomment the two lines in `build.bat` for subsequent builds
+* open `PluginProcessor.cpp`, and change two variables (NOTE: these are temporary measures that should be fixed soon):
+  * change the local variable `fileDirectory` in the `juceReadEntireFile` function to your local data directory
+  * change the local variable `pluginDirectory` in the `prepareToPlay` function to your local build directory
+* run `build_juce` to build the vst3 plugin with JUCE
+  * you will have to put the resulting vst3 bundle somewhere where your DAW/plugin host can find it
 
 ### Mac(untested) and Linux
 
 * navigate to the src directory
-* open build.sh and uncomment the two commented lines
-* run build.sh to build the native host application and the dynamic library plugin. These will be located in a new directory called build
-  * append your local build directory path to DYLD_LIBRARY_PATH (mac) or LD_LIBRARY_PATH (linux)
-  * recomment those two lines in build.sh for subsequent builds
-* run build_juce.sh to build the vst3 plugin with JUCE and install it
+* open `build.sh` and uncomment the two lines to compile miniaudio to a static library
+* run `./build.sh` to build the native host application and the dynamic library plugin. These will be located in a new directory called build
+  * append your local build directory path to `DYLD_LIBRARY_PATH` (mac) or `LD_LIBRARY_PATH` (linux)
+  * recomment those two lines in `build.sh` for subsequent builds
+* open `PluginProcessor.cpp`, and change the local variable `fileDirectory` in the `juceReadEntireFile` function to your local data directory (NOTE: this is a temporary measure that should be fixed soon)
+* run `./build_juce.sh` to build the vst3 plugin with JUCE and install it
 
 ## Issues
 
-* Windows build.bat does not have a way of building miniaudio as a static library
+* vst3 installation must be done manually on windows
 * JUCE requires a local path to the data directory to load files
-* loading the dynamic library plugin requires modifying shell environment variables on mac and linux (maybe windows too?)
+* loading the dynamic library plugin requires modifying shell environment variables on mac and linux (and requires a local path on windows)

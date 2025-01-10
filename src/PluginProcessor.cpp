@@ -6,7 +6,12 @@ PLATFORM_READ_ENTIRE_FILE(juceReadEntireFile)
   ReadFileResult result = {};
 
   // TODO: this is my(ry's) local working directory. We need to give JUCE a uniform location to look for files.
-  juce::String filepath = "~/Documents/C/GLFW_miniaudio_JUCE_test/data/" + juce::String(filename);
+  #if _WIN32
+  juce::String fileDirectory = "C:\\Users\\finnc\\programming\\granular_synth\\data\\";
+  #else
+  juce::String fileDirectory = "~/Documents/C/GLFW_miniaudio_JUCE_test/data/";
+  #endif
+  juce::String filepath = fileDirectory + juce::String(filename);
   juce::File file(filepath);  
   if(file.existsAsFile())
     {
@@ -158,8 +163,9 @@ AudioPluginAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 
   // TODO: you probably have to tell your shell to search for dynamic libaries in
   //       [your_local_project_directory]/build. We shouldn't require end-users to do that.
-#ifdef __WIN32__
-  juce::String pluginFilename = "plugin.dll";
+  juce::String pluginDirectory = "C:\\Users\\finnc\\programming\\granular_synth\\build\\";
+#ifdef _WIN32
+  juce::String pluginFilename = pluginDirectory + "plugin.dll";
 #else
   juce::String pluginFilename = "plugin.so";
 #endif

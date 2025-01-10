@@ -1,4 +1,8 @@
+#ifdef __clang__
 #define ASSERT(cond) if(!(cond)) __builtin_trap();
+#else
+#define ASSERT(cond) if(!(cond)) *(int *)0 = 0;
+#endif
 
 #define KILOBYTES(count) (1024LL*count)
 #define MEGABYTES(count) (1024LL*KILOBYTES(count))
@@ -11,4 +15,38 @@
 #define OFFSET_OF(type, member) ((usz)&(((type *)0)->member))
 
 #define ROUND_UP_TO_MULTIPLE_OF_2(num) (((num) + 1) & (~1))
+
+static inline void
+separateExtensionAndFilepath(char *filepath, char *resultPath, char *resultExtension)
+{
+  char *at = filepath;
+  char *dest = resultPath;
+  while(*at)
+    {
+      if(*at != '.')
+	{
+	  *dest++ = *at++;
+	}
+      else
+	{
+	  if(*(at + 1))
+	    {
+	      if(*(at + 1) == '.')
+		{
+		  *dest++ = *at++;
+		  *dest++ = *at++;
+		}
+	      else
+		{
+		  dest = resultExtension;
+		  ++at;
+		}
+	    }
+	  else
+	    {
+	      break;
+	    }
+	}
+    }
+}
 

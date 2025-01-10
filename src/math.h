@@ -1,3 +1,7 @@
+#ifdef _WIN32
+#define _USE_MATH_DEFINES
+#endif
+
 #include <math.h>
 #define M_TAU (2.0*M_PI)
 

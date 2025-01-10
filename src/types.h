@@ -16,6 +16,16 @@ typedef int64_t  s64;
 typedef float    r32;
 typedef double   r64;
 
+#define U8_MAX  (0xFF)
+#define U16_MAX (0xFFFF)
+#define U32_MAX (0xFFFFFFFF)
+#define U64_MAX (0xFFFFFFFFFFFFFFFF)
+
+#define S8_MAX  (0x7F)
+#define S16_MAX (0x7FFF)
+#define S32_MAX (0x7FFFFFFF)
+#define S64_MAX (0x7FFFFFFFFFFFFFFF)
+
 union v2
 {
   struct
