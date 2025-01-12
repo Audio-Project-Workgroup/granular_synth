@@ -26,6 +26,12 @@ juce_add_plugin(${PROJECT_NAME}
 	FORMATS VST3
 	PRODUCT_NAME "Granular Synth Test")
 
+get_filename_component(BASE_DIR ${CMAKE_SOURCE_DIR} DIRECTORY)
+set(BUILD_DIR ${BASE_DIR}/build)
+target_compile_definitions(${PROJECT_NAME}
+	PRIVATE
+	"BUILD_DIR=\"${BUILD_DIR}\"")
+
 target_sources(${PROJECT_NAME}
 	PRIVATE
 	PluginEditor.cpp

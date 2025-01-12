@@ -98,6 +98,7 @@ maDataCallback(ma_device *pDevice, void *pOutput, const void *pInput, ma_uint32 
 int
 main(int argc, char **argv)
 {
+  printf("plugin path: %s\n", PLUGIN_PATH);
   int result = 0;
   
   if(glfwInit())
@@ -133,10 +134,13 @@ main(int argc, char **argv)
 	  
 #ifdef _WIN32
 	  char *pluginName = "../build/plugin.dll";
+#elif  __APPLE__
+	  char *pluginName = "plugin.dylib";
 #else
 	  char *pluginName = "../build/plugin.so";
-#endif
-	  PluginCode plugin = loadPluginCode(pluginName);
+#endif	  
+	  //PluginCode plugin = loadPluginCode(pluginName);
+	  PluginCode plugin = loadPluginCode(PLUGIN_PATH);
 
 	  // audio setup
 

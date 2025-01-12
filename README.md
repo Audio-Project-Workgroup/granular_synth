@@ -2,11 +2,22 @@
 
 ## Code Structure
 
-* the native host application is compiled from main.cpp
-* the dynamic library plugin is compiled from plugin.cpp
-* the JUCE vst3 plugin is compiled from PluginProcessor.cpp and PluginEditor.cpp
-* common.h contains the code that the dynamic library plugin needs to interface with the native host and JUCE
-* platform.h is a small OS abstraction layer used by the native host (windows functions are untested)
+### Top-Level Directories
+
+* `src` contains all the source code, including all the source code for the JUCE framework
+* `data` contains audio files for the plugin to load
+* building the project creates a new directory called `build`, which will contain the compiled executables, libraries, and plugins. See [Building](#building)
+
+### Translation Units(TODO: real names)
+
+* `plugin.so/dll/dylib`: a dynamic library containing all of the plugin's audio-visual output logic. Compiled from `plugin.cpp`.
+* `test/main.exe`: a simple host application for the dynamic library plugin, capable of hot-reloading. Compiled from `main.cpp`.
+* `Granular Synth Test.vst3`: a vst plugin that loads the dynamic library plugin. Compiled from `PluginProcessor.cpp` and `PluginEditor.cpp`.
+
+### Misc.
+
+* `common.h` defines the functions and data structures that the dynamic library plugin needs to interface with the native host and JUCE, as well as some shared code and definitions
+* `platform.h` is a small OS abstraction layer used by the native host
 
 ## How it Works
 
@@ -33,24 +44,20 @@
 * open `build.bat` and uncomment the two lines to compile miniaudio to a static library
 * run `build` to build the native host application and the dynamic library plugin. These will be located in a new directory called `build` (with names `main.exe` and `plugin.dll`)
   * recomment the two lines in `build.bat` for subsequent builds
-* open `PluginProcessor.cpp`, and change two variables (NOTE: these are temporary measures that should be fixed soon):
-  * change the local variable `fileDirectory` in the `juceReadEntireFile` function to your local data directory
-  * change the local variable `pluginDirectory` in the `prepareToPlay` function to your local build directory
 * run `build_juce` to build the vst3 plugin with JUCE
-  * you will have to put the resulting vst3 bundle somewhere where your DAW/plugin host can find it
+  * you will have to put the resulting vst3 bundle somewhere where your DAW/plugin host can find it (TODO: get JUCE to do the installation auomatically)
 
-### Mac(untested) and Linux
+### Mac and Linux
 
 * navigate to the src directory
 * open `build.sh` and uncomment the two lines to compile miniaudio to a static library
 * run `./build.sh` to build the native host application and the dynamic library plugin. These will be located in a new directory called build
-  * append your local build directory path to `DYLD_LIBRARY_PATH` (mac) or `LD_LIBRARY_PATH` (linux)
+  * (NOTE: this may no longer be necessary) append your local build directory path to `DYLD_LIBRARY_PATH` (mac) or `LD_LIBRARY_PATH` (linux)
   * recomment those two lines in `build.sh` for subsequent builds
-* open `PluginProcessor.cpp`, and change the local variable `fileDirectory` in the `juceReadEntireFile` function to your local data directory (NOTE: this is a temporary measure that should be fixed soon)
 * run `./build_juce.sh` to build the vst3 plugin with JUCE and install it
 
 ## Issues
 
 * vst3 installation must be done manually on windows
-* JUCE requires a local path to the data directory to load files
-* loading the dynamic library plugin requires modifying shell environment variables on mac and linux (and requires a local path on windows)
+* the wav loader produces the right channel incorrectly
+* (NOTE: probably fixed) loading the dynamic library plugin requires modifying shell environment variables on mac and linux (and requires a local path on windows)
