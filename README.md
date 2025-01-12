@@ -29,19 +29,32 @@
 
 ## Requirements
 
-* GLFW: https://github.com/glfw/glfw
+* GLFW: https://github.com/glfw/glfw (to build from source), https://www.glfw.org/download.html (for the precompiled binaries)
 * OpenGL (mac and linux)
 * clang (mac and linux)
 * msvc (windows)
 
 ## Building
 
+* clone the repo with `git clone https://github.com/Audio-Project-Workgroup/granular_synth`
+* download the `JUCE` submodule with:
+```
+cd granular-synth
+git submodule update --init --recursive
+``` 
+This places the `https://github.com/juce-framework/JUCE` repository within `src/JUCE` directory.
+
 ### Windows 
 
 * from your downloaded GLFW folder, copy the `GLFW` folder to `src\include`, and from the `lib-vc[YEAR]` folder (corresponding to your version of Visual Studio), copy `glfw3_mt.lib` and `glfw3.lib` to `src\libs`
-* configure your shell to be able to call a C compiler from the command line. This can be done by calling `vcvarsall.bat x64`, which you can find in `C:\Program Files\Microsoft Visual Studio\[YEAR]\Community\VC\Auxiliary\Build`, or something similar
+* configure your shell to be able to call a C compiler from the command line. This can be done by calling `vcvarsall.bat x64`, which you can find in `C:\Program Files\Microsoft Visual Studio\[YEAR]\Community\VC\Auxiliary\Build`, or something similar. 
 * navigate to the src directory
-* open `build.bat` and uncomment the two lines to compile miniaudio to a static library
+* open `build.bat` and uncomment the two lines to compile miniaudio to a static library (by removing the REM command from the statements), as follows:
+```
+REM compile miniaudio to static library
+cl %CFLAGS% -c ..\src\miniaudio_impl.c
+lib -OUT:miniaudio.lib miniaudio_impl.obj
+```
 * run `build` to build the native host application and the dynamic library plugin. These will be located in a new directory called `build` (with names `main.exe` and `plugin.dll`)
   * recomment the two lines in `build.bat` for subsequent builds
 * run `build_juce` to build the vst3 plugin with JUCE
@@ -55,6 +68,12 @@
   * (NOTE: this may no longer be necessary) append your local build directory path to `DYLD_LIBRARY_PATH` (mac) or `LD_LIBRARY_PATH` (linux)
   * recomment those two lines in `build.sh` for subsequent builds
 * run `./build_juce.sh` to build the vst3 plugin with JUCE and install it
+
+## RUN
+Test the installation for the application and for the VST plugin.
+
+* To run the application find the executable within the build directory. The file names are `main.exe` for Windows and `test` for Linux.
+* To test the VST3 plugin, find the `Granular Synth Test.vst3` file, and import it in your DAW.
 
 ## Issues
 
