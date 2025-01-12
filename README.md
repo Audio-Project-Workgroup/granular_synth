@@ -25,15 +25,16 @@
 
 ## Building
 
-### Windows 
-
 * clone the repo with `git clone https://github.com/Audio-Project-Workgroup/granular_synth`
 * download the `JUCE` submodule with:
 ```
 cd granular-synth
 git submodule update --init --recursive
 ``` 
-This places the `https://github.com/juce-framework/JUCE` repository within `src/JUCE`.
+This places the `https://github.com/juce-framework/JUCE` repository within `src/JUCE` directory.
+
+### Windows 
+
 * from your downloaded GLFW folder, copy the `GLFW` folder to `src\include`, and from the `lib-vc[YEAR]` folder (corresponding to your version of Visual Studio), copy `glfw3_mt.lib` and `glfw3.lib` to `src\libs`
 * configure your shell to be able to call a C compiler from the command line. This can be done by calling `vcvarsall.bat x64`, which you can find in `C:\Program Files\Microsoft Visual Studio\[YEAR]\Community\VC\Auxiliary\Build`, or something similar. 
 * navigate to the src directory
@@ -62,10 +63,10 @@ lib -OUT:miniaudio.lib miniaudio_impl.obj
 * run `./build_juce.sh` to build the vst3 plugin with JUCE and install it
 
 ## RUN
-* Test the installation by running the application executable from within the build directory.
- - main.exe # for Windows
- - test # for Linux
-* Test the VST3 plugin by importing the vst3 file wihin your DAW.
+Test the installation for the application and for the VST plugin.
+
+* To run the application find the executable within the build directory. The file names are `main.exe` for Windows and `test` for Linux.
+* To test the VST3 plugin, find the `Granular Synth Test.vst3` file, and import it in your DAW.
 
 ## Issues
 
