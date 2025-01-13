@@ -237,7 +237,7 @@ AUDIO_PROCESS(audioProcess)
       if(loadedSound->isPlaying)
 	{
 	  loadedSoundSamples[0] = loadedSound->sound.samples[0] + loadedSound->samplesPlayed;
-	  loadedSoundSamples[1] = loadedSound->sound.samples[1] + loadedSound->samplesPlayed;
+	  loadedSoundSamples[1] = loadedSound->sound.samples[loadedSound->sound.channelCount - 1] + loadedSound->samplesPlayed;
 	}
 
       // TODO: there's too much code that's identical in the two switch cases

@@ -27,10 +27,19 @@ juce_add_plugin(${PROJECT_NAME}
 	PRODUCT_NAME "Granular Synth Test")
 
 get_filename_component(BASE_DIR ${CMAKE_SOURCE_DIR} DIRECTORY)
-set(BUILD_DIR ${BASE_DIR}/build)
+set(BUILD_DIR ${BASE_DIR}/build/)
+if(WIN32)
+	string(REPLACE "/" "\\\\" BUILD_DIR_NATIVE "${BUILD_DIR}")
+else()
+	set(BUILD_DIR_NATIVE ${BUILD_DIR})
+endif()
+message("${BUILD_DIR}")
+message("${BUILD_DIR_NATIVE}")
+
 target_compile_definitions(${PROJECT_NAME}
 	PRIVATE
-	"BUILD_DIR=\"${BUILD_DIR}\"")
+	"BUILD_DIR=\"${BUILD_DIR}\""
+	"BUILD_DIR_NATIVE=\"${BUILD_DIR_NATIVE}\"")
 
 target_sources(${PROJECT_NAME}
 	PRIVATE

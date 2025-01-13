@@ -16,6 +16,26 @@
 
 #define ROUND_UP_TO_MULTIPLE_OF_2(num) (((num) + 1) & (~1))
 
+static inline u32
+smallestNotInSortedArray(u32 *array, u32 length)
+{
+  u32 result = array[0];
+  for(u32 i = 1; i < length; ++i)
+    {
+      u32 val = array[i];
+      if(result == val)
+	{
+	  ++result;
+	}
+      else
+	{
+	  break;
+	}
+    }
+
+  return(result);
+}
+
 static inline void
 separateExtensionAndFilepath(char *filepath, char *resultPath, char *resultExtension)
 {

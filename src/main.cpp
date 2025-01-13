@@ -131,7 +131,7 @@ main(int argc, char **argv)
 	  commands.indices = (u32 *)calloc(commands.indexCapacity, sizeof(u32));	  
 
 	  // plugin setup
-	  
+	  /*
 #ifdef _WIN32
 	  char *pluginName = "../build/plugin.dll";
 #elif  __APPLE__
@@ -139,7 +139,8 @@ main(int argc, char **argv)
 #else
 	  char *pluginName = "../build/plugin.so";
 #endif	  
-	  //PluginCode plugin = loadPluginCode(pluginName);
+	  PluginCode plugin = loadPluginCode(pluginName);
+	  */
 	  PluginCode plugin = loadPluginCode(PLUGIN_PATH);
 
 	  // audio setup
@@ -188,13 +189,13 @@ main(int argc, char **argv)
 		    {
 		      // reload plugin
 		      
-		      u64 newWriteTime = getLastWriteTimeU64(pluginName);
+		      u64 newWriteTime = getLastWriteTimeU64(PLUGIN_PATH);
 		      if(newWriteTime != plugin.lastWriteTime)
 			{
 			  unloadPluginCode(&plugin);
 			  for(u32 tryIndex = 0; !plugin.isValid && (tryIndex < 10); ++tryIndex)
 			    {
-			      plugin = loadPluginCode(pluginName);
+			      plugin = loadPluginCode(PLUGIN_PATH);
 			      msecWait(5);
 			    }			  
 			}		      

@@ -1,3 +1,5 @@
+#include "sort.h"
+
 #define RIFF_CODE(a, b, c, d) (((u32)(a) << 0) | ((u32)(b) << 8) | ((u32)(c) << 16) | ((u32)(d) << 24))
 enum
 {
@@ -129,17 +131,61 @@ loadWav(char *filename, Arena *allocator)
 	  result.samples[0] = sampleData;
 	  result.samples[1] = sampleData + sampleCount;
 
-	  // TODO: wav files have interleaved sample data. For processing, we want separate arrays
-	  // for each channel. The right channel on my headphones is blown out and I can't test any
-	  // de-interleaving code, so we are loading sounds dual-mono for now -Ry
+	  // TODO: de-interleave stereo samples properly
+#if 1
 	  for(u32 sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex)
 	    {
 	      s16 source = sampleData[2*sampleIndex];
-	      sampleData[2*sampleIndex] = sampleData[sampleIndex];
+	      sampleData[2*sampleIndex] = sampleData[sampleIndex];	      
 	      sampleData[sampleIndex] = source;	      
 	    }
-	  
+
 	  result.channelCount = 1; 
+#else	  
+	  Arena scratchMemory = arenaSubArena(allocator, 2*(sampleCount - 1)*sizeof(u32));	  
+	  	  
+	  u32 m = 2*sampleCount - 1;
+	  u32 totalCycleCount = 0;
+	  u32 cycleBegin = 1;	  
+	  for(;;)
+	    {
+	      // find indices of cycle
+	      u32 *cycleBase = (u32 *)(scratchMemory.base + scratchMemory.used);
+	      u32 cycleCount = 0;
+	      u32 cycleNext = cycleBegin;	      
+	      do {
+		++cycleCount;
+		u32 *indexPtr = arenaPushStruct(&scratchMemory, u32);
+		*indexPtr = cycleNext;
+		
+	        cycleNext = 2*cycleNext % (2*sampleCount - 1);		
+	      } while(cycleNext != cycleBegin);
+
+	      // do the permutation
+	      for(u32 i = 1; i < cycleCount; ++i)
+		{
+		  u32 index = *(cycleBase + i);
+		  
+		  u32 temp = sampleData[cycleBegin];
+		  sampleData[cycleBegin] = sampleData[index];
+		  sampleData[index] = temp;
+		}
+
+	      // find next starting point
+	      totalCycleCount += cycleCount;
+	      if(totalCycleCount == (m - 1))
+		{
+		  break;
+		}
+	      else
+		{
+		  u32 *indices = (u32 *)scratchMemory.base;
+		  bubbleSort(indices, totalCycleCount);//, allocator);
+		  cycleBegin = smallestNotInSortedArray(indices, totalCycleCount);
+		}
+	    }
+	  arenaEndArena(allocator, scratchMemory);
+#endif	 	 
 	}
       else
 	{

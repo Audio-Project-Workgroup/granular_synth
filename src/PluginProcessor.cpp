@@ -15,7 +15,7 @@ PLATFORM_READ_ENTIRE_FILE(juceReadEntireFile)
   juce::String fileDirectory = "~/Documents/C/GLFW_miniaudio_JUCE_test/data/";
 #endif
   */
-  juce::String filepath = juce::String(BUILD_DIR) + juce::String("/") + juce::String(filename);
+  juce::String filepath = juce::String(BUILD_DIR) + juce::String(filename);
   juce::File file(filepath);  
   if(file.existsAsFile())
     {
@@ -160,32 +160,31 @@ void
 AudioPluginAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
   juce::Logger::writeToLog("prepareToPlay called");
-  juce::Logger::writeToLog(BUILD_DIR);
 
   pluginMemory = {};
   pluginMemory.memory = calloc(MEGABYTES(512), 1);
   pluginMemory.platformAPI.readEntireFile = juceReadEntireFile;  
 
-  // TODO: you probably have to tell your shell to search for dynamic libaries in
-  //       [your_local_project_directory]/build. We shouldn't require end-users to do that.
-  juce::String pluginDirectory = "C:\\Users\\finnc\\programming\\granular_synth\\build\\";
+  // TODO: maybe do this branching in CMakeLists.txt?
 #ifdef _WIN32
-  juce::String pluginFilename = pluginDirectory + "plugin.dll";
+  juce::String pluginFilename = "plugin.dll";
 #elif __APPLE__
-  juce::String pluginFilename = juce::String(BUILD_DIR) + juce::String("/plugin.dylib");
-  juce::Logger::writeToLog(pluginFilename);
+ juce::String pluginFilename = "plugin.dylib";
   //juce::Logger::writeToLog(std::getenv("LD_LIBRARY_PATH"));
   //juce::Logger::writeToLog(std::getenv("DYLD_LIBRARY_PATH"));
   //juce::Logger::writeToLog(std::getenv("DYLD_FALLBACK_LIBRARY_PATH"));
 #else
   juce::String pluginFilename = "plugin.so";
 #endif
+  juce::String buildDir = BUILD_DIR_NATIVE;//pluginDirectory;//
+  juce::String pluginPath = buildDir + pluginFilename;
+  juce::Logger::writeToLog(pluginPath);  
 
   // NOTE: JUCE's platform-independent DynamicLibrary abstraction doesn't provide an interface
   //       for getting error messages. If they haven't implemented that after 20 years, it must
   //       be really hard, right?
   pluginCode = {};
-  if(libPlugin.open(pluginFilename))
+  if(libPlugin.open(pluginPath))
     {
       pluginCode.renderNewFrame = (RenderNewFrame *)libPlugin.getFunction("renderNewFrame");
       if(!pluginCode.renderNewFrame)

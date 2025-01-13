@@ -78,5 +78,5 @@ Test the installation for the application and for the VST plugin.
 ## Issues
 
 * vst3 installation must be done manually on windows
-* the wav loader produces the right channel incorrectly
+* double-free bug when closing vst plugin
 * (NOTE: probably fixed) loading the dynamic library plugin requires modifying shell environment variables on mac and linux (and requires a local path on windows)
