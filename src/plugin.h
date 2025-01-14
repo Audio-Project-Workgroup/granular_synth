@@ -1,4 +1,5 @@
 #include "file_formats.h"
+#include "plugin_render.h"
 
 struct PlayingSound
 {  
@@ -12,7 +13,7 @@ struct PluginState
   Arena permanentArena;
   Arena frameArena;
   
-  r32 phasor;
+  r64 phasor;
   r32 freq;
   r32 volume;
 
@@ -24,6 +25,7 @@ struct PluginState
   //usz wavDataSize;
   //u8 *wavData;
   PlayingSound loadedSound;
+  LoadedBitmap testBitmap;
 
   bool initialized;
 };

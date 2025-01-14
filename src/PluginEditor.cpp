@@ -19,10 +19,13 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
   glContext.attachTo(*this);
 
   commands = {};
-  commands.vertexCapacity = 512;
-  commands.indexCapacity = 1024;
-  commands.vertices = (Vertex *)calloc(commands.vertexCapacity, sizeof(Vertex));
-  commands.indices = (u32 *)calloc(commands.indexCapacity, sizeof(u32));
+  commands.generateNewTextures = true;
+
+  //commands = {};
+  //commands.vertexCapacity = 512;
+  //commands.indexCapacity = 1024;
+  //commands.vertices = (Vertex *)calloc(commands.vertexCapacity, sizeof(Vertex));
+  //commands.indices = (u32 *)calloc(commands.indexCapacity, sizeof(u32));
 
   pluginInput[0] = {};
   pluginInput[1] = {};
@@ -33,8 +36,8 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
 AudioPluginAudioProcessorEditor::~AudioPluginAudioProcessorEditor()
 {
   glContext.detach();
-  free(commands.vertices);
-  free(commands.indices);
+  //free(commands.vertices);
+  //free(commands.indices);
 }
 
 //==============================================================================

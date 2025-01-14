@@ -22,7 +22,7 @@ arenaBegin(void *memory, usz capacity)
 static inline u8 *
 arenaPushSize_(Arena *arena, usz size)
 {
-  ASSERT(size + arena->used <= arena->capacity);
+  ASSERT(size + arena->used <=  arena->capacity);
   u8 *result = arena->base + arena->used;
   arena->used += size;
 

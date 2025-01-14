@@ -6,6 +6,8 @@
 #include "arena.h"
 #include "render.h"
 
+// files
+
 struct ReadFileResult
 {
   usz contentsSize;
@@ -15,12 +17,18 @@ struct ReadFileResult
 #define PLATFORM_READ_ENTIRE_FILE(name) ReadFileResult (name)(char *filename, Arena *allocator)
 typedef PLATFORM_READ_ENTIRE_FILE(PlatformReadEntireFile);
 
+#define PLATFORM_FREE_FILE_MEMORY(name) void (name)(ReadFileResult file)
+typedef PLATFORM_FREE_FILE_MEMORY(PlatformFreeFileMemory);
+
 struct PlatformAPI
 {
   PlatformReadEntireFile *readEntireFile;
+  PlatformFreeFileMemory *freeFileMemory;
 };
 
 extern PlatformAPI platform;
+
+// input
 
 struct PluginMemory
 {
@@ -76,8 +84,12 @@ struct PluginFileOperations
   bool operationCompleted;
 };
 
+// video
+
 #define RENDER_NEW_FRAME(name) void (name)(PluginMemory *memory, PluginInput *input, RenderCommands *renderCommands)
 typedef RENDER_NEW_FRAME(RenderNewFrame);
+
+// audio
 
 enum AudioFormat
 {

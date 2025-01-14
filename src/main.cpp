@@ -13,16 +13,57 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "common.h"
-#include "platform.h"
-
 #include <GLFW/glfw3.h>
+
+#define GL_PRINT_ERROR(msg, ...) do {		\
+    GLenum err = glGetError();			\
+    if(err) {					\
+      fprintf(stderr, msg, err, ##__VA_ARGS__);	\
+    }						\
+  } while(0)
+
 //#define MINIAUDIO_IMPLEMENTATION
 #include "miniaudio.h"
 
+#include "common.h"
+#include "platform.h"
 #include "render.cpp"
 
 static PluginInput *newInput;
+
+static const char *vertexShaderSource = R"HERE(
+#version 330 core
+
+layout(location = 0) in vec2 vPos;
+layout(location = 1) in vec2 uvIn;
+layout(location = 2) in vec4 color;
+
+out vec2 uvFrag;
+out vec4 colorFrag;
+
+void main()
+{
+  gl_Position = vec4(vPos, 0, 0);
+  uvFrag = uvIn;
+}
+)HERE";
+
+static const char *fragmentShaderSource = R"HERE(
+#version 330 core
+
+in vec2 uvFrag;
+in vec4 colorFrag;
+
+uniform sampler2D texSampler;
+
+out vec4 colorOut;
+
+void main()
+{
+  vec4 texColor = texture(texSampler, uvFrag);
+  colorOut = colorFrag * texColor;
+}
+)HERE";
 
 static inline void
 glfwProcessButtonPress(ButtonState *newState, bool pressed)
@@ -102,7 +143,12 @@ main(int argc, char **argv)
   int result = 0;
   
   if(glfwInit())
-    {      
+    {
+      //glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+      //glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+      //glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+      //glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
       GLFWwindow *window = glfwCreateWindow(640, 480, "glfw_miniaudio", NULL, NULL);
       if(window)	
 	{
@@ -117,7 +163,9 @@ main(int argc, char **argv)
 	  glfwMakeContextCurrent(window);
 
 	  glfwSwapInterval(1);
-
+	  glEnable(GL_TEXTURE_2D);
+	  GL_PRINT_ERROR("GL ERROR %u: enable texture 2D failed at startup:\n");
+	  
 	  // memory/grahics setup
 
 	  PluginMemory pluginMemory = {};
@@ -125,10 +173,36 @@ main(int argc, char **argv)
 	  pluginMemory.platformAPI.readEntireFile = platformReadEntireFile;
 
 	  RenderCommands commands = {};
+#if 0
+	  RenderCommands commands = {};
 	  commands.vertexCapacity = 512;
 	  commands.indexCapacity = 1024;
 	  commands.vertices = (Vertex *)calloc(commands.vertexCapacity, sizeof(Vertex));
-	  commands.indices = (u32 *)calloc(commands.indexCapacity, sizeof(u32));	  
+	  commands.indices = (u32 *)calloc(commands.indexCapacity, sizeof(u32));
+
+	  GLState glState = {};
+	  glGenVertexArrays(1, &glState.vaoID);
+	  glBindVertexArray(glState.vaoID);
+	  
+	  glGenBuffers(1, &glState.vboID);	    
+	  glGenBuffers(1, &glState.eboID);
+
+	  glState.vertexShaderID = glCreateShader(GL_VERTEX_SHADER);
+	  glState.fragmentShaderID = glCreateShader(GL_FRAGMENT_SHADER);
+
+	  glShaderSource(glState.vertexShaderID, 1, &vertexShaderSource, NULL);
+	  glCompileShader(glState.vertexShaderID);
+	  
+	  glShaderSource(glState.fragmentShaderID, 1, &fragmentShaderSource, NULL);
+	  glCompileShader(glState.fragmentShaderID);
+
+	  glState.programID = glCreateProgram();
+	  glAttachShader(glState.programID, glState.vertexShaderID);
+	  glAttachShader(glState.programID, glState.fragmentShaderID);
+	  glLinkProgram(glState.programID);
+
+	  glState.samplerID = glGetUniformLocation(glState.ProgramID, "texSampler");
+#endif
 
 	  // plugin setup
 	  /*
@@ -223,8 +297,17 @@ main(int argc, char **argv)
 		      glfwGetFramebufferSize(window, &width, &height);
 		      glViewport(0, 0, width, height);
 
+		      GL_PRINT_ERROR("GL ERROR: %u at frame start\n");
+		      /*
+		      GLenum error = glGetError();
+		      if(error)
+			{
+			  fprintf(stderr, "GL ERROR: %u at frame start\n", error);
+			}
+		      */
+
 		      glClearColor(0.2f, 0.2f, 0.2f, 0.f);
-		      glClear(GL_COLOR_BUFFER_BIT);
+		      glClear(GL_COLOR_BUFFER_BIT);		      
 
 		      if(plugin.renderNewFrame)
 			{

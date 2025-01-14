@@ -72,6 +72,8 @@ initializePluginState(PluginMemory *memoryBlock)
 	  pluginState->loadedSound.samplesPlayed = 0;
 	  pluginState->loadedSound.isPlaying = false;
 
+	  pluginState->testBitmap = loadBitmap("../data/signal_z.bmp", &pluginState->permanentArena);
+
 	  pluginState->initialized = true;
 	}
     }
@@ -81,11 +83,12 @@ initializePluginState(PluginMemory *memoryBlock)
 
 extern "C"
 RENDER_NEW_FRAME(renderNewFrame)
-{
+{ 
   PluginState *pluginState = initializePluginState(memory);
   if(pluginState)
     {
-      //renderCommands->arena = &pluginState->frameArena;      
+      //renderCommands->arena = &pluginState->frameArena;
+      renderBeginCommands(renderCommands, &pluginState->frameArena);
 
       pluginState->mouseP.x = (r32)input->mousePositionX;
       pluginState->mouseP.y = (r32)input->mousePositionY;
@@ -114,7 +117,10 @@ RENDER_NEW_FRAME(renderNewFrame)
       
       v4 defaultColor = V4(1, 1, 1, 1);
       v4 hoverColor = V4(1, 1, 0, 1);
-      v4 activeColor = V4(0.8, 0.8, 0, 1);
+      v4 activeColor = V4(0.8f, 0.8f, 0, 1);
+
+      //renderPushBitmap(&renderCommands, &pluginState->testBitmap, rectCenterDim(V2(0, 0), V2(0.5f, 0.5f)));
+      renderPushQuad(renderCommands, rectCenterDim(V2(0, 0), V2(0.5f, 0.5f)), &pluginState->testBitmap);
 
       v2 playButtonDim = V2(0.1f, 0.1f);
       Rect2 playButton = rectCenterDim(V2(0.5f, 0.5f), playButtonDim);
@@ -133,9 +139,15 @@ RENDER_NEW_FRAME(renderNewFrame)
 	      playColor = hoverColor;
 	    }
 	}
+      Vertex playVertex1 = makeVertex(playButton.min + V2(0.2f*playButtonDim.x, 0.2f*playButtonDim.y), V2(0, 0), playColor);
+      Vertex playVertex2 = makeVertex(playButton.min + V2(0.2f*playButtonDim.x, 0.8f*playButtonDim.y), V2(0, 0), playColor);
+      Vertex playVertex3 = makeVertex(playButton.min + V2(0.8f*playButtonDim.x, 0.5f*playButtonDim.y), V2(0, 0), playColor);
+      renderPushTriangle(renderCommands, playVertex1, playVertex2, playVertex3);
+      /*
       renderPushVertex(renderCommands, playButton.min + V2(0.2f*playButtonDim.x, 0.2f*playButtonDim.y), V2(0, 0), playColor);
       renderPushVertex(renderCommands, playButton.min + V2(0.2f*playButtonDim.x, 0.8f*playButtonDim.y), V2(0, 0), playColor);
       renderPushVertex(renderCommands, playButton.min + V2(0.8f*playButtonDim.x, 0.5f*playButtonDim.y), V2(0, 0), playColor);
+      */
 
       v2 faderBarCenter = V2(-0.8f, 0);
       v2 faderBarDim = V2(0.02f, 1.5f);
@@ -160,7 +172,8 @@ RENDER_NEW_FRAME(renderNewFrame)
       renderPushQuad(renderCommands, fader, faderColor);
 
       pluginState->lastMouseP = pluginState->mouseP;
-    }
+      arenaEnd(&pluginState->frameArena);
+    }  
 }
 
 enum MidiStatus : u32
@@ -230,7 +243,7 @@ AUDIO_PROCESS(audioProcess)
 	  --audioBuffer->midiMessageCount;
 	}
 
-      r32 nFreq = M_TAU*pluginState->freq/(r32)audioBuffer->sampleRate;
+      r64 nFreq = M_TAU*pluginState->freq/(r64)audioBuffer->sampleRate;
 
       PlayingSound *loadedSound = &pluginState->loadedSound;
       s16 *loadedSoundSamples[2] = {};
@@ -251,7 +264,7 @@ AUDIO_PROCESS(audioProcess)
 		pluginState->phasor += nFreq;
 		if(pluginState->phasor > M_TAU) pluginState->phasor -= M_TAU;
 				  
-		r32 sinVal = pluginState->volume*sinf(pluginState->phasor);
+		r32 sinVal = pluginState->volume*sin(pluginState->phasor);
 		for(u32 j = 0; j < audioBuffer->channels; ++j)
 		  {
 		    r32 mixedVal = 0.5f*sinVal;
@@ -282,7 +295,7 @@ AUDIO_PROCESS(audioProcess)
 		pluginState->phasor += nFreq;
 		if(pluginState->phasor > M_TAU) pluginState->phasor -= M_TAU;
 				  
-		r32 sinVal = 32000.f*pluginState->volume*sinf(pluginState->phasor);
+		r32 sinVal = 32000.f*pluginState->volume*sin(pluginState->phasor);
 		for(u32 j = 0; j < audioBuffer->channels; ++j)
 		  {
 		    r32 mixedVal = 0.5f*sinVal;

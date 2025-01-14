@@ -38,6 +38,30 @@ struct WavFormat
   u8 subFormat[16];
 };
 
+struct BitmapHeader
+{
+  u16 signature;
+  u32 fileSize;
+  u32 reserved;
+  u32 dataOffset;
+
+  u32 headerSize;
+  u32 width;
+  u32 height;
+  u16 planes;
+  u16 bitsPerPixel;
+  u32 compression;
+  u32 imageSize;
+  u32 xPixelsPerM;
+  u32 yPixelsPerM;
+  u32 colorsUsed;
+  u32 colorsImportant;
+
+  u32 redMask;
+  u32 greenMask;
+  u32 blueMask;
+};
+
 #pragma pack(pop)
 
 struct RiffIterator
@@ -63,14 +87,6 @@ nextChunk(RiffIterator it)
 
   return(it);
 }
-
-struct LoadedSound
-{
-  u32 sampleCount;
-  u32 channelCount;
-  
-  s16 *samples[2]; // TODO: support other formats
-};
 
 static inline LoadedSound
 loadWav(char *filename, Arena *allocator)
@@ -193,6 +209,61 @@ loadWav(char *filename, Arena *allocator)
 	}
 
       result.sampleCount = sampleCount;
+    }
+
+  return(result);
+}
+
+static inline LoadedBitmap
+loadBitmap(char *filename, Arena *allocator)
+{
+  LoadedBitmap result = {};
+
+  ReadFileResult readResult = platform.readEntireFile(filename, allocator);
+  if(readResult.contents)
+    {
+      BitmapHeader *header = (BitmapHeader *)readResult.contents;
+      ASSERT(header->signature == (u16)RIFF_CODE('B', 'M', ' ', ' '));
+      ASSERT(header->fileSize == readResult.contentsSize - 1);
+      result.pixels = (u32 *)(readResult.contents + header->dataOffset);
+      result.width = header->width;
+      result.height = header->height;
+      u16 bytesPerPixel = header->bitsPerPixel / 8;
+      ASSERT(bytesPerPixel == 4);
+      u32 compression = header->compression;
+      ASSERT(header->imageSize == bytesPerPixel*result.width*result.height);
+
+      u32 redMask = header->redMask;
+      u32 greenMask = header->greenMask;
+      u32 blueMask = header->blueMask;
+      u32 alphaMask = ~(redMask | greenMask | blueMask);
+
+      u32 alphaShiftDown = alphaMask ? lowestOrderBit(alphaMask) : 24;
+      u32 redShiftDown = redMask ? lowestOrderBit(redMask) : 16;
+      u32 greenShiftDown = greenMask ? lowestOrderBit(greenMask) : 8;
+      u32 blueShiftDown = blueMask ? lowestOrderBit(blueMask) : 0;
+
+      u32 *sourceDest = result.pixels;
+      for(u32 y = 0; y < result.height; ++y)
+	{
+	  for(u32 x = 0; x < result.width; ++x)
+	    {
+	      u32 c = *sourceDest;
+	      u32 red = (c & redMask) >> redShiftDown;
+	      u32 green = (c & greenMask) >> greenShiftDown;
+	      u32 blue = (c & blueMask) >> blueShiftDown;
+	      u32 alpha = (c & alphaMask) >> alphaShiftDown;
+
+	      // NOTE: texture format is argb
+	      // TODO: premultiplied alpha, gamma-correctness
+	      *sourceDest++ = ((alpha << 24) |
+			       (red << 16) |
+			       (green << 8) |
+			       (blue << 0));
+	    }
+	}
+
+      result.stride = result.width*bytesPerPixel;      
     }
 
   return(result);

@@ -17,6 +17,20 @@
 #define ROUND_UP_TO_MULTIPLE_OF_2(num) (((num) + 1) & (~1))
 
 static inline u32
+lowestOrderBit(u32 num)
+{
+  u32 result = 0;  
+  u32 lowestBit = num & -num;
+  while(lowestBit > 1)
+    {
+      lowestBit >>= 1;
+      ++result;
+    }
+
+  return(result);
+}
+
+static inline u32
 smallestNotInSortedArray(u32 *array, u32 length)
 {
   u32 result = array[0];
