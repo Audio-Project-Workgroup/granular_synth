@@ -42,7 +42,7 @@
 #include "common.h"
 #include "plugin.h"
 
-PlatformAPI platform;
+PlatformAPI globalPlatform;
 
 static PluginState *
 initializePluginState(PluginMemory *memoryBlock)
@@ -54,10 +54,11 @@ initializePluginState(PluginMemory *memoryBlock)
       pluginState = (PluginState *)memory;
       if(!pluginState->initialized)
 	{
-	  platform = memoryBlock->platformAPI;
+	  globalPlatform = memoryBlock->platformAPI;
 
 	  pluginState->permanentArena = arenaBegin((u8 *)memory + sizeof(PluginState), MEGABYTES(256));
 	  pluginState->frameArena = arenaSubArena(&pluginState->permanentArena, MEGABYTES(2));
+	  pluginState->loadArena = arenaSubArena(&pluginState->permanentArena, MEGABYTES(32));
       
 	  pluginState->phasor = 0.f;
 	  pluginState->freq = 440.f;
@@ -73,6 +74,10 @@ initializePluginState(PluginMemory *memoryBlock)
 	  pluginState->loadedSound.isPlaying = false;
 
 	  pluginState->testBitmap = loadBitmap("../data/signal_z.bmp", &pluginState->permanentArena);
+
+	  RangeU32 characterRange = {32, 127}; // NOTE: from SPACE up to (but not including) DEL
+	  pluginState->testFont = loadFont("../data/arial.ttf", &pluginState->loadArena,
+					   &pluginState->permanentArena, characterRange, 32.f);
 
 	  pluginState->initialized = true;
 	}
@@ -119,7 +124,21 @@ RENDER_NEW_FRAME(renderNewFrame)
       v4 hoverColor = V4(1, 1, 0, 1);
       v4 activeColor = V4(0.8f, 0.8f, 0, 1);
 
-      //renderPushBitmap(&renderCommands, &pluginState->testBitmap, rectCenterDim(V2(0, 0), V2(0.5f, 0.5f)));
+      //u32 windowWidth = renderCommands->widthInPixels;
+      //u32 windowHeight = renderCommands->heightInPixels;
+      LoadedFont *font = &pluginState->testFont;
+
+      v2 textOutAt = V2(-1, 1);
+      textOutAt = renderPushText(renderCommands, font, "", textOutAt);
+
+      char *message = "I Will Become a Granular Synthesizer!";
+      //Rectangle2 messageRect = getTextRectangle(font, message, windowWidth, windowHeight);
+      //renderPushRectOutline(renderCommands, messageRect, 0.01f, V4(1, 1, 0, 1));
+      TextArgs textArgs = {};
+      textArgs.flags |= (TextFlags_centered | TextFlags_scaleAspect);
+      textArgs.hScale = 0.5f;
+      textOutAt = renderPushText(renderCommands, font, message, textOutAt, textArgs);
+
       renderPushQuad(renderCommands, rectCenterDim(V2(0, 0), V2(0.5f, 0.5f)), &pluginState->testBitmap);
 
       v2 playButtonDim = V2(0.1f, 0.1f);

@@ -75,17 +75,38 @@ renderPushQuad(RenderCommands *commands, Rect2 rect, v4 color = V4(1, 1, 1, 1))
 static inline void // NOTE: textured
 renderPushQuad(RenderCommands *commands, Rect2 rect, LoadedBitmap *texture, v4 color = V4(1, 1, 1, 1))
 {
-  ASSERT(commands->quadCount < commands->quadCapacity);
-  TexturedQuad *quad = commands->quads + commands->quadCount++;
+  if(texture)
+    {
+      ASSERT(commands->quadCount < commands->quadCapacity);
+      TexturedQuad *quad = commands->quads + commands->quadCount++;
 
-  v2 bottomLeft = rect.min;
-  v2 dim = getDim(rect);
-  quad->vertices[0] = {bottomLeft, V2(0, 0), color};
-  quad->vertices[1] = {bottomLeft + V2(dim.x, 0), V2(1, 0), color};
-  quad->vertices[2] = {bottomLeft + V2(0, dim.y), V2(0, 1), color};
-  quad->vertices[3] = {bottomLeft + dim, V2(1, 1), color};
+      v2 dim = getDim(rect);
+      v2 bottomLeft = rect.min - V2(texture->alignPercentage.x*dim.x, texture->alignPercentage.y*dim.y);      
+      quad->vertices[0] = {bottomLeft, V2(0, 0), color};
+      quad->vertices[1] = {bottomLeft + V2(dim.x, 0), V2(1, 0), color};
+      quad->vertices[2] = {bottomLeft + V2(0, dim.y), V2(0, 1), color};
+      quad->vertices[3] = {bottomLeft + dim, V2(1, 1), color};
   
-  quad->texture = texture;
+      quad->texture = texture;
+    }
+}
+
+static inline void
+renderPushRectOutline(RenderCommands *commands, Rect2 rect, r32 thickness, v4 color = V4(1, 1, 1, 1))
+{ 
+  v2 rectDim = getDim(rect);
+  v2 vDim = V2(thickness, rectDim.y);
+  v2 hDim = V2(rectDim.x, thickness);
+
+  v2 leftMiddle = rect.min + V2(0, 0.5f*rectDim.y);
+  v2 rightMiddle = rect.max - V2(0, 0.5f*rectDim.y);
+  v2 bottomMiddle = rect.min + V2(0.5f*rectDim.x, 0);
+  v2 topMiddle = rect.max - V2(0.5f*rectDim.y, 0);
+  
+  renderPushQuad(commands, rectCenterDim(leftMiddle, vDim), color);
+  renderPushQuad(commands, rectCenterDim(rightMiddle, vDim), color);
+  renderPushQuad(commands, rectCenterDim(bottomMiddle, hDim), color);
+  renderPushQuad(commands, rectCenterDim(topMiddle, hDim), color);
 }
 
 static inline void
@@ -99,6 +120,68 @@ renderPushTriangle(RenderCommands *commands, Vertex v1, Vertex v2, Vertex v3, Lo
   triangle->vertices[2] = v3;
 
   triangle->texture = texture;
+}
+
+static inline v2
+renderPushText(RenderCommands *commands, LoadedFont *font, char *string, v2 startPos,
+	       TextArgs textArgs = defaultTextArgs(), v4 color = V4(1, 1, 1, 1))
+{
+  // TODO: maybe make opengl do this transformation
+  v2 pixelsToRenderCoords;
+  if(commands->widthInPixels && commands->heightInPixels)
+    {
+      pixelsToRenderCoords = V2(2.f/(r32)commands->widthInPixels, 2.f/(r32)commands->heightInPixels);
+    }
+  else
+    {
+      pixelsToRenderCoords = V2(0.003f, 0.004f); // NOTE: in the absence of information, resort to dead reckoning
+    }
+
+  v2 textScale = pixelsToRenderCoords;
+  v2 textDimPixels = getTextDim(font, string);
+  v2 textDim = hadamard(textScale, textDimPixels);
+  if(textArgs.flags & TextFlags_scaleAspect)
+    {
+      if(textArgs.hScale)
+	{
+	  textScale *= 2.f*textArgs.hScale/textDim.x;
+	}
+      else if(textArgs.vScale)
+	{
+	  textScale *= 2.f*textArgs.vScale/textDim.y;
+	}
+      else
+	{
+	  fprintf(stderr, "ERROR: expected scale value in textArgs\n");
+	}
+
+      textDim = hadamard(textScale, textDimPixels);
+    }
+
+  v2 atPos = startPos;
+  if(textArgs.flags & TextFlags_centered)
+    {
+      r32 offset = startPos.x + 0.5f*textDim.x;
+      atPos.x -= offset;
+    }
+
+  char *at = string;  
+  while(*at)
+    {
+      char c = *at;
+      LoadedBitmap *glyph = getGlyphFromChar(font, c);
+
+      v2 glyphDim = V2(glyph->width, glyph->height);
+      v2 scaledGlyphDim = hadamard(textScale, glyphDim);
+      Rect2 glyphRect = rectMinDim(atPos, scaledGlyphDim);
+      renderPushQuad(commands, glyphRect, glyph, color);
+
+      ++at;
+      if(*at) atPos.x += textScale.x*getHorizontalAdvance(font, c, *at);
+    }
+
+  atPos.y -= textScale.y*font->verticalAdvance;
+  return(atPos);
 }
 
 #endif

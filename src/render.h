@@ -62,6 +62,9 @@ struct GLState
 
 struct RenderCommands
 {
+  u32 widthInPixels;
+  u32 heightInPixels;
+  
   Arena *allocator;
 
   u32 quadCount;

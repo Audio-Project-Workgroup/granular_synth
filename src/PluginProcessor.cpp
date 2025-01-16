@@ -62,6 +62,12 @@ PLATFORM_READ_ENTIRE_FILE(juceReadEntireFile)
   return(result);
 }
 
+PLATFORM_FREE_FILE_MEMORY(juceFreeFileMemory)
+{
+  arenaPopSize(allocator, file.contentsSize);
+}
+
+
 //==============================================================================
 AudioPluginAudioProcessor::AudioPluginAudioProcessor()
   : AudioProcessor(BusesProperties()
@@ -163,7 +169,8 @@ AudioPluginAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 
   pluginMemory = {};
   pluginMemory.memory = calloc(MEGABYTES(512), 1);
-  pluginMemory.platformAPI.readEntireFile = juceReadEntireFile;  
+  pluginMemory.platformAPI.readEntireFile = juceReadEntireFile;
+  pluginMemory.platformAPI.freeFileMemory = juceFreeFileMemory;
 
   // TODO: maybe do this branching in CMakeLists.txt?
 #ifdef _WIN32

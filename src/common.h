@@ -17,7 +17,7 @@ struct ReadFileResult
 #define PLATFORM_READ_ENTIRE_FILE(name) ReadFileResult (name)(char *filename, Arena *allocator)
 typedef PLATFORM_READ_ENTIRE_FILE(PlatformReadEntireFile);
 
-#define PLATFORM_FREE_FILE_MEMORY(name) void (name)(ReadFileResult file)
+#define PLATFORM_FREE_FILE_MEMORY(name) void (name)(ReadFileResult file, Arena *allocator)
 typedef PLATFORM_FREE_FILE_MEMORY(PlatformFreeFileMemory);
 
 struct PlatformAPI
@@ -26,7 +26,7 @@ struct PlatformAPI
   PlatformFreeFileMemory *freeFileMemory;
 };
 
-extern PlatformAPI platform;
+extern PlatformAPI globalPlatform;
 
 // input
 

@@ -164,15 +164,19 @@ main(int argc, char **argv)
 
 	  glfwSwapInterval(1);
 	  glEnable(GL_TEXTURE_2D);
-	  GL_PRINT_ERROR("GL ERROR %u: enable texture 2D failed at startup:\n");
+	  GL_PRINT_ERROR("GL ERROR %u: enable texture 2D failed at startup\n");
+	  glEnable(GL_BLEND);
+	  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	  GL_PRINT_ERROR("GL ERROR %u: enable alpha blending failed at startup\n");
 	  
 	  // memory/grahics setup
 
 	  PluginMemory pluginMemory = {};
 	  pluginMemory.memory = calloc(MEGABYTES(512), 1);
 	  pluginMemory.platformAPI.readEntireFile = platformReadEntireFile;
+	  pluginMemory.platformAPI.freeFileMemory = platformFreeFileMemory;
 
-	  RenderCommands commands = {};
+	  RenderCommands commands = {};	  
 #if 0
 	  RenderCommands commands = {};
 	  commands.vertexCapacity = 512;
@@ -283,8 +287,9 @@ main(int argc, char **argv)
 			    oldInput->mouseButtons[buttonIndex].endedDown;
 			}
 
+		      // TODO: what's the difference between window size and framebuffer size? do we need both?
 		      int windowWidth, windowHeight;
-		      glfwGetWindowSize(window, &windowWidth, &windowHeight);
+		      glfwGetWindowSize(window, &windowWidth, &windowHeight);		      
 
 		      double mouseX, mouseY;
 		      glfwGetCursorPos(window, &mouseX, &mouseY);
@@ -296,6 +301,8 @@ main(int argc, char **argv)
 		      int width, height;
 		      glfwGetFramebufferSize(window, &width, &height);
 		      glViewport(0, 0, width, height);
+		      commands.widthInPixels = width;
+		      commands.heightInPixels = height;
 
 		      GL_PRINT_ERROR("GL ERROR: %u at frame start\n");
 		      /*

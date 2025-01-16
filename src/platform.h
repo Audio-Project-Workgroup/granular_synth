@@ -342,3 +342,8 @@ PLATFORM_READ_ENTIRE_FILE(platformReadEntireFile)
 }
 
 #endif 
+
+PLATFORM_FREE_FILE_MEMORY(platformFreeFileMemory)
+{
+  arenaPopSize(allocator, file.contentsSize);
+}

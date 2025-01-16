@@ -97,6 +97,14 @@ operator/=(v2 &v, r32 a)
   return(v);
 }
 
+static inline v2
+hadamard(v2 v, v2 w)
+{
+  v2 result = V2(v.x*w.x, v.y*w.y);
+
+  return(result);
+}
+
 //
 // v3
 //

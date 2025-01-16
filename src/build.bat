@@ -1,6 +1,6 @@
 @echo off
 
-set CFLAGS=-I..\src\include -Zi -W4 -wd"4201" -wd"4100" -wd"4146" -wd"4310" -wd"4244" -MT -EHa- -GR-
+set CFLAGS=-I..\src\include -nologo -Zi -W4 -wd"4201" -wd"4100" -wd"4146" -wd"4310" -wd"4244" -MT -EHa- -GR-
 set LFLAGS=-incremental:no -opt:ref
 
 IF NOT EXIST ..\build mkdir ..\build

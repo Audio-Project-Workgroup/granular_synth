@@ -93,7 +93,7 @@ loadWav(char *filename, Arena *allocator)
 {
   LoadedSound result = {};
 
-  ReadFileResult readResult = platform.readEntireFile(filename, allocator);
+  ReadFileResult readResult = globalPlatform.readEntireFile(filename, allocator);
   if(readResult.contents)
     {
       WavHeader *header = (WavHeader *)readResult.contents;
@@ -219,7 +219,7 @@ loadBitmap(char *filename, Arena *allocator)
 {
   LoadedBitmap result = {};
 
-  ReadFileResult readResult = platform.readEntireFile(filename, allocator);
+  ReadFileResult readResult = globalPlatform.readEntireFile(filename, allocator);
   if(readResult.contents)
     {
       BitmapHeader *header = (BitmapHeader *)readResult.contents;
@@ -265,6 +265,116 @@ loadBitmap(char *filename, Arena *allocator)
 
       result.stride = result.width*bytesPerPixel;      
     }
+
+  return(result);
+}
+
+#define STB_TRUETYPE_IMPLEMENTATION
+#include "stb_truetype.h"
+
+static inline LoadedFont
+loadFont(char *filename, Arena *loadAllocator, Arena *permanentAllocator,
+	 RangeU32 characterRange, r32 scaleInPixels)
+{
+  LoadedFont result = {};
+
+  ReadFileResult readResult = globalPlatform.readEntireFile(filename, loadAllocator);
+  if(readResult.contents)
+    {
+      stbtt_fontinfo stbFontInfo;
+      if(stbtt_InitFont(&stbFontInfo, readResult.contents, stbtt_GetFontOffsetForIndex(readResult.contents, 0)))
+	{
+	  int ascent, descent, lineGap;
+	  stbtt_GetFontVMetrics(&stbFontInfo, &ascent, &descent, &lineGap);
+	 
+	  r32 fontScale = stbtt_ScaleForPixelHeight(&stbFontInfo, scaleInPixels);
+
+	  result.characterRange = characterRange;
+	  result.glyphCount = characterRange.max - characterRange.min;
+	  result.verticalAdvance = fontScale*(r32)(ascent - descent + lineGap);
+	  result.glyphs = arenaPushArray(permanentAllocator, result.glyphCount, LoadedBitmap);
+	  result.horizontalAdvance = arenaPushArray(permanentAllocator, result.glyphCount*result.glyphCount, r32);
+	  
+	  LoadedBitmap *glyphAt = result.glyphs;
+	  r32 *advanceAt = result.horizontalAdvance;
+	  for(u32 character = characterRange.min; character < characterRange.max; ++character, ++glyphAt)
+	    {
+	      int width, height, xOffset, yOffset;
+	      u8 *glyphSource =  stbtt_GetCodepointBitmap(&stbFontInfo, 0, fontScale, character,
+							  &width, &height, &xOffset, &yOffset);
+	      
+	      int advanceWidth, leftSideBearing;	      
+	      stbtt_GetCodepointHMetrics(&stbFontInfo, character, &advanceWidth, &leftSideBearing);
+	      
+	      for(u32 otherChar = characterRange.min; otherChar < characterRange.max; ++otherChar, ++advanceAt)
+		{
+		  if(otherChar == ' ')
+		    {
+		      *advanceAt = fontScale*(r32)advanceWidth - (r32)xOffset;
+		    }
+		  else
+		    {
+		      int kernAdvance = stbtt_GetCodepointKernAdvance(&stbFontInfo, character, otherChar);
+		      *advanceAt = fontScale*(r32)advanceWidth + (r32)kernAdvance;
+		    }
+		}
+	      
+	      if(glyphSource)
+		{
+		  glyphAt->width = width;
+		  glyphAt->height = height;
+		  glyphAt->stride = width*sizeof(u32);
+		  glyphAt->alignPercentage.x = 0;//width ? (r32)xOffset/(r32)width : 0;
+		  glyphAt->alignPercentage.y = height ? (r32)(height + yOffset)/(r32)height : 0;
+		  glyphAt->glHandle = 0;
+		  glyphAt->pixels = (width && height) ? arenaPushArray(permanentAllocator, glyphAt->height*glyphAt->width, u32) : 0; 
+
+		  // NOTE: stb bitmaps are top-down, but we want bottom-up
+		  u8 *src = glyphSource;
+		  u32 *destRow = glyphAt->pixels + glyphAt->width*(glyphAt->height - 1);
+		  for(int y = 0; y < height; ++y)
+		    {
+		      u32 *dest = destRow;
+		      for(int x = 0; x < width; ++x)
+			{
+			  u8 alpha = *src++;
+			  *dest++ = ((alpha << 24) |
+				     (alpha << 16) |
+				     (alpha <<  8) |
+				     (alpha <<  0));
+			}
+
+		      destRow -= glyphAt->width;
+		    }
+
+		  stbtt_FreeBitmap(glyphSource, 0);
+		}
+	    }
+	}
+
+      // TODO: need to think harder about how file memory is allocated and used
+      globalPlatform.freeFileMemory(readResult, loadAllocator);
+    }
+
+  return(result);
+}
+
+static inline LoadedBitmap *
+getGlyphFromChar(LoadedFont *font, char c)
+{
+  u32 glyphIndex = c - font->characterRange.min;
+  ASSERT(glyphIndex < font->glyphCount);
+  LoadedBitmap *glyph = font->glyphs + glyphIndex;
+
+  return(glyph);
+}
+
+static inline r32
+getHorizontalAdvance(LoadedFont *font, char current, char next)
+{
+  u32 currentGlyphIndex = current - font->characterRange.min;
+  u32 nextGlyphIndex = next - font->characterRange.min;
+  r32 result = font->horizontalAdvance[currentGlyphIndex*font->glyphCount + nextGlyphIndex];
 
   return(result);
 }

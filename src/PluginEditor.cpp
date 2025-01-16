@@ -20,6 +20,8 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
 
   commands = {};
   commands.generateNewTextures = true;
+  commands.widthInPixels = getWidth();
+  commands.heightInPixels = getHeight();
 
   //commands = {};
   //commands.vertexCapacity = 512;
@@ -56,7 +58,9 @@ AudioPluginAudioProcessorEditor::paint(juce::Graphics& g)
 
 void
 AudioPluginAudioProcessorEditor::resized()
-{  
+{
+  commands.widthInPixels = getWidth();
+  commands.heightInPixels = getHeight();
 }
 
 void

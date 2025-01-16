@@ -26,24 +26,6 @@ typedef double   r64;
 #define S32_MAX (0x7FFFFFFF)
 #define S64_MAX (0x7FFFFFFFFFFFFFFF)
 
-struct LoadedSound
-{
-  u32 sampleCount;
-  u32 channelCount;
-  
-  s16 *samples[2]; // TODO: support other formats
-};
-
-struct LoadedBitmap
-{
-  u32 width;
-  u32 height;
-  u32 stride;
-
-  u32 *pixels;
-  u32 glHandle;
-};
-
 union v2
 {
   struct
@@ -127,4 +109,34 @@ union RangeU32
 struct Rect2
 {
   v2 min, max;  
+};
+
+struct LoadedSound
+{
+  u32 sampleCount;
+  u32 channelCount;
+  
+  s16 *samples[2]; // TODO: support other formats
+};
+
+struct LoadedBitmap
+{
+  u32 width;
+  u32 height;
+  u32 stride;
+  v2 alignPercentage;
+
+  u32 *pixels;
+  u32 glHandle;
+};
+
+struct LoadedFont
+{
+  RangeU32 characterRange;
+
+  r32 verticalAdvance; 
+
+  u32 glyphCount;
+  LoadedBitmap *glyphs;
+  r32 *horizontalAdvance;
 };

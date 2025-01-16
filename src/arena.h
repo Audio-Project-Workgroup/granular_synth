@@ -29,6 +29,12 @@ arenaPushSize_(Arena *arena, usz size)
   return(result);
 }
 
+static inline void
+arenaPopSize(Arena *arena, usz size)
+{
+  arena->used -= size;
+}
+
 static inline Arena
 arenaSubArena(Arena *arena, usz size)
 {
