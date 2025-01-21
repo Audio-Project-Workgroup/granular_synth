@@ -36,6 +36,16 @@ renderBindTexture(LoadedBitmap *texture, bool generateNewTextures)
 static void
 renderCommands(RenderCommands *commands)
 {
+  glMatrixMode(GL_MODELVIEW);
+  glLoadIdentity();
+
+  glMatrixMode(GL_TEXTURE);
+  glLoadIdentity();
+
+  mat4 projectionMatrix = transpose(makeProjectionMatrix(commands->widthInPixels, commands->heightInPixels));
+  glMatrixMode(GL_PROJECTION);
+  glLoadMatrixf(projectionMatrix.E);
+  
   bool textureEnabled = true;
   
   for(u32 quadIndex = 0; quadIndex < commands->quadCount; ++quadIndex)

@@ -67,14 +67,69 @@ enum MouseButton
   MouseButton_count,
 };
 
+struct MouseState
+{
+  v2 position;
+  
+  ButtonState buttons[MouseButton_count];
+  
+  int scrollDelta;
+};
+
+enum KeyboardButton
+{
+  KeyboardButton_a,
+  KeyboardButton_b,
+  KeyboardButton_c,
+  KeyboardButton_d,
+  KeyboardButton_e,
+  KeyboardButton_f,
+  KeyboardButton_g,
+  KeyboardButton_h,
+  KeyboardButton_i,
+  KeyboardButton_j,
+  KeyboardButton_k,
+  KeyboardButton_l,
+  KeyboardButton_m,
+  KeyboardButton_n,
+  KeyboardButton_o,
+  KeyboardButton_p,
+  KeyboardButton_q,
+  KeyboardButton_r,
+  KeyboardButton_s,
+  KeyboardButton_t,
+  KeyboardButton_u,
+  KeyboardButton_v,
+  KeyboardButton_w,
+  KeyboardButton_x,
+  KeyboardButton_y,
+  KeyboardButton_z,
+  KeyboardButton_tab,  
+  KeyboardButton_backspace,
+  KeyboardButton_minus,
+  KeyboardButton_equal,
+  KeyboardButton_enter,
+  KeyboardButton_COUNT,
+};
+
+enum KeyboardModifier
+{
+  KeyboardModifier_shift,
+  KeyboardModifier_control,
+  KeyboardModifier_alt,
+  KeyboardModifier_COUNT,
+};
+
+struct KeyboardState
+{
+  ButtonState keys[KeyboardButton_COUNT];
+  ButtonState modifiers[KeyboardModifier_COUNT];
+};
+
 struct PluginInput
 {
-  r32 mousePositionX;
-  r32 mousePositionY;
-  
-  ButtonState mouseButtons[MouseButton_count];
-  
-  int mouseScrollDelta;
+  MouseState mouseState;
+  KeyboardState keyboardState;
 };
 
 struct PluginFileOperations

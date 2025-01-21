@@ -1,3 +1,5 @@
+// common utilities and miscellaneous functions
+
 #ifdef __clang__
 #define ASSERT(cond) if(!(cond)) __builtin_trap();
 #else
@@ -15,6 +17,35 @@
 #define OFFSET_OF(type, member) ((usz)&(((type *)0)->member))
 
 #define ROUND_UP_TO_MULTIPLE_OF_2(num) (((num) + 1) & (~1))
+
+#define LINKED_LIST_APPEND(head, new) do {	\
+    new->next = head;				\
+    head = new;					\
+  } while(0)
+
+#define DLINKED_LIST_APPEND(sentinel, new) do { \
+    new->next = sentinel;			\
+    new->prev = sentinel->prev;			\
+    new->next->prev = new;			\
+    new->prev->next = new;			\
+  } while(0)
+
+#define ZERO_SIZE(ptr, size) do {		\
+    u8 *p = (u8 *)ptr;				\
+    for(u32 i = 0; i < size; ++i) *p++ = 0;	\
+  } while(0)
+
+#define ZERO_STRUCT(s) do {					\
+    usz size = sizeof(s);					\
+    u8 *data = (u8 *)&s;					\
+    for(u32 byte = 0; byte < size; ++byte) data[byte] = 0;	\
+  } while(0)
+
+#define COPY_SIZE(dest, src, size) do {			\
+    u8 *destP = (u8 *)dest;				\
+    u8 *srcP = (u8 *)src;				\
+    for(u32 i = 0; i < size; ++i) *destP++ = *srcP++;	\
+  } while(0)
 
 static inline u32
 lowestOrderBit(u32 num)

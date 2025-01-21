@@ -5,6 +5,29 @@ struct Arena
   usz used;
 };
 
+struct ArenaPushFlags
+{
+  bool clearToZero;
+  u32 alignment;
+};
+
+inline ArenaPushFlags
+defaultArenaPushFlags(void)
+{
+  ArenaPushFlags result = {};
+
+  return(result);
+}
+
+inline ArenaPushFlags
+arenaFlagsZeroNoAlign(void)
+{
+  ArenaPushFlags result = {};
+  result.clearToZero = true;
+
+  return(result);
+}
+
 static inline Arena
 arenaBegin(void *memory, usz capacity)
 {
@@ -15,16 +38,37 @@ arenaBegin(void *memory, usz capacity)
   return(result);
 }
 
-#define arenaPushSize(arena, size) arenaPushSize_(arena, size)
-#define arenaPushArray(arena, count, type) (type *)arenaPushSize_(arena, count*sizeof(type))
-#define arenaPushStruct(arena, type) (type *)arenaPushSize_(arena, sizeof(type))
+#define arenaPushSize(arena, size, ...) arenaPushSize_(arena, size, ##__VA_ARGS__)
+#define arenaPushArray(arena, count, type, ...) (type *)arenaPushSize_(arena, count*sizeof(type), ##__VA_ARGS__)
+#define arenaPushStruct(arena, type, ...) (type *)arenaPushSize_(arena, sizeof(type), ##__VA_ARGS__)
 
 static inline u8 *
-arenaPushSize_(Arena *arena, usz size)
+arenaPushSize_(Arena *arena, usz size, ArenaPushFlags flags = defaultArenaPushFlags())
 {
   ASSERT(size + arena->used <=  arena->capacity);
   u8 *result = arena->base + arena->used;
   arena->used += size;
+
+  if(flags.clearToZero)
+    {
+      ZERO_SIZE(result, size);
+    }
+
+  return(result);
+}
+
+inline u8 *
+arenaPushString(Arena *arena, char *string)
+{
+  u8 *result = arena->base + arena->used;
+  char *at = string;
+  while(*at)
+    {
+      ASSERT(arena->used < arena->capacity);
+      *(arena->base + arena->used++) = *at++;
+    }
+  ASSERT(arena->used < arena->capacity);
+  *(arena->base + arena->used++) = 0; // NOTE: null termination
 
   return(result);
 }

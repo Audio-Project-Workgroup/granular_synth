@@ -19,6 +19,7 @@ juce_add_plugin(${PROJECT_NAME}
 	IS_SYNTH TRUE
 	NEEDS_MIDI_INPUT TRUE
 	NEEDS_MIDI_OUTPUT FALSE
+	EDITOR_WANTS_KEYBOARD_FOCUS TRUE
 	NEEDS_CURL TRUE			# on linux, juce tries to link with curl for some reason
 	NEEDS_WEB_BROWSER TRUE  	# on linux, juce cant find gtk.h unless this flag is set
 	PLUGIN_MANUFACTURER_CODE Test

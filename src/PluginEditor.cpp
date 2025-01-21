@@ -5,6 +5,13 @@
 
 using namespace juce::gl;
 
+inline void
+juceProcessButtonPress(ButtonState *newState, bool pressed)
+{
+  newState->endedDown = pressed;
+  ++newState->halfTransitionCount;
+}
+
 //==============================================================================
 AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudioProcessor& p)
     : AudioProcessorEditor(&p), processorRef(p)
@@ -29,6 +36,10 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
   //commands.vertices = (Vertex *)calloc(commands.vertexCapacity, sizeof(Vertex));
   //commands.indices = (u32 *)calloc(commands.indexCapacity, sizeof(u32));
 
+  setWantsKeyboardFocus(true);
+  setMouseClickGrabsKeyboardFocus(true);
+  //grabKeyboardFocus();
+  
   pluginInput[0] = {};
   pluginInput[1] = {};
   newInput = &pluginInput[0];
@@ -67,16 +78,16 @@ void
 AudioPluginAudioProcessorEditor::mouseMove(const juce::MouseEvent &event)
 {
   juce::Point<int> mousePosition = event.getPosition();
-  newInput->mousePositionX = 2.f*((r32)mousePosition.getX()/(r32)getWidth()) - 1.f;
-  newInput->mousePositionY = -2.f*((r32)mousePosition.getY()/(r32)getHeight()) + 1.f;
+  newInput->mouseState.position.x = mousePosition.getX();//2.f*((r32)mousePosition.getX()/(r32)getWidth()) - 1.f;
+  newInput->mouseState.position.y = getHeight() - mousePosition.getY();//-2.f*((r32)mousePosition.getY()/(r32)getHeight()) + 1.f;
 }
 
 void
 AudioPluginAudioProcessorEditor::mouseDrag(const juce::MouseEvent &event)
 {
   juce::Point<int> mousePosition = event.getPosition();
-  newInput->mousePositionX = 2.f*((r32)mousePosition.getX()/(r32)getWidth()) - 1.f;
-  newInput->mousePositionY = -2.f*((r32)mousePosition.getY()/(r32)getHeight()) + 1.f;
+  newInput->mouseState.position.x = mousePosition.getX();//2.f*((r32)mousePosition.getX()/(r32)getWidth()) - 1.f;
+  newInput->mouseState.position.y = getHeight() - mousePosition.getY();//-2.f*((r32)mousePosition.getY()/(r32)getHeight()) + 1.f;
 }
 
 void
@@ -84,13 +95,15 @@ AudioPluginAudioProcessorEditor::mouseDown(const juce::MouseEvent &event)
 {
   if(event.mods.isLeftButtonDown())
     {
-      newInput->mouseButtons[MouseButton_left].endedDown = true;
-      ++newInput->mouseButtons[MouseButton_left].halfTransitionCount;
+      juceProcessButtonPress(&newInput->mouseState.buttons[MouseButton_left], true);
+      //newInput->mouseButtons[MouseButton_left].endedDown = true;
+      //++newInput->mouseButtons[MouseButton_left].halfTransitionCount;
     }
   if(event.mods.isRightButtonDown())
     {
-      newInput->mouseButtons[MouseButton_right].endedDown = true;
-      ++newInput->mouseButtons[MouseButton_right].halfTransitionCount;
+      juceProcessButtonPress(&newInput->mouseState.buttons[MouseButton_right], true);
+      //newInput->mouseButtons[MouseButton_right].endedDown = true;
+      //++newInput->mouseButtons[MouseButton_right].halfTransitionCount;
     }
 }
 
@@ -99,14 +112,16 @@ AudioPluginAudioProcessorEditor::mouseUp(const juce::MouseEvent &event)
 {
   // NOTE: JUCE is a very intuitive and well-designed framework that everyone should use without question
   if(event.mods.isLeftButtonDown())
-    {      
-      newInput->mouseButtons[MouseButton_left].endedDown = false;
-      ++newInput->mouseButtons[MouseButton_left].halfTransitionCount;
+    {
+      juceProcessButtonPress(&newInput->mouseState.buttons[MouseButton_left], false);
+      //newInput->mouseButtons[MouseButton_left].endedDown = false;
+      //++newInput->mouseButtons[MouseButton_left].halfTransitionCount;
     }
   if(event.mods.isRightButtonDown())
-    {     
-      newInput->mouseButtons[MouseButton_right].endedDown = false;
-      ++newInput->mouseButtons[MouseButton_right].halfTransitionCount;
+    {
+      juceProcessButtonPress(&newInput->mouseState.buttons[MouseButton_right], false);
+      //newInput->mouseButtons[MouseButton_right].endedDown = false;
+      //++newInput->mouseButtons[MouseButton_right].halfTransitionCount;
     }
 }
 
@@ -115,8 +130,72 @@ AudioPluginAudioProcessorEditor::mouseWheelMove(const juce::MouseEvent &event, c
 {
   if(wheel.deltaY != 0)
     {
-      newInput->mouseScrollDelta += wheel.deltaY;
+      newInput->mouseState.scrollDelta += wheel.deltaY;
     }
+}
+
+bool AudioPluginAudioProcessorEditor::
+keyPressed(const juce::KeyPress &key)
+{
+  bool result = false;
+  if(key == juce::KeyPress::tabKey)
+    {
+      result = true;
+      juceProcessButtonPress(&newInput->keyboardState.keys[KeyboardButton_tab], result);
+      juce::Logger::writeToLog("tab pressed");
+    }
+  else if(key == juce::KeyPress::backspaceKey)
+    {
+      result = true;
+      juceProcessButtonPress(&newInput->keyboardState.keys[KeyboardButton_backspace], result);
+      juce::Logger::writeToLog("backspace pressed");
+    }
+  else if(key == juce::KeyPress::returnKey)
+    {
+      result = true;
+      juceProcessButtonPress(&newInput->keyboardState.keys[KeyboardButton_enter], result);
+    }
+  else if(key.getKeyCode() == '-')
+    {
+      result = true;
+      juceProcessButtonPress(&newInput->keyboardState.keys[KeyboardButton_minus], result);
+    }
+  else if(key.getKeyCode() == '=')
+    {
+      result = true;
+      juceProcessButtonPress(&newInput->keyboardState.keys[KeyboardButton_equal], result);
+    }
+  /*
+  else if(key == juce::KeyPress::upKey)
+    {
+      result = true;
+      juceProcessButtonPress(&newInput->keyboardState.keys[KeyboardButton_up], result);
+    }
+  else if(key == juce::KeyPress::downKey)
+    {
+      result = true;
+      juceProcessButtonPress(&newInput->keyboardState.keys[KeyboardButton_down], result);
+    }
+  */
+
+  juce::ModifierKeys modifiers = key.getModifiers();
+  if(modifiers.isShiftDown())
+    {
+      result = true;
+      juceProcessButtonPress(&newInput->keyboardState.modifiers[KeyboardModifier_shift], result);
+    }
+  else if(modifiers.isCtrlDown())
+    {
+      result = true;
+      juceProcessButtonPress(&newInput->keyboardState.modifiers[KeyboardModifier_control], result);
+    }
+  else if(modifiers.isAltDown())
+    {
+      result = true;
+      juceProcessButtonPress(&newInput->keyboardState.modifiers[KeyboardModifier_alt], result);
+    }
+
+  return(result);
 }
 
 void
@@ -142,9 +221,21 @@ AudioPluginAudioProcessorEditor::renderOpenGL(void)
 
   for(u32 buttonIndex = 0; buttonIndex < MouseButton_count; ++buttonIndex)
     {
-      newInput->mouseButtons[buttonIndex].halfTransitionCount = 0;
-      newInput->mouseButtons[buttonIndex].endedDown =
-	oldInput->mouseButtons[buttonIndex].endedDown;
+      newInput->mouseState.buttons[buttonIndex].halfTransitionCount = 0;
+      newInput->mouseState.buttons[buttonIndex].endedDown =
+	oldInput->mouseState.buttons[buttonIndex].endedDown;
+    }
+  for(u32 keyIndex = 0; keyIndex < KeyboardButton_COUNT; ++keyIndex)
+    {
+      newInput->keyboardState.keys[keyIndex].halfTransitionCount = 0;
+      newInput->keyboardState.keys[keyIndex].endedDown =
+	oldInput->keyboardState.keys[keyIndex].endedDown;
+    }
+  for(u32 modifierIndex = 0; modifierIndex < KeyboardModifier_COUNT; ++modifierIndex)
+    {
+      newInput->keyboardState.modifiers[modifierIndex].halfTransitionCount = 0;
+      newInput->keyboardState.modifiers[modifierIndex].endedDown =
+	oldInput->keyboardState.modifiers[modifierIndex].endedDown;
     }
 }
 

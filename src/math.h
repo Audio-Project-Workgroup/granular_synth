@@ -130,6 +130,69 @@ V4(r32 x, r32 y, r32 z, r32 w)
 }
 
 //
+// mat4
+//
+
+inline mat4
+makeProjectionMatrix(u32 widthInPixels, u32 heightInPixels)
+{
+  mat4 result = {};
+  result.r1 = V4(2.f/(r32)widthInPixels, 0, 0, -1.f);
+  result.r2 = V4(0, 2.f/(r32)heightInPixels, 0, -1.f);
+  result.r3 = V4(0, 0, 1, 0);
+  result.r4 = V4(0, 0, 0, 1);
+
+  return(result);
+}
+
+inline mat4
+transpose(mat4 m)
+{
+  mat4 result = {};
+  for(u32 i = 0; i < 4; ++i)
+    {
+      for(u32 j = 0; j < 4; ++j)
+	{
+	  result.rows[j].E[i] = m.rows[i].E[j];
+	}
+    }
+
+  return(result);
+}
+
+//
+// RangeR32
+//
+
+inline RangeR32
+makeRange(r32 min, r32 max)
+{
+  RangeR32 result = {};
+  result.min = min;
+  result.max = max;
+
+  return(result);
+}
+
+inline r32
+getLength(RangeR32 range)
+{
+  r32 result = range.max - range.min;
+
+  return(result);
+}
+
+inline r32
+clampToRange(r32 val, RangeR32 range)
+{
+  r32 result = val;
+  if(result > range.max) result = range.max;
+  if(result < range.min) result = range.min;
+
+  return(result);
+}
+
+//
 // Rect2
 //
 
@@ -180,7 +243,7 @@ getDim(Rect2 rect)
 static inline v2
 getCenter(Rect2 rect)
 {
-  v2 result = 0.5f*getDim(rect);
+  v2 result = rect.min + 0.5f*getDim(rect);
 
   return(result);
 }

@@ -68,10 +68,11 @@ void main()
 static inline void
 glfwProcessButtonPress(ButtonState *newState, bool pressed)
 {
-  ASSERT(newState->endedDown != pressed);
   newState->endedDown = pressed;
   ++newState->halfTransitionCount;
 }
+
+// TODO: handle holding down keys!
 
 static void
 glfwKeyCallback(GLFWwindow *window, int key, int scancode, int action, int mods)
@@ -80,6 +81,38 @@ glfwKeyCallback(GLFWwindow *window, int key, int scancode, int action, int mods)
     {
       glfwSetWindowShouldClose(window, GLFW_TRUE);
     }
+  else if(key == GLFW_KEY_LEFT_SHIFT || key == GLFW_KEY_RIGHT_SHIFT)
+    {
+      glfwProcessButtonPress(&newInput->keyboardState.modifiers[KeyboardModifier_shift], action == GLFW_PRESS);
+    }
+  else if(key == GLFW_KEY_LEFT_CONTROL || key == GLFW_KEY_RIGHT_CONTROL)
+    {
+      glfwProcessButtonPress(&newInput->keyboardState.modifiers[KeyboardModifier_control], action == GLFW_PRESS);
+    }
+  else if(key == GLFW_KEY_LEFT_ALT || key == GLFW_KEY_RIGHT_ALT)
+    {
+      glfwProcessButtonPress(&newInput->keyboardState.modifiers[KeyboardModifier_alt], action == GLFW_PRESS);
+    }
+  else if(key == GLFW_KEY_TAB)
+    {
+      glfwProcessButtonPress(&newInput->keyboardState.keys[KeyboardButton_tab], action == GLFW_PRESS);
+    }
+  else if(key == GLFW_KEY_BACKSPACE)
+    {
+      glfwProcessButtonPress(&newInput->keyboardState.keys[KeyboardButton_backspace], action == GLFW_PRESS);
+    }
+  else if(key == GLFW_KEY_MINUS)
+    {
+      glfwProcessButtonPress(&newInput->keyboardState.keys[KeyboardButton_minus], action == GLFW_PRESS);
+    }
+  else if(key == GLFW_KEY_EQUAL)
+    {
+      glfwProcessButtonPress(&newInput->keyboardState.keys[KeyboardButton_equal], action == GLFW_PRESS);
+    }
+  else if(key == GLFW_KEY_ENTER)
+    {
+      glfwProcessButtonPress(&newInput->keyboardState.keys[KeyboardButton_enter], action == GLFW_PRESS);
+    }
 }
 
 static void
@@ -87,12 +120,12 @@ glfwMouseButtonCallback(GLFWwindow *window, int button, int action, int mods)
 {
   if(button == GLFW_MOUSE_BUTTON_LEFT)
     {
-      glfwProcessButtonPress(&newInput->mouseButtons[MouseButton_left],
+      glfwProcessButtonPress(&newInput->mouseState.buttons[MouseButton_left],
 			     action == GLFW_PRESS);
     }
   else if(button == GLFW_MOUSE_BUTTON_RIGHT)
     {
-      glfwProcessButtonPress(&newInput->mouseButtons[MouseButton_right],
+      glfwProcessButtonPress(&newInput->mouseState.buttons[MouseButton_right],
 			     action == GLFW_PRESS);
     }
 }
@@ -282,9 +315,21 @@ main(int argc, char **argv)
 		      
 		      for(u32 buttonIndex = 0; buttonIndex < MouseButton_count; ++buttonIndex)
 			{
-			  newInput->mouseButtons[buttonIndex].halfTransitionCount = 0;
-			  newInput->mouseButtons[buttonIndex].endedDown =
-			    oldInput->mouseButtons[buttonIndex].endedDown;
+			  newInput->mouseState.buttons[buttonIndex].halfTransitionCount = 0;
+			  newInput->mouseState.buttons[buttonIndex].endedDown =
+			    oldInput->mouseState.buttons[buttonIndex].endedDown;
+			}
+		      for(u32 keyIndex = 0; keyIndex < KeyboardButton_COUNT; ++keyIndex)
+			{
+			  newInput->keyboardState.keys[keyIndex].halfTransitionCount = 0;
+			  newInput->keyboardState.keys[keyIndex].endedDown =
+			    oldInput->keyboardState.keys[keyIndex].endedDown;
+			}
+		      for(u32 modifierIndex = 0; modifierIndex < KeyboardModifier_COUNT; ++modifierIndex)
+			{
+			  newInput->keyboardState.modifiers[modifierIndex].halfTransitionCount = 0;
+			  newInput->keyboardState.modifiers[modifierIndex].endedDown =
+			    oldInput->keyboardState.modifiers[modifierIndex].endedDown;
 			}
 
 		      // TODO: what's the difference between window size and framebuffer size? do we need both?
@@ -293,8 +338,7 @@ main(int argc, char **argv)
 
 		      double mouseX, mouseY;
 		      glfwGetCursorPos(window, &mouseX, &mouseY);
-		      newInput->mousePositionX = 2.0*mouseX/(r64)windowWidth - 1.0;
-		      newInput->mousePositionY = -2.0*mouseY/(r64)windowHeight + 1.0;
+		      newInput->mouseState.position = V2(mouseX, (r64)windowHeight - mouseY);
 
 		      // render new frame
 
@@ -318,7 +362,7 @@ main(int argc, char **argv)
 
 		      if(plugin.renderNewFrame)
 			{
-			  plugin.renderNewFrame(&pluginMemory, newInput, &commands);
+			  plugin.renderNewFrame(&pluginMemory, oldInput, &commands);
 			  renderCommands(&commands);
 			}
 

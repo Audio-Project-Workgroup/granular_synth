@@ -1,8 +1,8 @@
 // the core audio-visual functionality of our plugin is implemented here
 
 /* NOTE:
-   - elements are passed to the renderer in OpenGL clip-coordinates ((-1, -1) is the bottom-left of the
-     screen, (1, 1) is the top-right).
+   - elements are passed to the renderer in pixel space (where (0, 0) is the bottom-left of the
+     screen, and (windowWidthInPixels, windowHeightInPixels) is the top-right).
      
    - the mouse position is in these coordinates as well, for ease of intersection testing
    
@@ -26,9 +26,9 @@
      We need a system for creating a hierarchy of UI elements, which can be navigated with the keyboard
      and can pass information to a screen reader, and having elements bound to state parameters and
      midi channels/keyboard keys. This system then needs to interface with a system for updating and reading
-     state parameters in a thread-safe way.
+     state parameters in a thread-safe way. (WIP)
 
-   - Image loading for text rendering and a prettier UI
+   - Image loading for text rendering and a prettier UI (DONE)
 
    - Make the audioProcess() do granular synth things
 
@@ -43,6 +43,14 @@
 #include "plugin.h"
 
 PlatformAPI globalPlatform;
+
+inline void
+printButtonState(ButtonState button, char *name)
+{
+  printf("%s: %s, %s\n", name,
+	 wasPressed(button) ? "pressed" : "not pressed",
+	 isDown(button) ? "down" : "up");
+}
 
 static PluginState *
 initializePluginState(PluginMemory *memoryBlock)
@@ -79,6 +87,9 @@ initializePluginState(PluginMemory *memoryBlock)
 	  pluginState->testFont = loadFont("../data/arial.ttf", &pluginState->loadArena,
 					   &pluginState->permanentArena, characterRange, 32.f);
 
+	  pluginState->layout = uiInitializeLayout(&pluginState->frameArena, &pluginState->permanentArena,
+						   &pluginState->testFont);
+
 	  pluginState->initialized = true;
 	}
     }
@@ -95,27 +106,32 @@ RENDER_NEW_FRAME(renderNewFrame)
       //renderCommands->arena = &pluginState->frameArena;
       renderBeginCommands(renderCommands, &pluginState->frameArena);
 
-      pluginState->mouseP.x = (r32)input->mousePositionX;
-      pluginState->mouseP.y = (r32)input->mousePositionY;
-      pluginState->mouseP.z += (r32)input->mouseScrollDelta;
+      pluginState->mouseP.x = input->mouseState.position.x;
+      pluginState->mouseP.y = input->mouseState.position.y;
+      pluginState->mouseP.z += (r32)input->mouseState.scrollDelta;
 #if 0
       printf("mouseP: (%.2f, %.2f, %.2f)\n",
 	     pluginState->mouseP.x, pluginState->mouseP.y, pluginState->mouseP.z);
       printf("mouseLeft: %s, %s\n",
-	     wasPressed(input->mouseButtons[MouseButton_left]) ? "pressed" : "not pressed",
-	     isDown(input->mouseButtons[MouseButton_left]) ? "down" : "up");
+	     wasPressed(input->mouseState.buttons[MouseButton_left]) ? "pressed" : "not pressed",
+	     isDown(input->mouseState.buttons[MouseButton_left]) ? "down" : "up");
       printf("mouseRight: %s, %s\n",
-	     wasPressed(input->mouseButtons[MouseButton_right]) ? "pressed" : "not pressed",	     
-	     isDown(input->mouseButtons[MouseButton_right]) ? "down" : "up");
+	     wasPressed(input->mouseState.buttons[MouseButton_right]) ? "pressed" : "not pressed",	     
+	     isDown(input->mouseState.buttons[MouseButton_right]) ? "down" : "up");
+#endif
+
+#if 1
+      printButtonState(input->keyboardState.keys[KeyboardButton_tab], "tab");
+      printButtonState(input->keyboardState.keys[KeyboardButton_backspace], "backspace");
 #endif
 
       v2 dMouseP = pluginState->mouseP.xy - pluginState->lastMouseP.xy;
 
-      if(wasPressed(input->mouseButtons[MouseButton_left]))
+      if(wasPressed(input->mouseState.buttons[MouseButton_left]))
 	{
 	  pluginState->mouseLClickP = pluginState->mouseP.xy;
 	}
-      if(wasPressed(input->mouseButtons[MouseButton_right]))
+      if(wasPressed(input->mouseState.buttons[MouseButton_right]))
 	{
 	  pluginState->mouseRClickP = pluginState->mouseP.xy;
 	}      
@@ -124,20 +140,152 @@ RENDER_NEW_FRAME(renderNewFrame)
       v4 hoverColor = V4(1, 1, 0, 1);
       v4 activeColor = V4(0.8f, 0.8f, 0, 1);
 
-      //u32 windowWidth = renderCommands->widthInPixels;
-      //u32 windowHeight = renderCommands->heightInPixels;
+      u32 windowWidth = renderCommands->widthInPixels;
+      u32 windowHeight = renderCommands->heightInPixels;
       LoadedFont *font = &pluginState->testFont;
+#if 1
+      // TODO: mouse intersection testing, parameter modification
+      UILayout *layout = &pluginState->layout;
+      uiBeginLayout(layout, V2(windowWidth, windowHeight));
 
-      v2 textOutAt = V2(-1, 1);
+      UIElement *title = uiMakeTextElement(layout, "I Will Become a Granular Synthesizer!", 0.5f, 0.f);
+      
+      UIElement *play = uiMakeButton(layout, "play", V2(0.75f, 0.75f), V2(0.1f, 0.1f),
+				     &pluginState->loadedSound.isPlaying, V4(0, 0, 1, 1));
+            
+      UIElement *volume = uiMakeSlider(layout, "volume", V2(0.1f, 0.1f), V2(0.1f, 0.75f),
+				        &pluginState->volume, makeRange(0.f, 1.f), V4(0.8f, 0.8f, 0.8f, 1));
+
+      if(wasPressed(input->keyboardState.keys[KeyboardButton_tab]))
+	{
+	  layout->selectedElementOrdinal = (layout->selectedElementOrdinal + 1) % (layout->elementCount + 1);
+	  if(layout->selectedElement)
+	    {
+	      layout->selectedElement->isActive = false;
+	      layout->selectedElement = 0;
+	    }
+	}
+      
+      if(wasPressed(input->keyboardState.keys[KeyboardButton_backspace]))
+	{
+	  if(layout->selectedElementOrdinal)
+	    {
+	      --layout->selectedElementOrdinal;
+	    }
+	  //else
+	  //{
+	  //  layout->selectedElementOrdinal = layout->elementCount + 1;
+	  //}
+
+	  if(layout->selectedElement)
+	    {
+	      layout->selectedElement->isActive = false;
+	      layout->selectedElement = 0;
+	    }
+	}
+
+      UIElement *selectedElement = 0;
+      for(u32 i = 0; i < layout->selectedElementOrdinal; ++i)
+	{
+	  
+	  if(selectedElement)
+	    {
+	      bool advanced = false;
+	      if(selectedElement->first)
+		{
+		  if(selectedElement->first != ELEMENT_SENTINEL(selectedElement))
+		    {
+		      selectedElement = selectedElement->first;
+		      advanced = true;
+		    }
+		}
+	      
+	      if(!advanced && selectedElement->next)
+		{
+		  if(selectedElement->next != ELEMENT_SENTINEL(selectedElement->parent))
+		    {
+		      selectedElement = selectedElement->next;
+		      advanced = true;
+		    }
+		}
+	      
+	      ASSERT(advanced);
+	    }
+	  else
+	    {
+	      selectedElement = layout->root;
+	    }
+	}
+
+      if(selectedElement)
+	{
+	  selectedElement->lastFrameTouched = layout->frameIndex;
+	  selectedElement->isActive = true;
+
+	  if(selectedElement->flags & UIElementFlag_draggable)
+	    {
+	      if(selectedElement->data)
+		{
+		  if(selectedElement->dataFlags & UIDataFlag_float)
+		    {
+		      r32 *parameter = (r32 *)selectedElement->data;
+		      if(wasPressed(input->keyboardState.keys[KeyboardButton_minus]))
+			{
+			  r32 newParameter = *parameter - 0.02f*getLength(selectedElement->range);
+			  newParameter = clampToRange(newParameter, selectedElement->range);
+			  
+			  *parameter = newParameter;
+			}
+		      
+		      if(wasPressed(input->keyboardState.keys[KeyboardButton_equal]) &&
+			 isDown(input->keyboardState.modifiers[KeyboardModifier_shift]))
+			{
+			  r32 newParameter = *parameter + 0.02f*getLength(selectedElement->range);
+			  newParameter = clampToRange(newParameter, selectedElement->range);
+			  
+			  *parameter = newParameter;
+			}
+		    }
+		}
+	    }
+	  else if(selectedElement->flags * UIElementFlag_clickable)
+	    {
+	      if(selectedElement->data)
+		{
+		  if(selectedElement->dataFlags & UIDataFlag_boolean)
+		    {
+		      bool *parameter = (bool *)selectedElement->data;
+		      if(wasPressed(input->keyboardState.keys[KeyboardButton_enter]))
+			{
+			  bool oldVal = *parameter;
+			  bool newVal = !oldVal;
+			  
+			  *parameter = newVal;
+			}
+		    }
+		}
+	    }
+
+	  UIElement *persistentSelectedElement = uiCacheElement(selectedElement, layout);
+	  layout->selectedElement = persistentSelectedElement;
+	}      
+      
+      //uiPrintLayout(layout);
+      renderPushUILayout(renderCommands, layout);
+      uiEndLayout(layout);
+      printf("permanent arena used %llu bytes\n", pluginState->permanentArena.used);
+
+#else
+      v2 textOutAt = V2(0, windowHeight);
       textOutAt = renderPushText(renderCommands, font, "", textOutAt);
 
       char *message = "I Will Become a Granular Synthesizer!";
       //Rectangle2 messageRect = getTextRectangle(font, message, windowWidth, windowHeight);
       //renderPushRectOutline(renderCommands, messageRect, 0.01f, V4(1, 1, 0, 1));
-      TextArgs textArgs = {};
-      textArgs.flags |= (TextFlags_centered | TextFlags_scaleAspect);
-      textArgs.hScale = 0.5f;
-      textOutAt = renderPushText(renderCommands, font, message, textOutAt, textArgs);
+      //TextArgs textArgs = {};
+      //textArgs.flags |= (TextFlag_centered | TextFlag_scaleAspect);
+      //textArgs.hScale = 0.5f;
+      textOutAt = renderPushText(renderCommands, font, message, textOutAt);
 
       renderPushQuad(renderCommands, rectCenterDim(V2(0, 0), V2(0.5f, 0.5f)), &pluginState->testBitmap);
 
@@ -158,15 +306,13 @@ RENDER_NEW_FRAME(renderNewFrame)
 	      playColor = hoverColor;
 	    }
 	}
-      Vertex playVertex1 = makeVertex(playButton.min + V2(0.2f*playButtonDim.x, 0.2f*playButtonDim.y), V2(0, 0), playColor);
-      Vertex playVertex2 = makeVertex(playButton.min + V2(0.2f*playButtonDim.x, 0.8f*playButtonDim.y), V2(0, 0), playColor);
-      Vertex playVertex3 = makeVertex(playButton.min + V2(0.8f*playButtonDim.x, 0.5f*playButtonDim.y), V2(0, 0), playColor);
+      Vertex playVertex1 = makeVertex(playButton.min + V2(0.2f*playButtonDim.x, 0.2f*playButtonDim.y),
+				      V2(0, 0), playColor);
+      Vertex playVertex2 = makeVertex(playButton.min + V2(0.2f*playButtonDim.x, 0.8f*playButtonDim.y),
+				      V2(0, 0), playColor);
+      Vertex playVertex3 = makeVertex(playButton.min + V2(0.8f*playButtonDim.x, 0.5f*playButtonDim.y),
+				      V2(0, 0), playColor);
       renderPushTriangle(renderCommands, playVertex1, playVertex2, playVertex3);
-      /*
-      renderPushVertex(renderCommands, playButton.min + V2(0.2f*playButtonDim.x, 0.2f*playButtonDim.y), V2(0, 0), playColor);
-      renderPushVertex(renderCommands, playButton.min + V2(0.2f*playButtonDim.x, 0.8f*playButtonDim.y), V2(0, 0), playColor);
-      renderPushVertex(renderCommands, playButton.min + V2(0.8f*playButtonDim.x, 0.5f*playButtonDim.y), V2(0, 0), playColor);
-      */
 
       v2 faderBarCenter = V2(-0.8f, 0);
       v2 faderBarDim = V2(0.02f, 1.5f);
@@ -189,6 +335,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 	    }
 	}      
       renderPushQuad(renderCommands, fader, faderColor);
+#endif
 
       pluginState->lastMouseP = pluginState->mouseP;
       arenaEnd(&pluginState->frameArena);

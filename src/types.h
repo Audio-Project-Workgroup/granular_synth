@@ -96,6 +96,18 @@ union v4
   r32 E[4];
 };
 
+union mat4
+{
+  struct
+  {
+    v4 r1, r2, r3, r4;
+  };
+
+  v4 rows[4];
+
+  r32 E[16];
+};
+
 union RangeU32
 {
   struct
@@ -104,6 +116,16 @@ union RangeU32
   };
   
   u32 E[2];
+};
+
+union RangeR32
+{
+  struct
+  {
+    r32 min, max;
+  };
+
+  r32 E[2];
 };
 
 struct Rect2

@@ -23,6 +23,8 @@ public:
   void mouseUp(const juce::MouseEvent &event) override;
   void mouseWheelMove(const juce::MouseEvent &event, const juce::MouseWheelDetails &wheel) override;
 
+  bool keyPressed(const juce::KeyPress &key) override;
+
   void newOpenGLContextCreated(void) override;
   void renderOpenGL(void) override;
   void openGLContextClosing(void) override;

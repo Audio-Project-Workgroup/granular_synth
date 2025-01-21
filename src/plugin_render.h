@@ -101,7 +101,7 @@ renderPushRectOutline(RenderCommands *commands, Rect2 rect, r32 thickness, v4 co
   v2 leftMiddle = rect.min + V2(0, 0.5f*rectDim.y);
   v2 rightMiddle = rect.max - V2(0, 0.5f*rectDim.y);
   v2 bottomMiddle = rect.min + V2(0.5f*rectDim.x, 0);
-  v2 topMiddle = rect.max - V2(0.5f*rectDim.y, 0);
+  v2 topMiddle = rect.max - V2(0.5f*rectDim.x, 0);
   
   renderPushQuad(commands, rectCenterDim(leftMiddle, vDim), color);
   renderPushQuad(commands, rectCenterDim(rightMiddle, vDim), color);
@@ -123,9 +123,10 @@ renderPushTriangle(RenderCommands *commands, Vertex v1, Vertex v2, Vertex v3, Lo
 }
 
 static inline v2
-renderPushText(RenderCommands *commands, LoadedFont *font, char *string, v2 startPos,
-	       TextArgs textArgs = defaultTextArgs(), v4 color = V4(1, 1, 1, 1))
+renderPushText(RenderCommands *commands, LoadedFont *font, u8 *string, v2 startPos,
+	       v4 color = V4(1, 1, 1, 1))
 {
+#if 0
   // TODO: maybe make opengl do this transformation
   v2 pixelsToRenderCoords;
   if(commands->widthInPixels && commands->heightInPixels)
@@ -140,7 +141,28 @@ renderPushText(RenderCommands *commands, LoadedFont *font, char *string, v2 star
   v2 textScale = pixelsToRenderCoords;
   v2 textDimPixels = getTextDim(font, string);
   v2 textDim = hadamard(textScale, textDimPixels);
-  if(textArgs.flags & TextFlags_scaleAspect)
+
+  v2 textRectDim = getDim(textRect);
+  if(textRectDim.x)
+    {
+      if(textRectDim.y)
+	{
+	  textScale.x *= textRectDim.x/textDim.x;
+	  textScale.y *= textRectDim.y/textDim.y;
+	}
+      else
+	{
+	  textScale *= textRectDim.x/textDim.x;
+	}
+    }
+  else if(textRectDim.y)
+    {
+      textScale *= textRectDim.y/textDim.y;
+    }
+  textDim = hadamard(textScale, textDimPixels);
+  
+#if 0
+  if(textArgs.flags & TextFlag_scaleAspect)
     {
       if(textArgs.hScale)
 	{
@@ -157,31 +179,184 @@ renderPushText(RenderCommands *commands, LoadedFont *font, char *string, v2 star
 
       textDim = hadamard(textScale, textDimPixels);
     }
+#endif
 
-  v2 atPos = startPos;
-  if(textArgs.flags & TextFlags_centered)
+  v2 atPos = textRect.min;
+#if 0
+  if(textArgs.flags & TextFlag_centered)
     {
       r32 offset = startPos.x + 0.5f*textDim.x;
       atPos.x -= offset;
     }
+#endif
+#endif
 
-  char *at = string;  
+  v2 atPos = startPos;
+  u8 *at = string;  
   while(*at)
     {
-      char c = *at;
+      u8 c = *at;
       LoadedBitmap *glyph = getGlyphFromChar(font, c);
 
       v2 glyphDim = V2(glyph->width, glyph->height);
-      v2 scaledGlyphDim = hadamard(textScale, glyphDim);
-      Rect2 glyphRect = rectMinDim(atPos, scaledGlyphDim);
+      //v2 scaledGlyphDim = hadamard(textScale, glyphDim);
+      Rect2 glyphRect = rectMinDim(atPos, glyphDim);
       renderPushQuad(commands, glyphRect, glyph, color);
 
       ++at;
-      if(*at) atPos.x += textScale.x*getHorizontalAdvance(font, c, *at);
+      if(*at) atPos.x += getHorizontalAdvance(font, c, *at);
     }
 
-  atPos.y -= textScale.y*font->verticalAdvance;
+  atPos.y -= font->verticalAdvance;
   return(atPos);
+}
+
+inline Rect2
+renderComputeUIElementRegion(RenderCommands *commands, UIElement *element)
+{
+  v2 elementDim = V2(0, 0);      
+  switch(element->semanticDim[UIAxis_x].type)
+    {
+    case UISizeType_none:
+      {	
+      } break;
+    case UISizeType_pixels:
+      {
+	elementDim.x = element->semanticDim[UIAxis_x].value;
+      } break;
+    case UISizeType_percentOfParentDim:
+      {
+	elementDim.x = element->semanticDim[UIAxis_x].value*getDim(element->parent->region).x;
+      } break;
+    default: ASSERT(!"unhandled/invalid case");
+    }
+  switch(element->semanticDim[UIAxis_y].type)
+    {
+    case UISizeType_none:
+      {
+      } break;
+    case UISizeType_pixels:
+      {
+	elementDim.y = element->semanticDim[UIAxis_y].value;
+      } break;
+    case UISizeType_percentOfParentDim:
+      {
+	elementDim.y = element->semanticDim[UIAxis_y].value*getDim(element->parent->region).y;
+      } break;
+    default: ASSERT(!"unhandled/invalid case");
+    }
+      
+  v2 elementMin = V2(0, 0);
+  switch(element->semanticOffset[UIAxis_x].type)
+    {
+    case UISizeType_none:
+      {
+      } break;
+    case UISizeType_pixels:
+      {
+	elementMin.x = element->semanticOffset[UIAxis_x].value;
+      } break;
+    case UISizeType_percentOfParentDim:
+      {
+	elementMin.x = element->semanticOffset[UIAxis_x].value*getDim(element->parent->region).x;
+      } break;
+    case UISizeType_percentOfOwnDim:
+      {
+	elementMin.x = element->semanticOffset[UIAxis_x].value*elementDim.x;
+      } break;
+    default: ASSERT(!"unhandled/invalid case");
+    }
+  switch(element->semanticOffset[UIAxis_y].type)
+    {
+    case UISizeType_none:
+      {
+      } break;
+    case UISizeType_pixels:
+      {
+	elementMin.y = element->semanticOffset[UIAxis_y].value;
+      } break;
+    case UISizeType_percentOfParentDim:
+      {
+	elementMin.y = element->semanticOffset[UIAxis_y].value*getDim(element->parent->region).y;
+      } break;
+    case UISizeType_percentOfOwnDim:
+      {
+	elementMin.y = element->semanticOffset[UIAxis_y].value*elementDim.y;
+      } break;
+    default: ASSERT(!"unhandled/invalid case");	  
+    }
+
+  Rect2 elementRect = rectMinDim(elementMin, elementDim);
+  return(elementRect);
+}
+
+inline void
+renderPushUIElement(RenderCommands *commands, UILayout *layout, UIElement *element)
+{
+  element->region = renderComputeUIElementRegion(commands, element);
+  UIElement *persistentElement = uiGetCachedElement(element, layout);
+  v4 color = V4(0, 0, 0, 1);
+  if(persistentElement)
+    {
+      if(persistentElement->isActive)
+	{
+	  color = V4(1, 0.5f, 0, 1);
+	}
+    }
+  renderPushRectOutline(commands, element->region, 4.f, color);
+  
+  if(element->flags & UIElementFlag_drawText)
+    {      
+      renderPushText(commands, layout->font, element->name, element->region.min);
+    }
+  if(element->flags & UIElementFlag_drawBorder)
+    {
+      v4 color = element->isActive ? V4(1, 0.5f, 0, 1) : V4(0, 0, 0, 1);
+      renderPushRectOutline(commands, element->region, 0.01f, color);
+    }
+  if(element->flags & UIElementFlag_drawBackground)
+    {
+      renderPushQuad(commands, element->region, element->color);
+    }
+  if(element->flags & UIElementFlag_draggable)
+    {
+      v2 elementRegionCenter = getCenter(element->region);
+      v2 elementRegionDim = getDim(element->region);
+      v2 travelDim = V2(0.2f*elementRegionDim.x, elementRegionDim.y);
+      Rect2 travelRect = rectCenterDim(elementRegionCenter, travelDim);
+      renderPushQuad(commands, travelRect, V4(0, 0, 0, 1));
+
+      if(element->dataFlags == UIDataFlag_float)
+	{
+	  r32 paramValue = *(r32 *)element->data;
+	  r32 paramPercentage = (paramValue - element->range.min)/(element->range.max - element->range.min);
+	  v2 faderCenter = V2(elementRegionCenter.x, element->region.min.y + paramPercentage*elementRegionDim.y);
+	  Rect2 faderRect = rectCenterDim(faderCenter, V2(elementRegionDim.x, 0.1f*elementRegionDim.y));
+	  renderPushQuad(commands, faderRect, element->color);
+	}
+    }
+
+
+  if(element->next)
+    {
+      if(element->next != (UIElement *)&element->parent->first)
+	{
+	  renderPushUIElement(commands, layout, element->next);
+	}
+    }
+  if(element->first)
+    {
+      if(element->first != (UIElement *)&element->first)
+	{
+	  renderPushUIElement(commands, layout, element->first);
+	}
+    }  
+}
+
+inline void
+renderPushUILayout(RenderCommands *commands, UILayout *layout)
+{
+  renderPushUIElement(commands, layout, layout->root);
 }
 
 #endif

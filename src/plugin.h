@@ -30,5 +30,7 @@ struct PluginState
   LoadedBitmap testBitmap;
   LoadedFont testFont;
 
+  UILayout layout;
+
   bool initialized;
 };
