@@ -72,11 +72,17 @@ initializePluginState(PluginMemory *memoryBlock)
       
 	  pluginState->phasor = 0.f;
 	  pluginState->freq = 440.f;
-	  pluginState->volume = 0.8f;	  
+	  //pluginState->volume = 0.8f;
+	  //pluginSetFloatParameter(&pluginState->volume, 0.8f);
+	  pluginState->volume.currentValue = 0.8f;
+	  pluginState->volume.targetValue = 0.8f;
+	  pluginState->volume.range = makeRange(0, 1);
+	  pluginState->soundIsPlaying.value = false;
 
 	  pluginState->loadedSound.sound = loadWav("../data/fingertips.wav", &pluginState->permanentArena);
 	  pluginState->loadedSound.samplesPlayed = 0;
-	  pluginState->loadedSound.isPlaying = false;
+	  //pluginState->loadedSound.isPlaying = false;
+	  //pluginState->loadedSound.isPlaying = &pluginState->soundIsPlaying;
 
 	  pluginState->testBitmap = loadBitmap("../data/signal_z.bmp", &pluginState->permanentArena);
 
@@ -102,20 +108,13 @@ RENDER_NEW_FRAME(renderNewFrame)
     {
       //renderCommands->arena = &pluginState->frameArena;
       renderBeginCommands(renderCommands, &pluginState->frameArena);
-      
+
+      // TODO: maybe make a logging system?
 #if 0
       printf("mouseP: (%.2f, %.2f)\n",
 	     input->mouseState.position.x, input->mouseState.position.y);
       printButtonState(input->mouseState.buttons[MouseButton_left], "left");
-      printButtonState(input->mouseState.buttons[MouseButton_right], "right");
-      /*
-      printf("mouseLeft: %s, %s\n",
-	     wasPressed(input->mouseState.buttons[MouseButton_left]) ? "pressed" : "not pressed",
-	     isDown(input->mouseState.buttons[MouseButton_left]) ? "down" : "up");
-      printf("mouseRight: %s, %s\n",
-	     wasPressed(input->mouseState.buttons[MouseButton_right]) ? "pressed" : "not pressed",	     
-	     isDown(input->mouseState.buttons[MouseButton_right]) ? "down" : "up");
-      */
+      printButtonState(input->mouseState.buttons[MouseButton_right], "right");     
 #endif
 
 #if 0
@@ -132,11 +131,10 @@ RENDER_NEW_FRAME(renderNewFrame)
       u32 windowWidth = renderCommands->widthInPixels;
       u32 windowHeight = renderCommands->heightInPixels;
       LoadedFont *font = &pluginState->testFont;
-#if 1
-      // TODO: mouse intersection testing, parameter modification
+#if 1     
       UILayout *layout = &pluginState->layout;
       uiBeginLayout(layout, V2(windowWidth, windowHeight), &input->mouseState);
-#if 1
+#if 0
       printf("\nlayout:\n  mouseP: (%.2f, %.2f)\n  left pressed: %s\n  left released: %s\n  left down: %s\n",
 	     layout->mouseP.x, layout->mouseP.y,
 	     layout->leftButtonPressed ? "true" : "false",
@@ -146,27 +144,34 @@ RENDER_NEW_FRAME(renderNewFrame)
       UIComm title = uiMakeTextElement(layout, "I Will Become a Granular Synthesizer!", 0.75f, 0.f);
       
       UIComm play = uiMakeButton(layout, "play", V2(0.75f, 0.75f), V2(0.1f, 0.1f),
-				     &pluginState->loadedSound.isPlaying, V4(0, 0, 1, 1));
+				     &pluginState->soundIsPlaying, V4(0, 0, 1, 1));
       if(play.flags & UICommFlag_leftPressed)
 	{
-	  pluginState->loadedSound.isPlaying = true;
+	  //pluginState->loadedSound.isPlaying = true;
+	  ASSERT(play.element->parameterType = UIParameter_boolean);
+	  pluginSetBooleanParameter(play.element->bParam, true);
 	}
             
       UIComm volume = uiMakeSlider(layout, "volume", V2(0.1f, 0.1f), V2(0.1f, 0.75f),
-				        &pluginState->volume, makeRange(0.f, 1.f), V4(0.8f, 0.8f, 0.8f, 1));
-
+				   &pluginState->volume,// makeRange(0.f, 1.f),
+				   V4(0.8f, 0.8f, 0.8f, 1));
+#if 0
       printf("\nvolume flags:\n %u(comm)\n %u(element)\n", volume.flags, volume.element->commFlags);
       printf("volume rect:\n  min: (%.2f, %.2f)\n  max: (%.2f, %.2f)\n",
 	     volume.element->region.min.x, volume.element->region.min.y,
 	     volume.element->region.max.x, volume.element->region.max.y);
-
+#endif
       if(volume.flags & UICommFlag_leftDragging)
 	{
-	  v2 dMouseP = layout->mouseP.xy - layout->lastMouseP.xy;
-	  r32 *parameter = (r32 *)volume.element->data;
-	  r32 oldVal = *parameter;	  
-	  r32 newVal = clampToRange(oldVal + dMouseP.y/(r32)windowHeight, volume.element->range);
-	  *parameter = newVal;
+	  v2 dMouseP = layout->mouseP.xy - layout->lastMouseP.xy;	  
+	  ASSERT(volume.element->parameterType == UIParameter_float);
+	  //r32 *parameter = (r32 *)volume.element->data;	  
+	  //r32 oldVal = *parameter;
+	  r32 oldVal = pluginReadFloatParameter(volume.element->fParam);
+	  //r32 newVal = clampToRange(oldVal + dMouseP.y/(r32)windowHeight, volume.element->range);
+	  r32 newVal = oldVal + dMouseP.y/getDim(volume.element->region).y;
+	  //*parameter = newVal;
+	  pluginSetFloatParameter(volume.element->fParam, newVal);
 	}
 
       if(wasPressed(input->keyboardState.keys[KeyboardButton_tab]))
@@ -220,51 +225,48 @@ RENDER_NEW_FRAME(renderNewFrame)
 	    }
 	}
 
+      // TODO: merge this keyboard interaction codepath with the mouse interaction codepath
       if(selectedElement)
 	{
 	  selectedElement->lastFrameTouched = layout->frameIndex;
 	  //selectedElement->isActive = true;
 
 	  if(selectedElement->flags & UIElementFlag_draggable)
-	    {
-	      if(selectedElement->data)
+	    {	      
+	      if(selectedElement->parameterType == UIParameter_float)
 		{
-		  if(selectedElement->dataFlags & UIDataFlag_float)
+		  r32 parameter = pluginReadFloatParameter(selectedElement->fParam);//(r32 *)selectedElement->data;
+		  r32 newParameter = parameter;
+		  if(wasPressed(input->keyboardState.keys[KeyboardButton_minus]))
 		    {
-		      r32 *parameter = (r32 *)selectedElement->data;
-		      if(wasPressed(input->keyboardState.keys[KeyboardButton_minus]))
-			{
-			  r32 newParameter = *parameter - 0.02f*getLength(selectedElement->range);
-			  newParameter = clampToRange(newParameter, selectedElement->range);
-			  
-			  *parameter = newParameter;
-			}
-		      
-		      if(wasPressed(input->keyboardState.keys[KeyboardButton_equal]) &&
-			 isDown(input->keyboardState.modifiers[KeyboardModifier_shift]))
-			{
-			  r32 newParameter = *parameter + 0.02f*getLength(selectedElement->range);
-			  newParameter = clampToRange(newParameter, selectedElement->range);
-			  
-			  *parameter = newParameter;
-			}
+		      newParameter = parameter - 0.02f*getLength(selectedElement->fParam->range);
+		      //newParameter = clampToRange(newParameter, selectedElement->range);			  
+		      //*parameter = newParameter;		      
 		    }
+		      
+		  if(wasPressed(input->keyboardState.keys[KeyboardButton_equal]) &&
+		     isDown(input->keyboardState.modifiers[KeyboardModifier_shift]))
+		    {
+		      newParameter = parameter + 0.02f*getLength(selectedElement->fParam->range);
+		      //newParameter = clampToRange(newParameter, selectedElement->range);			  
+		      //*parameter = newParameter;
+		    }
+
+		  pluginSetFloatParameter(selectedElement->fParam, newParameter);
 		}
 	    }
 	  else if(selectedElement->flags * UIElementFlag_clickable)
-	    {
-	      if(selectedElement->data)
+	    {	      
+	      if(selectedElement->parameterType == UIParameter_boolean)
 		{
-		  if(selectedElement->dataFlags & UIDataFlag_boolean)
+		  bool parameter = pluginReadBooleanParameter(selectedElement->bParam);
+		  if(wasPressed(input->keyboardState.keys[KeyboardButton_enter]))
 		    {
-		      bool *parameter = (bool *)selectedElement->data;
-		      if(wasPressed(input->keyboardState.keys[KeyboardButton_enter]))
-			{
-			  bool oldVal = *parameter;
-			  bool newVal = !oldVal;
+		      //bool oldVal = *parameter;
+		      bool newVal = !parameter;
 			  
-			  *parameter = newVal;
-			}
+		      //*parameter = newVal;
+		      pluginSetBooleanParameter(selectedElement->bParam, newVal);
 		    }
 		}
 	    }
@@ -396,7 +398,8 @@ AUDIO_PROCESS(audioProcess)
 		    u32 noteNumber = *atMidiBuffer++;
 		    u32 noteVelocity = *atMidiBuffer++;
 		    pluginState->freq = hertzFromMidiNoteNumber(noteNumber);
-		    pluginState->volume = (r32)noteVelocity/127.f;
+		    //pluginState->volume = (r32)noteVelocity/127.f;
+		    pluginSetFloatParameter(&pluginState->volume, (r32)noteVelocity/127.f);
 		  } break;
 		  
 		default:
@@ -415,9 +418,10 @@ AUDIO_PROCESS(audioProcess)
 
       r64 nFreq = M_TAU*pluginState->freq/(r64)audioBuffer->sampleRate;
 
+      bool soundIsPlaying = pluginReadBooleanParameter(&pluginState->soundIsPlaying);
       PlayingSound *loadedSound = &pluginState->loadedSound;
       s16 *loadedSoundSamples[2] = {};
-      if(loadedSound->isPlaying)
+      if(soundIsPlaying)
 	{
 	  loadedSoundSamples[0] = loadedSound->sound.samples[0] + loadedSound->samplesPlayed;
 	  loadedSoundSamples[1] = loadedSound->sound.samples[loadedSound->sound.channelCount - 1] + loadedSound->samplesPlayed;
@@ -431,29 +435,36 @@ AUDIO_PROCESS(audioProcess)
 	    r32 *audioFrames = (r32 *)audioBuffer->buffer;
 	    for(u64 i = 0; i < audioBuffer->framesToWrite; ++i)
 	      {
+		r32 volume = pluginReadFloatParameter(&pluginState->volume);
+		
 		pluginState->phasor += nFreq;
 		if(pluginState->phasor > M_TAU) pluginState->phasor -= M_TAU;
 				  
-		r32 sinVal = pluginState->volume*sin(pluginState->phasor);
+		r32 sinVal = volume*sin(pluginState->phasor);
 		for(u32 j = 0; j < audioBuffer->channels; ++j)
 		  {
 		    r32 mixedVal = 0.5f*sinVal;
-		    if(pluginState->loadedSound.isPlaying)		       
+
+		    soundIsPlaying = pluginReadBooleanParameter(&pluginState->soundIsPlaying);
+		    if(soundIsPlaying)		       
 		      {
 			if((loadedSound->samplesPlayed + i) < loadedSound->sound.sampleCount)
 			  {
-			    r32 loadedSoundVal = pluginState->volume*(r32)loadedSoundSamples[j][i]/32000.f;
+			    r32 loadedSoundVal = volume*(r32)loadedSoundSamples[j][i]/32000.f;
 			    mixedVal += 0.5f*loadedSoundVal;
 			  }
 			else
 			  {
-			    loadedSound->isPlaying = false;
+			    //loadedSound->isPlaying = false;
+			    pluginSetBooleanParameter(&pluginState->soundIsPlaying, false);
 			    loadedSound->samplesPlayed = 0;
 			  }
 		      }
 		    
 		    *audioFrames++ = mixedVal;
 		  }
+
+		pluginUpdateFloatParameter(&pluginState->volume);
 	      }
 	  } break;
 
@@ -462,36 +473,44 @@ AUDIO_PROCESS(audioProcess)
 	    s16 *audioFrames = (s16 *)audioBuffer->buffer;
 	    for(u64 i = 0; i < audioBuffer->framesToWrite; ++i)
 	      {
+		r32 volume = pluginReadFloatParameter(&pluginState->volume);
+
 		pluginState->phasor += nFreq;
 		if(pluginState->phasor > M_TAU) pluginState->phasor -= M_TAU;
 				  
-		r32 sinVal = 32000.f*pluginState->volume*sin(pluginState->phasor);
+		r32 sinVal = 32000.f*volume*sin(pluginState->phasor);
 		for(u32 j = 0; j < audioBuffer->channels; ++j)
 		  {
 		    r32 mixedVal = 0.5f*sinVal;
-		    if(pluginState->loadedSound.isPlaying)		       
+
+		    soundIsPlaying = pluginReadBooleanParameter(&pluginState->soundIsPlaying);
+		    if(soundIsPlaying)		       
 		      {
 			if((loadedSound->samplesPlayed + i) < loadedSound->sound.sampleCount)
 			  {
-			    r32 loadedSoundVal = pluginState->volume*(r32)loadedSoundSamples[j][i];
+			    r32 loadedSoundVal = volume*(r32)loadedSoundSamples[j][i];
 			    mixedVal += 0.5f*loadedSoundVal;
 			  }
 			else
 			  {
-			    loadedSound->isPlaying = false;
+			    //loadedSound->isPlaying = false;
+			    pluginSetBooleanParameter(&pluginState->soundIsPlaying, false);
 			    loadedSound->samplesPlayed = 0;
 			  }
 		      }
 		    
 		    *audioFrames++ = (s16)mixedVal;
-		  }		
+		  }
+
+		pluginUpdateFloatParameter(&pluginState->volume);
 	      }
 	  } break;
 
 	default: { ASSERT(!"invalid default case"); } break;
 	}
 
-      if(loadedSound->isPlaying)
+      soundIsPlaying = pluginReadBooleanParameter(&pluginState->soundIsPlaying);
+      if(soundIsPlaying)
 	{
 	  loadedSound->samplesPlayed += audioBuffer->framesToWrite;
 	}

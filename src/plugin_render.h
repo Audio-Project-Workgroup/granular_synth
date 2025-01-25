@@ -273,10 +273,10 @@ renderPushUIElement(RenderCommands *commands, UILayout *layout, UIElement *eleme
       Rect2 travelRect = rectCenterDim(elementRegionCenter, travelDim);
       renderPushQuad(commands, travelRect, V4(0, 0, 0, 1));
 
-      if(element->dataFlags == UIDataFlag_float)
+      if(element->parameterType == UIParameter_float)
 	{
-	  r32 paramValue = *(r32 *)element->data;
-	  r32 paramPercentage = (paramValue - element->range.min)/(element->range.max - element->range.min);
+	  r32 paramValue = pluginReadFloatParameter(element->fParam);//*(r32 *)element->data;
+	  r32 paramPercentage = (paramValue - element->fParam->range.min)/(element->fParam->range.max - element->fParam->range.min);
 	  v2 faderCenter = V2(elementRegionCenter.x, element->region.min.y + paramPercentage*elementRegionDim.y);
 	  Rect2 faderRect = rectCenterDim(faderCenter, V2(elementRegionDim.x, 0.1f*elementRegionDim.y));
 	  renderPushQuad(commands, faderRect, element->color);

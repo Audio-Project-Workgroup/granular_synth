@@ -122,18 +122,20 @@ uiMakeElement(UILayout *layout, char *name, u32 flags, v4 color)
 }
 
 inline void
-uiSetElementDataBoolean(UIElement *element, bool *variable)
+uiSetElementDataBoolean(UIElement *element, PluginBooleanParameter *param)//bool *variable)
 {
-  element->dataFlags = UIDataFlag_boolean;
-  element->data = variable;
+  element->parameterType = UIParameter_boolean;
+  //element->data = variable;
+  element->bParam = param;
 }
 
 inline void
-uiSetElementDataFloat(UIElement *element, r32 *variable, RangeR32 range)
+uiSetElementDataFloat(UIElement *element, PluginFloatParameter *param)//r32 *variable, RangeR32 range)
 {
-  element->dataFlags = UIDataFlag_float;
-  element->data = variable;
-  element->range = range;
+  element->parameterType = UIParameter_float;
+  element->fParam = param;
+  //element->data = variable;
+  //element->range = range;
 }
 
 inline void
@@ -418,11 +420,13 @@ uiCommFromElement(UIElement *element, UILayout *layout)
 	  result.flags |= UICommFlag_leftDragging;
 	  result.element->lastFrameTouched = layout->frameIndex;
 	}
+      else if(layout->leftButtonReleased)
+	{
+	  result.flags |= UICommFlag_leftReleased;
+	  result.element->lastFrameTouched = layout->frameIndex;
+	}
     }
-
-  // TODO: I'd like to only set this if the user actually interacted with the element. But if we do that, the user
-  //       can drag elements even if they clicked outside the element's region, which should not be happening. -Ry
-  //result.element->lastFrameTouched = layout->frameIndex;
+  
   result.element->commFlags = result.flags;
   return(result);
 }
@@ -443,10 +447,11 @@ uiMakeTextElement(UILayout *layout, char *message, r32 wScale, r32 hScale, v4 co
 }
 
 inline UIComm
-uiMakeButton(UILayout *layout, char *name, v2 offset, v2 dim, bool *variable, v4 color = V4(1, 1, 1, 1))
+uiMakeButton(UILayout *layout, char *name, v2 offset, v2 dim, PluginBooleanParameter *param,
+	     v4 color = V4(1, 1, 1, 1))
 {
   UIElement *button = uiMakeElement(layout, name, UIElementFlag_clickable | UIElementFlag_drawBackground, color);
-  uiSetElementDataBoolean(button, variable);
+  uiSetElementDataBoolean(button, param);
   uiSetSemanticSizeRelative(button, offset, dim);
 
   UIComm buttonComm = uiCommFromElement(button, layout);
@@ -455,11 +460,11 @@ uiMakeButton(UILayout *layout, char *name, v2 offset, v2 dim, bool *variable, v4
 }
 
 inline UIComm
-uiMakeSlider(UILayout *layout, char *name, v2 offset, v2 dim, r32 *variable, RangeR32 range,
+uiMakeSlider(UILayout *layout, char *name, v2 offset, v2 dim, PluginFloatParameter *param,
 	     v4 color = V4(1, 1, 1, 1))
 {
   UIElement *slider = uiMakeElement(layout, name, UIElementFlag_clickable | UIElementFlag_draggable, color);
-  uiSetElementDataFloat(slider, variable, range);
+  uiSetElementDataFloat(slider, param);
   uiSetSemanticSizeRelative(slider, offset, dim);
 
   UIComm sliderComm = uiCommFromElement(slider, layout);

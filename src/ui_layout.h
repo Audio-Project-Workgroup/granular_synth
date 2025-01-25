@@ -51,11 +51,11 @@ enum UIElementFlags : u32
   UIElementFlag_focusHotOff = (1 << 6),
 };
 
-enum UIDataFlags : u32
+enum UIParameter
 {
-  UIDataFlag_none,
-  UIDataFlag_boolean,
-  UIDataFlag_float,
+  UIParameter_none,
+  UIParameter_boolean,
+  UIParameter_float,
 };
 
 struct UIHashKey
@@ -84,9 +84,14 @@ struct UIElement
   u8 *name;
   v4 color;
 
-  UIDataFlags dataFlags;
-  void *data;
-  RangeR32 range;
+  UIParameter parameterType;
+  union
+  {
+    PluginBooleanParameter *bParam;
+    PluginFloatParameter *fParam;
+  };
+  //void *data;
+  //RangeR32 range;
 
   //bool isActive;  
   UISize semanticDim[UIAxis_COUNT];

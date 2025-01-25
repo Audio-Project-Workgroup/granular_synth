@@ -6,6 +6,16 @@
 #define M_TAU (2.0*M_PI)
 
 //
+// scalar
+//
+
+inline r32
+Abs(r32 val)
+{
+  return(fabsf(val));
+}
+
+//
 // v2
 //
 
