@@ -221,15 +221,27 @@ AudioPluginAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
   audioBuffer.channels = 1;
   audioBuffer.buffer = calloc(samplesPerBlock, 2*sizeof(float));
   audioBuffer.midiBuffer = (u8 *)calloc(KILOBYTES(1), 1);
+  
+  resourcesReleased = false;
 }
 
 void
 AudioPluginAudioProcessor::releaseResources()
-{  
-  free(audioBuffer.buffer);
-  free(audioBuffer.midiBuffer);
-  free(pluginMemory.memory);  
-  libPlugin.close(); 
+{
+  // NOTE: when an instance of the plugin is deleted, this function gets called multiple times, because the DAW
+  //       wants to be *super careful* and make sure all the resources were freed for real, so we have to keep 
+  //       track of whether or not we *actually* have to free our resources, otherwise the DAW will crash itself
+  //       by double-freeing resources.
+  //       there is, of course, no need to reinvent the wheel that is the audio software toolchain, since
+  //       everyone involved in its creation was very clever and thought through everything they did perfectly
+  if(!resourcesReleased)
+    {
+      free(audioBuffer.buffer);
+      free(audioBuffer.midiBuffer);
+      free(pluginMemory.memory);  
+      libPlugin.close();
+      resourcesReleased = true;
+    }
 }
 
 bool

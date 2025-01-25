@@ -46,6 +46,9 @@ enum UIElementFlags : u32
   UIElementFlag_drawText = (1 << 2),
   UIElementFlag_drawBorder = (1 << 3),
   UIElementFlag_drawBackground = (1 << 4),
+  
+  UIElementFlag_focusHot = (1 << 5),
+  UIElementFlag_focusHotOff = (1 << 6),
 };
 
 enum UIDataFlags : u32
@@ -85,12 +88,13 @@ struct UIElement
   void *data;
   RangeR32 range;
 
-  bool isActive;  
+  //bool isActive;  
   UISize semanticDim[UIAxis_COUNT];
   UISize semanticOffset[UIAxis_COUNT];
 
   // NOTE: computed
-  Rect2 region;  
+  Rect2 region;
+  u32 commFlags;
 };
 
 #define ELEMENT_SENTINEL(element) (UIElement *)&element->first
@@ -103,423 +107,81 @@ struct UILayout
   LoadedFont *font;
 
   u32 elementCount;
-  UIElement *root;
-  //UIElement *elementFreeList;
+  UIElement *root;  
   
   UIElement *currentParent;
-
+  
   UIElement *elementCache[512];
+  UIElement *elementFreeList;
 
   //UIElement *hotElementStack[32];
   u32 selectedElementOrdinal;
-  UIElement *selectedElement;
+  UIHashKey selectedElement;
+
+  // NOTE: interaction state
+  v3 mouseP;
+  v3 lastMouseP;
+  v2 mouseLClickP;
+  v2 mouseRClickP;
+  bool leftButtonPressed;
+  bool leftButtonReleased;
+  bool leftButtonDown;
+  bool rightButtonPressed;
+  bool rightButtonReleased;
+  bool rightButtonDown;
 
   u32 frameIndex;
 };
 
-inline UILayout
-uiInitializeLayout(Arena *frameArena, Arena *permanentArena, LoadedFont *font)
+enum UICommFlags : u32
 {
-  UILayout layout = {};
-  layout.frameArena = frameArena;
-  layout.permanentArena = permanentArena;
-  layout.font = font;
+  // NOTE: mouse button pressed while hovering
+  UICommFlag_leftPressed = (1 << 0),
+  UICommFlag_rightPressed = (1 << 1),
 
-  return(layout);
-}
+  // NOTE: mouse button previously pressed, button still down
+  UICommFlag_leftDragging = (1 << 2),
+  UICommFlag_rightDragging = (1 << 3),
 
-inline void
-uiPushParentElement(UILayout *layout, UIElement *newParent)
-{
-  layout->currentParent = newParent;
-  //newParent->first = newParent;
-  //newParent->last = newParent;
-  layout->currentParent->first = (UIElement *)&layout->currentParent->first;
-  layout->currentParent->last = (UIElement *)&layout->currentParent->first;
-}
+  // NOTE: mouse button previously pressed, button released in bounds
+  UICommFlag_leftClicked = (1 << 4),
+  UICommFlag_rightClicked = (1 << 5),
 
-inline void
-uiPopParentElement(UILayout *layout)
-{
-  layout->currentParent = layout->currentParent->parent;  
-}
+  // NOTE: mouse button previously pressed, button released in or out of bounds
+  UICommFlag_leftReleased = (1 << 6),
+  UICommFlag_rightReleased = (1 << 7),
 
-inline UIElement *
-uiAllocateElement(UILayout *layout, char *name, u32 flags, v4 color)
-{
-  UIElement *result = 0;
-  //if(layout->elementFreeList)
-  //{
-  //  result = layout->elementFreeList;
-  //  layout->elementFreeList = result->next;
-  //  result->next = 0;
-  //}
-  //else
-  //{
-  result = arenaPushStruct(layout->frameArena, UIElement, arenaFlagsZeroNoAlign());      
-      //}
-  result->name = arenaPushString(layout->frameArena, name);
-  result->flags = flags;
-  result->color = color;
+  // NOTE: mouse button previously clicked, button pressed again
+  UICommFlag_leftDoubleClicked = (1 << 8),
+  UICommFlag_rightDoubleClicked = (1 << 9),
 
-  return(result);
-}
+  // NOTE: key pressed while element focused
+  UICommFlag_keyPressed = (1 << 10),
 
-inline UIHashKey
-uiHashKeyFromString(u8 *name)
-{
-  // TODO: better hash function
-  u64 hashKey = 5381;
-  u8 *at = name;
-  while(*at)
-    {
-      hashKey = ((hashKey << 5) + hashKey + *at++);
-    }
+  // NOTE: mouse over element
+  UICommFlag_hovering = (1 << 11),
 
-  UIHashKey result = {};
-  result.key = hashKey;
-  result.name = name;
-  
-  return(result);
-}
+  // NOTE: combos
+  UICommFlag_pressed = UICommFlag_leftPressed | UICommFlag_keyPressed,
+  UICommFlag_released = UICommFlag_leftReleased,
+  UICommFlag_clicked = UICommFlag_leftClicked | UICommFlag_keyPressed,
+  UICommFlag_doubleClicked = UICommFlag_leftDoubleClicked,
+  UICommFlag_dragging = UICommFlag_leftDragging,
+};
 
-inline bool
-uiHashKeysAreEqual(UIHashKey key1, UIHashKey key2)
-{
-  bool result = (key1.key == key2.key);
-  if(result)
-    {
-      u8 *at1 = key1.name;
-      u8 *at2 = key2.name;
-      while(*at1 && *at2)
-	{
-	  result = ((*at1++) == (*at2++));
-	  if(!result) break;
-	}
-      if(result)
-	{
-	  if((*at1 != 0) || (*at2 != 0))
-	    {
-	      result = false;
-	    }
-	}
-    }
-
-  return(result);
-}
-
-inline UIElement *
-uiMakeElement(UILayout *layout, char *name, u32 flags, v4 color)	      
+struct UIComm
 {  
-  UIElement *result = uiAllocateElement(layout, name, flags, color);
-  result->hashKey = uiHashKeyFromString(result->name);
+  UIElement *element;
+  u32 flags;
+};
 
-  // NOTE: add as a child of the current parent if there is one, else become the parent
-  UIElement *parent = layout->currentParent;
-  if(parent)
-    {
-      UIElement *parentSentinel = (UIElement *)&parent->first;
-      DLINKED_LIST_APPEND(parentSentinel, result);
-      result->parent = parent;
-    }
-  else
-    {
-      uiPushParentElement(layout, result);
-    }
-  
-  // NOTE: set parameters of the new element
-  //result->name = name;
-  //result->flags = flags;
-  //result->color = color;
-  //result->data = parameter;   
+UIHashKey uiHashKeyFromString(u8 *name);
+bool uiHashKeysAreEqual(UIHashKey key1, UIHashKey key2);
 
-  ++layout->elementCount;
-  return(result);
-}
+UIElement *uiCacheElement(UIElement *element, UILayout *layout);
+UIElement *uiGetCachedElement(UIElement *element, UILayout *layout);
 
-inline void
-uiSetElementDataBoolean(UIElement *element, bool *variable)
-{
-  element->dataFlags = UIDataFlag_boolean;
-  element->data = variable;
-}
-
-inline void
-uiSetElementDataFloat(UIElement *element, r32 *variable, RangeR32 range)
-{
-  element->dataFlags = UIDataFlag_float;
-  element->data = variable;
-  element->range = range;
-}
-
-inline void
-uiSetSemanticSizeAbsolute(UIElement *element, v2 offset, v2 dim)
-{
-  element->semanticDim[UIAxis_x] = makeUISize(UISizeType_pixels, dim.x);
-  element->semanticDim[UIAxis_y] = makeUISize(UISizeType_pixels, dim.y);
-  element->semanticOffset[UIAxis_x] = makeUISize(UISizeType_pixels, offset.x);
-  element->semanticOffset[UIAxis_y] = makeUISize(UISizeType_pixels, offset.y);
-}
-
-inline void
-uiSetSemanticSizeRelative(UIElement *element, v2 offset, v2 dim)
-{
-  element->semanticDim[UIAxis_x] = makeUISize(UISizeType_percentOfParentDim, dim.x);
-  element->semanticDim[UIAxis_y] = makeUISize(UISizeType_percentOfParentDim, dim.y);
-  element->semanticOffset[UIAxis_x] = makeUISize(UISizeType_percentOfParentDim, offset.x);
-  element->semanticOffset[UIAxis_y] = makeUISize(UISizeType_percentOfParentDim, offset.y);
-}
-
-inline void
-uiSetSemanticSizeTextCentered(UIElement *element, LoadedFont *font, r32 wScale, r32 hScale)
-{
-  v2 textDim = getTextDim(font, element->name);
-  v2 textOffset = V2(0.5f*(element->parent->semanticDim[UIAxis_x].value - textDim.x),
-		     element->parent->semanticDim[UIAxis_y].value - font->verticalAdvance);
-  uiSetSemanticSizeAbsolute(element, textOffset, textDim);
-}
-
-inline void
-uiBeginLayout(UILayout *layout, v2 screenDimPixels, v4 color = V4(1, 1, 1, 1))
-{
-  ASSERT(layout->elementCount == 0);;
-  layout->root = uiMakeElement(layout, "root", 0, color);
-  uiSetSemanticSizeAbsolute(layout->root, V2(0, 0), screenDimPixels);
-  ++layout->frameIndex;
-}
-
-inline void
-uiDestroyElement(UILayout *layout, UIElement *element)
-{
-  if(element->next) element->next->prev = element->prev;
-  if(element->prev) element->prev->next = element->next;  
-  //ZERO_STRUCT(*element);
-  --layout->elementCount;
-
-  /*
-  // NOTE: update element cache, adding an element if necessary (we are not clearing the cache ever)
-  UIHashKey hashKey = element->hashKey;
-  u64 cacheIndex = hashKey.key % ARRAY_COUNT(layout->elementCache);
-  UIElement *cachedElement = layout->elementCache[cacheIndex];
-  if(cachedElement)
-    {
-      if(uiHashKeysAreEqual(hashKey, cachedElement->hashKey))
-	{
-	  element->nextInHash = cachedElement->nextInHash;
-	  //COPY_SIZE(cachedElement, element, sizeof(*element));
-	  *cachedElement = *element;
-	}
-      else
-	{
-	  while(cachedElement->nextInHash)
-	    {
-	      cachedElement = cachedElement->nextInHash;
-	      if(uiHashKeysAreEqual(hashKey, cachedElement->hashKey))
-		{
-		  element->nextInHash = cachedElement->nextInHash;
-		  //COPY_SIZE(cachedElement, element, sizeof(UIElement));
-		  *cachedElement = *element;
-		  break;
-		}
-	    }
-      
-	  if(!cachedElement->nextInHash)
-	    {
-	      cachedElement->nextInHash = arenaPushStruct(layout->permanentArena, UIElement);
-	      //COPY_SIZE(layout->elementCache[cacheIndex], element, sizeof(UIElement));
-	      *cachedElement->nextInHash = *element;
-	    }
-	}
-    }
-  else
-    {
-      layout->elementCache[cacheIndex] = arenaPushStruct(layout->permanentArena, UIElement);
-      //COPY_SIZE(layout->elementCache[cacheIndex], element, sizeof(UIElement));
-      *layout->elementCache[cacheIndex] = *element;
-    }
-  */
-}
-
-inline UIElement *
-uiCacheElement(UIElement *element, UILayout *layout)
-{
-  UIHashKey hashKey = element->hashKey;
-  u64 cacheIndex = hashKey.key % ARRAY_COUNT(layout->elementCache);
-  UIElement *cachedElement = layout->elementCache[cacheIndex];
-  if(cachedElement)
-    {
-      if(uiHashKeysAreEqual(hashKey, cachedElement->hashKey))
-	{
-	  if(element->lastFrameTouched > cachedElement->lastFrameTouched)
-	    {
-	      element->nextInHash = cachedElement->nextInHash;
-	      //COPY_SIZE(cachedElement, element, sizeof(*element));
-	      *cachedElement = *element;
-	    }
-	}
-      else
-	{
-	  while(cachedElement->nextInHash)
-	    {
-	      cachedElement = cachedElement->nextInHash;
-	      if(uiHashKeysAreEqual(hashKey, cachedElement->hashKey))
-		{
-		  if(element->lastFrameTouched > cachedElement->lastFrameTouched)
-		    {
-		      element->nextInHash = cachedElement->nextInHash;
-		      //COPY_SIZE(cachedElement, element, sizeof(UIElement));
-		      *cachedElement = *element;
-		    }
-		  break;
-		}
-	    }
-      
-	  if(!cachedElement->nextInHash)
-	    {
-	      cachedElement->nextInHash = arenaPushStruct(layout->permanentArena, UIElement);
-	      //COPY_SIZE(layout->elementCache[cacheIndex], element, sizeof(UIElement));
-	      *cachedElement->nextInHash = *element;
-	      cachedElement = cachedElement->nextInHash;
-	    }
-	}
-    }
-  else
-    {
-      cachedElement = arenaPushStruct(layout->permanentArena, UIElement);
-      layout->elementCache[cacheIndex] = cachedElement;
-      //COPY_SIZE(layout->elementCache[cacheIndex], element, sizeof(UIElement));
-      *cachedElement = *element;
-    }
-
-  return(cachedElement);
-}
-
-inline UIElement *
-uiGetCachedElement(UIElement *element, UILayout *layout)
-{
-  UIHashKey hashKey = element->hashKey;
-  u64 cacheIndex = hashKey.key % ARRAY_COUNT(layout->elementCache);
-  UIElement *cachedElement = layout->elementCache[cacheIndex];
-  if(cachedElement)
-    {
-      if(!uiHashKeysAreEqual(hashKey, cachedElement->hashKey))
-	{
-	  while(cachedElement->nextInHash)
-	    {
-	      cachedElement = cachedElement->nextInHash;
-	      if(uiHashKeysAreEqual(hashKey, cachedElement->hashKey))
-		{
-		  break;
-		}
-	    }
-	}
-    }
-
-  return(cachedElement);
-}
-
-inline void
-uiPrintElement(UIElement *element, u32 depth)
-{
-  if(element)
-    {
-      for(u32 i = 0; i < depth; ++i)
-	{
-	  printf("-");
-	}
-      if(element->name)
-	{
-	  printf("%s\n", element->name);
-	}
-
-      if(element->first)
-	{
-	  if(element->first != (UIElement *)&element->first)
-	    {
-	      uiPrintElement(element->first, depth + 1);
-	    }
- 	}
-
-      if(element->next)
-	{
-	  if(element->next != (UIElement *)&element->parent->first)
-	    {
-	      uiPrintElement(element->next, depth);
-	    }
-	}
-    }
-}
-
-inline void
-uiPrintLayout(UILayout *layout)
-{
-  if(layout->elementCount)
-    {
-      uiPrintElement(layout->root, 0);
-    }
-}
-
-inline void
-uiDestroyElementRecursive(UILayout *layout, UIElement *element)
-{
-  if(element->first)
-    {
-      if(element->first != (UIElement *)&element->first)
-	{
-	  uiDestroyElementRecursive(layout, element->first);
-	}
-    }
-
-  if(element->next)
-    {
-      if(element->next != (UIElement *)&element->parent->first)
-	{
-	  uiDestroyElementRecursive(layout, element->next);
-	}
-    }
-
-  uiDestroyElement(layout, element);
-  //uiPrintLayout(layout);
-}
-
-inline void
-uiEndLayout(UILayout *layout)
-{  
-  uiDestroyElementRecursive(layout, layout->root);
-  layout->root = 0;
-  layout->currentParent = 0;
-}
-
-inline UIElement *
-uiMakeTextElement(UILayout *layout, char *message, r32 wScale, r32 hScale, v4 color = V4(1, 1, 1, 1))
-{
-  UIElement *text = uiMakeElement(layout, message, UIElementFlag_drawText, color);
-  uiSetSemanticSizeTextCentered(text, layout->font, wScale, hScale);
-
-  return(text);
-}
-
-inline UIElement *
-uiMakeButton(UILayout *layout, char *name, v2 offset, v2 dim, bool *variable, v4 color = V4(1, 1, 1, 1))
-{
-  UIElement *button = uiMakeElement(layout, name, UIElementFlag_clickable | UIElementFlag_drawBackground, color);
-  uiSetElementDataBoolean(button, variable);
-  uiSetSemanticSizeRelative(button, offset, dim);
-
-  return(button);
-}
-
-inline UIElement *
-uiMakeSlider(UILayout *layout, char *name, v2 offset, v2 dim, r32 *variable, RangeR32 range,
-	     v4 color = V4(1, 1, 1, 1))
-{
-  UIElement *slider = uiMakeElement(layout, name, UIElementFlag_clickable | UIElementFlag_draggable, color);
-  uiSetElementDataFloat(slider, variable, range);
-  uiSetSemanticSizeRelative(slider, offset, dim);
-
-  return(slider);
-}
-
+/*
 enum TextFlags : u32
 {
   TextFlag_none = 0,
@@ -560,3 +222,4 @@ getTextPos(UIElement *element, UIElement *parent)
 
   return(result);
 }
+*/

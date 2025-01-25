@@ -6,6 +6,10 @@
 #include "arena.h"
 #include "render.h"
 
+//
+// functionality the host provides to the plugin
+// 
+
 // files
 
 struct ReadFileResult
@@ -28,13 +32,13 @@ struct PlatformAPI
 
 extern PlatformAPI globalPlatform;
 
-// input
-
 struct PluginMemory
 {
   void *memory;
   PlatformAPI platformAPI;
 };
+
+// input
 
 struct ButtonState
 {
@@ -59,19 +63,28 @@ isDown(ButtonState button)
   return(result);
 }
 
+inline bool
+wasReleased(ButtonState button)
+{
+  bool result = ((button.halfTransitionCount > 1) ||
+		 ((button.halfTransitionCount == 1) && !button.endedDown));
+
+  return(result);
+}
+
 enum MouseButton
 {
   MouseButton_left,
   MouseButton_right,
 
-  MouseButton_count,
+  MouseButton_COUNT,
 };
 
 struct MouseState
 {
   v2 position;
   
-  ButtonState buttons[MouseButton_count];
+  ButtonState buttons[MouseButton_COUNT];
   
   int scrollDelta;
 };
@@ -138,6 +151,10 @@ struct PluginFileOperations
   void *destMemory;
   bool operationCompleted;
 };
+
+//
+// functionality the plugin provides to the host
+//
 
 // video
 

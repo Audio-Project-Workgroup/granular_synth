@@ -313,7 +313,7 @@ main(int argc, char **argv)
 
 		      // handle input
 		      
-		      for(u32 buttonIndex = 0; buttonIndex < MouseButton_count; ++buttonIndex)
+		      for(u32 buttonIndex = 0; buttonIndex < MouseButton_COUNT; ++buttonIndex)
 			{
 			  newInput->mouseState.buttons[buttonIndex].halfTransitionCount = 0;
 			  newInput->mouseState.buttons[buttonIndex].endedDown =

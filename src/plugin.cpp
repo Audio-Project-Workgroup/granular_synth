@@ -42,6 +42,8 @@
 #include "common.h"
 #include "plugin.h"
 
+#include "ui_layout.cpp"
+
 PlatformAPI globalPlatform;
 
 inline void
@@ -70,12 +72,7 @@ initializePluginState(PluginMemory *memoryBlock)
       
 	  pluginState->phasor = 0.f;
 	  pluginState->freq = 440.f;
-	  pluginState->volume = 0.8f;
-
-	  pluginState->mouseP = V3(0, 0, 0);
-	  pluginState->lastMouseP = V3(0, 0, 0);
-	  pluginState->mouseLClickP = V2(0, 0);
-	  pluginState->mouseRClickP = V2(0, 0);
+	  pluginState->volume = 0.8f;	  
 
 	  pluginState->loadedSound.sound = loadWav("../data/fingertips.wav", &pluginState->permanentArena);
 	  pluginState->loadedSound.samplesPlayed = 0;
@@ -105,36 +102,28 @@ RENDER_NEW_FRAME(renderNewFrame)
     {
       //renderCommands->arena = &pluginState->frameArena;
       renderBeginCommands(renderCommands, &pluginState->frameArena);
-
-      pluginState->mouseP.x = input->mouseState.position.x;
-      pluginState->mouseP.y = input->mouseState.position.y;
-      pluginState->mouseP.z += (r32)input->mouseState.scrollDelta;
+      
 #if 0
-      printf("mouseP: (%.2f, %.2f, %.2f)\n",
-	     pluginState->mouseP.x, pluginState->mouseP.y, pluginState->mouseP.z);
+      printf("mouseP: (%.2f, %.2f)\n",
+	     input->mouseState.position.x, input->mouseState.position.y);
+      printButtonState(input->mouseState.buttons[MouseButton_left], "left");
+      printButtonState(input->mouseState.buttons[MouseButton_right], "right");
+      /*
       printf("mouseLeft: %s, %s\n",
 	     wasPressed(input->mouseState.buttons[MouseButton_left]) ? "pressed" : "not pressed",
 	     isDown(input->mouseState.buttons[MouseButton_left]) ? "down" : "up");
       printf("mouseRight: %s, %s\n",
 	     wasPressed(input->mouseState.buttons[MouseButton_right]) ? "pressed" : "not pressed",	     
 	     isDown(input->mouseState.buttons[MouseButton_right]) ? "down" : "up");
+      */
 #endif
 
-#if 1
+#if 0
       printButtonState(input->keyboardState.keys[KeyboardButton_tab], "tab");
       printButtonState(input->keyboardState.keys[KeyboardButton_backspace], "backspace");
 #endif
 
-      v2 dMouseP = pluginState->mouseP.xy - pluginState->lastMouseP.xy;
-
-      if(wasPressed(input->mouseState.buttons[MouseButton_left]))
-	{
-	  pluginState->mouseLClickP = pluginState->mouseP.xy;
-	}
-      if(wasPressed(input->mouseState.buttons[MouseButton_right]))
-	{
-	  pluginState->mouseRClickP = pluginState->mouseP.xy;
-	}      
+      //v2 dMouseP = pluginState->mouseP.xy - pluginState->lastMouseP.xy;      
       
       v4 defaultColor = V4(1, 1, 1, 1);
       v4 hoverColor = V4(1, 1, 0, 1);
@@ -146,24 +135,46 @@ RENDER_NEW_FRAME(renderNewFrame)
 #if 1
       // TODO: mouse intersection testing, parameter modification
       UILayout *layout = &pluginState->layout;
-      uiBeginLayout(layout, V2(windowWidth, windowHeight));
-
-      UIElement *title = uiMakeTextElement(layout, "I Will Become a Granular Synthesizer!", 0.5f, 0.f);
+      uiBeginLayout(layout, V2(windowWidth, windowHeight), &input->mouseState);
+#if 1
+      printf("\nlayout:\n  mouseP: (%.2f, %.2f)\n  left pressed: %s\n  left released: %s\n  left down: %s\n",
+	     layout->mouseP.x, layout->mouseP.y,
+	     layout->leftButtonPressed ? "true" : "false",
+	     layout->leftButtonReleased ? "true" : "false",
+	     layout->leftButtonDown ? "true" : "false");
+#endif
+      UIComm title = uiMakeTextElement(layout, "I Will Become a Granular Synthesizer!", 0.75f, 0.f);
       
-      UIElement *play = uiMakeButton(layout, "play", V2(0.75f, 0.75f), V2(0.1f, 0.1f),
+      UIComm play = uiMakeButton(layout, "play", V2(0.75f, 0.75f), V2(0.1f, 0.1f),
 				     &pluginState->loadedSound.isPlaying, V4(0, 0, 1, 1));
+      if(play.flags & UICommFlag_leftPressed)
+	{
+	  pluginState->loadedSound.isPlaying = true;
+	}
             
-      UIElement *volume = uiMakeSlider(layout, "volume", V2(0.1f, 0.1f), V2(0.1f, 0.75f),
+      UIComm volume = uiMakeSlider(layout, "volume", V2(0.1f, 0.1f), V2(0.1f, 0.75f),
 				        &pluginState->volume, makeRange(0.f, 1.f), V4(0.8f, 0.8f, 0.8f, 1));
+
+      printf("\nvolume flags:\n %u(comm)\n %u(element)\n", volume.flags, volume.element->commFlags);
+      printf("volume rect:\n  min: (%.2f, %.2f)\n  max: (%.2f, %.2f)\n",
+	     volume.element->region.min.x, volume.element->region.min.y,
+	     volume.element->region.max.x, volume.element->region.max.y);
+
+      if(volume.flags & UICommFlag_leftDragging)
+	{
+	  v2 dMouseP = layout->mouseP.xy - layout->lastMouseP.xy;
+	  r32 *parameter = (r32 *)volume.element->data;
+	  r32 oldVal = *parameter;	  
+	  r32 newVal = clampToRange(oldVal + dMouseP.y/(r32)windowHeight, volume.element->range);
+	  *parameter = newVal;
+	}
 
       if(wasPressed(input->keyboardState.keys[KeyboardButton_tab]))
 	{
 	  layout->selectedElementOrdinal = (layout->selectedElementOrdinal + 1) % (layout->elementCount + 1);
-	  if(layout->selectedElement)
-	    {
-	      layout->selectedElement->isActive = false;
-	      layout->selectedElement = 0;
-	    }
+
+	  //layout->selectedElement->isActive = false;
+	  layout->selectedElement = {};
 	}
       
       if(wasPressed(input->keyboardState.keys[KeyboardButton_backspace]))
@@ -171,23 +182,15 @@ RENDER_NEW_FRAME(renderNewFrame)
 	  if(layout->selectedElementOrdinal)
 	    {
 	      --layout->selectedElementOrdinal;
-	    }
-	  //else
-	  //{
-	  //  layout->selectedElementOrdinal = layout->elementCount + 1;
-	  //}
+	    }	  
 
-	  if(layout->selectedElement)
-	    {
-	      layout->selectedElement->isActive = false;
-	      layout->selectedElement = 0;
-	    }
+	  //layout->selectedElement->isActive = false;
+	  layout->selectedElement = {};
 	}
 
       UIElement *selectedElement = 0;
       for(u32 i = 0; i < layout->selectedElementOrdinal; ++i)
-	{
-	  
+	{	  
 	  if(selectedElement)
 	    {
 	      bool advanced = false;
@@ -220,7 +223,7 @@ RENDER_NEW_FRAME(renderNewFrame)
       if(selectedElement)
 	{
 	  selectedElement->lastFrameTouched = layout->frameIndex;
-	  selectedElement->isActive = true;
+	  //selectedElement->isActive = true;
 
 	  if(selectedElement->flags & UIElementFlag_draggable)
 	    {
@@ -266,8 +269,9 @@ RENDER_NEW_FRAME(renderNewFrame)
 		}
 	    }
 
-	  UIElement *persistentSelectedElement = uiCacheElement(selectedElement, layout);
-	  layout->selectedElement = persistentSelectedElement;
+	  //UIElement *persistentSelectedElement = uiCacheElement(selectedElement, layout);
+	  //layout->selectedElement = persistentSelectedElement;
+	  layout->selectedElement = selectedElement->hashKey;
 	}      
       
       //uiPrintLayout(layout);
@@ -337,7 +341,7 @@ RENDER_NEW_FRAME(renderNewFrame)
       renderPushQuad(renderCommands, fader, faderColor);
 #endif
 
-      pluginState->lastMouseP = pluginState->mouseP;
+      //pluginState->lastMouseP = pluginState->mouseP;
       arenaEnd(&pluginState->frameArena);
     }  
 }

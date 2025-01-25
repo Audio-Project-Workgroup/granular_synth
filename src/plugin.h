@@ -17,12 +17,7 @@ struct PluginState
   
   r64 phasor;
   r32 freq;
-  r32 volume;
-
-  v3 mouseP;
-  v3 lastMouseP;
-  v2 mouseLClickP;
-  v2 mouseRClickP;
+  r32 volume;  
 
   //usz wavDataSize;
   //u8 *wavData;

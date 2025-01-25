@@ -1,63 +1,3 @@
-#if 0
-
-static inline void
-renderPushIndex(RenderCommands *commands, u32 index)
-{
-  ASSERT(commands->indexCount < ARRAY_COUNT(commands->indices));
-  commands->indices[commands->indexCount++] = index;
-}
-
-static inline void
-renderPushVertex(RenderCommands *commands, v2 vPos, v2 uv, v4 color)
-{
-  ASSERT(commands->vertexCount < ARRAY_COUNT(commands->vertices));
-  
-  renderPushIndex(commands, commands->vertexCount);
-  Vertex *vertex = commands->vertices + commands->vertexCount++;
-  vertex->vPos = vPos;
-  vertex->uv = uv;
-  vertex->color = color;
-}
-
-static inline void
-renderPushQuad(RenderCommands *commands, Rect2 rect, v4 color)
-{
-  v2 bottomLeft = rect.min;
-  v2 dim = getDim(rect);
-
-  u32 startingVertexCount = commands->vertexCount;
-  renderPushVertex(commands, bottomLeft, V2(0, 0), color);
-  renderPushVertex(commands, bottomLeft + V2(dim.x, 0), V2(0, 0), color);
-  renderPushVertex(commands, bottomLeft + V2(0, dim.y), V2(0, 0), color);
-
-  renderPushIndex(commands, startingVertexCount + 1);
-  renderPushIndex(commands, startingVertexCount + 2);
-  renderPushVertex(commands, bottomLeft + dim, V2(0, 0), color);
-}
-
-static inline void
-renderPushBitmap(RenderCommands *commands, LoadedBitmap *bitmap, Rect2 rect, v4 color = V4(1, 1, 1, 1))
-{
-  v2 bottomLeft = rect.min;
-  v2 dim = getDim(rect);
-
-  Texture *texture = commands->textures + commands->textureCount++;
-  texture->vertexRange.min = commands->vertexCount;
-  texture->bitmap = bitmap;
-  
-  renderPushVertex(commands, bottomLeft, V2(0, 0), color);
-  renderPushVertex(commands, bottomLeft + V2(dim.x, 0), V2(1, 0), color);
-  renderPushVertex(commands, bottomLeft + V2(0, dim.y), V2(0, 1), color);
-  
-  renderPushIndex(commands, texture->vertexRange.min + 1);
-  renderPushIndex(commands, texture->vertexRange.min + 2);
-  renderPushVertex(commands, bottomLeft + dim, V2(1, 1), color);
-  
-  texture->vertexRange.max = commands->vertexCount;
-}
-
-#else
-
 static inline void // NOTE: not textured
 renderPushQuad(RenderCommands *commands, Rect2 rect, v4 color = V4(1, 1, 1, 1))
 {
@@ -123,7 +63,7 @@ renderPushTriangle(RenderCommands *commands, Vertex v1, Vertex v2, Vertex v3, Lo
 }
 
 static inline v2
-renderPushText(RenderCommands *commands, LoadedFont *font, u8 *string, v2 startPos,
+renderPushText(RenderCommands *commands, LoadedFont *font, u8 *string, Rect2 textRect,//v2 startPos, v2 textDim,
 	       v4 color = V4(1, 1, 1, 1))
 {
 #if 0
@@ -191,7 +131,11 @@ renderPushText(RenderCommands *commands, LoadedFont *font, u8 *string, v2 startP
 #endif
 #endif
 
-  v2 atPos = startPos;
+  v2 textDimBase = getTextDim(font, string);
+  v2 textDim = getDim(textRect);
+  v2 textScale = V2(textDim.x/textDimBase.x, textDim.y/textDimBase.y);
+
+  v2 atPos = textRect.min;//startPos;
   u8 *at = string;  
   while(*at)
     {
@@ -199,15 +143,15 @@ renderPushText(RenderCommands *commands, LoadedFont *font, u8 *string, v2 startP
       LoadedBitmap *glyph = getGlyphFromChar(font, c);
 
       v2 glyphDim = V2(glyph->width, glyph->height);
-      //v2 scaledGlyphDim = hadamard(textScale, glyphDim);
-      Rect2 glyphRect = rectMinDim(atPos, glyphDim);
+      v2 scaledGlyphDim = hadamard(textScale, glyphDim);
+      Rect2 glyphRect = rectMinDim(atPos, scaledGlyphDim);
       renderPushQuad(commands, glyphRect, glyph, color);
 
       ++at;
-      if(*at) atPos.x += getHorizontalAdvance(font, c, *at);
+      if(*at) atPos.x += textScale.x*getHorizontalAdvance(font, c, *at);
     }
 
-  atPos.y -= font->verticalAdvance;
+  atPos.y -= textScale.y*font->verticalAdvance;
   return(atPos);
 }
 
@@ -294,6 +238,7 @@ inline void
 renderPushUIElement(RenderCommands *commands, UILayout *layout, UIElement *element)
 {
   element->region = renderComputeUIElementRegion(commands, element);
+  /*
   UIElement *persistentElement = uiGetCachedElement(element, layout);
   v4 color = V4(0, 0, 0, 1);
   if(persistentElement)
@@ -303,15 +248,17 @@ renderPushUIElement(RenderCommands *commands, UILayout *layout, UIElement *eleme
 	  color = V4(1, 0.5f, 0, 1);
 	}
     }
+  */
+  v4 color = (uiHashKeysAreEqual(element->hashKey, layout->selectedElement)) ? V4(1, 0.5f, 0, 1) : V4(0, 0, 0, 1);
   renderPushRectOutline(commands, element->region, 4.f, color);
   
   if(element->flags & UIElementFlag_drawText)
     {      
-      renderPushText(commands, layout->font, element->name, element->region.min);
+      renderPushText(commands, layout->font, element->name, element->region);
     }
   if(element->flags & UIElementFlag_drawBorder)
     {
-      v4 color = element->isActive ? V4(1, 0.5f, 0, 1) : V4(0, 0, 0, 1);
+      v4 color = (uiHashKeysAreEqual(element->hashKey, layout->selectedElement)) ? V4(1, 0.5f, 0, 1) : V4(0, 0, 0, 1);
       renderPushRectOutline(commands, element->region, 0.01f, color);
     }
   if(element->flags & UIElementFlag_drawBackground)
@@ -359,5 +306,4 @@ renderPushUILayout(RenderCommands *commands, UILayout *layout)
   renderPushUIElement(commands, layout, layout->root);
 }
 
-#endif
 

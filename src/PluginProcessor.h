@@ -55,7 +55,8 @@ public:
 private:  
   juce::DynamicLibrary libPlugin;  
   PluginAudioBuffer audioBuffer;
-  void *audioBufferMemory;  
+  void *audioBufferMemory;
+  bool resourcesReleased;
   
   //==============================================================================
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioPluginAudioProcessor)
