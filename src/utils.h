@@ -61,6 +61,33 @@ lowestOrderBit(u32 num)
   return(result);
 }
 
+inline u32
+reverseBits(u32 num)
+{
+  u32 v = num;
+  v = ((v >> 1) & 0x55555555) | ((v & 0x55555555) << 1);
+  v = ((v >> 2) & 0x33333333) | ((v & 0x33333333) << 2);
+  v = ((v >> 4) & 0x0F0F0F0F) | ((v & 0x0F0F0F0F) << 4);
+  v = ((v >> 8) & 0x00FF00FF) | ((v & 0x00FF00FF) << 8);
+  v = (v >> 16) | (v << 16);
+
+  return(v);
+}
+
+inline u64
+reverseBits(u64 num)
+{
+  u64 v = num;
+  v = ((v >> 1) & 0x5555555555555555) | ((v & 0x5555555555555555) << 1);
+  v = ((v >> 2) & 0x3333333333333333) | ((v & 0x3333333333333333) << 2);
+  v = ((v >> 4) & 0x0F0F0F0F0F0F0F0F) | ((v & 0x0F0F0F0F0F0F0F0F) << 4);
+  v = ((v >> 8) & 0x00FF00FF00FF00FF) | ((v & 0x00FF00FF00FF00FF) << 8);
+  v = ((v >> 16) & 0x0000FFFF0000FFFF) | ((v & 0x0000FFFF0000FFFF) << 16);
+  v = (v >> 32) | (v << 32);
+
+  return(v);
+}
+
 static inline u32
 smallestNotInSortedArray(u32 *array, u32 length)
 {

@@ -26,6 +26,11 @@ typedef double   r64;
 #define S32_MAX (0x7FFFFFFF)
 #define S64_MAX (0x7FFFFFFFFFFFFFFF)
 
+struct c64
+{
+  r32 re, im;
+};
+
 union v2
 {
   struct
@@ -138,7 +143,7 @@ struct LoadedSound
   u32 sampleCount;
   u32 channelCount;
   
-  s16 *samples[2]; // TODO: support other formats
+  r32 *samples[2]; // NOTE: we are using 32-bit floating-point samples internally
 };
 
 struct LoadedBitmap

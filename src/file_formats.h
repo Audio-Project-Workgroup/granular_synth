@@ -89,11 +89,11 @@ nextChunk(RiffIterator it)
 }
 
 static inline LoadedSound
-loadWav(char *filename, Arena *allocator)
+loadWav(char *filename, Arena *loadAllocator, Arena *permanentAllocator)
 {
   LoadedSound result = {};
 
-  ReadFileResult readResult = globalPlatform.readEntireFile(filename, allocator);
+  ReadFileResult readResult = globalPlatform.readEntireFile(filename, loadAllocator);
   if(readResult.contents)
     {
       WavHeader *header = (WavHeader *)readResult.contents;
@@ -102,7 +102,8 @@ loadWav(char *filename, Arena *allocator)
 
       u32 channelCount = 0;
       u32 sampleDataSize = 0;
-      s16 *sampleData = 0;
+      u32 bytesPerSample = 0;
+      void *sampleData = 0;
 
       RiffIterator it = {};
       it.at = (u8 *)(header + 1);
@@ -120,33 +121,122 @@ loadWav(char *filename, Arena *allocator)
 		WavFormat *fmt = (WavFormat *)(it.at + sizeof(WavChunk));
 		ASSERT(fmt->wFormatTag == 1); // NOTE: only support pcm
 		ASSERT(fmt->nSamplesPerSec == 48000); // TODO: up/down-sample to the internal rate
-		ASSERT(fmt->wBitsPerSample == 16); // TODO: support other formats
-		ASSERT(fmt->nBlockAlign = (sizeof(s16)*fmt->nChannels));
+		bytesPerSample = fmt->wBitsPerSample/8;
+		ASSERT(fmt->nBlockAlign = (bytesPerSample*fmt->nChannels));
 		
 	        channelCount = fmt->nChannels;
 	      } break;
 
 	    case WAVE_CHUNK_ID_data:
-	      {	
-		sampleData = (s16 *)(it.at + sizeof(WavChunk));
+	      {		
+		sampleData = it.at + sizeof(WavChunk);
 		sampleDataSize = chunkSize;
 	      } break;
 	    }
 	}
       ASSERT(sampleData && channelCount);
 
-      result.channelCount = channelCount;
-      u32 sampleCount = sampleDataSize/(channelCount*sizeof(s16));
+      result.sampleCount = sampleDataSize/(channelCount*bytesPerSample);
+      result.channelCount = channelCount;      
+      result.samples[0] = arenaPushArray(permanentAllocator, result.sampleCount, r32);
+      result.samples[1] = arenaPushArray(permanentAllocator, result.sampleCount, r32);
+      
       if(channelCount == 1)
 	{
-	  result.samples[0] = sampleData;
-	  result.samples[1] = 0;
+	  //result.samples[0] = sampleData;
+	  //result.samples[1] = 0;
+	  void *srcData = sampleData;
+	  r32 *destSamplesL = result.samples[0];
+	  r32 *destSamplesR = result.samples[1];
+	  for(u32 sampleIndex = 0; sampleIndex < result.sampleCount; ++sampleIndex)
+	    {
+	      r32 srcSample;
+	      if(bytesPerSample == 1)
+		{
+		  // NOTE: unsigned 8-bit sample
+		  u8 sample = *(u8 *)srcData;
+		  srcSample = (r32)sample/(r32)U8_MAX;
+		  srcData = (u8 *)srcData + 1;
+		}
+	      else if(bytesPerSample == 2)
+		{
+		  // NOTE: signed 16-bit sample
+		  s16 sample = *(s16 *)srcData;
+		  srcSample = (r32)sample/(r32)S16_MAX;
+		  srcData = (s16 *)srcData + 1;
+		}
+	      else if(bytesPerSample == 4)
+		{
+		  // NOTE: 32-bit floating-point sample
+		  srcSample = *(r32 *)srcData;
+		  srcData = (r32 *)srcData + 1;
+		}
+	      else
+		{
+		  srcSample = 0;
+		  ASSERT(!"ERROR: unsupported sample size");
+		}
+		
+	      *destSamplesL++ = srcSample;
+	      *destSamplesR++ = srcSample;
+	    }
 	}
       else if(channelCount == 2)
 	{
-	  result.samples[0] = sampleData;
-	  result.samples[1] = sampleData + sampleCount;
+	  //result.samples[0] = sampleData;
+	  //result.samples[1] = sampleData + sampleCount;
+	  void *srcDataL = sampleData;
+	  void *srcDataR = (u8 *)sampleData + bytesPerSample;
+	  r32 *destSamplesL = result.samples[0];
+	  r32 *destSamplesR = result.samples[1];
+	  for(u32 sampleIndex = 0; sampleIndex < result.sampleCount; ++sampleIndex)
+	    {
+	      r32 srcSampleL, srcSampleR;
+	      if(bytesPerSample == 1)
+		{
+		  // NOTE: unsigned 8-bit sample
+		  u8 sampleL = *(u8 *)srcDataL;
+		  u8 sampleR = *(u8 *)srcDataR;
+		  
+		  srcSampleL = (r32)sampleL/(r32)U8_MAX;
+		  srcSampleR = (r32)sampleR/(r32)U8_MAX;
 
+		  srcDataL = (u8 *)srcDataL + channelCount;
+		  srcDataR = (u8 *)srcDataR + channelCount;
+		}
+	      else if(bytesPerSample == 2)
+		{
+		  // NOTE: signed 16-bit sample
+		  s16 sampleL = *(s16 *)srcDataL;
+		  s16 sampleR = *(s16 *)srcDataR;
+		  
+		  srcSampleL = (r32)sampleL/(r32)S16_MAX;
+		  srcSampleR = (r32)sampleR/(r32)S16_MAX;
+
+		  srcDataL = (s16 *)srcDataL + channelCount;
+		  srcDataR = (s16 *)srcDataR + channelCount;
+		}
+	      else if(bytesPerSample == 4)
+		{
+		  // NOTE: 32-bit floating-point sample
+		  srcSampleL = *(r32 *)srcDataL;
+		  srcSampleR = *(r32 *)srcDataR;
+
+		  srcDataL = (r32 *)srcDataL + channelCount;
+		  srcDataR = (r32 *)srcDataR + channelCount;
+		}
+	      else
+		{
+		  srcSampleL = 0;
+		  srcSampleR = 0;
+		  ASSERT(!"ERROR: unsupported sample size");
+		}
+		
+	      *destSamplesL++ = srcSampleL;
+	      *destSamplesR++ = srcSampleR;
+	    }
+
+#if 0
 	  // TODO: de-interleave stereo samples properly
 #if 1
 	  for(u32 sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex)
@@ -201,14 +291,16 @@ loadWav(char *filename, Arena *allocator)
 		}
 	    }
 	  arenaEndArena(allocator, scratchMemory);
-#endif	 	 
+#endif
+#endif
 	}
       else
 	{
 	  ASSERT(!"unhandled channel count in wav file");
 	}
 
-      result.sampleCount = sampleCount;
+      //result.sampleCount = sampleCount;
+      globalPlatform.freeFileMemory(readResult, loadAllocator);
     }
 
   return(result);

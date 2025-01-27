@@ -79,7 +79,8 @@ initializePluginState(PluginMemory *memoryBlock)
 	  pluginState->volume.range = makeRange(0, 1);
 	  pluginState->soundIsPlaying.value = false;
 
-	  pluginState->loadedSound.sound = loadWav("../data/fingertips.wav", &pluginState->permanentArena);
+	  pluginState->loadedSound.sound = loadWav("../data/fingertips.wav",
+						   &pluginState->loadArena, &pluginState->permanentArena);
 	  pluginState->loadedSound.samplesPlayed = 0;
 	  //pluginState->loadedSound.isPlaying = false;
 	  //pluginState->loadedSound.isPlaying = &pluginState->soundIsPlaying;
@@ -251,11 +252,11 @@ RENDER_NEW_FRAME(renderNewFrame)
 		      //newParameter = clampToRange(newParameter, selectedElement->range);			  
 		      //*parameter = newParameter;
 		    }
-
+		  
 		  pluginSetFloatParameter(selectedElement->fParam, newParameter);
 		}
 	    }
-	  else if(selectedElement->flags * UIElementFlag_clickable)
+	  else if(selectedElement->flags & UIElementFlag_clickable)
 	    {	      
 	      if(selectedElement->parameterType == UIParameter_boolean)
 		{
@@ -263,8 +264,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 		  if(wasPressed(input->keyboardState.keys[KeyboardButton_enter]))
 		    {
 		      //bool oldVal = *parameter;
-		      bool newVal = !parameter;
-			  
+		      bool newVal = !parameter;		      
 		      //*parameter = newVal;
 		      pluginSetBooleanParameter(selectedElement->bParam, newVal);
 		    }
@@ -420,11 +420,11 @@ AUDIO_PROCESS(audioProcess)
 
       bool soundIsPlaying = pluginReadBooleanParameter(&pluginState->soundIsPlaying);
       PlayingSound *loadedSound = &pluginState->loadedSound;
-      s16 *loadedSoundSamples[2] = {};
+      r32 *loadedSoundSamples[2] = {};
       if(soundIsPlaying)
 	{
 	  loadedSoundSamples[0] = loadedSound->sound.samples[0] + loadedSound->samplesPlayed;
-	  loadedSoundSamples[1] = loadedSound->sound.samples[loadedSound->sound.channelCount - 1] + loadedSound->samplesPlayed;
+	  loadedSoundSamples[1] = loadedSound->sound.samples[1] + loadedSound->samplesPlayed;
 	}
 
       // TODO: there's too much code that's identical in the two switch cases
@@ -450,7 +450,7 @@ AUDIO_PROCESS(audioProcess)
 		      {
 			if((loadedSound->samplesPlayed + i) < loadedSound->sound.sampleCount)
 			  {
-			    r32 loadedSoundVal = volume*(r32)loadedSoundSamples[j][i]/32000.f;
+			    r32 loadedSoundVal = volume*(r32)loadedSoundSamples[j][i];
 			    mixedVal += 0.5f*loadedSoundVal;
 			  }
 			else
@@ -488,7 +488,7 @@ AUDIO_PROCESS(audioProcess)
 		      {
 			if((loadedSound->samplesPlayed + i) < loadedSound->sound.sampleCount)
 			  {
-			    r32 loadedSoundVal = volume*(r32)loadedSoundSamples[j][i];
+			    r32 loadedSoundVal = volume*32000.f*loadedSoundSamples[j][i];
 			    mixedVal += 0.5f*loadedSoundVal;
 			  }
 			else

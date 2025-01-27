@@ -9,10 +9,198 @@
 // scalar
 //
 
+// TODO: stop using the C runtime library
 inline r32
 Abs(r32 val)
 {
   return(fabsf(val));
+}
+
+inline r32
+Sqrt(r32 val)
+{
+  return(sqrtf(val));
+}
+
+inline r32
+Sin(r32 angle)
+{
+  return(sinf(angle));
+}
+
+inline r32
+Cos(r32 angle)
+{
+  return(cosf(angle));
+}
+
+inline u32
+log2(u32 num)
+{
+  u32 v = num;
+  u32 masks[] = {0x2, 0xC, 0xF0, 0xFF00, 0xFFFF0000};
+  u32 shifts[] = {1, 2, 4, 8, 16};
+  u32 result = 0;
+
+  for(u32 i = 4; i >= 0; --i)
+    {
+      if(v & masks[i])
+	{
+	  v >>= shifts[i];
+	  result |= shifts[i];
+	}
+    }
+
+  return(result);
+}
+
+inline u64
+log2(u64 num)
+{
+  u64 v = num;
+  u64 masks[] = {0x2, 0xC, 0xF0, 0xFF00, 0xFFFF0000, 0xFFFFFFFF00000000};
+  u64 shifts[] = {1, 2, 4, 8, 16, 32};
+  u64 result = 0;
+
+  for(u32 i = 5; i >= 0; --i)
+    {
+      if(v & masks[i])
+	{
+	  v >>= shifts[i];
+	  result |= shifts[i];
+	}
+    }
+
+  return(result);  
+}
+
+//
+// complex
+//
+
+inline c64
+C64(r32 re, r32 im)
+{
+  c64 result = {re, im};
+
+  return(result);
+}
+
+inline c64
+C64Polar(r32 mag, r32 arg)
+{
+  c64 result = C64(mag*Cos(arg), mag*Sin(arg));
+
+  return(result);
+}
+
+inline c64
+conjugateC64(c64 z)
+{
+  c64 result = C64(z.re, -z.im);
+
+  return(result);
+}
+
+inline r32
+lengthC64(c64 z)
+{
+  r32 result = Sqrt(z.re*z.re + z.im*z.im);
+
+  return(result);
+}
+
+inline c64
+operator-(c64 z)
+{
+  c64 result = C64(-z.re, -z.im);
+}
+
+inline c64
+operator+(c64 z, c64 w)
+{
+  c64 result = C64(z.re + w.re, z.im + w.im);
+
+  return(result);
+}
+
+inline c64 &
+operator+=(c64 &z, c64 w)
+{
+  z = z + w;
+
+  return(z);
+}
+
+inline c64
+operator-(c64 z, c64 w)
+{
+  c64 result = C64(z.re - w.re, z.im - w.im);
+
+  return(result);
+}
+
+inline c64 &
+operator-=(c64 &z, c64 w)
+{
+  z = z - w;
+
+  return(z);
+}
+
+inline c64
+operator*(c64 z, c64 w)
+{
+  c64 result = C64(z.re*w.re - w.im*z.im, z.re*w.im + z.im*w.re);
+
+  return(result);
+}
+
+inline c64 &
+operator*=(c64 &z, c64 w)
+{
+  z = z*w;
+
+  return(z);
+}
+
+inline c64
+operator*(r32 x, c64 z)
+{
+  c64 result = C64(x*z.re, x*z.im);
+
+  return(result);
+}
+
+inline c64
+operator*(c64 z, r32 x)
+{
+  return(x*z);
+}
+
+inline c64 &
+operator*=(c64 &z, r32 x)
+{
+  z = z * x;
+
+  return(z);
+}
+
+inline c64
+operator/(c64 z, c64 w)
+{
+  r32 coeff = 1.f/(w.re*w.re + w.im*w.im);
+  c64 result = C64(coeff*(z.re*w.re + z.im*w.im), coeff*(z.im*w.re - z.re*w.im));
+
+  return(result);
+}
+
+inline c64 &
+operator/=(c64 &z, c64 w)
+{
+  z = z / w;
+  
+  return(z);
 }
 
 //
@@ -266,4 +454,46 @@ isInRectangle(Rect2 r, v2 v)
 		 v.x <= r.max.x &&
 		 v.y <= r.max.y);
   return(result);
+}
+
+inline void
+fft(c64 *destBuffer, r32 *sourceBuffer, u32 length)
+{
+  // NOTE: radix-2 DIT fft
+  u32 logLength = log2(length);  
+
+  // NOTE: bit-reverse copy
+  for(u32 index = 0; index < length; ++index)
+    {
+      u32 reversedIndex = (reverseBits(index) >> logLength);
+      destBuffer[index].re = sourceBuffer[reversedIndex];
+    }  
+
+  // NOTE: swizzles
+  for(u32 level = 1; level <= logLength; ++level)
+    {
+      u32 m = (1 << level);
+      r32 angle = -2.f*M_PI/(r32)m;
+      c64 wm = C64Polar(1, angle);
+      
+      for(u32 k = 0; k < length; k += m)
+	{
+	  c64 w = C64(1, 0);
+	  
+	  c64 *dest0 = destBuffer + k;
+	  c64 *dest1 = destBuffer + k + m/2;	  
+	  for(u32 j = 0; j < m/2; ++j)
+	    {
+	      c64 in0 = *dest0;
+	      c64 in1 = *dest1;     
+
+	      // TODO: optimize this math:
+	      //       use SIMD intrinsics, and take advantage of the fact that the input data is real
+	      *dest0 = in0 + w*in1;
+	      *dest1 = in0 - w*in1;
+
+	      w *= wm;
+	    }
+	}
+    }
 }

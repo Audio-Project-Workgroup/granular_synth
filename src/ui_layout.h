@@ -47,8 +47,8 @@ enum UIElementFlags : u32
   UIElementFlag_drawBorder = (1 << 3),
   UIElementFlag_drawBackground = (1 << 4),
   
-  UIElementFlag_focusHot = (1 << 5),
-  UIElementFlag_focusHotOff = (1 << 6),
+    //UIElementFlag_focusHot = (1 << 5),
+    //UIElementFlag_focusHotOff = (1 << 6),
 };
 
 enum UIParameter
@@ -85,15 +85,12 @@ struct UIElement
   v4 color;
 
   UIParameter parameterType;
-  union
+  union // TODO: maybe there could be a use for an element that has both a boolean and a float parameter attached
   {
     PluginBooleanParameter *bParam;
     PluginFloatParameter *fParam;
-  };
-  //void *data;
-  //RangeR32 range;
-
-  //bool isActive;  
+  };  
+  
   UISize semanticDim[UIAxis_COUNT];
   UISize semanticOffset[UIAxis_COUNT];
 
@@ -128,6 +125,7 @@ struct UILayout
   v3 lastMouseP;
   v2 mouseLClickP;
   v2 mouseRClickP;
+  // TODO: put these bools into a bitfield (use UICommFlags?)
   bool leftButtonPressed;
   bool leftButtonReleased;
   bool leftButtonDown;

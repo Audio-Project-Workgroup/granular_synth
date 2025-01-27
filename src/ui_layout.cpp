@@ -393,6 +393,7 @@ uiCommFromElement(UIElement *element, UILayout *layout)
   result.element = element;
   if(isInRectangle(elementRect, mouseP))
     {
+      // TODO: maybe check clickable field here?
       if(layout->leftButtonPressed)
 	{
 	  result.flags |= UICommFlag_leftPressed;
@@ -412,6 +413,7 @@ uiCommFromElement(UIElement *element, UILayout *layout)
       result.element->lastFrameTouched = layout->frameIndex;
     }
 
+  // TODO: maybe check draggable field here?
   if((element->commFlags & UICommFlag_leftPressed) ||
      (element->commFlags & UICommFlag_leftDragging))
     {

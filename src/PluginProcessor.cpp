@@ -278,6 +278,7 @@ AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::
     {
       auto message = metadata.getMessage();
       int messageLength = message.getRawDataSize();
+      double messageTimestamp = message.getTimeStamp();
       
       MidiHeader *messageHeader = (MidiHeader *)atMidiBuffer;
       messageHeader->messageLength = messageLength;      
