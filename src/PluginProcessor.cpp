@@ -296,6 +296,7 @@ AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::
   for(auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
     buffer.clear(i, 0, buffer.getNumSamples());  
 
+  // TODO: we are assuming these are float-pointers above, so we should make that explicit here
   auto *lChannel = buffer.getWritePointer(0);
   auto *rChannel = buffer.getWritePointer(1);
 
@@ -303,7 +304,8 @@ AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::
     {
       audioBuffer.framesToWrite = buffer.getNumSamples();      
       pluginCode.audioProcess(&pluginMemory, &audioBuffer);
-      
+
+      // TODO: make this not dual mono
       memcpy(lChannel, audioBuffer.buffer, sizeof(*lChannel)*buffer.getNumSamples());
       memcpy(rChannel, audioBuffer.buffer, sizeof(*rChannel)*buffer.getNumSamples());
     }  

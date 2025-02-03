@@ -529,58 +529,79 @@ AUDIO_PROCESS(audioProcess)
 	  loadedSoundSamples[1] = loadedSound->sound.samples[1] + loadedSound->samplesPlayed;
 	}
 
-      // TODO: there's too much code that's identical in the two switch cases
+      // TODO: there's too much code that's identical in the two switch cases      
+      r32 formatVolumeFactor = 1.f;
+      void *genericAudioFrames = audioBuffer->buffer;
       switch(audioBuffer->format)
 	{
-	case AudioFormat_r32:
+	case AudioFormat_s16:
 	  {
-	    r32 *audioFrames = (r32 *)audioBuffer->buffer;
-	    for(u64 i = 0; i < audioBuffer->framesToWrite; ++i)
-	      {
-		r32 volume = pluginReadFloatParameter(&pluginState->volume);
-		
-		pluginState->phasor += nFreq;
-		if(pluginState->phasor > M_TAU) pluginState->phasor -= M_TAU;
-				  
-		r32 sinVal = volume*sin(pluginState->phasor);
-		for(u32 j = 0; j < audioBuffer->channels; ++j)
-		  {
-		    r32 mixedVal = 0.5f*sinVal;
-
-		    soundIsPlaying = pluginReadBooleanParameter(&pluginState->soundIsPlaying);
-		    if(soundIsPlaying)		       
-		      {
-			if((loadedSound->samplesPlayed + i) < loadedSound->sound.sampleCount)
-			  {
-			    r32 loadedSoundVal = volume*(r32)loadedSoundSamples[j][i];
-			    mixedVal += 0.5f*loadedSoundVal;
-			  }
-			else
-			  {
-			    //loadedSound->isPlaying = false;
-			    pluginSetBooleanParameter(&pluginState->soundIsPlaying, false);
-			    loadedSound->samplesPlayed = 0;
-			  }
-		      }
-		    
-		    *audioFrames++ = mixedVal;
-		  }
-
-		pluginUpdateFloatParameter(&pluginState->volume);
-	      }
+	    formatVolumeFactor = 32000.f;
 	  } break;
+	case AudioFormat_r32: break;
+	default: { ASSERT(!"invalid audio format"); } break;
+	}
+      
+      //r32 *audioFrames = (r32 *)audioBuffer->buffer;
+      for(u64 i = 0; i < audioBuffer->framesToWrite; ++i)
+	{
+	  r32 volume = formatVolumeFactor*pluginReadFloatParameter(&pluginState->volume);
+		
+	  pluginState->phasor += nFreq;
+	  if(pluginState->phasor > M_TAU) pluginState->phasor -= M_TAU;
+				  
+	  r32 sinVal = volume*sin(pluginState->phasor);
+	  for(u32 j = 0; j < audioBuffer->channels; ++j)
+	    {
+	      r32 mixedVal = 0.5f*sinVal;
 
+	      soundIsPlaying = pluginReadBooleanParameter(&pluginState->soundIsPlaying);
+	      if(soundIsPlaying)		       
+		{
+		  if((loadedSound->samplesPlayed + i) < loadedSound->sound.sampleCount)
+		    {
+		      r32 loadedSoundVal = volume*loadedSoundSamples[j][i];
+		      mixedVal += 0.5f*loadedSoundVal;
+		    }
+		  else
+		    {
+		      //loadedSound->isPlaying = false;
+		      pluginSetBooleanParameter(&pluginState->soundIsPlaying, false);
+		      loadedSound->samplesPlayed = 0;
+		    }
+		}
+
+	      switch(audioBuffer->format)
+		{
+		case AudioFormat_r32:
+		  {
+		    r32 *audioFrames = (r32 *)genericAudioFrames;
+		    *audioFrames++ = mixedVal;
+		    genericAudioFrames = audioFrames;
+		  } break;
+		case AudioFormat_s16:
+		  {
+		    s16 *audioFrames = (s16 *)genericAudioFrames;
+		    *audioFrames++ = (s16)mixedVal;
+		    genericAudioFrames = audioFrames;
+		  } break;
+		}
+	    }
+	  
+	  pluginUpdateFloatParameter(&pluginState->volume);
+	}	 
+      /*
 	case AudioFormat_s16:
 	  {
 	    s16 *audioFrames = (s16 *)audioBuffer->buffer;
 	    for(u64 i = 0; i < audioBuffer->framesToWrite; ++i)
 	      {
-		r32 volume = pluginReadFloatParameter(&pluginState->volume);
+		r32 volume = formatVolumeFactor*pluginReadFloatParameter(&pluginState->volume);
 
 		pluginState->phasor += nFreq;
 		if(pluginState->phasor > M_TAU) pluginState->phasor -= M_TAU;
 				  
-		r32 sinVal = 32000.f*volume*sin(pluginState->phasor);
+		r32 sinVal = volumesin(pluginState->phasor);
 		for(u32 j = 0; j < audioBuffer->channels; ++j)
 		  {
 		    r32 mixedVal = 0.5f*sinVal;
@@ -590,7 +611,7 @@ AUDIO_PROCESS(audioProcess)
 		      {
 			if((loadedSound->samplesPlayed + i) < loadedSound->sound.sampleCount)
 			  {
-			    r32 loadedSoundVal = volume*32000.f*loadedSoundSamples[j][i];
+			    r32 loadedSoundVal = volume*loadedSoundSamples[j][i];
 			    mixedVal += 0.5f*loadedSoundVal;
 			  }
 			else
@@ -610,7 +631,8 @@ AUDIO_PROCESS(audioProcess)
 
 	default: { ASSERT(!"invalid default case"); } break;
 	}
-
+      */
+      
       soundIsPlaying = pluginReadBooleanParameter(&pluginState->soundIsPlaying);
       if(soundIsPlaying)
 	{
