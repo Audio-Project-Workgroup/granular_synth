@@ -70,7 +70,7 @@ initializePluginState(PluginMemory *memoryBlock)
 	  pluginState->frameArena = arenaSubArena(&pluginState->permanentArena, MEGABYTES(2));
 	  pluginState->loadArena = arenaSubArena(&pluginState->permanentArena, MEGABYTES(128));
 
-#if 0
+#if 0 // NOTE: fft sample rate conversion workbench
 	  r32 sourceSignalFreq = 4.f;
 	  u32 sourceSignalLength = 4410;
 	  u32 destSignalLength = 4800;
@@ -171,11 +171,9 @@ initializePluginState(PluginMemory *memoryBlock)
 	      printf("err[%u]: %.6f\n", i, err);
 	    }
 #endif
- 
+	  
 	  pluginState->phasor = 0.f;
-	  pluginState->freq = 440.f;
-	  //pluginState->volume = 0.8f;
-	  //pluginSetFloatParameter(&pluginState->volume, 0.8f);
+	  pluginState->freq = 440.f;	  
 	  pluginState->volume.currentValue = 0.8f;
 	  pluginState->volume.targetValue = 0.8f;
 	  pluginState->volume.range = makeRange(0, 1);
@@ -184,8 +182,6 @@ initializePluginState(PluginMemory *memoryBlock)
 	  pluginState->loadedSound.sound = loadWav("../data/fingertips_44100_PCM_16.wav",
 						   &pluginState->loadArena, &pluginState->permanentArena);
 	  pluginState->loadedSound.samplesPlayed = 0;
-	  //pluginState->loadedSound.isPlaying = false;
-	  //pluginState->loadedSound.isPlaying = &pluginState->soundIsPlaying;
 
 	  pluginState->testBitmap = loadBitmap("../data/signal_z.bmp", &pluginState->permanentArena);
 
@@ -478,6 +474,7 @@ AUDIO_PROCESS(audioProcess)
   if(pluginState->initialized)
     {
       // TODO: This midi parsing is janky and bad. Passing the message length before each message is unnecessary
+      // TODO: move the midi loop inside the output loop, so that we don't only see the most recent midi message
       u8 *atMidiBuffer = audioBuffer->midiBuffer;
       while(audioBuffer->midiMessageCount)
 	{
@@ -499,8 +496,7 @@ AUDIO_PROCESS(audioProcess)
 		    ASSERT(bytesToRead == 2);
 		    u32 noteNumber = *atMidiBuffer++;
 		    u32 noteVelocity = *atMidiBuffer++;
-		    pluginState->freq = hertzFromMidiNoteNumber(noteNumber);
-		    //pluginState->volume = (r32)noteVelocity/127.f;
+		    pluginState->freq = hertzFromMidiNoteNumber(noteNumber);		    
 		    pluginSetFloatParameter(&pluginState->volume, (r32)noteVelocity/127.f);
 		  } break;
 		  
@@ -525,13 +521,11 @@ AUDIO_PROCESS(audioProcess)
       r32 *loadedSoundSamples[2] = {};
       if(soundIsPlaying)
 	{
-	  loadedSoundSamples[0] = loadedSound->sound.samples[0] + loadedSound->samplesPlayed;
-	  loadedSoundSamples[1] = loadedSound->sound.samples[1] + loadedSound->samplesPlayed;
+	  loadedSoundSamples[0] = loadedSound->sound.samples[0] + (u32)loadedSound->samplesPlayed;
+	  loadedSoundSamples[1] = loadedSound->sound.samples[1] + (u32)loadedSound->samplesPlayed;
 	}
-
-      // TODO: there's too much code that's identical in the two switch cases      
-      r32 formatVolumeFactor = 1.f;
-      void *genericAudioFrames = audioBuffer->buffer;
+      
+      r32 formatVolumeFactor = 1.f;      
       switch(audioBuffer->format)
 	{
 	case AudioFormat_s16:
@@ -541,16 +535,17 @@ AUDIO_PROCESS(audioProcess)
 	case AudioFormat_r32: break;
 	default: { ASSERT(!"invalid audio format"); } break;
 	}
-      
-      //r32 *audioFrames = (r32 *)audioBuffer->buffer;
-      for(u64 i = 0; i < audioBuffer->framesToWrite; ++i)
+
+      void *genericAudioFrames = audioBuffer->buffer;
+      r32 sampleRateRatio = (r32)INTERNAL_SAMPLE_RATE/(r32)audioBuffer->sampleRate;      
+      for(u32 i = 0; i < audioBuffer->framesToWrite; ++i)
 	{
 	  r32 volume = formatVolumeFactor*pluginReadFloatParameter(&pluginState->volume);
 		
 	  pluginState->phasor += nFreq;
 	  if(pluginState->phasor > M_TAU) pluginState->phasor -= M_TAU;
 				  
-	  r32 sinVal = volume*sin(pluginState->phasor);
+	  r32 sinVal = sin(pluginState->phasor);
 	  for(u32 j = 0; j < audioBuffer->channels; ++j)
 	    {
 	      r32 mixedVal = 0.5f*sinVal;
@@ -558,14 +553,19 @@ AUDIO_PROCESS(audioProcess)
 	      soundIsPlaying = pluginReadBooleanParameter(&pluginState->soundIsPlaying);
 	      if(soundIsPlaying)		       
 		{
-		  if((loadedSound->samplesPlayed + i) < loadedSound->sound.sampleCount)
-		    {
-		      r32 loadedSoundVal = volume*loadedSoundSamples[j][i];
+		  r32 soundReadPosition = sampleRateRatio*i;
+		  if((loadedSound->samplesPlayed + soundReadPosition + 1) < loadedSound->sound.sampleCount)
+		    {		      
+		      u32 soundReadIndex = (u32)soundReadPosition;
+		      r32 soundReadFrac = soundReadPosition - soundReadIndex;
+
+		      r32 firstSoundVal = loadedSoundSamples[j][soundReadIndex];
+		      r32 nextSoundVal = loadedSoundSamples[j][soundReadIndex + 1];
+		      r32 loadedSoundVal = lerp(firstSoundVal, nextSoundVal, soundReadFrac);
 		      mixedVal += 0.5f*loadedSoundVal;
 		    }
 		  else
-		    {
-		      //loadedSound->isPlaying = false;
+		    {		      
 		      pluginSetBooleanParameter(&pluginState->soundIsPlaying, false);
 		      loadedSound->samplesPlayed = 0;
 		    }
@@ -576,67 +576,25 @@ AUDIO_PROCESS(audioProcess)
 		case AudioFormat_r32:
 		  {
 		    r32 *audioFrames = (r32 *)genericAudioFrames;
-		    *audioFrames++ = mixedVal;
+		    *audioFrames++ = volume*mixedVal;
 		    genericAudioFrames = audioFrames;
 		  } break;
 		case AudioFormat_s16:
 		  {
 		    s16 *audioFrames = (s16 *)genericAudioFrames;
-		    *audioFrames++ = (s16)mixedVal;
+		    *audioFrames++ = (s16)(volume*mixedVal);
 		    genericAudioFrames = audioFrames;
 		  } break;
 		}
 	    }
-	  
+
 	  pluginUpdateFloatParameter(&pluginState->volume);
-	}	 
-      /*
-	case AudioFormat_s16:
-	  {
-	    s16 *audioFrames = (s16 *)audioBuffer->buffer;
-	    for(u64 i = 0; i < audioBuffer->framesToWrite; ++i)
-	      {
-		r32 volume = formatVolumeFactor*pluginReadFloatParameter(&pluginState->volume);
-
-		pluginState->phasor += nFreq;
-		if(pluginState->phasor > M_TAU) pluginState->phasor -= M_TAU;
-				  
-		r32 sinVal = volumesin(pluginState->phasor);
-		for(u32 j = 0; j < audioBuffer->channels; ++j)
-		  {
-		    r32 mixedVal = 0.5f*sinVal;
-
-		    soundIsPlaying = pluginReadBooleanParameter(&pluginState->soundIsPlaying);
-		    if(soundIsPlaying)		       
-		      {
-			if((loadedSound->samplesPlayed + i) < loadedSound->sound.sampleCount)
-			  {
-			    r32 loadedSoundVal = volume*loadedSoundSamples[j][i];
-			    mixedVal += 0.5f*loadedSoundVal;
-			  }
-			else
-			  {
-			    //loadedSound->isPlaying = false;
-			    pluginSetBooleanParameter(&pluginState->soundIsPlaying, false);
-			    loadedSound->samplesPlayed = 0;
-			  }
-		      }
-		    
-		    *audioFrames++ = (s16)mixedVal;
-		  }
-
-		pluginUpdateFloatParameter(&pluginState->volume);
-	      }
-	  } break;
-
-	default: { ASSERT(!"invalid default case"); } break;
 	}
-      */
-      
+
       soundIsPlaying = pluginReadBooleanParameter(&pluginState->soundIsPlaying);
       if(soundIsPlaying)
 	{
-	  loadedSound->samplesPlayed += audioBuffer->framesToWrite;
-	}
+	  loadedSound->samplesPlayed += sampleRateRatio*audioBuffer->framesToWrite;
+	}      
     }
 }

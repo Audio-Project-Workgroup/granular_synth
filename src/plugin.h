@@ -53,6 +53,23 @@ pluginUpdateFloatParameter(PluginFloatParameter *param)
     }
 }
 
+enum PluginParameterType
+{
+  PluginParameterType_float,
+  PluginParamterType_bool,
+};
+
+struct PluginParameter
+{
+  PluginParameterType type;
+
+  union
+  {
+    PluginFloatParameter floatParam;
+    PluginBooleanParameter boolParam;
+  };
+};
+
 #include "file_formats.h"
 #include "ui_layout.h"
 #include "plugin_render.h"
@@ -60,24 +77,20 @@ pluginUpdateFloatParameter(PluginFloatParameter *param)
 struct PlayingSound
 {  
   LoadedSound sound;
-  u32 samplesPlayed;
-  //bool isPlaying;
-  //PluginBooleanParameter *isPlaying;
+  r32 samplesPlayed;  
 };
 
 struct PluginState
 {
   Arena permanentArena;
   Arena frameArena;
-  Arena loadArena;
+  Arena loadArena; 
   
   r64 phasor;
   r32 freq;
   PluginFloatParameter volume;
   PluginBooleanParameter soundIsPlaying;
 
-  //usz wavDataSize;
-  //u8 *wavData;
   PlayingSound loadedSound;
   LoadedBitmap testBitmap;
   LoadedFont testFont;
