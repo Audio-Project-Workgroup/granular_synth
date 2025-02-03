@@ -9,6 +9,37 @@
 // scalar
 //
 
+inline r32
+lerp(r32 val1, r32 val2, r32 t)
+{
+  r32 result = (1 - t)*val1 + t*val2;
+
+  return(result);
+}
+
+inline r32
+binterp(r32 val0, r32 val1, r32 val2, r32 t0)
+{
+  r32 t1 = t0 - 1;
+  r32 t2 = t0 - 2;
+  
+  r32 result = 0.5f*t1*t2*val0 - t0*t2*val1 + 0.5f*t0*t1*val2;
+
+  return(result);
+}
+
+inline r32
+cubicInterp(r32 val0, r32 val1, r32 val2, r32 val3, r32 t0)
+{
+  r32 t1 = t0 - 1;
+  r32 t2 = t0 - 2;
+  r32 t3 = t0 - 3;
+  
+  r32 result = (-1.f/6.f)*t1*t2*t3*val0 + 0.5f*t0*t2*t3*val1 - 0.5f*t0*t1*t3*val2 + 0.5f*t0*t1*t2*val3;
+
+  return(result);
+}
+
 // TODO: stop using the C runtime library
 inline r32
 Abs(r32 val)
@@ -42,7 +73,7 @@ log2(u32 num)
   u32 shifts[] = {1, 2, 4, 8, 16};
   u32 result = 0;
 
-  for(u32 i = 4; i >= 0; --i)
+  for(s32 i = 4; i >= 0; --i)
     {
       if(v & masks[i])
 	{
@@ -73,6 +104,8 @@ log2(u64 num)
 
   return(result);  
 }
+
+#define ROUND_UP_TO_POWER_OF_2(num) ((num == (u32)(1 << log2(num))) ? num : (u32)(1 << (log2(num) + 1)))
 
 //
 // complex
@@ -201,6 +234,37 @@ operator/=(c64 &z, c64 w)
   z = z / w;
   
   return(z);
+}
+
+inline c64
+lerp(c64 val1, c64 val2, r32 t)
+{
+  c64 result = (1 - t)*val1 + t*val2;
+
+  return(result);
+}
+
+inline c64
+binterp(c64 val0, c64 val1, c64 val2, r32 t0)
+{
+  r32 t1 = t0 - 1;
+  r32 t2 = t0 - 2;
+  
+  c64 result = 0.5f*t1*t2*val0 - t0*t2*val1 + 0.5f*t0*t1*val2;
+
+  return(result);
+}
+
+inline c64
+cubicInterp(c64 val0, c64 val1, c64 val2, c64 val3, r32 t0)
+{
+  r32 t1 = t0 - 1;
+  r32 t2 = t0 - 2;
+  r32 t3 = t0 - 3;
+  
+  c64 result = (-1.f/6.f)*t1*t2*t3*val0 + 0.5f*t0*t2*t3*val1 - 0.5f*t0*t1*t3*val2 + 0.5f*t0*t1*t2*val3;
+
+  return(result);
 }
 
 //
@@ -457,23 +521,52 @@ isInRectangle(Rect2 r, v2 v)
 }
 
 inline void
-fft(c64 *destBuffer, r32 *sourceBuffer, u32 length)
+fft(c64 *destBuffer, r32 *sourceBuffer, u32 lengthInit, u32 stride = 1)
 {
-  // NOTE: radix-2 DIT fft
+#if 0
+  u32 length = lengthInit;
+  if(length == 1)
+    {
+      (*destBuffer).re = *sourceBuffer;
+    }
+  else
+    {
+      fft(destBuffer, sourceBuffer, length/2, 2*stride);
+      fft(destBuffer + length/2, sourceBuffer + stride, length/2, 2*stride);
+
+      for(u32 k = 0; k < length/2; ++k)
+	{
+	  c64 w = C64Polar(1, -M_TAU*k/(r32)length);
+	  c64 in0 = destBuffer[k];
+	  c64 in1 = destBuffer[k + length/2];
+
+	  destBuffer[k] = in0 + w*in1;
+	  destBuffer[k + length/2] = in0 - w*in1;
+	}
+    }
+#else 
+  // NOTE: iterative radix-2 DIT fft
+  // TODO: radix-4
+  u32 length = ROUND_UP_TO_POWER_OF_2(lengthInit);
+  u32 lengthSizeInBits = 8*sizeof(length);
   u32 logLength = log2(length);  
 
   // NOTE: bit-reverse copy
+  // TODO: optimize
   for(u32 index = 0; index < length; ++index)
     {
-      u32 reversedIndex = (reverseBits(index) >> logLength);
+      u32 reversedIndex = reverseBits(index);
+      reversedIndex >>= lengthSizeInBits - logLength;
+      ASSERT(reversedIndex < length);
+      
       destBuffer[index].re = sourceBuffer[reversedIndex];
     }  
 
-  // NOTE: swizzles
+  // NOTE: twiddles
   for(u32 level = 1; level <= logLength; ++level)
     {
       u32 m = (1 << level);
-      r32 angle = -2.f*M_PI/(r32)m;
+      r32 angle = -M_TAU/(r32)m;
       c64 wm = C64Polar(1, angle);
       
       for(u32 k = 0; k < length; k += m)
@@ -489,11 +582,282 @@ fft(c64 *destBuffer, r32 *sourceBuffer, u32 length)
 
 	      // TODO: optimize this math:
 	      //       use SIMD intrinsics, and take advantage of the fact that the input data is real
-	      *dest0 = in0 + w*in1;
-	      *dest1 = in0 - w*in1;
+	      *dest0++ = in0 + w*in1;
+	      *dest1++ = in0 - w*in1;
 
 	      w *= wm;
 	    }
 	}
+    }  
+#endif
+}
+
+inline void
+ifft(r32 *destBuffer, r32 *destImScratch, c64 *sourceBuffer, u32 lengthInit, u32 stride = 1)
+{
+#if 0
+  if(length == 1)
+    {
+      *destBuffer = (*sourceBuffer).re;
+    }
+  else
+    {
+      ifft(destBuffer, sourceBuffer, length/2, 2*stride);
+      ifft(destBuffer + length/2, sourceBuffer + stride, length/2, 2*stride);
+
+      for(u32 k = 0; k < length/2; ++k)
+	{
+	  c64 w = C64Polar(1, M_TAU*k/(r32)length);
+	  c64 in0 = destBuffer[k];
+	  c64 in1 = destBuffer[k + length/2];
+
+	  destBuffer[k] = in0 + w*in1;
+	  destBuffer[k + length/2] = in0 - w*in1;
+	}
+    }
+#else
+  // TODO: optimize
+  //ASSERT(!(length & 1));
+  u32 length = ROUND_UP_TO_POWER_OF_2(lengthInit);
+  u32 logLength = log2(length);
+  // NOTE: assuming power-of-two size
+  // TODO: support non-power-of-two sizes, don't require zero-padding input
+  ASSERT(length == (u32)(1 << logLength));
+  r32 invLength = 1.f/(r32)length;
+
+  u32 lengthSizeInBits = 8*sizeof(length);
+  for(u32 index = 0; index < length; ++index)
+    {
+      u32 reversedIndex = reverseBits(index);
+      reversedIndex >>= lengthSizeInBits - logLength;
+
+      c64 source = invLength*sourceBuffer[reversedIndex];
+      destBuffer[index] = source.re;
+      destImScratch[index] = source.im;
+    }
+
+  for(u32 level = 1; level <= logLength; ++level)
+    {
+      u32 m = 1 << level;
+      r32 angle = M_TAU/(r32)m;
+      c64 wm = C64Polar(1, angle);
+
+      for(u32 k = 0; k < length; k += m)
+	{
+	  c64 w = C64(1, 0);
+	  
+	  r32 *dest0 = destBuffer + k;
+	  r32 *dest0Im = destImScratch + k;
+	  r32 *dest1 = destBuffer + k + m/2;
+	  r32 *dest1Im = destImScratch + k + m/2;
+	  for(u32 j = 0; j < m/2; ++j)
+	    {
+	      c64 in0 = C64(*dest0, *dest0Im);
+	      c64 in1 = C64(*dest1, *dest1Im);
+
+	      c64 result0 = in0 + w*in1;
+	      c64 result1 = in0 - w*in1;
+	      
+	      *dest0++ = result0.re;
+	      *dest1++ = result1.re;
+	      *dest0Im++ = result0.im;
+	      *dest1Im++ = result1.im;
+
+	      w *= wm;
+	    }
+	}
+    }
+#endif
+}
+
+inline void
+fft(c64 *output, c64 *input, u32 lengthInit)
+{
+  u32 length = ROUND_UP_TO_POWER_OF_2(lengthInit);
+  u32 lengthSizeInBits = 8*sizeof(lengthInit);
+  u32 logLength = log2(length);
+  
+  for(u32 index = 0; index < length; ++index)
+    {
+      u32 reverseIndex = reverseBits(index);
+      reverseIndex >>= lengthSizeInBits - logLength;
+      output[index] = input[reverseIndex];
+    }
+
+  for(u32 s = 1; s <= logLength; ++s)
+    {
+      u32 m = 1 << s;
+      r32 angle = -M_TAU/(r32)m;
+      c64 wm = C64Polar(1, angle);
+
+      for(u32 k = 0; k < length; k += m)
+	{
+	  c64 w = C64(1, 0);
+	  
+	  c64 *dest0 = output + k;
+	  c64 *dest1 = output + k + m/2;	  
+	  for(u32 j = 0; j < m/2; ++j)
+	    {
+	      c64 in0 = *dest0;
+	      c64 in1 = *dest1;     
+
+	      // TODO: SIMD	 
+	      *dest0++ = in0 + w*in1;
+	      *dest1++ = in0 - w*in1;
+
+	      w *= wm;
+	    }
+	}
+    }
+}
+
+inline void
+ifft(c64 *output, c64 *input, u32 lengthInit)
+{
+  u32 length = ROUND_UP_TO_POWER_OF_2(lengthInit);
+  u32 lengthSizeInBits = 8*sizeof(lengthInit);
+  u32 logLength = log2(length);
+  r32 invLength = 1.f/(r32)length;
+  
+  for(u32 index = 0; index < length; ++index)
+    {
+      u32 reverseIndex = reverseBits(index);
+      reverseIndex >>= lengthSizeInBits - logLength;
+      output[index] = invLength*input[reverseIndex];
+    }
+
+  for(u32 s = 1; s <= logLength; ++s)
+    {
+      u32 m = 1 << s;
+      r32 angle = M_TAU/(r32)m;
+      c64 wm = C64Polar(1, angle);
+
+      for(u32 k = 0; k < length; k += m)
+	{
+	  c64 w = C64(1, 0);
+	  
+	  c64 *dest0 = output + k;
+	  c64 *dest1 = output + k + m/2;	  
+	  for(u32 j = 0; j < m/2; ++j)
+	    {
+	      c64 in0 = *dest0;
+	      c64 in1 = *dest1;     
+
+	      // TODO: SIMD	 
+	      *dest0++ = in0 + w*in1;
+	      *dest1++ = in0 - w*in1;
+
+	      w *= wm;
+	    }
+	}
+    }
+}
+
+inline void
+czt(c64 *output, r32 *input, u32 length, Arena *scratchAllocator)
+{
+  // NOTE: chirp z transform.
+  //       for taking ffts of arbitrary length signals
+  
+  u32 chirpLength = 2*length - 1;
+  u32 fftLength = ROUND_UP_TO_POWER_OF_2(chirpLength);
+
+  r32 angle = -M_PI/(r32)length;
+  c64 wBase = C64Polar(1, angle);  
+  c64 *chirp = arenaPushArray(scratchAllocator, chirpLength, c64);//, arenaFlagsZeroNoAlign());
+  c64 *reciprocalChirp = arenaPushArray(scratchAllocator, fftLength, c64);//, arenaFlagsZeroNoAlign());
+  c64 *scaledInput = arenaPushArray(scratchAllocator, fftLength, c64);//, arenaFlagsZeroNoAlign());
+  c64 *wTemp = arenaPushArray(scratchAllocator, fftLength, c64);//, arenaFlagsZeroNoAlign());
+  chirp[length - 1] = C64(1, 0);
+  reciprocalChirp[length - 1] = C64(1, 0);
+  wTemp[0] = C64(1, 0);
+  scaledInput[0] = input[0]*chirp[length];
+  for(u32 k = 1; k < length; ++k)
+    {
+      // NOTE: generate chirp, multiply the input
+      c64 chirpVal = chirp[length - 1 + k - 1] * wTemp[k - 1] * wBase;
+      c64 conjChirpVal = conjugateC64(chirpVal);
+      chirp[length - 1 + k] = chirpVal;
+      chirp[length - 1 - k] = chirpVal;
+      reciprocalChirp[length - 1 + k] = conjChirpVal;
+      reciprocalChirp[length - 1 - k] = conjChirpVal;
+      scaledInput[k] = input[k] * chirp[length + k - 1 ];
+
+      // TODO: don't compute more of these values than necessary. may be a source of significant numerical error
+      //if(k*k >= 2*length) 
+      wTemp[k] = wTemp[k - 1] * wBase * wBase;
+    } 
+
+  // NOTE: convolve the scaled input with the reciprocal chirp  
+  c64 *fftScaledInput = wTemp;
+  fft(fftScaledInput, scaledInput, fftLength);
+
+  c64 *fftReciprocalChirp = scaledInput;
+  fft(fftReciprocalChirp, reciprocalChirp, fftLength);
+  
+  for(u32 index = 0; index < fftLength; ++index)
+    {
+      fftScaledInput[index] *= fftReciprocalChirp[index];
+    }
+
+  c64 *ifftOutput = reciprocalChirp;
+  ifft(ifftOutput, fftScaledInput, fftLength);
+
+  // NOTE: write out, scaling by the chirp
+  for(u32 index = 0; index < length; ++index)
+    {
+      output[index] = ifftOutput[length + index - 1] * chirp[length + index - 1];
+    }
+}
+
+inline void
+iczt(r32 *outputReal, r32 *outputImag, c64 *input, u32 length, Arena *scratchAllocator)
+{
+  r32 invLength = 1.f/(r32)length;
+  u32 chirpLength = 2*length - 1;
+  u32 fftLength = ROUND_UP_TO_POWER_OF_2(chirpLength);
+
+  r32 angle = M_PI/(r32)length;
+  c64 wBase = C64Polar(1, angle);  
+  c64 *chirp = arenaPushArray(scratchAllocator, chirpLength, c64);//, arenaFlagsZeroNoAlign());
+  c64 *reciprocalChirp = arenaPushArray(scratchAllocator, fftLength, c64);//, arenaFlagsZeroNoAlign());
+  c64 *scaledInput = arenaPushArray(scratchAllocator, fftLength, c64);//, arenaFlagsZeroNoAlign());
+  c64 *wTemp = arenaPushArray(scratchAllocator, fftLength, c64);//, arenaFlagsZeroNoAlign());
+  chirp[length - 1] = C64(1, 0);
+  reciprocalChirp[length - 1] = C64(1, 0);
+  wTemp[0] = C64(1, 0);
+  scaledInput[0] = input[0]*chirp[length];
+  for(u32 k = 1; k < length; ++k)
+    {      
+      c64 chirpVal = chirp[length - 1 + k - 1] * wTemp[k - 1] * wBase;
+      c64 conjChirpVal = conjugateC64(chirpVal);
+      chirp[length - 1 + k] = chirpVal;
+      chirp[length - 1 - k] = chirpVal;
+      reciprocalChirp[length - 1 + k] = conjChirpVal;
+      reciprocalChirp[length - 1 - k] = conjChirpVal;
+      scaledInput[k] = input[k] * chirp[length + k - 1 ];
+      
+      wTemp[k] = wTemp[k - 1] * wBase * wBase;
+    } 
+
+  c64 *fftScaledInput = wTemp;
+  fft(fftScaledInput, scaledInput, fftLength);
+
+  c64 *fftReciprocalChirp = scaledInput;
+  fft(fftReciprocalChirp, reciprocalChirp, fftLength);
+  
+  for(u32 index = 0; index < fftLength; ++index)
+    {
+      fftScaledInput[index] *= fftReciprocalChirp[index];
+    }
+
+  c64 *ifftOutput = reciprocalChirp;
+  ifft(ifftOutput, fftScaledInput, fftLength);
+
+  for(u32 index = 0; index < length; ++index)
+    {
+      c64 outVal = invLength * ifftOutput[length + index - 1] * chirp[length + index - 1];
+      outputReal[index] = outVal.re;
+      outputImag[index] = outVal.im;
     }
 }

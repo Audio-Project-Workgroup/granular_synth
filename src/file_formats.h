@@ -103,6 +103,7 @@ loadWav(char *filename, Arena *loadAllocator, Arena *permanentAllocator)
       u32 channelCount = 0;
       u32 sampleDataSize = 0;
       u32 bytesPerSample = 0;
+      u32 sampleRate = 0;
       void *sampleData = 0;
 
       RiffIterator it = {};
@@ -120,9 +121,10 @@ loadWav(char *filename, Arena *loadAllocator, Arena *permanentAllocator)
 	      {		
 		WavFormat *fmt = (WavFormat *)(it.at + sizeof(WavChunk));
 		ASSERT(fmt->wFormatTag == 1); // NOTE: only support pcm
-		ASSERT(fmt->nSamplesPerSec == 48000); // TODO: up/down-sample to the internal rate
+		//ASSERT(fmt->nSamplesPerSec == 48000); // TODO: up/down-sample to the internal rate
+		sampleRate = fmt->nSamplesPerSec;
 		bytesPerSample = fmt->wBitsPerSample/8;
-		ASSERT(fmt->nBlockAlign = (bytesPerSample*fmt->nChannels));
+		ASSERT(fmt->nBlockAlign == (bytesPerSample*fmt->nChannels));
 		
 	        channelCount = fmt->nChannels;
 	      } break;
@@ -134,12 +136,25 @@ loadWav(char *filename, Arena *loadAllocator, Arena *permanentAllocator)
 	      } break;
 	    }
 	}
-      ASSERT(sampleData && channelCount);
+      ASSERT(sampleData && channelCount);      
 
-      result.sampleCount = sampleDataSize/(channelCount*bytesPerSample);
-      result.channelCount = channelCount;      
-      result.samples[0] = arenaPushArray(permanentAllocator, result.sampleCount, r32);
-      result.samples[1] = arenaPushArray(permanentAllocator, result.sampleCount, r32);
+      r32 sampleRateConversionFactor = ((r32)INTERNAL_SAMPLE_RATE/(r32)sampleRate);
+      //bool shouldResample = (INTERNAL_SAMPLE_RATE != sampleRate);
+      
+      u32 sourceSampleCount = sampleDataSize/(channelCount*bytesPerSample);
+      //u32 paddedSourceSampleCount = shouldResample ? ROUND_UP_TO_POWER_OF_2(sourceSampleCount) : sourceSampleCount;
+      
+      u32 destSampleCount = ROUND_UP_TO_MULTIPLE_OF_2((u32)(sampleRateConversionFactor*sourceSampleCount));
+      //u32 paddedDestSampleCount = shouldResample ? ROUND_UP_TO_POWER_OF_2(destSampleCount) : destSampleCount;
+      //u32 maxPaddedSampleCount = MAX(paddedDestSampleCount, paddedSourceSampleCount);
+      u32 maxSampleCount = MAX(sourceSampleCount, destSampleCount);
+
+      // NOTE: we allocate more space than we actually need for storing samples, since we use these buffers
+      //       as both inputs to the fft and destinations of the ifft when doing sample-rate conversion
+      result.sampleCount = destSampleCount;
+      result.channelCount = channelCount;
+      result.samples[0] = arenaPushArray(permanentAllocator, maxSampleCount, r32);
+      result.samples[1] = arenaPushArray(permanentAllocator, maxSampleCount, r32);
       
       if(channelCount == 1)
 	{
@@ -148,7 +163,7 @@ loadWav(char *filename, Arena *loadAllocator, Arena *permanentAllocator)
 	  void *srcData = sampleData;
 	  r32 *destSamplesL = result.samples[0];
 	  r32 *destSamplesR = result.samples[1];
-	  for(u32 sampleIndex = 0; sampleIndex < result.sampleCount; ++sampleIndex)
+	  for(u32 sampleIndex = 0; sampleIndex < sourceSampleCount; ++sampleIndex)
 	    {
 	      r32 srcSample;
 	      if(bytesPerSample == 1)
@@ -175,11 +190,11 @@ loadWav(char *filename, Arena *loadAllocator, Arena *permanentAllocator)
 		{
 		  srcSample = 0;
 		  ASSERT(!"ERROR: unsupported sample size");
-		}
-		
+		}	      
+
 	      *destSamplesL++ = srcSample;
 	      *destSamplesR++ = srcSample;
-	    }
+	    }	  
 	}
       else if(channelCount == 2)
 	{
@@ -189,7 +204,7 @@ loadWav(char *filename, Arena *loadAllocator, Arena *permanentAllocator)
 	  void *srcDataR = (u8 *)sampleData + bytesPerSample;
 	  r32 *destSamplesL = result.samples[0];
 	  r32 *destSamplesR = result.samples[1];
-	  for(u32 sampleIndex = 0; sampleIndex < result.sampleCount; ++sampleIndex)
+	  for(u32 sampleIndex = 0; sampleIndex < sourceSampleCount; ++sampleIndex)
 	    {
 	      r32 srcSampleL, srcSampleR;
 	      if(bytesPerSample == 1)
@@ -235,68 +250,133 @@ loadWav(char *filename, Arena *loadAllocator, Arena *permanentAllocator)
 	      *destSamplesL++ = srcSampleL;
 	      *destSamplesR++ = srcSampleR;
 	    }
-
-#if 0
-	  // TODO: de-interleave stereo samples properly
-#if 1
-	  for(u32 sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex)
-	    {
-	      s16 source = sampleData[2*sampleIndex];
-	      sampleData[2*sampleIndex] = sampleData[sampleIndex];	      
-	      sampleData[sampleIndex] = source;	      
-	    }
-
-	  result.channelCount = 1; 
-#else	  
-	  Arena scratchMemory = arenaSubArena(allocator, 2*(sampleCount - 1)*sizeof(u32));	  
-	  	  
-	  u32 m = 2*sampleCount - 1;
-	  u32 totalCycleCount = 0;
-	  u32 cycleBegin = 1;	  
-	  for(;;)
-	    {
-	      // find indices of cycle
-	      u32 *cycleBase = (u32 *)(scratchMemory.base + scratchMemory.used);
-	      u32 cycleCount = 0;
-	      u32 cycleNext = cycleBegin;	      
-	      do {
-		++cycleCount;
-		u32 *indexPtr = arenaPushStruct(&scratchMemory, u32);
-		*indexPtr = cycleNext;
-		
-	        cycleNext = 2*cycleNext % (2*sampleCount - 1);		
-	      } while(cycleNext != cycleBegin);
-
-	      // do the permutation
-	      for(u32 i = 1; i < cycleCount; ++i)
-		{
-		  u32 index = *(cycleBase + i);
-		  
-		  u32 temp = sampleData[cycleBegin];
-		  sampleData[cycleBegin] = sampleData[index];
-		  sampleData[index] = temp;
-		}
-
-	      // find next starting point
-	      totalCycleCount += cycleCount;
-	      if(totalCycleCount == (m - 1))
-		{
-		  break;
-		}
-	      else
-		{
-		  u32 *indices = (u32 *)scratchMemory.base;
-		  bubbleSort(indices, totalCycleCount);//, allocator);
-		  cycleBegin = smallestNotInSortedArray(indices, totalCycleCount);
-		}
-	    }
-	  arenaEndArena(allocator, scratchMemory);
-#endif
-#endif
 	}
       else
 	{
 	  ASSERT(!"unhandled channel count in wav file");
+	}
+
+      // NOTE: sample-rate conversion
+      if(sampleRate != INTERNAL_SAMPLE_RATE)
+	{
+#if 1
+	  // NOTE: stupid linear interpolation until the fft method (or another better one) works
+	  Arena tempAllocator = arenaSubArena(loadAllocator, 2*sourceSampleCount*sizeof(r32));
+	  r32 *tempL = arenaPushArray(&tempAllocator, sourceSampleCount, r32);
+	  r32 *tempR = arenaPushArray(&tempAllocator, sourceSampleCount, r32);
+	  for(u32 index = 0; index < sourceSampleCount; ++index)
+	    {
+	      tempL[index] = result.samples[0][index];
+	      tempR[index] = result.samples[1][index];
+	    }
+
+	  r32 sampleRateRatio = 1.f/sampleRateConversionFactor;
+	  for(u32 destIndex = 0; destIndex < result.sampleCount; ++destIndex)
+	    {
+
+	      r32 sourceOffset = destIndex*sampleRateRatio;
+	      u32 sourceIndex = (u32)sourceOffset;
+	      r32 sourceFrac = sourceOffset - sourceIndex;
+
+	      ASSERT(sourceIndex < sourceSampleCount);
+	      r32 sourceSample0 =
+		lerp(tempL[sourceIndex], tempL[sourceIndex + 1], sourceFrac);
+	      r32 sourceSample1 =
+		lerp(tempR[sourceIndex], tempR[sourceIndex + 1], sourceFrac);
+	      
+	      result.samples[0][destIndex] = sourceSample0;
+	      result.samples[1][destIndex] = sourceSample1;
+	    }
+
+	  arenaEndArena(loadAllocator, tempAllocator);
+#else
+	  // TODO: make this work
+	  usz tempBufferSize = 4*maxSampleCount*sizeof(c64);
+	  TemporaryMemory tempBufferAllocator = arenaBeginTemporaryMemory(loadAllocator, tempBufferSize);
+	  c64 *tempFFTBufferL = arenaPushArray((Arena *)&tempBufferAllocator, maxSampleCount, c64,
+					       arenaFlagsZeroNoAlign());
+	  c64 *tempFFTBufferR = arenaPushArray((Arena *)&tempBufferAllocator, maxSampleCount, c64,
+					       arenaFlagsZeroNoAlign());
+
+	  usz cztScratchSize = 16*maxSampleCount*sizeof(c64);
+	  TemporaryMemory cztScratch = arenaBeginTemporaryMemory(loadAllocator, cztScratchSize);
+	  
+	  czt(tempFFTBufferL, result.samples[0], sourceSampleCount, (Arena *)&cztScratch);
+	  arenaEnd((Arena *)&cztScratch);
+	  
+	  czt(tempFFTBufferR, result.samples[1], sourceSampleCount, (Arena *)&cztScratch);
+	  arenaEnd((Arena *)&cztScratch);
+      
+	  if(sampleRate < INTERNAL_SAMPLE_RATE)
+	    {
+	      // NOTE: upsample
+
+	      // NOTE: zero out unused frequencies
+	      for(u32 index = sourceSampleCount/2 + 1; index < destSampleCount; ++index)
+		{
+		  tempFFTBufferL[index] = C64(0, 0);
+		  tempFFTBufferR[index] = C64(0, 0);
+		}
+
+	      // NOTE: copy frequencies, preserving hermitian symmetry
+	      c64 *midpointL = tempFFTBufferL + sourceSampleCount/2;
+	      c64 *midpointR = tempFFTBufferR + sourceSampleCount/2;
+	      c64 *destL = tempFFTBufferL + destSampleCount - sourceSampleCount/2;
+	      c64 *destR = tempFFTBufferR + destSampleCount - sourceSampleCount/2;
+	      for(u32 index = 0; index < sourceSampleCount/2; ++index)
+		{
+		  c64 coeffL = *midpointL;
+		  c64 coeffR = *midpointR;
+		  if(index == 0)
+		    {		      
+		      coeffL *= 0.5f;
+		      coeffR *= 0.5f;		      
+		    }
+		  //coeffL *= sampleRateConversionFactor;
+		  //coeffR *= sampleRateConversionFactor;
+
+		  *destL++ = conjugateC64(coeffL);
+		  *destR++ = conjugateC64(coeffR);
+
+		  *midpointL-- = coeffL;
+		  *midpointR-- = coeffR;		  
+		}	      
+	    }
+	  else if(sampleRate > INTERNAL_SAMPLE_RATE)
+	    {
+	      // NOTE: downsample
+	      c64 *writeL = tempFFTBufferL + result.sampleCount/2;
+	      c64 *writeR = tempFFTBufferR + result.sampleCount/2;
+	      c64 *readL = tempFFTBufferL + sourceSampleCount - result.sampleCount/2;
+	      c64 *readR = tempFFTBufferR + sourceSampleCount - result.sampleCount/2;
+	      for(u32 index = 0; index < result.sampleCount/2; ++index)
+		{
+		  c64 coeffL = *readL++;
+		  c64 coeffR = *readR++;
+		  if(index == 0)
+		    {
+		      coeffL = {0, 0};
+		      coeffR = {0, 0};
+		    }
+
+		  *writeL++ = coeffL;
+		  *writeR++ = coeffR;
+		}
+	    }
+
+	  r32 *IFFTtempImL = arenaPushArray((Arena *)&tempBufferAllocator, maxSampleCount, r32,
+					    arenaFlagsZeroNoAlign());
+	  r32 *IFFTtempImR = arenaPushArray((Arena *)&tempBufferAllocator, maxSampleCount, r32,
+					    arenaFlagsZeroNoAlign());
+	  iczt(result.samples[0], IFFTtempImL, tempFFTBufferL, destSampleCount, (Arena *)&cztScratch);
+	  arenaEnd((Arena *)&cztScratch);
+	  iczt(result.samples[1], IFFTtempImR, tempFFTBufferR, destSampleCount, (Arena *)&cztScratch);
+	  arenaEnd((Arena *)&cztScratch);
+	  
+	  //arenaEndArena(loadAllocator, tempAllocator);
+	  arenaEndTemporaryMemory(&cztScratch);
+	  arenaEndTemporaryMemory(&tempBufferAllocator);
+#endif
 	}
 
       //result.sampleCount = sampleCount;

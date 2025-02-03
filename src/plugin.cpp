@@ -68,8 +68,110 @@ initializePluginState(PluginMemory *memoryBlock)
 
 	  pluginState->permanentArena = arenaBegin((u8 *)memory + sizeof(PluginState), MEGABYTES(256));
 	  pluginState->frameArena = arenaSubArena(&pluginState->permanentArena, MEGABYTES(2));
-	  pluginState->loadArena = arenaSubArena(&pluginState->permanentArena, MEGABYTES(32));
-      
+	  pluginState->loadArena = arenaSubArena(&pluginState->permanentArena, MEGABYTES(128));
+
+#if 0
+	  r32 sourceSignalFreq = 4.f;
+	  u32 sourceSignalLength = 4410;
+	  u32 destSignalLength = 4800;
+	  u32 maxSignalLength = MAX(sourceSignalLength, destSignalLength);
+	  r32 conversionFactor = (r32)destSignalLength/(r32)sourceSignalLength;	  
+	  
+	  r32 *sourceSignal = arenaPushArray(&pluginState->permanentArena, sourceSignalLength, r32);   
+	  for(u32 i = 0; i < sourceSignalLength; ++i)
+	    {
+	      r32 angle = M_TAU*sourceSignalFreq*i/(r32)sourceSignalLength;
+	      sourceSignal[i] = Sin(angle);
+	    }
+	  
+	  r32 *compSignal = arenaPushArray(&pluginState->permanentArena, destSignalLength, r32);
+	  r32 *destSignal = arenaPushArray(&pluginState->permanentArena, destSignalLength, r32);
+	  for(u32 i = 0; i < destSignalLength; ++i)
+	    {
+	      r32 angle = M_TAU*sourceSignalFreq*i/(r32)destSignalLength;
+	      compSignal[i] = Sin(angle);
+	    }	  
+
+	  u32 destBatchSize = 1024;
+	  u32 sourceBatchSize = (u32)((r32)destBatchSize/conversionFactor);
+	  u32 maxBatchSize = MAX(sourceBatchSize, destBatchSize);
+	  u32 numBatches = ((destSignalLength + destBatchSize - 1) & ~(destBatchSize - 1))/destBatchSize;
+
+	  TemporaryMemory cztScratch = arenaBeginTemporaryMemory(&pluginState->loadArena,
+								 16*maxSignalLength*sizeof(c64));
+
+	  r32 *source = sourceSignal;
+	  r32 *dest = destSignal;
+	  c64 *cztDest = arenaPushArray(&pluginState->permanentArena, maxSignalLength, c64);
+	  r32 *imagScratch = arenaPushArray(&pluginState->permanentArena, destSignalLength, r32);
+	  for(u32 batch = 0; batch < numBatches; ++batch)
+	    {	      	      
+	      //czt(cztDest, sourceSignal, sourceSignalLength, (Arena *)&cztScratch);
+	      czt(cztDest, source, sourceBatchSize, (Arena *)&cztScratch);
+	      arenaEnd((Arena *)&cztScratch, true);
+
+	      if(sourceSignalLength < destSignalLength)
+		{
+		  for(u32 i = sourceBatchSize/2 + 1; i < destBatchSize; ++i)
+		    {
+		      cztDest[i] = C64(0, 0);
+		    }
+
+		  c64 *midpoint = cztDest + sourceBatchSize/2;
+		  c64 *write = cztDest + destBatchSize - sourceBatchSize/2;
+		  for(u32 i = 0; i < sourceBatchSize/2; ++i)
+		    {
+		      c64 sourceVal = *(midpoint - i);
+		      if(i == 0) sourceVal *= 0.5f;
+
+		      *(midpoint - i) = conversionFactor*sourceVal;
+		      *write++ = conversionFactor*conjugateC64(sourceVal);
+		    }
+		}
+	      else if(sourceSignalLength > destSignalLength)
+		{
+		  for(u32 i = destBatchSize; i < sourceBatchSize; ++i)
+		    {
+		      cztDest[i] = C64(0, 0);
+		    }
+	      
+		  c64 *read = cztDest + destBatchSize/2;
+		  c64 *write = read;
+		  *write++ = C64(0, 0);
+		  --read;
+		  for(u32 i = 1; i < destBatchSize/2; ++i)
+		    {
+		      c64 readVal = *read;
+		      readVal *= conversionFactor;
+		  
+		      *write++ = conjugateC64(readVal);
+		      *read-- = readVal;
+		    }
+		}
+	  	      
+	      //iczt(destSignal, imagScratch, cztDest, destSignalLength, (Arena *)&cztScratch);
+	      iczt(dest, imagScratch, cztDest, destBatchSize, (Arena *)&cztScratch);
+
+	      source += sourceBatchSize;
+	      dest += destBatchSize;
+
+	      cztDest += maxBatchSize;
+	      imagScratch += destBatchSize;
+	    }
+	  
+	  arenaEndTemporaryMemory(&cztScratch);
+	  //(void *)&sourceSignalFreq;
+
+	  for(u32 i = 0; i < destSignalLength; ++i)
+	    {
+	      r32 compVal = compSignal[i];
+	      r32 destVal = destSignal[i];
+	      r32 diff = Abs(compVal - destVal);
+	      r32 err = diff/(compVal + 0.0001f);
+	      printf("err[%u]: %.6f\n", i, err);
+	    }
+#endif
+ 
 	  pluginState->phasor = 0.f;
 	  pluginState->freq = 440.f;
 	  //pluginState->volume = 0.8f;
@@ -79,7 +181,7 @@ initializePluginState(PluginMemory *memoryBlock)
 	  pluginState->volume.range = makeRange(0, 1);
 	  pluginState->soundIsPlaying.value = false;
 
-	  pluginState->loadedSound.sound = loadWav("../data/fingertips.wav",
+	  pluginState->loadedSound.sound = loadWav("../data/fingertips_44100_PCM_16.wav",
 						   &pluginState->loadArena, &pluginState->permanentArena);
 	  pluginState->loadedSound.samplesPlayed = 0;
 	  //pluginState->loadedSound.isPlaying = false;

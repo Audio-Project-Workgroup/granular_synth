@@ -2,8 +2,8 @@
 
 #include "types.h"
 #include "utils.h"
-#include "math.h"
 #include "arena.h"
+#include "math.h"
 #include "render.h"
 
 //

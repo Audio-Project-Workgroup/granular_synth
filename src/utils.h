@@ -18,6 +18,8 @@
 
 #define ROUND_UP_TO_MULTIPLE_OF_2(num) (((num) + 1) & (~1))
 
+#define CYCLIC_ARRAY_INDEX(i, len) ((i < len) ? ((i < 0) ? (i + len) : i) : (i - len))
+
 #define LINKED_LIST_APPEND(head, new) do {	\
     new->next = head;				\
     head = new;					\

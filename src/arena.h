@@ -5,6 +5,15 @@ struct Arena
   usz used;
 };
 
+struct TemporaryMemory
+{
+  u8 *base;
+  usz capacity;
+  usz used;
+
+  Arena *parent;  
+};
+
 struct ArenaPushFlags
 {
   bool clearToZero;
@@ -24,6 +33,16 @@ arenaFlagsZeroNoAlign(void)
 {
   ArenaPushFlags result = {};
   result.clearToZero = true;
+
+  return(result);
+}
+
+inline ArenaPushFlags
+arenaFlagsZeroAlign(u32 alignment)
+{
+  ArenaPushFlags result = {};
+  result.clearToZero = true;
+  result.alignment = alignment;
 
   return(result);
 }
@@ -95,8 +114,29 @@ arenaEndArena(Arena *parent, Arena child)
   parent->used -= child.capacity;
 }
 
-static inline void
-arenaEnd(Arena *arena)
+inline TemporaryMemory
+arenaBeginTemporaryMemory(Arena *arena, usz size)
 {
+  TemporaryMemory result = {};
+  result.base = arenaPushSize(arena, size, arenaFlagsZeroNoAlign());
+  result.capacity = size;
+  result.parent = arena;
+
+  return(result);
+}
+
+inline void
+arenaEndTemporaryMemory(TemporaryMemory *tempMem)
+{
+  tempMem->parent->used -= tempMem->capacity;
+}
+
+static inline void
+arenaEnd(Arena *arena, bool clearToZero = false)
+{
+  if(clearToZero)
+    {
+      ZERO_SIZE(arena->base, arena->used);
+    }
   arena->used = 0;
 }
