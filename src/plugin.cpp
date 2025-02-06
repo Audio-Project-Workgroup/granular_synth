@@ -28,11 +28,30 @@
      midi channels/keyboard keys. This system then needs to interface with a system for updating and reading
      state parameters in a thread-safe way. (WIP)
 
-   - Image loading for text rendering and a prettier UI (DONE)
+   - UI:
+     - screen reader support
+     - bitmap assets for ui elements
+     - allow specification of horizontal vs. vertical slider, or knob for draggable elements
+     - render element name, with control over position (ie above, below, left, right)
+     - collapsable element groups, sized relative to children
+
+   - Parameters:
+     - come up with what parameters we want to have
+     - make parameter reads/updates atomic
+     - put parameters in an array (or multiple), for keyboard/midi mapping
+
+   - File Loading:
+     - more audio file formats (eg flac, ogg, mp3)
+     - speed up reads (ie SIMD)
+     - better samplerate conversion (ie FFT method (TODO: speed up fft and czt))
+     - load in batches to pass to ML model (maybe)
+
+   - MIDI:
+     - pass timestamps to the midi buffer, and read new messages based on timestamps
+     - map midi channels to parameters
+     - handle more message codes
 
    - Make the audioProcess() do granular synth things
-
-   - Either finish the Midi message parsing code, or pass the relevant information from the host layer
 
    - Integrate with the ML system
 */  
@@ -191,6 +210,21 @@ initializePluginState(PluginMemory *memoryBlock)
 
 	  pluginState->layout = uiInitializeLayout(&pluginState->frameArena, &pluginState->permanentArena,
 						   &pluginState->testFont);
+
+#if 1
+	  r32 *testModelInput = pluginState->loadedSound.sound.samples[0];
+	  //s64 testModelInputSampleCount = pluginState->loadedSound.sound.sampleCount;
+	  s64 testModelInputSampleCount = 2400; // TODO: feed the whole file
+#else	  
+	  ReadFileResult testInputFile = globalPlatform.readEntireFile("../data/test_input.data",
+								       &pluginState->permanentArena);
+	  ReadFileResult testOutputFile = globalPlatform.readEntireFile("../data/test_output.data",
+									&pluginState->permanentArena);
+	  r32 *testModelInput = (r32 *)testInputFile.contents;
+	  s64 testModelInputSampleCount = (testInputFile.contentsSize - 1)/(2*sizeof(r32));
+#endif
+	  void *outputData = globalPlatform.runModel(testModelInput, testModelInputSampleCount);
+	  r32 *outputFloat = (r32 *)outputData;
 
 	  pluginState->initialized = true;
 	}

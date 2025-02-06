@@ -139,22 +139,17 @@ loadWav(char *filename, Arena *loadAllocator, Arena *permanentAllocator)
       ASSERT(sampleData && channelCount);      
 
       r32 sampleRateConversionFactor = ((r32)INTERNAL_SAMPLE_RATE/(r32)sampleRate);
-      //bool shouldResample = (INTERNAL_SAMPLE_RATE != sampleRate);
       
-      u32 sourceSampleCount = sampleDataSize/(channelCount*bytesPerSample);
-      //u32 paddedSourceSampleCount = shouldResample ? ROUND_UP_TO_POWER_OF_2(sourceSampleCount) : sourceSampleCount;
-      
+      u32 sourceSampleCount = sampleDataSize/(channelCount*bytesPerSample);      
       u32 destSampleCount = ROUND_UP_TO_MULTIPLE_OF_2((u32)(sampleRateConversionFactor*sourceSampleCount));
-      //u32 paddedDestSampleCount = shouldResample ? ROUND_UP_TO_POWER_OF_2(destSampleCount) : destSampleCount;
-      //u32 maxPaddedSampleCount = MAX(paddedDestSampleCount, paddedSourceSampleCount);
       u32 maxSampleCount = MAX(sourceSampleCount, destSampleCount);
 
       // NOTE: we allocate more space than we actually need for storing samples, since we use these buffers
       //       as both inputs to the fft and destinations of the ifft when doing sample-rate conversion
       result.sampleCount = destSampleCount;
       result.channelCount = channelCount;
-      result.samples[0] = arenaPushArray(permanentAllocator, maxSampleCount, r32);
-      result.samples[1] = arenaPushArray(permanentAllocator, maxSampleCount, r32);
+      result.samples[0] = arenaPushArray(permanentAllocator, 2*maxSampleCount, r32);
+      result.samples[1] = result.samples[0] + maxSampleCount;//arenaPushArray(permanentAllocator, maxSampleCount, r32);
       
       if(channelCount == 1)
 	{
@@ -270,6 +265,7 @@ loadWav(char *filename, Arena *loadAllocator, Arena *permanentAllocator)
 	      tempR[index] = result.samples[1][index];
 	    }
 
+	  result.samples[1] = result.samples[0] + destSampleCount;
 	  r32 sampleRateRatio = 1.f/sampleRateConversionFactor;
 	  for(u32 destIndex = 0; destIndex < result.sampleCount; ++destIndex)
 	    {

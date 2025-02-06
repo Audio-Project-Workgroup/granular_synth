@@ -22,48 +22,15 @@
     }						\
   } while(0)
 
-//#define MINIAUDIO_IMPLEMENTATION
 #include "miniaudio.h"
+
+#include "onnxruntime_c_api.h"
 
 #include "common.h"
 #include "platform.h"
 #include "render.cpp"
 
 static PluginInput *newInput;
-
-static const char *vertexShaderSource = R"HERE(
-#version 330 core
-
-layout(location = 0) in vec2 vPos;
-layout(location = 1) in vec2 uvIn;
-layout(location = 2) in vec4 color;
-
-out vec2 uvFrag;
-out vec4 colorFrag;
-
-void main()
-{
-  gl_Position = vec4(vPos, 0, 0);
-  uvFrag = uvIn;
-}
-)HERE";
-
-static const char *fragmentShaderSource = R"HERE(
-#version 330 core
-
-in vec2 uvFrag;
-in vec4 colorFrag;
-
-uniform sampler2D texSampler;
-
-out vec4 colorOut;
-
-void main()
-{
-  vec4 texColor = texture(texSampler, uvFrag);
-  colorOut = colorFrag * texColor;
-}
-)HERE";
 
 static inline void
 glfwProcessButtonPress(ButtonState *newState, bool pressed)
@@ -169,6 +136,65 @@ maDataCallback(ma_device *pDevice, void *pOutput, const void *pInput, ma_uint32 
     }
 }
 
+static const OrtApiBase *ortApiBase;
+static const OrtApi *ortApi;
+static OrtSession *ortSession;
+static OrtAllocator *ortSessionAllocator;
+
+static void
+ortPrintError(OrtStatus *status)
+{
+  if(status)
+    {
+      OrtErrorCode errorCode = ortApi->GetErrorCode(status);
+      const char *errorMessage = ortApi->GetErrorMessage(status);
+      fprintf(stderr, "ERROR: ORT error: %d: %s\n", errorCode, errorMessage);
+	      
+      ortApi->ReleaseStatus(status);
+    }
+}
+
+PLATFORM_RUN_MODEL(platformRunModel)
+{
+  char *inputName, *outputName;
+  ortApi->SessionGetInputName(ortSession, 0, ortSessionAllocator, &inputName);
+  ortApi->SessionGetOutputName(ortSession, 0, ortSessionAllocator, &outputName);
+
+  const char *inputNames[] = {inputName};
+  const char *outputNames[] = {outputName};
+  
+  OrtStatus *status = 0;
+  OrtMemoryInfo *inputMemInfo = 0;
+  status = ortApi->CreateCpuMemoryInfo(OrtArenaAllocator, (OrtMemType)0, &inputMemInfo);
+  ortPrintError(status);
+
+  OrtValue *inputTensor = 0;
+  usz inputLengthInBytes = 2*inputLength*sizeof(r32);
+  const s64 inputShape[] = {1, 2, inputLength};
+  usz inputShapeLen = ARRAY_COUNT(inputShape);
+  ONNXTensorElementDataType inputDataType = ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT;  
+  status = ortApi->CreateTensorWithDataAsOrtValue(inputMemInfo, inputData, inputLengthInBytes,
+						  inputShape, inputShapeLen, inputDataType, &inputTensor);
+  ortPrintError(status);
+
+  const OrtValue *inputTensors[] = {inputTensor};
+  OrtValue *outputTensor = 0;
+  status = ortApi->Run(ortSession, 0, inputNames, inputTensors, 1, outputNames, 1, &outputTensor);
+  ortPrintError(status);
+
+  void *outputData = 0;
+  status = ortApi->GetTensorMutableData(outputTensor, &outputData);
+  ortPrintError(status);
+
+  ortApi->ReleaseMemoryInfo(inputMemInfo);
+  ortApi->ReleaseValue(inputTensor);
+  ortApi->ReleaseValue(outputTensor);
+  ortApi->AllocatorFree(ortSessionAllocator, inputName);
+  ortApi->AllocatorFree(ortSessionAllocator, outputName);
+
+  return(outputData);
+}
+
 int
 main(int argc, char **argv)
 {
@@ -208,221 +234,206 @@ main(int argc, char **argv)
 	  pluginMemory.memory = calloc(MEGABYTES(512), 1);
 	  pluginMemory.platformAPI.readEntireFile = platformReadEntireFile;
 	  pluginMemory.platformAPI.freeFileMemory = platformFreeFileMemory;
+	  pluginMemory.platformAPI.runModel = platformRunModel;
 
 	  RenderCommands commands = {};	  
-#if 0
-	  RenderCommands commands = {};
-	  commands.vertexCapacity = 512;
-	  commands.indexCapacity = 1024;
-	  commands.vertices = (Vertex *)calloc(commands.vertexCapacity, sizeof(Vertex));
-	  commands.indices = (u32 *)calloc(commands.indexCapacity, sizeof(u32));
-
-	  GLState glState = {};
-	  glGenVertexArrays(1, &glState.vaoID);
-	  glBindVertexArray(glState.vaoID);
-	  
-	  glGenBuffers(1, &glState.vboID);	    
-	  glGenBuffers(1, &glState.eboID);
-
-	  glState.vertexShaderID = glCreateShader(GL_VERTEX_SHADER);
-	  glState.fragmentShaderID = glCreateShader(GL_FRAGMENT_SHADER);
-
-	  glShaderSource(glState.vertexShaderID, 1, &vertexShaderSource, NULL);
-	  glCompileShader(glState.vertexShaderID);
-	  
-	  glShaderSource(glState.fragmentShaderID, 1, &fragmentShaderSource, NULL);
-	  glCompileShader(glState.fragmentShaderID);
-
-	  glState.programID = glCreateProgram();
-	  glAttachShader(glState.programID, glState.vertexShaderID);
-	  glAttachShader(glState.programID, glState.fragmentShaderID);
-	  glLinkProgram(glState.programID);
-
-	  glState.samplerID = glGetUniformLocation(glState.ProgramID, "texSampler");
-#endif
 
 	  // plugin setup
-	  /*
-#ifdef _WIN32
-	  char *pluginName = "../build/plugin.dll";
-#elif  __APPLE__
-	  char *pluginName = "plugin.dylib";
-#else
-	  char *pluginName = "../build/plugin.so";
-#endif	  
-	  PluginCode plugin = loadPluginCode(pluginName);
-	  */
+
 	  PluginCode plugin = loadPluginCode(PLUGIN_PATH);
 
-	  // audio setup
+	  // model setup
 
-	  u32 audioBufferFrameCount = 48000/2;
-	  void *audioBufferData = calloc(audioBufferFrameCount, CHANNELS*sizeof(s16));
+	  ortApiBase = OrtGetApiBase();
+	  ASSERT(ortApiBase);
+	  ortApi = ortApiBase->GetApi(ORT_API_VERSION);
+	  ASSERT(ortApi);
+	  OrtStatus *ortStatus = 0;
+	  OrtEnv *ortEnv = 0;
+	  OrtSessionOptions *ortSessionOptions;	  
 
-	  PluginAudioBuffer audioBuffer = {};
-	  audioBuffer.format = AudioFormat_s16;
-	  audioBuffer.sampleRate = SR;
-	  audioBuffer.channels = CHANNELS;
-	  audioBuffer.midiMessageCount = 0; // TODO: send midi messages to the plugin
-	  audioBuffer.midiBuffer = (u8 *)calloc(KILOBYTES(1), 1);
+	  ortStatus = ortApi->GetAllocatorWithDefaultOptions(&ortSessionAllocator);
+	  ortPrintError(ortStatus);
+
+	  ortStatus = ortApi->CreateEnv(ORT_LOGGING_LEVEL_VERBOSE, "GranularSynthTestLog", &ortEnv);
+	  ortPrintError(ortStatus);
+
+	  ortStatus = ortApi->CreateSessionOptions(&ortSessionOptions);
+	  ortPrintError(ortStatus);
+
+	  const ORTCHAR_T *modelPath = ORT_TSTR("../data/test_model.onnx");
+	  ortStatus = ortApi->CreateSession(ortEnv, modelPath, ortSessionOptions, &ortSession);
+	  ortPrintError(ortStatus);
+	  ortApi->ReleaseSessionOptions(ortSessionOptions);
 	  
-	  ma_pcm_rb maRingBuffer;
-	  if(ma_pcm_rb_init(ma_format_s16, CHANNELS, audioBufferFrameCount, audioBufferData, NULL, &maRingBuffer) == MA_SUCCESS)
-	    {
-	      ASSERT(ma_pcm_rb_seek_write(&maRingBuffer, audioBufferFrameCount/10) == MA_SUCCESS);	     
+	  if(ortSession && ortEnv)
+	    {	      	      
+	      // audio setup
 
-	      // TODO: the host application is currently hard-coded to request an output device
-	      //       which is 48kHz, stereo, and 16-bit-per-sample. Miniaudio can iterate over
-	      //       output devices, so we should use that to make a device-selection interface.
-	      ma_device_config maConfig = ma_device_config_init(ma_device_type_playback);
-	      maConfig.playback.format = maRingBuffer.format;
-	      maConfig.playback.channels = maRingBuffer.channels;
-	      maConfig.sampleRate = SR;
-	      maConfig.dataCallback = maDataCallback;
-	      maConfig.pUserData = &maRingBuffer;
+	      u32 audioBufferFrameCount = 48000/2;
+	      void *audioBufferData = calloc(audioBufferFrameCount, CHANNELS*sizeof(s16));
 
-	      // TODO: this is about the lowest latency I could get on my machine while
-	      //       avoiding buffer underflows. Putting the audioProcess() call on a
-	      //       separate thread that doesn't have to wait for the monitor vblank
-	      //       will almost certainly enable us to get lower latency, but I don't
-	      //       want to introduce that extra complexity just yet. -Ry
-	      r32 targetLatencyMs = 30.f;
-	      u32 targetLatencySamples = (u32)(targetLatencyMs*(r32)SR/1000.f);
-
-	      ma_device maDevice;
-	      if(ma_device_init(NULL, &maConfig, &maDevice) == MA_SUCCESS)
+	      PluginAudioBuffer audioBuffer = {};
+	      audioBuffer.format = AudioFormat_s16;
+	      audioBuffer.sampleRate = SR;
+	      audioBuffer.channels = CHANNELS;
+	      audioBuffer.midiMessageCount = 0; // TODO: send midi messages to the plugin
+	      audioBuffer.midiBuffer = (u8 *)calloc(KILOBYTES(1), 1);
+	  
+	      ma_pcm_rb maRingBuffer;
+	      if(ma_pcm_rb_init(ma_format_s16, CHANNELS, audioBufferFrameCount, audioBufferData, NULL, &maRingBuffer) == MA_SUCCESS)
 		{
-		  ma_device_start(&maDevice);
+		  ASSERT(ma_pcm_rb_seek_write(&maRingBuffer, audioBufferFrameCount/10) == MA_SUCCESS);	     
 
-		  // main loop
+		  // TODO: the host application is currently hard-coded to request an output device
+		  //       which is 48kHz, stereo, and 16-bit-per-sample. Miniaudio can iterate over
+		  //       output devices, so we should use that to make a device-selection interface.
+		  ma_device_config maConfig = ma_device_config_init(ma_device_type_playback);
+		  maConfig.playback.format = maRingBuffer.format;
+		  maConfig.playback.channels = maRingBuffer.channels;
+		  maConfig.sampleRate = SR;
+		  maConfig.dataCallback = maDataCallback;
+		  maConfig.pUserData = &maRingBuffer;
 
-		  while(!glfwWindowShouldClose(window))
+		  // TODO: this is about the lowest latency I could get on my machine while
+		  //       avoiding buffer underflows. Putting the audioProcess() call on a
+		  //       separate thread that doesn't have to wait for the monitor vblank
+		  //       will almost certainly enable us to get lower latency, but I don't
+		  //       want to introduce that extra complexity just yet. -Ry
+		  r32 targetLatencyMs = 30.f;
+		  u32 targetLatencySamples = (u32)(targetLatencyMs*(r32)SR/1000.f);
+
+		  ma_device maDevice;
+		  if(ma_device_init(NULL, &maConfig, &maDevice) == MA_SUCCESS)
 		    {
-		      // reload plugin
+		      ma_device_start(&maDevice);
+
+		      // main loop
+
+		      while(!glfwWindowShouldClose(window))
+			{
+			  // reload plugin
 		      
-		      u64 newWriteTime = getLastWriteTimeU64(PLUGIN_PATH);
-		      if(newWriteTime != plugin.lastWriteTime)
-			{
-			  unloadPluginCode(&plugin);
-			  for(u32 tryIndex = 0; !plugin.isValid && (tryIndex < 10); ++tryIndex)
+			  u64 newWriteTime = getLastWriteTimeU64(PLUGIN_PATH);
+			  if(newWriteTime != plugin.lastWriteTime)
 			    {
-			      plugin = loadPluginCode(PLUGIN_PATH);
-			      msecWait(5);
-			    }			  
-			}		      
-
-		      // handle input
-		      
-		      for(u32 buttonIndex = 0; buttonIndex < MouseButton_COUNT; ++buttonIndex)
-			{
-			  newInput->mouseState.buttons[buttonIndex].halfTransitionCount = 0;
-			  newInput->mouseState.buttons[buttonIndex].endedDown =
-			    oldInput->mouseState.buttons[buttonIndex].endedDown;
-			}
-		      for(u32 keyIndex = 0; keyIndex < KeyboardButton_COUNT; ++keyIndex)
-			{
-			  newInput->keyboardState.keys[keyIndex].halfTransitionCount = 0;
-			  newInput->keyboardState.keys[keyIndex].endedDown =
-			    oldInput->keyboardState.keys[keyIndex].endedDown;
-			}
-		      for(u32 modifierIndex = 0; modifierIndex < KeyboardModifier_COUNT; ++modifierIndex)
-			{
-			  newInput->keyboardState.modifiers[modifierIndex].halfTransitionCount = 0;
-			  newInput->keyboardState.modifiers[modifierIndex].endedDown =
-			    oldInput->keyboardState.modifiers[modifierIndex].endedDown;
-			}
-
-		      // TODO: what's the difference between window size and framebuffer size? do we need both?
-		      int windowWidth, windowHeight;
-		      glfwGetWindowSize(window, &windowWidth, &windowHeight);		      
-
-		      double mouseX, mouseY;
-		      glfwGetCursorPos(window, &mouseX, &mouseY);
-		      newInput->mouseState.position = V2(mouseX, (r64)windowHeight - mouseY);
-
-		      // render new frame
-
-		      int width, height;
-		      glfwGetFramebufferSize(window, &width, &height);
-		      glViewport(0, 0, width, height);
-		      commands.widthInPixels = width;
-		      commands.heightInPixels = height;
-
-		      GL_PRINT_ERROR("GL ERROR: %u at frame start\n");
-		      /*
-		      GLenum error = glGetError();
-		      if(error)
-			{
-			  fprintf(stderr, "GL ERROR: %u at frame start\n", error);
-			}
-		      */
-
-		      glClearColor(0.2f, 0.2f, 0.2f, 0.f);
-		      glClear(GL_COLOR_BUFFER_BIT);		      
-
-		      if(plugin.renderNewFrame)
-			{
-			  plugin.renderNewFrame(&pluginMemory, oldInput, &commands);
-			  renderCommands(&commands);
-			}
-
-		      glfwSwapBuffers(window);
-		      glfwPollEvents();		      	     		      
-
-		      // process audio
-
-		      s32 maRBPtrDistance = ma_pcm_rb_pointer_distance(&maRingBuffer);
-		      //fprintf(stdout, "\nptr distance: %d\n", maRBPtrDistance);
-
-		      // TODO: this timing code was hastily hacked together and should be thought out
-		      //       more and made better
-		      u32 framesRemaining = (maRBPtrDistance < 2*(s32)targetLatencySamples) ?
-			targetLatencySamples : 0;		      
-		      while(framesRemaining)
-			{
-			  void *writePtr = 0;
-			  u32 framesToWrite = framesRemaining;
-			  ma_result maResult = ma_pcm_rb_acquire_write(&maRingBuffer, &framesToWrite, &writePtr);
-			  if(maResult == MA_SUCCESS)
-			    {
-			      if(plugin.audioProcess)
+			      unloadPluginCode(&plugin);
+			      for(u32 tryIndex = 0; !plugin.isValid && (tryIndex < 10); ++tryIndex)
 				{
-				  audioBuffer.buffer = writePtr;
-				  audioBuffer.framesToWrite = framesToWrite;
-				  plugin.audioProcess(&pluginMemory, &audioBuffer);
-				}
+				  plugin = loadPluginCode(PLUGIN_PATH);
+				  msecWait(5);
+				}			  
+			    }		      
 
-			      maResult = ma_pcm_rb_commit_write(&maRingBuffer, framesToWrite);
+			  // handle input
+		      
+			  for(u32 buttonIndex = 0; buttonIndex < MouseButton_COUNT; ++buttonIndex)
+			    {
+			      newInput->mouseState.buttons[buttonIndex].halfTransitionCount = 0;
+			      newInput->mouseState.buttons[buttonIndex].endedDown =
+				oldInput->mouseState.buttons[buttonIndex].endedDown;
+			    }
+			  for(u32 keyIndex = 0; keyIndex < KeyboardButton_COUNT; ++keyIndex)
+			    {
+			      newInput->keyboardState.keys[keyIndex].halfTransitionCount = 0;
+			      newInput->keyboardState.keys[keyIndex].endedDown =
+				oldInput->keyboardState.keys[keyIndex].endedDown;
+			    }
+			  for(u32 modifierIndex = 0; modifierIndex < KeyboardModifier_COUNT; ++modifierIndex)
+			    {
+			      newInput->keyboardState.modifiers[modifierIndex].halfTransitionCount = 0;
+			      newInput->keyboardState.modifiers[modifierIndex].endedDown =
+				oldInput->keyboardState.modifiers[modifierIndex].endedDown;
+			    }
+
+			  // TODO: what's the difference between window size and framebuffer size? do we need both?
+			  int windowWidth, windowHeight;
+			  glfwGetWindowSize(window, &windowWidth, &windowHeight);		      
+
+			  double mouseX, mouseY;
+			  glfwGetCursorPos(window, &mouseX, &mouseY);
+			  newInput->mouseState.position = V2(mouseX, (r64)windowHeight - mouseY);
+
+			  // render new frame
+
+			  int width, height;
+			  glfwGetFramebufferSize(window, &width, &height);
+			  glViewport(0, 0, width, height);
+			  commands.widthInPixels = width;
+			  commands.heightInPixels = height;
+
+			  GL_PRINT_ERROR("GL ERROR: %u at frame start\n");		      
+
+			  glClearColor(0.2f, 0.2f, 0.2f, 0.f);
+			  glClear(GL_COLOR_BUFFER_BIT);		      
+
+			  if(plugin.renderNewFrame)
+			    {
+			      plugin.renderNewFrame(&pluginMemory, oldInput, &commands);
+			      renderCommands(&commands);
+			    }
+
+			  glfwSwapBuffers(window);
+			  glfwPollEvents();		      	     		      
+
+			  // process audio
+
+			  s32 maRBPtrDistance = ma_pcm_rb_pointer_distance(&maRingBuffer);
+			  //fprintf(stdout, "\nptr distance: %d\n", maRBPtrDistance);
+
+			  // TODO: this timing code was hastily hacked together and should be thought out
+			  //       more and made better
+			  u32 framesRemaining = (maRBPtrDistance < 2*(s32)targetLatencySamples) ?
+			    targetLatencySamples : 0;		      
+			  while(framesRemaining)
+			    {
+			      void *writePtr = 0;
+			      u32 framesToWrite = framesRemaining;
+			      ma_result maResult = ma_pcm_rb_acquire_write(&maRingBuffer, &framesToWrite, &writePtr);
 			      if(maResult == MA_SUCCESS)
 				{
-				  //fprintf(stdout, "wrote %u frames\n", framesToWrite);
-				  framesRemaining -= framesToWrite;
+				  if(plugin.audioProcess)
+				    {
+				      audioBuffer.buffer = writePtr;
+				      audioBuffer.framesToWrite = framesToWrite;
+				      plugin.audioProcess(&pluginMemory, &audioBuffer);
+				    }
+
+				  maResult = ma_pcm_rb_commit_write(&maRingBuffer, framesToWrite);
+				  if(maResult == MA_SUCCESS)
+				    {
+				      //fprintf(stdout, "wrote %u frames\n", framesToWrite);
+				      framesRemaining -= framesToWrite;
+				    }
+				  else
+				    {
+				      fprintf(stderr, "ERROR: ma_pcm_rb_commit_write failed: %s\n",
+					      ma_result_description(maResult));
+				    }
 				}
 			      else
 				{
-				  fprintf(stderr, "ERROR: ma_pcm_rb_commit_write failed: %s\n",
+				  fprintf(stderr, "ERROR: ma_pcm_rb_acquire_write failed: %s\n",
 					  ma_result_description(maResult));
 				}
 			    }
-			  else
-			    {
-			      fprintf(stderr, "ERROR: ma_pcm_rb_acquire_write failed: %s\n",
-				      ma_result_description(maResult));
-			    }
+
+			  PluginInput *temp = newInput;
+			  newInput = oldInput;
+			  oldInput = temp;
 			}
 
-		      PluginInput *temp = newInput;
-		      newInput = oldInput;
-		      oldInput = temp;
+		      ma_device_uninit(&maDevice);
 		    }
 
-		  ma_device_uninit(&maDevice);
+		  ma_pcm_rb_uninit(&maRingBuffer);
 		}
 
-	      ma_pcm_rb_uninit(&maRingBuffer);
+	      ortApi->ReleaseSession(ortSession);
+	      ortApi->ReleaseEnv(ortEnv);
 	    }
 	  
-	   glfwDestroyWindow(window);
+	  glfwDestroyWindow(window);
 	}
       
       glfwTerminate();

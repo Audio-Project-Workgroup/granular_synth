@@ -10,6 +10,11 @@
 // functionality the host provides to the plugin
 // 
 
+// model
+
+#define PLATFORM_RUN_MODEL(name) void *(name)(r32 *inputData, s64 inputLength)
+typedef PLATFORM_RUN_MODEL(PlatformRunModel);
+
 // files
 
 struct ReadFileResult
@@ -28,6 +33,8 @@ struct PlatformAPI
 {
   PlatformReadEntireFile *readEntireFile;
   PlatformFreeFileMemory *freeFileMemory;
+
+  PlatformRunModel *runModel;
 };
 
 extern PlatformAPI globalPlatform;
