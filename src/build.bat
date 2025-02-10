@@ -8,7 +8,7 @@ pushd ..\build
 
 REM delete old pdbs and rdis
 del *.pdb > NUL 2> NUL
-REM del *.rdi > NUL 2> NUL
+del *.rdi > NUL 2> NUL
 
 REM compile miniaudio to static library
 REM cl %CFLAGS% -c ..\src\miniaudio_impl.c

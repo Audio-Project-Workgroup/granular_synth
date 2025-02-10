@@ -1,20 +1,16 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
+// #if _WIN32
+// #include <windows.h>
+// #endif
+
+#include "onnx.cpp"
+
 PLATFORM_READ_ENTIRE_FILE(juceReadEntireFile)
 {
   ReadFileResult result = {};
-
-  // TODO: this is my(ry's) local working directory. We need to give JUCE a uniform location to look for files.
-  /*
-#if _WIN32
-  juce::String fileDirectory = "C:\\Users\\finnc\\programming\\granular_synth\\data\\";
-#elif __APPLE__
-  juce::String fileDirectory = "~/Desktop/C/granular_synth/data";
-#else
-  juce::String fileDirectory = "~/Documents/C/GLFW_miniaudio_JUCE_test/data/";
-#endif
-  */
+ 
   juce::String filepath = juce::String(BUILD_DIR) + juce::String(filename);
   juce::File file(filepath);  
   if(file.existsAsFile())
@@ -68,6 +64,7 @@ PLATFORM_FREE_FILE_MEMORY(juceFreeFileMemory)
 }
 
 
+
 //==============================================================================
 AudioPluginAudioProcessor::AudioPluginAudioProcessor()
   : AudioProcessor(BusesProperties()
@@ -86,14 +83,14 @@ AudioPluginAudioProcessor::~AudioPluginAudioProcessor()
 }
 
 //==============================================================================
-const juce::String
-AudioPluginAudioProcessor::getName() const
+const juce::String AudioPluginAudioProcessor::
+getName() const
 {
   return(JucePlugin_Name);
 }
 
-bool
-AudioPluginAudioProcessor::acceptsMidi() const
+bool AudioPluginAudioProcessor::
+acceptsMidi() const
 {
 #if JucePlugin_WantsMidiInput
   return(true);
@@ -102,8 +99,8 @@ AudioPluginAudioProcessor::acceptsMidi() const
 #endif
 }
 
-bool
-AudioPluginAudioProcessor::producesMidi() const
+bool AudioPluginAudioProcessor::
+producesMidi() const
 {
 #if JucePlugin_ProducesMidiOutput
   return(true);
@@ -112,8 +109,8 @@ AudioPluginAudioProcessor::producesMidi() const
 #endif
 }
 
-bool
-AudioPluginAudioProcessor::isMidiEffect() const
+bool AudioPluginAudioProcessor::
+isMidiEffect() const
 {
 #if JucePlugin_IsMidiEffect
   return(true);
@@ -122,55 +119,74 @@ AudioPluginAudioProcessor::isMidiEffect() const
 #endif
 }
 
-double
-AudioPluginAudioProcessor::getTailLengthSeconds() const
+double AudioPluginAudioProcessor::
+getTailLengthSeconds() const
 {
   return(0.0);
 }
 
-int
-AudioPluginAudioProcessor::getNumPrograms()
+int AudioPluginAudioProcessor::
+getNumPrograms()
 {
   return(1);   // NB: some hosts don't cope very well if you tell them there are 0 programs,
                // so this should be at least 1, even if you're not really implementing programs.
 }
 
-int
-AudioPluginAudioProcessor::getCurrentProgram()
+int AudioPluginAudioProcessor::
+getCurrentProgram()
 {
   return(0);
 }
 
-void
-AudioPluginAudioProcessor::setCurrentProgram(int index)
+void AudioPluginAudioProcessor::
+setCurrentProgram(int index)
 {
   juce::ignoreUnused(index);
 }
 
-const juce::String
-AudioPluginAudioProcessor::getProgramName(int index)
+const juce::String AudioPluginAudioProcessor::
+getProgramName(int index)
 {
   juce::ignoreUnused(index);
   const juce::String result = {};
   return(result);
 }
 
-void
-AudioPluginAudioProcessor::changeProgramName(int index, const juce::String& newName)
+void AudioPluginAudioProcessor::
+changeProgramName(int index, const juce::String& newName)
 {
   juce::ignoreUnused(index, newName);
 }
 
 //==============================================================================
-void
-AudioPluginAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
+void AudioPluginAudioProcessor::
+prepareToPlay(double sampleRate, int samplesPerBlock)
 {
   juce::Logger::writeToLog("prepareToPlay called");
+
+  juce::String buildDir = BUILD_DIR_NATIVE;
+  
+  const ORTCHAR_T *modelPath = ORT_TSTR_ON_MACRO(ONNX_MODEL_PATH);
+  juce::Logger::writeToLog(modelPath);
+// #if _WIN32
+//   HMODULE onnxModule = LoadLibraryW(L"onnxruntime.dll");
+//   if(!onnxModule)
+//     {
+//       DWORD error = GetLastError();
+//       juce::String errorStr = "ERROR: failed to load onnruntime.dll: " + juce::String(error);
+//       juce::Logger::writeToLog(errorStr);
+//     }
+//   FreeLibrary(onnxModule);
+// #endif  
+
+  //onnxState = {};
+  onnxState = onnxInitializeState(modelPath);
 
   pluginMemory = {};
   pluginMemory.memory = calloc(MEGABYTES(512), 1);
   pluginMemory.platformAPI.readEntireFile = juceReadEntireFile;
   pluginMemory.platformAPI.freeFileMemory = juceFreeFileMemory;
+  pluginMemory.platformAPI.runModel = platformRunModel;
 
   // TODO: maybe do this branching in CMakeLists.txt?
 #ifdef _WIN32
@@ -182,8 +198,7 @@ AudioPluginAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
   //juce::Logger::writeToLog(std::getenv("DYLD_FALLBACK_LIBRARY_PATH"));
 #else
   juce::String pluginFilename = "plugin.so";
-#endif
-  juce::String buildDir = BUILD_DIR_NATIVE;//pluginDirectory;//
+#endif  
   juce::String pluginPath = buildDir + pluginFilename;
   juce::Logger::writeToLog(pluginPath);  
 
@@ -225,8 +240,8 @@ AudioPluginAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
   resourcesReleased = false;
 }
 
-void
-AudioPluginAudioProcessor::releaseResources()
+void AudioPluginAudioProcessor::
+releaseResources()
 {
   // NOTE: when an instance of the plugin is deleted, this function gets called multiple times, because the DAW
   //       wants to be *super careful* and make sure all the resources were freed for real, so we have to keep 
@@ -244,8 +259,8 @@ AudioPluginAudioProcessor::releaseResources()
     }
 }
 
-bool
-AudioPluginAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
+bool AudioPluginAudioProcessor::
+isBusesLayoutSupported(const BusesLayout& layouts) const
 {
 #if JucePlugin_IsMidiEffect
   juce::ignoreUnused(layouts);
@@ -269,8 +284,8 @@ AudioPluginAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) co
 #endif
 }
 
-void
-AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
+void AudioPluginAudioProcessor::
+processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
   audioBuffer.midiMessageCount = 0;
   u8 *atMidiBuffer = audioBuffer.midiBuffer;
@@ -299,7 +314,7 @@ AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::
   // TODO: we are assuming these are float-pointers above, so we should make that explicit here
   auto *lChannel = buffer.getWritePointer(0);
   auto *rChannel = buffer.getWritePointer(1);
-
+  
   if(pluginCode.audioProcess)
     {
       audioBuffer.framesToWrite = buffer.getNumSamples();      
@@ -312,21 +327,21 @@ AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::
 }
 
 //==============================================================================
-bool
-AudioPluginAudioProcessor::hasEditor() const
+bool AudioPluginAudioProcessor::
+hasEditor() const
 {
   return(true); // (change this to false if you choose to not supply an editor)
 }
 
-juce::AudioProcessorEditor*
-AudioPluginAudioProcessor::createEditor()
+juce::AudioProcessorEditor* AudioPluginAudioProcessor::
+createEditor()
 {
   return(new AudioPluginAudioProcessorEditor(*this));
 }
 
 //==============================================================================
-void
-AudioPluginAudioProcessor::getStateInformation(juce::MemoryBlock& destData)
+void AudioPluginAudioProcessor::
+getStateInformation(juce::MemoryBlock& destData)
 {
   // You should use this method to store your parameters in the memory block.
   // You could do that either as raw data, or use the XML or ValueTree classes
@@ -334,8 +349,8 @@ AudioPluginAudioProcessor::getStateInformation(juce::MemoryBlock& destData)
   juce::ignoreUnused(destData);
 }
 
-void
-AudioPluginAudioProcessor::setStateInformation(const void* data, int sizeInBytes)
+void AudioPluginAudioProcessor::
+setStateInformation(const void* data, int sizeInBytes)
 {
   // You should use this method to restore your parameters from this memory block,
   // whose contents will have been created by the getStateInformation() call.

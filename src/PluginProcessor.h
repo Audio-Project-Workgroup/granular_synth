@@ -57,6 +57,8 @@ private:
   PluginAudioBuffer audioBuffer;
   void *audioBufferMemory;
   bool resourcesReleased;
+
+  //juce::DynamicLibrary onnxDLL;
   
   //==============================================================================
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioPluginAudioProcessor)

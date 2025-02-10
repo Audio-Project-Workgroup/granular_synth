@@ -30,6 +30,7 @@
 ## Requirements
 
 * GLFW: https://github.com/glfw/glfw (to build from source), https://www.glfw.org/download.html (for the precompiled binaries)
+* ONNX: https://github.com/microsoft/onnxruntime (source), https://github.com/microsoft/onnxruntime/releases/tag/v1.20.1 (releases)
 * OpenGL (mac and linux)
 * clang (mac and linux)
 * msvc (windows)
@@ -46,7 +47,12 @@ This places the `https://github.com/juce-framework/JUCE` repository within `src/
 
 ### Windows 
 
-* from your downloaded GLFW folder, copy the `GLFW` folder to `src\include`, and from the `lib-vc[YEAR]` folder (corresponding to your version of Visual Studio), copy `glfw3_mt.lib` and `glfw3.lib` to `src\libs`
+* from your downloaded GLFW folder:
+  * copy the `GLFW` folder to `src\include`
+  * from the `lib-vc[YEAR]` folder (corresponding to your version of Visual Studio), copy `glfw3_mt.lib` and `glfw3.lib` to `src\libs`
+* from your downloaded onnxruntime folder:
+  * from the `include` directory, copy the file `onnxruntime_c_api.h` to `src\include`
+  * from the `lib` directory, copy the files `onnxruntime.lib` and `onnxruntime.pdb` to `src\libs`, and copy the file `onnxruntime.dll` to the `build` directory (if this is your first build, that directory won't be there yet, so defer this step until after you run `build.bat`)
 * configure your shell to be able to call a C compiler from the command line. This can be done by calling `vcvarsall.bat x64`, which you can find in `C:\Program Files\Microsoft Visual Studio\[YEAR]\Community\VC\Auxiliary\Build`, or something similar. 
 * navigate to the src directory
 * open `build.bat` and uncomment the two lines to compile miniaudio to a static library (by removing the REM command from the statements), as follows:
@@ -59,8 +65,9 @@ lib -OUT:miniaudio.lib miniaudio_impl.obj
   * recomment the two lines in `build.bat` for subsequent builds
 * run `build_juce` to build the vst3 plugin with JUCE
   * you will have to put the resulting vst3 bundle somewhere where your DAW/plugin host can find it (TODO: get JUCE to do the installation auomatically)
+  * on your first build, you will also have to copy `onnxruntime.dll` from your `build` folder to the folder containing your DAW's executable (TODO: install the onnxruntime dll globally with a custom name (to not interfere with the one that's installed by default))
 
-### Mac and Linux
+### Mac and Linux (TODO: update for building with ONNX)
 
 * navigate to the src directory
 * open `build.sh` and uncomment the two lines to compile miniaudio to a static library
@@ -72,11 +79,12 @@ lib -OUT:miniaudio.lib miniaudio_impl.obj
 ## RUN
 Test the installation for the application and for the VST plugin.
 
-* To run the application find the executable within the build directory. The file names are `main.exe` for Windows and `test` for Linux.
+* To run the application find the executable within the build directory. The file names are `main.exe` for Windows and `test` for Linux. (TODO: real names)
 * To test the VST3 plugin, find the `Granular Synth Test.vst3` file, and import it in your DAW.
 
 ## Issues
 
 * vst3 installation must be done manually on windows
-* double-free bug when closing vst plugin
+* must put onnxruntime dlls everywhere on windows. We don't want to make users do that, so we should put a dll with a custom name (to not conflict with the default) in System32.
+* (FIXED) double-free bug when closing vst plugin
 * (NOTE: probably fixed) loading the dynamic library plugin requires modifying shell environment variables on mac and linux (and requires a local path on windows)

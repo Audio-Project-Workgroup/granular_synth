@@ -24,11 +24,11 @@
 
 #include "miniaudio.h"
 
-#include "onnxruntime_c_api.h"
-
 #include "common.h"
 #include "platform.h"
+
 #include "render.cpp"
+#include "onnx.cpp"
 
 static PluginInput *newInput;
 
@@ -136,65 +136,6 @@ maDataCallback(ma_device *pDevice, void *pOutput, const void *pInput, ma_uint32 
     }
 }
 
-static const OrtApiBase *ortApiBase;
-static const OrtApi *ortApi;
-static OrtSession *ortSession;
-static OrtAllocator *ortSessionAllocator;
-
-static void
-ortPrintError(OrtStatus *status)
-{
-  if(status)
-    {
-      OrtErrorCode errorCode = ortApi->GetErrorCode(status);
-      const char *errorMessage = ortApi->GetErrorMessage(status);
-      fprintf(stderr, "ERROR: ORT error: %d: %s\n", errorCode, errorMessage);
-	      
-      ortApi->ReleaseStatus(status);
-    }
-}
-
-PLATFORM_RUN_MODEL(platformRunModel)
-{
-  char *inputName, *outputName;
-  ortApi->SessionGetInputName(ortSession, 0, ortSessionAllocator, &inputName);
-  ortApi->SessionGetOutputName(ortSession, 0, ortSessionAllocator, &outputName);
-
-  const char *inputNames[] = {inputName};
-  const char *outputNames[] = {outputName};
-  
-  OrtStatus *status = 0;
-  OrtMemoryInfo *inputMemInfo = 0;
-  status = ortApi->CreateCpuMemoryInfo(OrtArenaAllocator, (OrtMemType)0, &inputMemInfo);
-  ortPrintError(status);
-
-  OrtValue *inputTensor = 0;
-  usz inputLengthInBytes = 2*inputLength*sizeof(r32);
-  const s64 inputShape[] = {1, 2, inputLength};
-  usz inputShapeLen = ARRAY_COUNT(inputShape);
-  ONNXTensorElementDataType inputDataType = ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT;  
-  status = ortApi->CreateTensorWithDataAsOrtValue(inputMemInfo, inputData, inputLengthInBytes,
-						  inputShape, inputShapeLen, inputDataType, &inputTensor);
-  ortPrintError(status);
-
-  const OrtValue *inputTensors[] = {inputTensor};
-  OrtValue *outputTensor = 0;
-  status = ortApi->Run(ortSession, 0, inputNames, inputTensors, 1, outputNames, 1, &outputTensor);
-  ortPrintError(status);
-
-  void *outputData = 0;
-  status = ortApi->GetTensorMutableData(outputTensor, &outputData);
-  ortPrintError(status);
-
-  ortApi->ReleaseMemoryInfo(inputMemInfo);
-  ortApi->ReleaseValue(inputTensor);
-  ortApi->ReleaseValue(outputTensor);
-  ortApi->AllocatorFree(ortSessionAllocator, inputName);
-  ortApi->AllocatorFree(ortSessionAllocator, outputName);
-
-  return(outputData);
-}
-
 int
 main(int argc, char **argv)
 {
@@ -244,29 +185,10 @@ main(int argc, char **argv)
 
 	  // model setup
 
-	  ortApiBase = OrtGetApiBase();
-	  ASSERT(ortApiBase);
-	  ortApi = ortApiBase->GetApi(ORT_API_VERSION);
-	  ASSERT(ortApi);
-	  OrtStatus *ortStatus = 0;
-	  OrtEnv *ortEnv = 0;
-	  OrtSessionOptions *ortSessionOptions;	  
-
-	  ortStatus = ortApi->GetAllocatorWithDefaultOptions(&ortSessionAllocator);
-	  ortPrintError(ortStatus);
-
-	  ortStatus = ortApi->CreateEnv(ORT_LOGGING_LEVEL_VERBOSE, "GranularSynthTestLog", &ortEnv);
-	  ortPrintError(ortStatus);
-
-	  ortStatus = ortApi->CreateSessionOptions(&ortSessionOptions);
-	  ortPrintError(ortStatus);
-
 	  const ORTCHAR_T *modelPath = ORT_TSTR("../data/test_model.onnx");
-	  ortStatus = ortApi->CreateSession(ortEnv, modelPath, ortSessionOptions, &ortSession);
-	  ortPrintError(ortStatus);
-	  ortApi->ReleaseSessionOptions(ortSessionOptions);
+	  onnxState = onnxInitializeState(modelPath);
 	  
-	  if(ortSession && ortEnv)
+	  if(onnxState.session && onnxState.env)
 	    {	      	      
 	      // audio setup
 
@@ -429,8 +351,8 @@ main(int argc, char **argv)
 		  ma_pcm_rb_uninit(&maRingBuffer);
 		}
 
-	      ortApi->ReleaseSession(ortSession);
-	      ortApi->ReleaseEnv(ortEnv);
+	      onnxState.api->ReleaseSession(onnxState.session);
+	      onnxState.api->ReleaseEnv(onnxState.env);
 	    }
 	  
 	  glfwDestroyWindow(window);
