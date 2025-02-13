@@ -22,13 +22,16 @@ juce_add_plugin(
 )
 
 get_filename_component(BASE_DIR ${CMAKE_SOURCE_DIR} DIRECTORY)
-set(BUILD_DIR ${BASE_DIR}/build/)
+set(BUILD_DIR "${BASE_DIR}/build")
+set(DATA_DIR "${BASE_DIR}/data")
 
 set(ONNX_MODEL_PATH ${BASE_DIR}/data/test_model.onnx)
-
 set(ONNX_LIBRARY_DIR "${BASE_DIR}/src/libs")
 set(ONNX_INCLUDE_DIR "${BASE_DIR}/src/include")
+
 if(WIN32)
+  set(DYNAMIC_PLUGIN_PATH "${BUILD_DIR}/plugin.dll")
+
   set(ONNX_LIBRARY "${ONNX_LIBRARY_DIR}/onnxruntime.lib")
   set(ONNX_DLL "${BUILD_DIR}/onnxruntime.dll")
   
@@ -36,30 +39,33 @@ if(WIN32)
   #set(JUCE_VST3_COPY_DIR ${USER_ROOT}AppData/Local/Programs/Common/VST3)
   #set(JUCE_COPY_PLUGIN_AFTER_BUILD ON)
 elseif(APPLE)
+  set(DYNAMIC_PLUGIN_PATH "${BUILD_DIR}/plugin.dylib")
+
   set(ONNX_LIBRARY "${ONNX_LIBRARY_DIR}/libonnxruntime.dylib")	
   set(JUCE_COPY_PLUGIN_AFTER_BUILD ON)
 elseif(UNIX)
+  set(DYNAMIC_PLUGIN_PATH "${BUILD_DIR}/plugin.so")
+
   set(ONNX_LIBRARY "${ONNX_LIBRARY_DIR}/libonnxruntime.so")
   set(JUCE_COPY_PLUGIN_AFTER_BUILD ON)	
 endif()
 
-if(WIN32)
-  string(REPLACE "/" "\\\\" BUILD_DIR_NATIVE "${BUILD_DIR}")
-else()
-  set(BUILD_DIR_NATIVE ${BUILD_DIR})
-endif()
 message("${BUILD_DIR}")
-message("${BUILD_DIR_NATIVE}")
+message("${DATA_DIR}")
+message("${DYNAMIC_PLUGIN_PATH}")
 message("${ONNX_LIBRARY_DIR}")
 message("${ONNX_INCLUDE_DIR}")
 message("${ONNX_LIBRARY}")
 message("${ONNX_MODEL_PATH}")
 
-target_compile_definitions(${PROJECT_NAME}
+target_compile_definitions(
+  ${PROJECT_NAME}
   PRIVATE
   "BUILD_DIR=\"${BUILD_DIR}\""
-  "BUILD_DIR_NATIVE=\"${BUILD_DIR_NATIVE}\""
-  "ONNX_MODEL_PATH=\"${ONNX_MODEL_PATH}\"")
+  "DATA_DIR=\"${DATA_DIR}\""
+  "DYNAMIC_PLUGIN_PATH=\"${DYNAMIC_PLUGIN_PATH}\""
+  "ONNX_MODEL_PATH=\"${ONNX_MODEL_PATH}\""
+)
 
 target_include_directories(
   ${PROJECT_NAME}
@@ -84,10 +90,7 @@ target_link_libraries(
 )
 
 set(VST3_HELPER_DIRECTORY "${CMAKE_BINARY_DIR}/Debug")
-set(VST3_HELPER_PATH "${VST3_HELPER_DIRECTORY}/juce_vst3_helper.exe")
 set(VST3_OUTPUT_DIR "${CMAKE_BINARY_DIR}/GranularSynthTest_artefacts/${CMAKE_BUILD_TYPE}/VST3/Granular Synth Test.vst3")
-set(MODULEINFO_RESOURCES_DIR "${VST3_OUTPUT_DIR}/Contents/Resources")
-set(MODULEINFO_PATH "${MODULEINFO_RESOURCES_DIR}/moduleinfo.json")
 
 if(WIN32)
   set(VST3_BIN_DIR "${VST3_OUTPUT_DIR}/Contents/x86_64-win")

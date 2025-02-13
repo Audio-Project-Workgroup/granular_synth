@@ -1,17 +1,15 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
-// #if _WIN32
-// #include <windows.h>
-// #endif
-
 #include "onnx.cpp"
 
 PLATFORM_READ_ENTIRE_FILE(juceReadEntireFile)
 {
   ReadFileResult result = {};
  
-  juce::String filepath = juce::String(BUILD_DIR) + juce::String(filename);
+  juce::String filepath = juce::String(BUILD_DIR) + juce::String("/") + juce::String(filename);
+  juce::Logger::writeToLog(filepath);
+  
   juce::File file(filepath);  
   if(file.existsAsFile())
     {
@@ -42,7 +40,7 @@ PLATFORM_READ_ENTIRE_FILE(juceReadEntireFile)
 
 	  if(result.contents)
 	    {
-	      result.contents[result.contentsSize++] = ' '; // NOTE: null termination
+	      result.contents[result.contentsSize++] = 0; // NOTE: null termination
 	    }
 	}
       else
@@ -163,21 +161,9 @@ void AudioPluginAudioProcessor::
 prepareToPlay(double sampleRate, int samplesPerBlock)
 {
   juce::Logger::writeToLog("prepareToPlay called");
-
-  juce::String buildDir = BUILD_DIR_NATIVE;
   
   const ORTCHAR_T *modelPath = ORT_TSTR_ON_MACRO(ONNX_MODEL_PATH);
   juce::Logger::writeToLog(modelPath);
-// #if _WIN32
-//   HMODULE onnxModule = LoadLibraryW(L"onnxruntime.dll");
-//   if(!onnxModule)
-//     {
-//       DWORD error = GetLastError();
-//       juce::String errorStr = "ERROR: failed to load onnruntime.dll: " + juce::String(error);
-//       juce::Logger::writeToLog(errorStr);
-//     }
-//   FreeLibrary(onnxModule);
-// #endif  
 
   //onnxState = {};
   onnxState = onnxInitializeState(modelPath);
@@ -188,18 +174,7 @@ prepareToPlay(double sampleRate, int samplesPerBlock)
   pluginMemory.platformAPI.freeFileMemory = juceFreeFileMemory;
   pluginMemory.platformAPI.runModel = platformRunModel;
 
-  // TODO: maybe do this branching in CMakeLists.txt?
-#ifdef _WIN32
-  juce::String pluginFilename = "plugin.dll";
-#elif __APPLE__
- juce::String pluginFilename = "plugin.dylib";
-  //juce::Logger::writeToLog(std::getenv("LD_LIBRARY_PATH"));
-  //juce::Logger::writeToLog(std::getenv("DYLD_LIBRARY_PATH"));
-  //juce::Logger::writeToLog(std::getenv("DYLD_FALLBACK_LIBRARY_PATH"));
-#else
-  juce::String pluginFilename = "plugin.so";
-#endif  
-  juce::String pluginPath = buildDir + pluginFilename;
+  juce::String pluginPath(DYNAMIC_PLUGIN_PATH);
   juce::Logger::writeToLog(pluginPath);  
 
   // NOTE: JUCE's platform-independent DynamicLibrary abstraction doesn't provide an interface

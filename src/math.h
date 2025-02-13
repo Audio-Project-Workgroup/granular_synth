@@ -788,7 +788,10 @@ czt(c64 *output, r32 *input, u32 length, Arena *scratchAllocator)
       wTemp[k] = wTemp[k - 1] * wBase * wBase;
     } 
 
-  // NOTE: convolve the scaled input with the reciprocal chirp  
+  // NOTE: convolve the scaled input with the reciprocal chirp
+  // TODO: these fft calls are not optimized for doing convolutions:
+  //       we do an (order 2) input permutation at the beginning of each fft and ifft so that our output coefficients
+  //       are in order of increasing frequency. That is not necessary to do here, and a huge burden on performance
   c64 *fftScaledInput = wTemp;
   fft(fftScaledInput, scaledInput, fftLength);
 
