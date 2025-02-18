@@ -186,7 +186,8 @@ namespace midi{
 	*/
 	void parseMidiMessage(PluginAudioBuffer *audioBuffer, PluginState *pluginState){
 		u8 *atMidiBuffer = audioBuffer->midiBuffer;
-		while(audioBuffer->midiMessageCount){
+		
+		if(audioBuffer->midiMessageCount){
 
 #ifdef MIDI_VERBOSE
 			printf("ALL BYTES : ");
@@ -644,10 +645,8 @@ AUDIO_PROCESS(audioProcess)
 	if(pluginState->initialized)
 	{
 
-		// TODO: This midi parsing is janky and bad. Passing the message length before each message is unnecessary --> FIXING IT. 
-		// TODO: move the midi loop inside the output loop, so that we don't only see the most recent midi message --> WE LL CREATE A FUNCTION HERE 
-		
-		midi::parseMidiMessage(audioBuffer, pluginState);
+		// moved in the for loop below
+		// midi::parseMidiMessage(audioBuffer, pluginState);
 
 		r64 nFreq = M_TAU*pluginState->freq/(r64)audioBuffer->sampleRate;
 
@@ -675,6 +674,8 @@ AUDIO_PROCESS(audioProcess)
 		r32 sampleRateRatio = (r32)INTERNAL_SAMPLE_RATE/(r32)audioBuffer->sampleRate;      
 		for(u32 i = 0; i < audioBuffer->framesToWrite; ++i)
 		{
+			midi::parseMidiMessage(audioBuffer, pluginState);
+
 			r32 volume = formatVolumeFactor*pluginReadFloatParameter(&pluginState->volume);
 			
 			pluginState->phasor += nFreq;
