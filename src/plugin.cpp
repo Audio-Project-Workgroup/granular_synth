@@ -91,7 +91,7 @@ namespace midi{
 	typedef void (*MidiHandler)(uint8_t channel, uint8_t* data, uint8_t len, PluginState *pluginState);
 
 	// Define the MIDI command table as an array of function pointers
-	MidiHandler midiCommandTable[256] = {nullptr};
+	MidiHandler midiCommandTable[8] = {nullptr};
 
 	// Functions for each MIDI command
 	void NoteOff(uint8_t channel, uint8_t* data, uint8_t len, PluginState *pluginState) {
@@ -151,24 +151,31 @@ namespace midi{
 	}
 
 	void initializeMidiCommandTable() {
-		midiCommandTable[0x80] = NoteOff;
-		midiCommandTable[0x90] = NoteOn;
-		midiCommandTable[0xA0] = Aftertouch;
-		midiCommandTable[0xB0] = ContinuousController;
-		midiCommandTable[0xC0] = PatchChange;
-		midiCommandTable[0xD0] = ChannelPressure;
-		midiCommandTable[0xE0] = PitchBend;
-		midiCommandTable[0xF0] = SystemMessages;
+		midiCommandTable[0] = NoteOff;
+		midiCommandTable[1] = NoteOn;
+		midiCommandTable[2] = Aftertouch;
+		midiCommandTable[3] = ContinuousController;
+		midiCommandTable[4] = PatchChange;
+		midiCommandTable[5] = ChannelPressure;
+		midiCommandTable[6] = PitchBend;
+		midiCommandTable[7] = SystemMessages;
 	}
 
 	// Function to call the handler for a specific command
 	void processMidiCommand(uint8_t commandByte, uint8_t* data, uint8_t len, PluginState *pluginState) {
+
+		uint8_t channel = commandByte & 0x0F; // take the last 4 bits
+		
+		commandByte &= 0xF0; // take the first 4 bits
+		commandByte >>= 4; // shift the bits to the right
+		commandByte &= 0b0111; // take the last 3 bits
+
 		if (midiCommandTable[commandByte] == nullptr) {
 			printf("Unknown MIDI command");
 			return;
-		} 
-		uint8_t channel = commandByte & 0x0F; // take the last 4 bits			
-		midiCommandTable[commandByte & 0xF0](channel,data,len,pluginState); // commandByte & 0xF0 will zero down the last 4 bits
+		}
+
+		midiCommandTable[commandByte](channel,data,len,pluginState); // commandByte & 0xF0 will zero down the last 4 bits
 	}
 
 	/* @TODO FIX THIS DOC
