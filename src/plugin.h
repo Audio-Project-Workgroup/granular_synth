@@ -80,22 +80,107 @@ struct PlayingSound
   r32 samplesPlayed;  
 };
 
+struct GrainBuffer
+{
+    r32* samples;
+    
+    u32 writeIndex;
+    u32 readIndex;
+
+    u32 bufferSize;
+};
+
+struct Grain
+{
+    r32* start;
+    u32 samplesToPlay;
+
+    Grain* next;
+    Grain* prev;
+};
+
+struct GrainManager
+{
+    Arena* grainAllocator;
+    Grain* grainPlayList;
+    GrainBuffer* grainBuffer;
+    u32 grainCount;
+
+    Grain* grainFreeList;
+};
+
+void
+makeNewGrain(GrainManager* grainManager, u32 grainSize)
+{
+    Grain* result;
+    if (grainManager->grainFreeList)
+    {
+        result = grainManager->grainFreeList;
+        grainManager->grainFreeList = result->next;
+        result->next = 0;
+    }
+    else
+    {
+        result = arenaPushStruct(grainManager->grainAllocator, Grain);
+    }
+
+    GrainBuffer* buffer = grainManager->grainBuffer;
+    result->start = buffer->samples + buffer->readIndex;
+    result->samplesToPlay = grainSize;
+
+    result->next = grainManager->grainPlayList;
+    grainManager->grainPlayList = result;
+
+    ++grainManager->grainCount;
+}
+
+void
+destroyGrain(GrainManager* grainManager, Grain* grain)
+{
+    --grainManager->grainCount;
+    grain->prev->next = grain->next;
+    grain->next = grainManager->grainFreeList;
+    grainManager->grainFreeList = grain;
+}
+
+u32 setReadPos(u32 write_pos, u32 bufferSize) {
+    u32 scratch_rpos = write_pos - 2400;
+
+    if (scratch_rpos < 0) {
+        scratch_rpos += bufferSize;
+    }
+    else {
+        scratch_rpos %= bufferSize;
+    }
+    
+    return scratch_rpos;
+
+}
 struct PluginState
 {
-  Arena permanentArena;
-  Arena frameArena;
-  Arena loadArena; 
-  
-  r64 phasor;
-  r32 freq;
-  PluginFloatParameter volume;
-  PluginBooleanParameter soundIsPlaying;
+    Arena permanentArena;
+    Arena frameArena;
+    Arena loadArena;
+    Arena grainArena;
 
-  PlayingSound loadedSound;
-  LoadedBitmap testBitmap;
-  LoadedFont testFont;
+    r64 phasor;
+    r32 freq;
+    PluginFloatParameter volume;
+    PluginBooleanParameter soundIsPlaying;
 
-  UILayout layout;
+    PlayingSound loadedSound;
+    LoadedBitmap testBitmap;
+    LoadedFont testFont;
 
-  bool initialized;
+    UILayout layout;
+
+    GrainManager GrainManager;
+    GrainBuffer* gbuff;
+    bool initialized;
 };
+
+/*
+    Frequency of time between new grains and old grains. Ok so what I could do
+*/
+#
+
