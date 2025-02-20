@@ -440,7 +440,7 @@ uiCommFromElement(UIElement *element, UILayout *layout)
 inline UIComm
 uiMakeTextElement(UILayout *layout, char *message, r32 wScale, r32 hScale, v4 color = V4(1, 1, 1, 1))
 {
-  UIElement *text = uiMakeElement(layout, message, UIElementFlag_drawText, color);
+  UIElement *text = uiMakeElement(layout, message, UIElementFlag_drawText | UIElementFlag_drawBorder, color);
   uiSetSemanticSizeTextCentered(text, layout->font, wScale, hScale);
 
   UIComm textComm = uiCommFromElement(text, layout);
@@ -452,7 +452,8 @@ inline UIComm
 uiMakeButton(UILayout *layout, char *name, v2 offset, v2 dim, PluginBooleanParameter *param,
 	     v4 color = V4(1, 1, 1, 1))
 {
-  UIElement *button = uiMakeElement(layout, name, UIElementFlag_clickable | UIElementFlag_drawBackground, color);
+  u32 flags = UIElementFlag_clickable | UIElementFlag_drawBackground | UIElementFlag_drawBorder;
+  UIElement *button = uiMakeElement(layout, name, flags, color);
   uiSetElementDataBoolean(button, param);
   uiSetSemanticSizeRelative(button, offset, dim);
 
@@ -465,7 +466,8 @@ inline UIComm
 uiMakeSlider(UILayout *layout, char *name, v2 offset, v2 dim, PluginFloatParameter *param,
 	     v4 color = V4(1, 1, 1, 1))
 {
-  UIElement *slider = uiMakeElement(layout, name, UIElementFlag_clickable | UIElementFlag_draggable, color);
+  u32 flags = UIElementFlag_clickable | UIElementFlag_draggable | UIElementFlag_drawBorder;
+  UIElement *slider = uiMakeElement(layout, name, flags, color);
   uiSetElementDataFloat(slider, param);
   uiSetSemanticSizeRelative(slider, offset, dim);
 

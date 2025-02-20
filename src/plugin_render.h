@@ -249,8 +249,8 @@ renderPushUIElement(RenderCommands *commands, UILayout *layout, UIElement *eleme
 	}
     }
   */
-  v4 color = (uiHashKeysAreEqual(element->hashKey, layout->selectedElement)) ? V4(1, 0.5f, 0, 1) : V4(0, 0, 0, 1);
-  renderPushRectOutline(commands, element->region, 4.f, color);
+  //v4 color = (uiHashKeysAreEqual(element->hashKey, layout->selectedElement)) ? V4(1, 0.5f, 0, 1) : V4(0, 0, 0, 1);
+  //renderPushRectOutline(commands, element->region, 4.f, color);
   
   if(element->flags & UIElementFlag_drawText)
     {      
@@ -259,7 +259,7 @@ renderPushUIElement(RenderCommands *commands, UILayout *layout, UIElement *eleme
   if(element->flags & UIElementFlag_drawBorder)
     {
       v4 color = (uiHashKeysAreEqual(element->hashKey, layout->selectedElement)) ? V4(1, 0.5f, 0, 1) : V4(0, 0, 0, 1);
-      renderPushRectOutline(commands, element->region, 0.01f, color);
+      renderPushRectOutline(commands, element->region, 2.f, color);
     }
   if(element->flags & UIElementFlag_drawBackground)
     {

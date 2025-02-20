@@ -53,6 +53,14 @@
 
 #define COPY_ARRAY(dest, src, count, type) COPY_SIZE(dest, src, (count)*sizeof(type))
 
+inline u32
+safeTruncateU64(u64 val)
+{
+  u32 result = MIN(val, (u64)U32_MAX);
+
+  return(result);
+}
+
 static inline u32
 lowestOrderBit(u32 num)
 {

@@ -405,6 +405,7 @@ loadBitmap(char *filename, Arena *allocator)
       u16 bytesPerPixel = header->bitsPerPixel / 8;
       ASSERT(bytesPerPixel == 4);
       u32 compression = header->compression;
+      (void)compression;
       ASSERT(header->imageSize == bytesPerPixel*result.width*result.height);
 
       u32 redMask = header->redMask;

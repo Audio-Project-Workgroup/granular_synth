@@ -160,7 +160,7 @@ PLATFORM_READ_ENTIRE_FILE(platformReadEntireFile)
 	  
 	  u8 *dest = result.contents;
 	  usz totalBytesToRead = result.contentsSize;
-	  u32 bytesToRead = MIN(totalBytesToRead, U32_MAX); // TODO: replace with safe truncate to suppress warning
+	  u32 bytesToRead = safeTruncateU64(totalBytesToRead);
 	  while(totalBytesToRead)
 	    {
 	      DWORD bytesRead;
@@ -217,7 +217,7 @@ PLATFORM_WRITE_ENTIRE_FILE(platformWriteEntireFile)
       usz bytesRemaining = fileSize;      
       while(bytesRemaining)
 	{
-	  u32 bytesToWrite = MIN(bytesRemaining, U32_MAX); // TODO: replace with safe truncate to suppress warning
+	  u32 bytesToWrite = safeTruncateU64(bytesRemaining);
 	  if(WriteFile(fileHandle, fileMemory, bytesToWrite, 0, 0))
 	    {
 	      bytesRemaining -= bytesToWrite;

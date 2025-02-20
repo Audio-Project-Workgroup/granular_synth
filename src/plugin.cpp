@@ -542,6 +542,7 @@ AUDIO_PROCESS(audioProcess)
 	    {
 	      u32 midiStatus = *atMidiBuffer & 0xF0;
 	      u32 midiChannelNumber = *atMidiBuffer & 0x0F;
+	      (void)midiChannelNumber;
 	      ++atMidiBuffer;
 	      --bytesToRead;
 
@@ -643,6 +644,7 @@ AUDIO_PROCESS(audioProcess)
 		      r32 nextSoundVal = loadedSoundSamples[channelIndex][soundReadIndex + 1];
 		      r32 loadedSoundVal = lerp(firstSoundVal, nextSoundVal, soundReadFrac);
 		      //mixedVal += 0.5f*loadedSoundVal;
+		      (void)loadedSoundVal;
 		    }
 		  else
 		    {		      
