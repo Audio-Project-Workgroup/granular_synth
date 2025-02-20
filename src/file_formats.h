@@ -142,116 +142,118 @@ loadWav(char *filename, Arena *loadAllocator, Arena *permanentAllocator)
       
       u32 sourceSampleCount = sampleDataSize/(channelCount*bytesPerSample);      
       u32 destSampleCount = ROUND_UP_TO_MULTIPLE_OF_2((u32)(sampleRateConversionFactor*sourceSampleCount));
-      u32 maxSampleCount = MAX(sourceSampleCount, destSampleCount);
+      u32 paddedDestSampleCount = ROUND_UP_TO_MULTIPLE(destSampleCount, GRAIN_LENGTH);
+      u32 maxSampleCount = MAX(sourceSampleCount, paddedDestSampleCount);
 
       // NOTE: we allocate more space than we actually need for storing samples, since we use these buffers
       //       as both inputs to the fft and destinations of the ifft when doing sample-rate conversion
-      result.sampleCount = destSampleCount;
+      result.sampleCount = destSampleCount + 0;
       result.channelCount = channelCount;
       result.samples[0] = arenaPushArray(permanentAllocator, 2*maxSampleCount, r32);
       result.samples[1] = result.samples[0] + maxSampleCount;//arenaPushArray(permanentAllocator, maxSampleCount, r32);
+       
+      // NOTE: convert sample format         
+#define CONVERT_SAMPLE(srcData, srcSample, type, channels) do {	\
+	type sample = *(type *)srcData;				\
+	srcSample = (r32)sample/(r32)type##_MAX;		\
+	srcData = (type *)srcData + channels;			\
+      } while(0)
       
+      r32 *destSamplesL = result.samples[0];
+      r32 *destSamplesR = result.samples[1];
+      void *srcDataL = sampleData;
+      // TODO: it might be worthwhile doing some kind of dynamic dispatch here
       if(channelCount == 1)
 	{
-	  //result.samples[0] = sampleData;
-	  //result.samples[1] = 0;
-	  void *srcData = sampleData;
-	  r32 *destSamplesL = result.samples[0];
-	  r32 *destSamplesR = result.samples[1];
-	  for(u32 sampleIndex = 0; sampleIndex < sourceSampleCount; ++sampleIndex)
+	  if(bytesPerSample == 1)
 	    {
-	      r32 srcSample;
-	      if(bytesPerSample == 1)
+	      for(u32 sampleIndex = 0; sampleIndex < sourceSampleCount; ++sampleIndex)
 		{
-		  // NOTE: unsigned 8-bit sample
-		  u8 sample = *(u8 *)srcData;
-		  srcSample = (r32)sample/(r32)U8_MAX;
-		  srcData = (u8 *)srcData + 1;
+		  r32 srcSample = 0;
+		  CONVERT_SAMPLE(srcDataL, srcSample, u8, channelCount);
+	      
+		  *destSamplesL++ = srcSample;
+		  *destSamplesR++ = srcSample;
 		}
-	      else if(bytesPerSample == 2)
+	    }
+	  else if(bytesPerSample == 2)
+	    {
+	      for(u32 sampleIndex = 0; sampleIndex < sourceSampleCount; ++sampleIndex)
 		{
-		  // NOTE: signed 16-bit sample
-		  s16 sample = *(s16 *)srcData;
-		  srcSample = (r32)sample/(r32)S16_MAX;
-		  srcData = (s16 *)srcData + 1;
+		  r32 srcSample = 0;
+		  CONVERT_SAMPLE(srcDataL, srcSample, s16, channelCount);
+	      
+		  *destSamplesL++ = srcSample;
+		  *destSamplesR++ = srcSample;
 		}
-	      else if(bytesPerSample == 4)
+	    }
+	  else if(bytesPerSample == 4)
+	    {
+	      for(u32 sampleIndex = 0; sampleIndex < sourceSampleCount; ++sampleIndex)
 		{
-		  // NOTE: 32-bit floating-point sample
-		  srcSample = *(r32 *)srcData;
-		  srcData = (r32 *)srcData + 1;
+		  r32 srcSample = 0;
+		  CONVERT_SAMPLE(srcDataL, srcSample, r32, channelCount);
+	      
+		  *destSamplesL++ = srcSample;
+		  *destSamplesR++ = srcSample;
 		}
-	      else
-		{
-		  srcSample = 0;
-		  ASSERT(!"ERROR: unsupported sample size");
-		}	      
-
-	      *destSamplesL++ = srcSample;
-	      *destSamplesR++ = srcSample;
-	    }	  
+	    }
+	  else
+	    {
+	      ASSERT(!"ERROR: unsupported sample size");
+	    }
 	}
       else if(channelCount == 2)
 	{
-	  //result.samples[0] = sampleData;
-	  //result.samples[1] = sampleData + sampleCount;
-	  void *srcDataL = sampleData;
 	  void *srcDataR = (u8 *)sampleData + bytesPerSample;
-	  r32 *destSamplesL = result.samples[0];
-	  r32 *destSamplesR = result.samples[1];
-	  for(u32 sampleIndex = 0; sampleIndex < sourceSampleCount; ++sampleIndex)
+	  if(bytesPerSample == 1)
 	    {
-	      r32 srcSampleL, srcSampleR;
-	      if(bytesPerSample == 1)
+	      for(u32 sampleIndex = 0; sampleIndex < sourceSampleCount; ++sampleIndex)
 		{
-		  // NOTE: unsigned 8-bit sample
-		  u8 sampleL = *(u8 *)srcDataL;
-		  u8 sampleR = *(u8 *)srcDataR;
-		  
-		  srcSampleL = (r32)sampleL/(r32)U8_MAX;
-		  srcSampleR = (r32)sampleR/(r32)U8_MAX;
-
-		  srcDataL = (u8 *)srcDataL + channelCount;
-		  srcDataR = (u8 *)srcDataR + channelCount;
+		  r32 srcSampleL = 0, srcSampleR = 0;
+		  CONVERT_SAMPLE(srcDataL, srcSampleL, u8, channelCount);
+		  CONVERT_SAMPLE(srcDataR, srcSampleR, u8, channelCount);
+	      
+		  *destSamplesL++ = srcSampleL;
+		  *destSamplesR++ = srcSampleR;
 		}
-	      else if(bytesPerSample == 2)
+	    }
+	  else if(bytesPerSample == 2)
+	    {
+	      for(u32 sampleIndex = 0; sampleIndex < sourceSampleCount; ++sampleIndex)
 		{
-		  // NOTE: signed 16-bit sample
-		  s16 sampleL = *(s16 *)srcDataL;
-		  s16 sampleR = *(s16 *)srcDataR;
-		  
-		  srcSampleL = (r32)sampleL/(r32)S16_MAX;
-		  srcSampleR = (r32)sampleR/(r32)S16_MAX;
-
-		  srcDataL = (s16 *)srcDataL + channelCount;
-		  srcDataR = (s16 *)srcDataR + channelCount;
+		  r32 srcSampleL = 0, srcSampleR = 0;
+		  CONVERT_SAMPLE(srcDataL, srcSampleL, s16, channelCount);
+		  CONVERT_SAMPLE(srcDataR, srcSampleR, s16, channelCount);
+	      
+		  *destSamplesL++ = srcSampleL;
+		  *destSamplesR++ = srcSampleR;
 		}
-	      else if(bytesPerSample == 4)
+	    }
+	  else if(bytesPerSample == 4)
+	    {
+	      for(u32 sampleIndex = 0; sampleIndex < sourceSampleCount; ++sampleIndex)
 		{
-		  // NOTE: 32-bit floating-point sample
-		  srcSampleL = *(r32 *)srcDataL;
-		  srcSampleR = *(r32 *)srcDataR;
-
-		  srcDataL = (r32 *)srcDataL + channelCount;
-		  srcDataR = (r32 *)srcDataR + channelCount;
+		  r32 srcSampleL = 0, srcSampleR = 0;
+		  CONVERT_SAMPLE(srcDataL, srcSampleL, r32, channelCount);
+		  CONVERT_SAMPLE(srcDataR, srcSampleR, r32, channelCount);
+	      
+		  *destSamplesL++ = srcSampleL;
+		  *destSamplesR++ = srcSampleR;
 		}
-	      else
-		{
-		  srcSampleL = 0;
-		  srcSampleR = 0;
-		  ASSERT(!"ERROR: unsupported sample size");
-		}
-		
-	      *destSamplesL++ = srcSampleL;
-	      *destSamplesR++ = srcSampleR;
+	    }
+	  else
+	    {
+	      ASSERT(!"ERROR: unsupported sample size");
 	    }
 	}
       else
 	{
-	  ASSERT(!"unhandled channel count in wav file");
+	  ASSERT(!"ERROR: unsupported channel count");
 	}
-
-      // NOTE: sample-rate conversion
+#undef CONVERT_SAMPLE
+  
+      // NOTE: convert sample rate
       if(sampleRate != INTERNAL_SAMPLE_RATE)
 	{
 #if 1
@@ -265,7 +267,7 @@ loadWav(char *filename, Arena *loadAllocator, Arena *permanentAllocator)
 	      tempR[index] = result.samples[1][index];
 	    }
 
-	  result.samples[1] = result.samples[0] + destSampleCount;
+	  result.samples[1] = result.samples[0] + paddedDestSampleCount;
 	  r32 sampleRateRatio = 1.f/sampleRateConversionFactor;
 	  for(u32 destIndex = 0; destIndex < result.sampleCount; ++destIndex)
 	    {
@@ -283,10 +285,15 @@ loadWav(char *filename, Arena *loadAllocator, Arena *permanentAllocator)
 	      result.samples[0][destIndex] = sourceSample0;
 	      result.samples[1][destIndex] = sourceSample1;
 	    }
+	  for(u32 padIndex = result.sampleCount; padIndex < paddedDestSampleCount; ++padIndex)
+	    {
+	      result.samples[0][padIndex] = 0.f;
+	      result.samples[1][padIndex] = 0.f;
+	    }
 
 	  arenaEndArena(loadAllocator, tempAllocator);
 #else
-	  // TODO: make this work
+	  // TODO: make this work (problem is speed, numerical accuracy)
 	  usz tempBufferSize = 4*maxSampleCount*sizeof(c64);
 	  TemporaryMemory tempBufferAllocator = arenaBeginTemporaryMemory(loadAllocator, tempBufferSize);
 	  c64 *tempFFTBufferL = arenaPushArray((Arena *)&tempBufferAllocator, maxSampleCount, c64,
@@ -373,9 +380,8 @@ loadWav(char *filename, Arena *loadAllocator, Arena *permanentAllocator)
 	  arenaEndTemporaryMemory(&cztScratch);
 	  arenaEndTemporaryMemory(&tempBufferAllocator);
 #endif
-	}
-
-      //result.sampleCount = sampleCount;
+	} 
+      
       globalPlatform.freeFileMemory(readResult, loadAllocator);
     }
 

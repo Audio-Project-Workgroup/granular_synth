@@ -16,7 +16,9 @@
 #define ARRAY_COUNT(arr) (sizeof(arr)/sizeof(arr[0]))
 #define OFFSET_OF(type, member) ((usz)&(((type *)0)->member))
 
+#define IS_MULTIPLE_OF_2(num) (((num) & ((num) - 1)) == (num))
 #define ROUND_UP_TO_MULTIPLE_OF_2(num) (((num) + 1) & (~1))
+#define ROUND_UP_TO_MULTIPLE(num, length) (((num) % (length)) ? ((num) + (length) - ((num) % (length))) : (num))
 
 #define CYCLIC_ARRAY_INDEX(i, len) ((i < len) ? ((i < 0) ? (i + len) : i) : (i - len))
 
@@ -48,6 +50,8 @@
     u8 *srcP = (u8 *)src;				\
     for(u32 i = 0; i < size; ++i) *destP++ = *srcP++;	\
   } while(0)
+
+#define COPY_ARRAY(dest, src, count, type) COPY_SIZE(dest, src, (count)*sizeof(type))
 
 static inline u32
 lowestOrderBit(u32 num)

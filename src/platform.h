@@ -18,13 +18,31 @@ u64FromFILETIME(FILETIME filetime)
   return(result);
 }
 
-inline s64
+inline u64
 s64FromLARGE_INTEGER(LARGE_INTEGER largeInt)
 {
   s64 result = (s64)largeInt.HighPart << 32;
   result |= largeInt.LowPart;
 
   return(result);
+}
+
+inline u64
+getOSTimerFreq(void)
+{
+  LARGE_INTEGER timerFreq;
+  QueryPerformanceFrequency(&timerFreq);
+
+  return(timerFreq.QuadPart);
+}
+
+inline u64
+readOSTimer(void)
+{
+  LARGE_INTEGER cycleCount;
+  QueryPerformanceCounter(&cycleCount);
+
+  return(cycleCount.QuadPart);
 }
 
 inline FILETIME
@@ -142,7 +160,7 @@ PLATFORM_READ_ENTIRE_FILE(platformReadEntireFile)
 	  
 	  u8 *dest = result.contents;
 	  usz totalBytesToRead = result.contentsSize;
-	  u32 bytesToRead = MIN(totalBytesToRead, U32_MAX);
+	  u32 bytesToRead = MIN(totalBytesToRead, U32_MAX); // TODO: replace with safe truncate to suppress warning
 	  while(totalBytesToRead)
 	    {
 	      DWORD bytesRead;
@@ -190,13 +208,58 @@ PLATFORM_READ_ENTIRE_FILE(platformReadEntireFile)
   return(result);
 }
 
-#else
+PLATFORM_WRITE_ENTIRE_FILE(platformWriteEntireFile)
+{
+  HANDLE fileHandle = CreateFileA(filename, GENERIC_WRITE, FILE_SHARE_WRITE, 0,
+				  CREATE_ALWAYS, 0, 0);
+  if(fileHandle != INVALID_HANDLE_VALUE)
+    {
+      usz bytesRemaining = fileSize;      
+      while(bytesRemaining)
+	{
+	  u32 bytesToWrite = MIN(bytesRemaining, U32_MAX); // TODO: replace with safe truncate to suppress warning
+	  if(WriteFile(fileHandle, fileMemory, bytesToWrite, 0, 0))
+	    {
+	      bytesRemaining -= bytesToWrite;
+	      fileMemory = (u8 *)fileMemory + bytesToWrite;
+	    }
+	  else
+	    {
+	      DWORD errorCode = GetLastError();
+	      char *errorMessage;
+	      FORMAT_ERROR_AS_STRING(errorCode, errorMessage);
+	      fprintf(stderr, "ERROR: WriteFile %s failed: %s\n", filename, errorMessage);
+	    }
+	}
+      
+      CloseHandle(fileHandle);
+    }
+}
+
+#else // NOTE: POSIX
 
 #include <unistd.h>
 #include <dlfcn.h>
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/time.h>
+
+inline u64
+getOSTimerFreq(void)
+{
+  return(1000000);
+}
+
+inline u64
+readOSTimer(void)
+{
+  struct timeval timeVal;
+  gettimeofday(&timeVal, 0);
+  
+  u64 result = getOSTimerFreq()*(u64)timeVal.tv_sec + (u64)timeVal.tv_usec;
+  return(result);
+}
 
 inline time_t
 getLastWriteTime(char *filename)
@@ -341,9 +404,61 @@ PLATFORM_READ_ENTIRE_FILE(platformReadEntireFile)
   return(result);
 }
 
+PLATFORM_READ_ENTIRE_FILE(platformReadEntireFile)
+{
+  int fileHandle = open(filename, O_CREAT | O_WRONLY | O_TRUNC);
+  if(fileHandle != -1)
+    {
+      usz bytesToWrite = fileSize;
+      while(bytesToWrite)
+	{
+	  ssize_t bytesWritten = write(fileHandle, fileMemory, bytesToWrite);
+	  if(bytesWritten == -1)
+	    {
+	      fprintf(stderr, "ERROR: write %s failed\n", filename);
+	      break;
+	    }
+	  else
+	    {
+	      bytesToWrite -= bytesWritten;
+	      fileMemory = (u8 *)fileMemory + bytesWritten;
+	    }
+	}
+
+      close(fileHandle);
+    }
+  else
+    {
+      fprintf(stderr, "ERROR: open %s failed\n", filename);
+    }
+}
+
 #endif 
 
 PLATFORM_FREE_FILE_MEMORY(platformFreeFileMemory)
 {
   arenaPopSize(allocator, file.contentsSize);
 }
+
+PLATFORM_GET_CURRENT_TIMESTAMP(platformGetCurrentTimestamp)
+{
+  return(readOSTimer());
+}
+
+#if 0
+inline u64
+estimateCPUCyclesPerSecond(void)
+{
+  u64 millisecondsToWait = 100;
+  u64 osFreq = getOSTimerFreq();
+  u64 clocksToWait = millisecondsToWait*osFreq/1000;
+
+  u64 clocksElapsed = 0;  
+  u64 startClocks = readOSTimer();
+  while(clocksElapsed < clocksToWait)
+    {
+      u64 clocks = readOSTimer();
+      clocksElapsed = clocks - startClocks;
+    }
+}
+#endif

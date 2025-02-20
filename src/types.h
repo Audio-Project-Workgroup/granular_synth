@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <float.h>
 #include <stddef.h>
 
 typedef uint8_t  u8;
@@ -21,10 +22,22 @@ typedef double   r64;
 #define U32_MAX (0xFFFFFFFF)
 #define U64_MAX (0xFFFFFFFFFFFFFFFF)
 
+#define u8_MAX  U8_MAX 
+#define u16_MAX U16_MAX
+#define u32_MAX U32_MAX
+#define u64_MAX U64_MAX
+
 #define S8_MAX  (0x7F)
 #define S16_MAX (0x7FFF)
 #define S32_MAX (0x7FFFFFFF)
 #define S64_MAX (0x7FFFFFFFFFFFFFFF)
+
+#define s8_MAX  S8_MAX 
+#define s16_MAX S16_MAX
+#define s32_MAX S32_MAX
+#define s64_MAX S64_MAX
+
+#define r32_MAX FLT_MAX;
 
 struct c64
 {
@@ -143,7 +156,7 @@ struct LoadedSound
   u32 sampleCount;
   u32 channelCount;
   
-  r32 *samples[2]; // NOTE: we are using 32-bit floating-point samples internally
+  r32 *samples[2];
 };
 
 struct LoadedBitmap

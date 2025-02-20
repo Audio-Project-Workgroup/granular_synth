@@ -62,6 +62,7 @@
 #include "plugin.h"
 
 #include "ui_layout.cpp"
+#include "file_granulator.cpp"
 
 PlatformAPI globalPlatform;
 
@@ -84,6 +85,8 @@ initializePluginState(PluginMemory *memoryBlock)
       if(!pluginState->initialized)
 	{
 	  globalPlatform = memoryBlock->platformAPI;
+
+	  pluginState->osTimerFreq = memoryBlock->osTimerFreq;
 
 	  pluginState->permanentArena = arenaBegin((u8 *)memory + sizeof(PluginState), MEGABYTES(256));
 	  pluginState->frameArena = arenaSubArena(&pluginState->permanentArena, MEGABYTES(2));
@@ -202,7 +205,18 @@ initializePluginState(PluginMemory *memoryBlock)
 						   &pluginState->loadArena, &pluginState->permanentArena);
 	  pluginState->loadedSound.samplesPlayed = 0;
 
-	  pluginState->testBitmap = loadBitmap("../data/signal_z.bmp", &pluginState->permanentArena);
+	  char *fingertipsPackfilename = "../data/fingertips.grains";
+	  TemporaryMemory packfileMemory = arenaBeginTemporaryMemory(&pluginState->loadArena, MEGABYTES(64));
+	  GrainPackfile fingertipsGrains = beginGrainPackfile((Arena *)&packfileMemory);
+	  addSoundToGrainPackfile(&fingertipsGrains, &pluginState->loadedSound.sound);
+	  writePackfileToDisk(&fingertipsGrains, fingertipsPackfilename);
+	  arenaEndTemporaryMemory(&packfileMemory);
+
+	  pluginState->loadedGrainPackfile = loadGrainPackfile(fingertipsPackfilename,
+							       &pluginState->permanentArena);
+	  pluginState->silo = initializeFileGrainState(&pluginState->permanentArena);	  
+
+	  //pluginState->testBitmap = loadBitmap("../data/signal_z.bmp", &pluginState->permanentArena);
 
 	  RangeU32 characterRange = {32, 127}; // NOTE: from SPACE up to (but not including) DEL
 	  pluginState->testFont = loadFont("../data/arial.ttf", &pluginState->loadArena,
@@ -211,6 +225,7 @@ initializePluginState(PluginMemory *memoryBlock)
 	  pluginState->layout = uiInitializeLayout(&pluginState->frameArena, &pluginState->permanentArena,
 						   &pluginState->testFont);
 
+#if 0
 #if 1
 	  r32 *testModelInput = pluginState->loadedSound.sound.samples[0];
 	  //s64 testModelInputSampleCount = pluginState->loadedSound.sound.sampleCount;
@@ -225,6 +240,7 @@ initializePluginState(PluginMemory *memoryBlock)
 #endif
 	  void *outputData = globalPlatform.runModel(testModelInput, testModelInputSampleCount);
 	  r32 *outputFloat = (r32 *)outputData;
+#endif
 
 	  pluginState->initialized = true;
 	}
@@ -263,7 +279,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 
       u32 windowWidth = renderCommands->widthInPixels;
       u32 windowHeight = renderCommands->heightInPixels;
-      LoadedFont *font = &pluginState->testFont;
+      //LoadedFont *font = &pluginState->testFont;
 #if 1     
       UILayout *layout = &pluginState->layout;
       uiBeginLayout(layout, V2(windowWidth, windowHeight), &input->mouseState);
@@ -283,6 +299,12 @@ RENDER_NEW_FRAME(renderNewFrame)
 	  //pluginState->loadedSound.isPlaying = true;
 	  ASSERT(play.element->parameterType = UIParameter_boolean);
 	  pluginSetBooleanParameter(play.element->bParam, true);
+
+	  // TODO: stop doing the queue here: we don't want to have to synchronize grain (de)queueing across
+	  //       the audio and video threads (once we actually have them on their own threads)
+	  //r64 currentTimestamp = (r64)globalPlatform.getCurrentTimestamp()/(r64)pluginState->osTimerFreq;
+	  //printf("grainQueue: %llu\n", currentTimestamp);
+	  queueAllGrainsFromFile(&pluginState->silo, &pluginState->loadedGrainPackfile);
 	}
             
       UIComm volume = uiMakeSlider(layout, "volume", V2(0.1f, 0.1f), V2(0.1f, 0.75f),
@@ -559,7 +581,14 @@ AUDIO_PROCESS(audioProcess)
 	  loadedSoundSamples[1] = loadedSound->sound.samples[1] + (u32)loadedSound->samplesPlayed;
 	}
       
-      r32 formatVolumeFactor = 1.f;      
+      r32 *grainMixBuffers[2];
+      u32 framesToWrite = audioBuffer->framesToWrite;
+      //r64 grainMixTimestamp = (r64)globalPlatform.getCurrentTimestamp()/(r64)pluginState->osTimerFreq;
+      //printf("\ngrainMixTimestamp: %llu\n", grainMixTimestamp);            
+
+      r32 formatVolumeFactor = 1.f;
+      u32 destSampleRate = audioBuffer->sampleRate;
+      r32 sampleRateRatio = (r32)INTERNAL_SAMPLE_RATE/(r32)destSampleRate;
       switch(audioBuffer->format)
 	{
 	case AudioFormat_s16:
@@ -569,40 +598,57 @@ AUDIO_PROCESS(audioProcess)
 	case AudioFormat_r32: break;
 	default: { ASSERT(!"invalid audio format"); } break;
 	}
+            
+      TemporaryMemory grainMixerMemory = arenaBeginTemporaryMemory(&pluginState->permanentArena, KILOBYTES(128));
+      u32 scaledFramesToWrite = (u32)(sampleRateRatio*framesToWrite) + 1;
+      grainMixBuffers[0] = arenaPushArray((Arena *)&grainMixerMemory, scaledFramesToWrite, r32,
+					  arenaFlagsZeroNoAlign());
+      grainMixBuffers[1] = arenaPushArray((Arena *)&grainMixerMemory, scaledFramesToWrite, r32,
+					  arenaFlagsZeroNoAlign());
+      mixPlayingGrains(grainMixBuffers[0], grainMixBuffers[1],
+		       1.f, scaledFramesToWrite, &pluginState->silo);
 
-      void *genericAudioFrames = audioBuffer->buffer;
-      r32 sampleRateRatio = (r32)INTERNAL_SAMPLE_RATE/(r32)audioBuffer->sampleRate;      
-      for(u32 i = 0; i < audioBuffer->framesToWrite; ++i)
+      void *genericAudioFrames = audioBuffer->buffer;      
+      for(u32 frameIndex = 0; frameIndex < audioBuffer->framesToWrite; ++frameIndex)
 	{
-	  r32 volume = formatVolumeFactor*pluginReadFloatParameter(&pluginState->volume);
+	  r32 volume = 0.1f*formatVolumeFactor*pluginReadFloatParameter(&pluginState->volume);
 		
 	  pluginState->phasor += nFreq;
 	  if(pluginState->phasor > M_TAU) pluginState->phasor -= M_TAU;
 				  
 	  r32 sinVal = sin(pluginState->phasor);
-	  for(u32 j = 0; j < audioBuffer->channels; ++j)
+	  for(u32 channelIndex = 0; channelIndex < audioBuffer->channels; ++channelIndex)
 	    {
 	      r32 mixedVal = 0.5f*sinVal;
+	      
+	      r32 grainReadPosition = sampleRateRatio*frameIndex;
+	      u32 grainReadIndex = (u32)grainReadPosition;
+	      r32 grainReadFrac = grainReadPosition - grainReadIndex;
+	      
+	      r32 firstGrainVal = grainMixBuffers[channelIndex][grainReadIndex];
+	      r32 nextGrainVal = grainMixBuffers[channelIndex][grainReadIndex + 1];
+	      r32 grainVal = lerp(firstGrainVal, nextGrainVal, grainReadFrac);
+	      mixedVal += 0.5f*grainVal;
 
 	      soundIsPlaying = pluginReadBooleanParameter(&pluginState->soundIsPlaying);
 	      if(soundIsPlaying)		       
 		{
-		  r32 soundReadPosition = sampleRateRatio*i;
+		  r32 soundReadPosition = sampleRateRatio*frameIndex;
 		  if((loadedSound->samplesPlayed + soundReadPosition + 1) < loadedSound->sound.sampleCount)
 		    {		      
 		      u32 soundReadIndex = (u32)soundReadPosition;
 		      r32 soundReadFrac = soundReadPosition - soundReadIndex;
 
-		      r32 firstSoundVal = loadedSoundSamples[j][soundReadIndex];
-		      r32 nextSoundVal = loadedSoundSamples[j][soundReadIndex + 1];
+		      r32 firstSoundVal = loadedSoundSamples[channelIndex][soundReadIndex];
+		      r32 nextSoundVal = loadedSoundSamples[channelIndex][soundReadIndex + 1];
 		      r32 loadedSoundVal = lerp(firstSoundVal, nextSoundVal, soundReadFrac);
-		      mixedVal += 0.5f*loadedSoundVal;
+		      //mixedVal += 0.5f*loadedSoundVal;
 		    }
 		  else
 		    {		      
 		      pluginSetBooleanParameter(&pluginState->soundIsPlaying, false);
 		      loadedSound->samplesPlayed = 0;
-		    }
+		    }		  
 		}
 
 	      switch(audioBuffer->format)
@@ -624,6 +670,8 @@ AUDIO_PROCESS(audioProcess)
 
 	  pluginUpdateFloatParameter(&pluginState->volume);
 	}
+
+      arenaEndTemporaryMemory(&grainMixerMemory);
 
       soundIsPlaying = pluginReadBooleanParameter(&pluginState->soundIsPlaying);
       if(soundIsPlaying)

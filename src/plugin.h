@@ -70,6 +70,70 @@ struct PluginParameter
   };
 };
 
+/* struct GrainBuffer */
+/* { */
+/*   r32 *samples; */
+/*   u32 readIndex; */
+/*   u32 writeIndex; */
+
+/*   u32 bufferSize; */
+/* }; */
+
+/* struct Grain */
+/* { */
+/*   r32 *start; */
+/*   u32 samplesToPlay; */
+
+/*   Grain *next; */
+/*   Grain *prev; */
+/* }; */
+
+/* struct GrainManager */
+/* { */
+/*   Arena *grainAllocator; */
+/*   Grain *grainPlayList; */
+/*   GrainBuffer *grainBuffer; */
+/*   u32 grainCount; */
+
+/*   Grain *grainFreeList; */
+/* }; */
+
+/* Grain * */
+/* makeNewGrain(GrainManager *grainManager, u32 grainSize) */
+/* { */
+/*   Grain *result; */
+/*   if(grainFreeList) */
+/*     { */
+/*       result = grainFreeList; */
+/*       grainFreeList = result->next; */
+/*       result->next = 0; */
+/*     } */
+/*   else */
+/*     { */
+/*       result = arenaPushStruct(grainManager->grainAllocator, Grain); */
+/*     } */
+
+/*   GrainBuffer *buffer = grainManager->grainBuffer; */
+/*   result->start = buffer->samples + buffer->readIndex; */
+/*   result->sampleToPlay = grainSize; */
+  
+/*   grain->next = grainManager->grainPlayList; */
+/*   grainManager->grainPlayList = grain; */
+
+/*   ++grainManager->grainCount; */
+/*   return(result); */
+/* } */
+
+/* void */
+/* destroyGrain(GrainManager *grainManager, Grain *grain) */
+/* { */
+/*   --grainManager->grainCount; */
+/*   grain->prev->next = grain->next; */
+/*   grain->next = grainManager->grainFreeList; */
+/*   grainManager->grainFreeList = grain; */
+/* } */
+
+#include "file_granulator.h"
 #include "file_formats.h"
 #include "ui_layout.h"
 #include "plugin_render.h"
@@ -82,10 +146,15 @@ struct PlayingSound
 
 struct PluginState
 {
+  u64 osTimerFreq;
+
   Arena permanentArena;
   Arena frameArena;
   Arena loadArena; 
-  
+
+  LoadedGrainPackfile loadedGrainPackfile;
+  FileGrainState silo;
+
   r64 phasor;
   r32 freq;
   PluginFloatParameter volume;

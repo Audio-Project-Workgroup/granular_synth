@@ -57,7 +57,7 @@ PLATFORM_RUN_MODEL(platformRunModel)
   status = onnxState.api->Run(onnxState.session, 0, inputNames, inputTensors, 1, outputNames, 1, &outputTensor);
   ortPrintError(status);
 
-  void *outputData = 0;
+  void *outputData = 0; // TODO: do we need to free this thing?
   status = onnxState.api->GetTensorMutableData(outputTensor, &outputData);
   ortPrintError(status);
 

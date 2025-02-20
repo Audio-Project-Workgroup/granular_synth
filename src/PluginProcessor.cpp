@@ -56,12 +56,38 @@ PLATFORM_READ_ENTIRE_FILE(juceReadEntireFile)
   return(result);
 }
 
-PLATFORM_FREE_FILE_MEMORY(juceFreeFileMemory)
-{
-  arenaPopSize(allocator, file.contentsSize);
+PLATFORM_WRITE_ENTIRE_FILE(juceWriteEntireFile)
+{ 
+  juce::String filepath = juce::String(BUILD_DIR) + juce::String("/") + juce::String(filename);
+  juce::Logger::writeToLog(filepath);
+  
+  juce::File file(filepath);  
+  juce::FileOutputStream outputStream(filepath);
+  if(outputStream.openedOk())
+    {
+      if(outputStream.write(fileMemory, fileSize))
+	{
+	  // NOTE: nothing to do
+	}
+      else
+	{
+	  juce::Logger::writeToLog("ERROR: failed to write file: " +
+				   filepath + ": " +
+				   outputStream.getStatus().getErrorMessage());
+	}
+    }
+  else
+    {
+      juce::Logger::writeToLog("ERROR: failed to open file: " +
+				   filepath + ": " +
+				   outputStream.getStatus().getErrorMessage());
+    }
 }
 
-
+PLATFORM_FREE_FILE_MEMORY(juceFreeFileMemory)
+{
+  arenaPopSize(allocator, file.contentsSize);  
+}
 
 //==============================================================================
 AudioPluginAudioProcessor::AudioPluginAudioProcessor()
@@ -171,6 +197,7 @@ prepareToPlay(double sampleRate, int samplesPerBlock)
   pluginMemory = {};
   pluginMemory.memory = calloc(MEGABYTES(512), 1);
   pluginMemory.platformAPI.readEntireFile = juceReadEntireFile;
+  pluginMemory.platformAPI.writeEntireFile = juceWriteEntireFile;
   pluginMemory.platformAPI.freeFileMemory = juceFreeFileMemory;
   pluginMemory.platformAPI.runModel = platformRunModel;
 

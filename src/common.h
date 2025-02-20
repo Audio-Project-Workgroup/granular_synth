@@ -15,6 +15,11 @@
 #define PLATFORM_RUN_MODEL(name) void *(name)(r32 *inputData, s64 inputLength)
 typedef PLATFORM_RUN_MODEL(PlatformRunModel);
 
+// timing
+
+#define PLATFORM_GET_CURRENT_TIMESTAMP(name) u64 (name)(void)
+typedef PLATFORM_GET_CURRENT_TIMESTAMP(PlatformGetCurrentTimestamp);
+
 // files
 
 struct ReadFileResult
@@ -29,12 +34,18 @@ typedef PLATFORM_READ_ENTIRE_FILE(PlatformReadEntireFile);
 #define PLATFORM_FREE_FILE_MEMORY(name) void (name)(ReadFileResult file, Arena *allocator)
 typedef PLATFORM_FREE_FILE_MEMORY(PlatformFreeFileMemory);
 
+#define PLATFORM_WRITE_ENTIRE_FILE(name) void (name)(char *filename, void *fileMemory, usz fileSize)
+typedef PLATFORM_WRITE_ENTIRE_FILE(PlatformWriteEntireFile);
+
 struct PlatformAPI
 {
-  PlatformReadEntireFile *readEntireFile;
+  PlatformReadEntireFile *readEntireFile;  
   PlatformFreeFileMemory *freeFileMemory;
+  PlatformWriteEntireFile *writeEntireFile;
 
   PlatformRunModel *runModel;
+
+  PlatformGetCurrentTimestamp *getCurrentTimestamp;
 };
 
 extern PlatformAPI globalPlatform;
@@ -42,6 +53,7 @@ extern PlatformAPI globalPlatform;
 struct PluginMemory
 {
   void *memory;
+  u64 osTimerFreq;
   PlatformAPI platformAPI;
 };
 
@@ -148,6 +160,8 @@ struct KeyboardState
 
 struct PluginInput
 {
+  u64 frameMillisecondsElapsed;
+
   MouseState mouseState;
   KeyboardState keyboardState;
 };
@@ -185,6 +199,8 @@ struct MidiHeader
 
 struct PluginAudioBuffer
 {
+  u64 millisecondsElapsedSinceLastCall;
+
   AudioFormat format;
   void *buffer;
 

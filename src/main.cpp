@@ -173,9 +173,12 @@ main(int argc, char **argv)
 
 	  PluginMemory pluginMemory = {};
 	  pluginMemory.memory = calloc(MEGABYTES(512), 1);
+	  pluginMemory.osTimerFreq = getOSTimerFreq();
 	  pluginMemory.platformAPI.readEntireFile = platformReadEntireFile;
 	  pluginMemory.platformAPI.freeFileMemory = platformFreeFileMemory;
+	  pluginMemory.platformAPI.writeEntireFile = platformWriteEntireFile;
 	  pluginMemory.platformAPI.runModel = platformRunModel;
+	  pluginMemory.platformAPI.getCurrentTimestamp = platformGetCurrentTimestamp;
 
 	  RenderCommands commands = {};	  
 
@@ -232,8 +235,12 @@ main(int argc, char **argv)
 
 		      // main loop
 
+		      u64 frameElapsedTime = 0;
+		      u64 lastAudioProcessCallTime = 0;
 		      while(!glfwWindowShouldClose(window))
 			{
+			  u64 frameStartTime = readOSTimer();
+			  
 			  // reload plugin
 		      
 			  u64 newWriteTime = getLastWriteTimeU64(PLUGIN_PATH);
@@ -275,6 +282,7 @@ main(int argc, char **argv)
 			  double mouseX, mouseY;
 			  glfwGetCursorPos(window, &mouseX, &mouseY);
 			  newInput->mouseState.position = V2(mouseX, (r64)windowHeight - mouseY);
+			  newInput->frameMillisecondsElapsed = frameElapsedTime;
 
 			  // render new frame
 
@@ -316,6 +324,11 @@ main(int argc, char **argv)
 				{
 				  if(plugin.audioProcess)
 				    {
+				      u64 audioProcessCallTime = readOSTimer();
+				      audioBuffer.millisecondsElapsedSinceLastCall =
+					audioProcessCallTime - lastAudioProcessCallTime;
+				      lastAudioProcessCallTime = audioProcessCallTime;
+
 				      audioBuffer.buffer = writePtr;
 				      audioBuffer.framesToWrite = framesToWrite;
 				      plugin.audioProcess(&pluginMemory, &audioBuffer);
@@ -343,6 +356,9 @@ main(int argc, char **argv)
 			  PluginInput *temp = newInput;
 			  newInput = oldInput;
 			  oldInput = temp;
+
+			  u64 frameEndTime = readOSTimer();
+			  frameElapsedTime = frameEndTime - frameStartTime;
 			}
 
 		      ma_device_uninit(&maDevice);
