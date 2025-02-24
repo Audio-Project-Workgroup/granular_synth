@@ -404,7 +404,7 @@ PLATFORM_READ_ENTIRE_FILE(platformReadEntireFile)
   return(result);
 }
 
-PLATFORM_READ_ENTIRE_FILE(platformReadEntireFile)
+PLATFORM_WRITE_ENTIRE_FILE(platformWriteEntireFile)
 {
   int fileHandle = open(filename, O_CREAT | O_WRONLY | O_TRUNC);
   if(fileHandle != -1)

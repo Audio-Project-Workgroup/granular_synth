@@ -61,11 +61,11 @@ PLATFORM_RUN_MODEL(platformRunModel)
   status = onnxState.api->GetTensorMutableData(outputTensor, &outputData);
   ortPrintError(status);
 
-  onnxState.api->ReleaseMemoryInfo(inputMemInfo);
-  onnxState.api->ReleaseValue(inputTensor);
-  onnxState.api->ReleaseValue(outputTensor);
-  onnxState.api->AllocatorFree(onnxState.sessionAllocator, inputName);
-  onnxState.api->AllocatorFree(onnxState.sessionAllocator, outputName);
+  status = onnxState.api->ReleaseMemoryInfo(inputMemInfo);
+  status = onnxState.api->ReleaseValue(inputTensor);
+  status = onnxState.api->ReleaseValue(outputTensor);
+  status = onnxState.api->AllocatorFree(onnxState.sessionAllocator, inputName);
+  status = onnxState.api->AllocatorFree(onnxState.sessionAllocator, outputName);
 
   return(outputData);
 }
