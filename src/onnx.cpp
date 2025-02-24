@@ -31,14 +31,16 @@ onnxInitializeState(const ORTCHAR_T *modelPath)
 
 PLATFORM_RUN_MODEL(platformRunModel)
 {
+  OrtStatus *status = 0;
   char *inputName, *outputName;
-  onnxState.api->SessionGetInputName(onnxState.session, 0, onnxState.sessionAllocator, &inputName);
-  onnxState.api->SessionGetOutputName(onnxState.session, 0, onnxState.sessionAllocator, &outputName);
+  status = onnxState.api->SessionGetInputName(onnxState.session, 0, onnxState.sessionAllocator, &inputName);
+  ortPrintError(status);
+  status = onnxState.api->SessionGetOutputName(onnxState.session, 0, onnxState.sessionAllocator, &outputName);
+  ortPrintError(status);
 
   const char *inputNames[] = {inputName};
   const char *outputNames[] = {outputName};
-  
-  OrtStatus *status = 0;
+    
   OrtMemoryInfo *inputMemInfo = 0;
   status = onnxState.api->CreateCpuMemoryInfo(OrtArenaAllocator, (OrtMemType)0, &inputMemInfo);
   ortPrintError(status);
@@ -61,11 +63,13 @@ PLATFORM_RUN_MODEL(platformRunModel)
   status = onnxState.api->GetTensorMutableData(outputTensor, &outputData);
   ortPrintError(status);
 
-  status = onnxState.api->ReleaseMemoryInfo(inputMemInfo);
-  status = onnxState.api->ReleaseValue(inputTensor);
-  status = onnxState.api->ReleaseValue(outputTensor);
+  onnxState.api->ReleaseMemoryInfo(inputMemInfo);
+  onnxState.api->ReleaseValue(inputTensor);
+  onnxState.api->ReleaseValue(outputTensor);
   status = onnxState.api->AllocatorFree(onnxState.sessionAllocator, inputName);
+  ortPrintError(status);
   status = onnxState.api->AllocatorFree(onnxState.sessionAllocator, outputName);
+  ortPrintError(status);
 
   return(outputData);
 }
