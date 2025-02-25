@@ -72,11 +72,10 @@ printButtonState(ButtonState button, char *name)
 	 wasPressed(button) ? "pressed" : "not pressed",
 	 isDown(button) ? "down" : "up");
 }
-
-
-
+ 
 #define MIDI_VERBOSE // ERASE WHEN DONE
 // example function for NoteOn
+
 static inline r32
 hertzFromMidiNoteNumber(u8 noteNumber)
 {
@@ -98,6 +97,8 @@ namespace midi{
 		assert(len == 2);
 		uint8_t key = data[0];
 		uint8_t velocity = data[1];
+		pluginState->freq = hertzFromMidiNoteNumber(key);
+		pluginSetFloatParameter(&pluginState->volume, 0.0);
 		printf("Note Off: Channel %d Key %d Velocity %d\n",channel,key,velocity);
 	}
 
@@ -107,7 +108,8 @@ namespace midi{
 		uint8_t velocity = data[1];
 
 		pluginState->freq = hertzFromMidiNoteNumber(key);
-
+		pluginSetFloatParameter(&pluginState->volume, (r32)velocity / 127.f);
+		//pluginState->volume = 
 		printf("Note On: Channel %d Key %d Velocity %d\n",channel,key,velocity);
 	}
 
@@ -115,22 +117,26 @@ namespace midi{
 		assert(len == 2);
 		uint8_t key = data[0];
 		uint8_t touch = data[1];
+		pluginState->freq = hertzFromMidiNoteNumber(key);
+		pluginSetFloatParameter(&pluginState->volume, (r32)touch / 127.f);
 		printf("Aftertouch: Channel %d Key %d Touch %d\n",channel,key,touch);
 	}
 
 	void ContinuousController(uint8_t channel, uint8_t* data, uint8_t len, PluginState *pluginState) {
 		assert(len == 2);
-		uint8_t controller = data[0];
-		uint8_t value = data[1]; 
+		uint8_t controller = data[0]; // Index to look up into a parameter array[]
+		uint8_t value = data[1]; // value -> what we are setting the parameter to 
+		int paramIndex = ccParamTable[controller];
+		pluginReadFloatParameter(&pluginState->parameters[paramIndex], value)
+
 		printf("Continuous Controller: Channel %d Controller %d Value %d\n",channel,controller,value);
 	}
 
 	void PatchChange(uint8_t channel, uint8_t* data, uint8_t len, PluginState *pluginState) {
-		// @TODO Apply Testing --> number of parameters 2, what is the second param?
+		
 		assert(len >= 1);
-		uint8_t instument = data[0];
-		uint8_t FIX_ME = data[1];
-		printf("Patch Change: Channel %d instument %d FIX_ME %d\n",channel,instument,FIX_ME);
+		uint8_t instument = data[0]; // TODO: FIX Data = data 0  and data 1
+		printf("Patch Change: Channel %d instument %d\n",channel,instument);
 	}
 
 	void ChannelPressure(uint8_t channel, uint8_t* data, uint8_t len, PluginState *pluginState) {
