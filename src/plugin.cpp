@@ -197,7 +197,8 @@ namespace midi{
 
 #ifdef MIDI_VERBOSE
 			printf("ALL BYTES : ");
-			for (size_t i = 0; i < 5; ++i) {
+			size_t numberOfBytesAheadToPrint = 10;
+			for (size_t i = 0; i < numberOfBytesAheadToPrint; ++i) {
 				printf("0x%02x ", (unsigned char)atMidiBuffer[i]);
 			}
 			printf("\n");
@@ -207,6 +208,12 @@ namespace midi{
 			atMidiBuffer += sizeof(MidiHeader); // forward atMidiBuffer pointer past the header byte
 			u8 bytesToRead = header->messageLength;
 
+			// get the timestamp
+			// u32 timeStamp= *atMidiBuffer;
+			u32 timeStamp = *((u32*)atMidiBuffer);
+			atMidiBuffer += sizeof(u32); // forward atMidiBuffer pointer past the command byte
+			bytesToRead-=4;
+			
 			// get the command byte (command byte include both command and channel info within it)
 			u8 commandByte = *atMidiBuffer;
 			atMidiBuffer += sizeof(u8); // forward atMidiBuffer pointer past the command byte
@@ -222,8 +229,9 @@ namespace midi{
 			processMidiCommand(commandByte, data, bytesToRead, pluginState);
 
 #ifdef MIDI_VERBOSE
-			printf("AFTER PARSING : 0x%x | %d bytes to read | data points to 0x%x | midiBuffer ptr points to 0x%x\n", 
-				(int)commandByte, 
+			printf("AFTER PARSING : 0x%x | %d timeStamp(ms passed) | %d bytes to read | data points to 0x%x | midiBuffer ptr points to 0x%x\n", 
+				(int)commandByte,
+				timeStamp, 
 				(int)bytesToRead, 
 				(int)data[0], 
 				(int)atMidiBuffer[0]);
