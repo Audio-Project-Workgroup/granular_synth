@@ -74,6 +74,168 @@ printButtonState(ButtonState button, char *name)
 	 isDown(button) ? "down" : "up");
 }
 
+#define MIDI_VERBOSE // ERASE WHEN DONE
+// example function for NoteOn
+static inline r32
+hertzFromMidiNoteNumber(u8 noteNumber)
+{
+r32 result = 440.f;
+result *= powf(powf(2.f, 1.f/12.f), (r32)((s32)noteNumber - 69));
+return(result);
+}
+
+namespace midi{
+
+	// Function pointer type for MIDI handlers
+	typedef void (*MidiHandler)(uint8_t channel, uint8_t* data, uint8_t len, PluginState *pluginState);
+
+	// Define the MIDI command table as an array of function pointers
+	extern MidiHandler midiCommandTable[8] = {nullptr};
+
+	// Functions for each MIDI command
+	void NoteOff(uint8_t channel, uint8_t* data, uint8_t len, PluginState *pluginState) {
+		assert(len == 2);
+		uint8_t key = data[0];
+		uint8_t velocity = data[1];
+		printf("Note Off: Channel %d Key %d Velocity %d\n",channel,key,velocity);
+	}
+
+	void NoteOn(uint8_t channel, uint8_t* data, uint8_t len, PluginState *pluginState) {
+		assert(len == 2);
+		uint8_t key = data[0];
+		uint8_t velocity = data[1];
+
+		pluginState->freq = hertzFromMidiNoteNumber(key);
+
+		printf("Note On: Channel %d Key %d Velocity %d\n",channel,key,velocity);
+	}
+
+	void Aftertouch(uint8_t channel, uint8_t* data, uint8_t len, PluginState *pluginState) {
+		assert(len == 2);
+		uint8_t key = data[0];
+		uint8_t touch = data[1];
+		printf("Aftertouch: Channel %d Key %d Touch %d\n",channel,key,touch);
+	}
+
+	void ContinuousController(uint8_t channel, uint8_t* data, uint8_t len, PluginState *pluginState) {
+		assert(len == 2);
+		uint8_t controller = data[0];
+		uint8_t value = data[1]; 
+		printf("Continuous Controller: Channel %d Controller %d Value %d\n",channel,controller,value);
+	}
+
+	void PatchChange(uint8_t channel, uint8_t* data, uint8_t len, PluginState *pluginState) {
+		// @TODO Apply Testing --> number of parameters 2, what is the second param?
+		assert(len >= 1);
+		uint8_t instument = data[0];
+		uint8_t FIX_ME = data[1];
+		printf("Patch Change: Channel %d instument %d FIX_ME %d\n",channel,instument,FIX_ME);
+	}
+
+	void ChannelPressure(uint8_t channel, uint8_t* data, uint8_t len, PluginState *pluginState) {
+		assert(len == 1);
+		uint8_t pressure = data[0];  // Controller number (data[1])
+		printf("Channel Pressure: Channel %d pressure %d\n",channel,pressure);
+	}
+
+	void PitchBend(uint8_t channel, uint8_t* data, uint8_t len, PluginState *pluginState) {
+		assert(len == 2);
+		uint8_t lsb = data[0];
+		uint8_t msb = data[1]; 
+		printf("Pitch Bend: Channel %d lsb %d msb %d\n",channel,lsb,msb);
+	}
+
+	void SystemMessages(uint8_t channel, uint8_t* data, uint8_t len, PluginState *pluginState) {
+		printf("System Messages");
+	}
+
+	void initializeMidiCommandTable() {
+		midiCommandTable[0] = NoteOff;
+		midiCommandTable[1] = NoteOn;
+		midiCommandTable[2] = Aftertouch;
+		midiCommandTable[3] = ContinuousController;
+		midiCommandTable[4] = PatchChange;
+		midiCommandTable[5] = ChannelPressure;
+		midiCommandTable[6] = PitchBend;
+		midiCommandTable[7] = SystemMessages;
+	}
+
+	// Function to call the handler for a specific command
+	void processMidiCommand(uint8_t commandByte, uint8_t* data, uint8_t len, PluginState *pluginState) {
+
+		uint8_t channel = commandByte & 0x0F; // take the last 4 bits
+		
+		commandByte &= 0xF0; // take the first 4 bits
+		commandByte >>= 4; // shift the bits to the right
+		commandByte &= 0b0111; // take the last 3 bits
+
+		if (midiCommandTable[commandByte] == nullptr) {
+			printf("Unknown MIDI command");
+			return;
+		}
+
+		midiCommandTable[commandByte](channel,data,len,pluginState); // commandByte & 0xF0 will zero down the last 4 bits
+	}
+
+	/* @TODO FIX THIS DOC
+	* @brief This method is responsible for parsing the midi message
+	* @param audioBuffer [in/out]: The raw midi message is passed through the audioBuffer. 
+	* After the parsing, the audioBuffer pointer will be updated, and will point to the next available memory byte
+	* @param pluginState [out]: the plugin state is used to handle the midi message.
+	*/
+	void parseMidiMessage(PluginAudioBuffer *audioBuffer, PluginState *pluginState){
+		u8 *atMidiBuffer = audioBuffer->midiBuffer;
+		
+		if(audioBuffer->midiMessageCount){
+
+#ifdef MIDI_VERBOSE
+			printf("ALL BYTES : ");
+			size_t numberOfBytesAheadToPrint = 10;
+			for (size_t i = 0; i < numberOfBytesAheadToPrint; ++i) {
+				printf("0x%02x ", (unsigned char)atMidiBuffer[i]);
+			}
+			printf("\n");
+#endif			
+			// get the bytes to read
+			MidiHeader *header = (MidiHeader *)atMidiBuffer;
+			atMidiBuffer += sizeof(MidiHeader); // forward atMidiBuffer pointer past the header byte
+			u8 bytesToRead = header->messageLength;
+
+			// get the timestamp
+			// u32 timeStamp= *atMidiBuffer;
+			u32 timeStamp = *((u32*)atMidiBuffer);
+			atMidiBuffer += sizeof(u32); // forward atMidiBuffer pointer past the command byte
+			bytesToRead-=4;
+			
+			// get the command byte (command byte include both command and channel info within it)
+			u8 commandByte = *atMidiBuffer;
+			atMidiBuffer += sizeof(u8); // forward atMidiBuffer pointer past the command byte
+			--bytesToRead;
+
+			// get the rest of the data byte
+			u8 *data = atMidiBuffer;
+			atMidiBuffer += (bytesToRead*sizeof(u8));  // forward to the end of the message
+
+	// apply check for command and data 
+
+			// pass commandByte, the number of remaining bytes, and the pointer to them
+			processMidiCommand(commandByte, data, bytesToRead, pluginState);
+
+#ifdef MIDI_VERBOSE
+			printf("AFTER PARSING : 0x%x | %d timeStamp(ms passed) | %d bytes to read | data points to 0x%x | midiBuffer ptr points to 0x%x\n", 
+				(int)commandByte,
+				timeStamp, 
+				(int)bytesToRead, 
+				(int)data[0], 
+				(int)atMidiBuffer[0]);
+			printf("\n\n");
+#endif
+			--audioBuffer->midiMessageCount;
+		}
+	}
+}
+
+
 static PluginState *
 initializePluginState(PluginMemory *memoryBlock)
 {
@@ -243,6 +405,9 @@ initializePluginState(PluginMemory *memoryBlock)
 #endif
 
 	  pluginState->initialized = true;
+
+	  midi::initializeMidiCommandTable();
+
 	}
     }
   
@@ -502,27 +667,6 @@ RENDER_NEW_FRAME(renderNewFrame)
     }  
 }
 
-enum MidiStatus : u32
-{
-  MidiStatus_noteOff = 0x80,
-  MidiStatus_noteOn = 0x90,
-  MidiStatus_aftertouch = 0xA0,
-  MidiStatus_continuousController = 0xB0,
-  MidiStatus_patchChange = 0xC0,
-  MidiStatus_channelPressure = 0xD0,
-  MidiStatus_pitchBend = 0xE0,
-  MidiStatus_sysEx = 0xF0,
-};
-
-static inline r32
-hertzFromMidiNoteNumber(u32 noteNumber)
-{
-  r32 result = 440.f;
-  result *= powf(powf(2.f, 1.f/12.f), (r32)((s32)noteNumber - 69));
-
-  return(result);
-}
-
 extern "C"
 AUDIO_PROCESS(audioProcess)
 {  
@@ -531,46 +675,7 @@ AUDIO_PROCESS(audioProcess)
     {
       // TODO: This midi parsing is janky and bad. Passing the message length before each message is unnecessary
       // TODO: move the midi loop inside the output loop, so that we don't only see the most recent midi message
-      u8 *atMidiBuffer = audioBuffer->midiBuffer;
-      while(audioBuffer->midiMessageCount)
-	{
-	  MidiHeader *header = (MidiHeader *)atMidiBuffer;
-	  atMidiBuffer += sizeof(MidiHeader);
-
-	  u32 bytesToRead = header->messageLength;
-	  if(bytesToRead >= 1)
-	    {
-	      u32 midiStatus = *atMidiBuffer & 0xF0;
-	      u32 midiChannelNumber = *atMidiBuffer & 0x0F;
-	      (void)midiChannelNumber;
-	      ++atMidiBuffer;
-	      --bytesToRead;
-
-	      switch(midiStatus)
-		{				  
-		case MidiStatus_noteOn:
-		  {
-		    ASSERT(bytesToRead == 2);
-		    u32 noteNumber = *atMidiBuffer++;
-		    u32 noteVelocity = *atMidiBuffer++;
-		    pluginState->freq = hertzFromMidiNoteNumber(noteNumber);		    
-		    pluginSetFloatParameter(&pluginState->volume, (r32)noteVelocity/127.f);
-		  } break;
-		  
-		default:
-		  {
-		    while(bytesToRead)
-		      {
-			++atMidiBuffer;
-			--bytesToRead;
-		      }
-		  } break;
-		}
-	    }
-
-	  --audioBuffer->midiMessageCount;
-	}
-
+      
       r64 nFreq = M_TAU*pluginState->freq/(r64)audioBuffer->sampleRate;
 
       bool soundIsPlaying = pluginReadBooleanParameter(&pluginState->soundIsPlaying);
@@ -612,6 +717,9 @@ AUDIO_PROCESS(audioProcess)
       void *genericAudioFrames = audioBuffer->buffer;      
       for(u32 frameIndex = 0; frameIndex < audioBuffer->framesToWrite; ++frameIndex)
 	{
+
+		midi::parseMidiMessage(audioBuffer, pluginState);
+		
 	  r32 volume = 0.1f*formatVolumeFactor*pluginReadFloatParameter(&pluginState->volume);
 		
 	  pluginState->phasor += nFreq;
