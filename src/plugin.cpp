@@ -273,9 +273,9 @@ RENDER_NEW_FRAME(renderNewFrame)
 
       //v2 dMouseP = pluginState->mouseP.xy - pluginState->lastMouseP.xy;      
       
-      v4 defaultColor = V4(1, 1, 1, 1);
-      v4 hoverColor = V4(1, 1, 0, 1);
-      v4 activeColor = V4(0.8f, 0.8f, 0, 1);
+      //v4 defaultColor = V4(1, 1, 1, 1);
+      //v4 hoverColor = V4(1, 1, 0, 1);
+      //v4 activeColor = V4(0.8f, 0.8f, 0, 1);
 
       u32 windowWidth = renderCommands->widthInPixels;
       u32 windowHeight = renderCommands->heightInPixels;
@@ -291,6 +291,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 	     layout->leftButtonDown ? "true" : "false");
 #endif
       UIComm title = uiMakeTextElement(layout, "I Will Become a Granular Synthesizer!", 0.75f, 0.f);
+      (void)title;
       
       UIComm play = uiMakeButton(layout, "play", V2(0.75f, 0.75f), V2(0.1f, 0.1f),
 				     &pluginState->soundIsPlaying, V4(0, 0, 1, 1));
@@ -433,7 +434,7 @@ RENDER_NEW_FRAME(renderNewFrame)
       //uiPrintLayout(layout);
       renderPushUILayout(renderCommands, layout);
       uiEndLayout(layout);
-      printf("permanent arena used %llu bytes\n", pluginState->permanentArena.used);
+      printf("permanent arena used %zu bytes\n", pluginState->permanentArena.used);
 
 #else
       v2 textOutAt = V2(0, windowHeight);
@@ -667,6 +668,8 @@ AUDIO_PROCESS(audioProcess)
 		    *audioFrames++ = (s16)(volume*mixedVal);
 		    genericAudioFrames = audioFrames;
 		  } break;
+
+		default: ASSERT(!"ERROR: invalid audio format");
 		}
 	    }
 

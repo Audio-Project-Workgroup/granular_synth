@@ -1,12 +1,13 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
+//#include "platform.h"
 #include "onnx.cpp"
 
 PLATFORM_READ_ENTIRE_FILE(juceReadEntireFile)
 {
   ReadFileResult result = {};
- 
+
   juce::String filepath = juce::String(BUILD_DIR) + juce::String("/") + juce::String(filename);
   juce::Logger::writeToLog(filepath);
   
@@ -199,6 +200,9 @@ prepareToPlay(double sampleRate, int samplesPerBlock)
   pluginMemory.platformAPI.readEntireFile = juceReadEntireFile;
   pluginMemory.platformAPI.writeEntireFile = juceWriteEntireFile;
   pluginMemory.platformAPI.freeFileMemory = juceFreeFileMemory;
+  //pluginMemory.platformAPI.readEntireFile = platformReadEntireFile;
+  //pluginMemory.platformAPI.writeEntireFile = platformWriteEntireFile;
+  //pluginMemory.platformAPI.freeFileMemory = platformFreeFileMemory;
   pluginMemory.platformAPI.runModel = platformRunModel;
 
   juce::String pluginPath(DYNAMIC_PLUGIN_PATH);

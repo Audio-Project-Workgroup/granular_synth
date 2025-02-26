@@ -107,7 +107,7 @@ queueAllGrainsFromFile(FileGrainState *grainState, LoadedGrainPackfile *source)
   //r64 internalSamplePeriod = 1.0/(r64)INTERNAL_SAMPLE_RATE;
   //r64 grainLengthInSeconds = internalSamplePeriod*(r64)grainLength;
   
-  GrainPackfileTag *srcTags = source->tags;
+  GrainPackfileTag *srcTags = source->tags;  
   r32 *srcSamples = source->samples;  
   for(u64 grainIndex = 0; grainIndex < source->grainCount; ++grainIndex)
     {
@@ -137,6 +137,7 @@ queueAllGrainsFromFile(FileGrainState *grainState, LoadedGrainPackfile *source)
       ++srcTags; // TODO: how should we use the tags?
       srcSamples += 2*grainLength;
     }
+  (void)srcTags;
 
   // NOTE: we reverse the queue, so that the grain with the earliest startSampleIndex is at the head of the queue,
   //       rather than at the end

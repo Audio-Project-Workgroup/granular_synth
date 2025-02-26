@@ -147,6 +147,8 @@ inline c64
 operator-(c64 z)
 {
   c64 result = C64(-z.re, -z.im);
+
+  return(result);
 }
 
 inline c64

@@ -31,9 +31,11 @@
 
 * GLFW: https://github.com/glfw/glfw (to build from source), https://www.glfw.org/download.html (for the precompiled binaries)
 * ONNX: https://github.com/microsoft/onnxruntime (source), https://github.com/microsoft/onnxruntime/releases/tag/v1.20.1 (releases)
-* OpenGL (mac and linux)
-* clang (mac and linux)
+* OpenGL
+* CMake (for vst)
 * msvc (windows)
+* clang (mac and linux)
+* pkg-config (mac and linux)
 
 ## Building
 
@@ -67,12 +69,19 @@ lib -OUT:miniaudio.lib miniaudio_impl.obj
   * you will have to put the resulting vst3 bundle somewhere where your DAW/plugin host can find it (TODO: get JUCE to do the installation auomatically)
   * on your first build, you will also have to copy `onnxruntime.dll` from your `build` folder to the folder containing your DAW's executable (TODO: install the onnxruntime dll globally with a custom name (to not interfere with the one that's installed by default))
 
-### Mac and Linux (TODO: update for building with ONNX)
+### Mac and Linux (TODO: confirm on linux)
 
+* ensure the [required dependencies](#requirements) are installed via your package manager
+  * you may need to set/modify your shell's include, library, and pkg-config paths. For example, on M-series macs:
+  ```
+  # ~/.zshrc
+  export CPATH=/opt/homebrew/include
+  export LIBRARY_PATH=/opt/homebrew/lib
+  export PKG_CONFIG_PATH="/opt/homebrew/lib/pkgconfig:$PKG_CONFIG_PATH"
+  ```
 * navigate to the src directory
 * open `build.sh` and uncomment the two lines to compile miniaudio to a static library
-* run `./build.sh` to build the native host application and the dynamic library plugin. These will be located in a new directory called build
-  * (NOTE: this may no longer be necessary) append your local build directory path to `DYLD_LIBRARY_PATH` (mac) or `LD_LIBRARY_PATH` (linux)
+* run `./build.sh` to build the native host application and the dynamic library plugin. These will be located in a new directory called build  
   * recomment those two lines in `build.sh` for subsequent builds
 * run `./build_juce.sh` to build the vst3 plugin with JUCE and install it
 
@@ -84,7 +93,6 @@ Test the installation for the application and for the VST plugin.
 
 ## Issues
 
-* vst3 installation must be done manually on windows
+* vst3 installation must be done manually on windows and some versions of macos
 * must put onnxruntime dlls everywhere on windows. We don't want to make users do that, so we should put a dll with a custom name (to not conflict with the default) in System32.
-* (FIXED) double-free bug when closing vst plugin
-* (NOTE: probably fixed) loading the dynamic library plugin requires modifying shell environment variables on mac and linux (and requires a local path on windows)
+* should automatically detect if we need to build a miniaudio library, and not need to comment and uncomment crap

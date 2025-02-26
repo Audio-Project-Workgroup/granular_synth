@@ -1,5 +1,6 @@
 // functionality present in both the plugin and its host
 
+#include "context.h"
 #include "types.h"
 #include "utils.h"
 #include "arena.h"

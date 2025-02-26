@@ -1,6 +1,7 @@
 // operating-system-dependent functions/types
+#pragma once
 
-#ifdef _WIN32
+#if OS_WINDOWS
 
 #include <windows.h>
 
@@ -142,7 +143,7 @@ unloadPluginCode(PluginCode *code)
   code->audioProcess = 0;
 }
 
-PLATFORM_READ_ENTIRE_FILE(platformReadEntireFile)
+static PLATFORM_READ_ENTIRE_FILE(platformReadEntireFile)
 {
   ReadFileResult result = {};
   
@@ -208,7 +209,7 @@ PLATFORM_READ_ENTIRE_FILE(platformReadEntireFile)
   return(result);
 }
 
-PLATFORM_WRITE_ENTIRE_FILE(platformWriteEntireFile)
+static PLATFORM_WRITE_ENTIRE_FILE(platformWriteEntireFile)
 {
   HANDLE fileHandle = CreateFileA(filename, GENERIC_WRITE, FILE_SHARE_WRITE, 0,
 				  CREATE_ALWAYS, 0, 0);
@@ -236,11 +237,12 @@ PLATFORM_WRITE_ENTIRE_FILE(platformWriteEntireFile)
     }
 }
 
-#else // NOTE: POSIX
+#elif OS_LINUX || OS_MAC
 
 #include <unistd.h>
 #include <dlfcn.h>
 #include <fcntl.h>
+#include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/time.h>
@@ -351,7 +353,7 @@ unloadPluginCode(PluginCode *code)
 typedef ssize_t ssz;
 #define PLATFORM_MAX_READ_SIZE 0x7FFFF000
 
-PLATFORM_READ_ENTIRE_FILE(platformReadEntireFile)
+static PLATFORM_READ_ENTIRE_FILE(platformReadEntireFile)
 {
   ReadFileResult result = {};
   
@@ -377,7 +379,7 @@ PLATFORM_READ_ENTIRE_FILE(platformReadEntireFile)
 		}
 	      else
 		{
-		  fprintf(stderr, "ERROR: read failed\n");
+		  fprintf(stderr, "ERROR: read failed: %s\n", strerror(errno));
 		  result.contents = 0;
 		  result.contentsSize = 0;
 		  break;
@@ -391,22 +393,23 @@ PLATFORM_READ_ENTIRE_FILE(platformReadEntireFile)
 	}
       else
 	{
-	  fprintf(stderr, "ERROR: fstat failed\n");
+	  fprintf(stderr, "ERROR: fstat failed: %s\n", strerror(errno));
 	}
 
       close(fileHandle);
     }
   else
     {
-      fprintf(stderr, "ERROR: open failed\n");
+      fprintf(stderr, "ERROR: open failed: %s\n", strerror(errno));
     }
 
   return(result);
 }
 
-PLATFORM_WRITE_ENTIRE_FILE(platformWriteEntireFile)
+static PLATFORM_WRITE_ENTIRE_FILE(platformWriteEntireFile)
 {
-  int fileHandle = open(filename, O_CREAT | O_WRONLY | O_TRUNC);
+  int fileHandle = open(filename, O_CREAT | O_WRONLY | O_TRUNC,
+			S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
   if(fileHandle != -1)
     {
       usz bytesToWrite = fileSize;
@@ -415,7 +418,7 @@ PLATFORM_WRITE_ENTIRE_FILE(platformWriteEntireFile)
 	  ssize_t bytesWritten = write(fileHandle, fileMemory, bytesToWrite);
 	  if(bytesWritten == -1)
 	    {
-	      fprintf(stderr, "ERROR: write %s failed\n", filename);
+	      fprintf(stderr, "ERROR: write %s failed: %s\n", filename, strerror(errno));
 	      break;
 	    }
 	  else
@@ -429,18 +432,20 @@ PLATFORM_WRITE_ENTIRE_FILE(platformWriteEntireFile)
     }
   else
     {
-      fprintf(stderr, "ERROR: open %s failed\n", filename);
+      fprintf(stderr, "ERROR: open %s failed: %s\n", filename, strerror(errno));
     }
 }
 
+#else
+#error ERROR: unsupported OS
 #endif 
 
-PLATFORM_FREE_FILE_MEMORY(platformFreeFileMemory)
+static PLATFORM_FREE_FILE_MEMORY(platformFreeFileMemory)
 {
   arenaPopSize(allocator, file.contentsSize);
 }
 
-PLATFORM_GET_CURRENT_TIMESTAMP(platformGetCurrentTimestamp)
+static PLATFORM_GET_CURRENT_TIMESTAMP(platformGetCurrentTimestamp)
 {
   return(readOSTimer());
 }

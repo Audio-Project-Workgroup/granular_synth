@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
 #define GL_PRINT_ERROR(msg, ...) do {		\
