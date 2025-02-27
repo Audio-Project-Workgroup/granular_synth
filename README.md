@@ -69,16 +69,18 @@ lib -OUT:miniaudio.lib miniaudio_impl.obj
   * you will have to put the resulting vst3 bundle somewhere where your DAW/plugin host can find it (TODO: get JUCE to do the installation auomatically)
   * on your first build, you will also have to copy `onnxruntime.dll` from your `build` folder to the folder containing your DAW's executable (TODO: install the onnxruntime dll globally with a custom name (to not interfere with the one that's installed by default))
 
-### Mac and Linux (TODO: confirm on linux)
+### Mac and Linux
 
 * ensure the [required dependencies](#requirements) are installed via your package manager
-  * you may need to set/modify your shell's include, library, and pkg-config paths. For example, on M-series macs:
+  * on mac, you may need to set/modify your shell's include, library, and pkg-config paths. For example:
   ```
   # ~/.zshrc
-  export CPATH=/opt/homebrew/include
-  export LIBRARY_PATH=/opt/homebrew/lib
+  # replace /opt/homebrew with /usr/local on intel macs
+  export CPATH=/opt/homebrew/include # append to this path if it exists already
+  export LIBRARY_PATH=/opt/homebrew/lib # append to this path if it exists already
   export PKG_CONFIG_PATH="/opt/homebrew/lib/pkgconfig:$PKG_CONFIG_PATH"
   ```
+  * on linux, onnx is not available via standard package managers. Download the binaries (recommended version is 1.20.1) and install them globally (the exact directories can be found in the libonnxruntime.pc file, located in `[onnxruntime folder]/lib/pkgconfig`)
 * navigate to the src directory
 * open `build.sh` and uncomment the two lines to compile miniaudio to a static library
 * run `./build.sh` to build the native host application and the dynamic library plugin. These will be located in a new directory called build  
@@ -93,6 +95,7 @@ Test the installation for the application and for the VST plugin.
 
 ## Issues
 
-* vst3 installation must be done manually on windows and some versions of macos
+* vst3 automatic installation doesn't work anymore
 * must put onnxruntime dlls everywhere on windows. We don't want to make users do that, so we should put a dll with a custom name (to not conflict with the default) in System32.
 * should automatically detect if we need to build a miniaudio library, and not need to comment and uncomment crap
+* should condense builds into a single script, with optional arguments
