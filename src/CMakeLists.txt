@@ -55,8 +55,16 @@ elseif(APPLE)
   set(JUCE_COPY_PLUGIN_AFTER_BUILD ON)
 elseif(UNIX)
   set(DYNAMIC_PLUGIN_PATH "${BUILD_DIR}/plugin.so")
+  #set(ONNX_LIBRARY "${ONNX_LIBRARY_DIR}/libonnxruntime.so")
 
-  set(ONNX_LIBRARY "${ONNX_LIBRARY_DIR}/libonnxruntime.so")
+  find_package(onnxruntime REQUIRED)
+  if(TARGET onnxruntime::onnxruntime)
+    set(ONNX_LIBRARY "onnxruntime::onnxruntime")
+    set(ONNX_INCLUDE_DIR ${onnxruntime_INCLUDE_DIRS})
+  else()
+    message("onnxruntime not found")	
+  endif()
+
   set(JUCE_COPY_PLUGIN_AFTER_BUILD ON)	
 endif()
 

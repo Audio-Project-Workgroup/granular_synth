@@ -118,6 +118,6 @@ debugPrintQueuedGrainTimestamps(PlayingGrain *queue)
   u32 index = 0;
   for(PlayingGrain *grain = queue; grain; grain = grain->nextQueued, ++index)
     {
-      printf("%u: %llu\n", index, grain->startSampleIndex);
+      printf("%u: %zu\n", index, grain->startSampleIndex);
     }
 }
