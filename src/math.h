@@ -522,6 +522,16 @@ isInRectangle(Rect2 r, v2 v)
   return(result);
 }
 
+static inline v2
+clipToRect(v2 v, Rect2 r)
+{
+  RangeR32 width = makeRange(r.min.x, r.max.x);
+  RangeR32 height = makeRange(r.min.y, r.max.y);
+  v2 result = V2(clampToRange(v.x, width), clampToRange(v.y, height));
+
+  return(result);
+}
+
 inline void
 fft(c64 *destBuffer, r32 *sourceBuffer, u32 lengthInit, u32 stride = 1)
 {

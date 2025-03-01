@@ -28,17 +28,7 @@ uiPopParentElement(UILayout *layout)
 inline UIElement *
 uiAllocateElement(UILayout *layout, char *name, u32 flags, v4 color)
 {
-  UIElement *result = 0;
-  //if(layout->elementFreeList)
-  //{
-  //  result = layout->elementFreeList;
-  //  layout->elementFreeList = result->next;
-  //  result->next = 0;
-  //}
-  //else
-  //{
-  result = arenaPushStruct(layout->frameArena, UIElement, arenaFlagsZeroNoAlign());      
-      //}
+  UIElement *result = arenaPushStruct(layout->frameArena, UIElement, arenaFlagsZeroNoAlign());      
   result->name = arenaPushString(layout->frameArena, name);
   result->flags = flags;
   result->color = color;
@@ -122,20 +112,17 @@ uiMakeElement(UILayout *layout, char *name, u32 flags, v4 color)
 }
 
 inline void
-uiSetElementDataBoolean(UIElement *element, PluginBooleanParameter *param)//bool *variable)
+uiSetElementDataBoolean(UIElement *element, PluginBooleanParameter *param)
 {
   element->parameterType = UIParameter_boolean;
-  //element->data = variable;
   element->bParam = param;
 }
 
 inline void
-uiSetElementDataFloat(UIElement *element, PluginFloatParameter *param)//r32 *variable, RangeR32 range)
+uiSetElementDataFloat(UIElement *element, PluginFloatParameter *param)
 {
   element->parameterType = UIParameter_float;
   element->fParam = param;
-  //element->data = variable;
-  //element->range = range;
 }
 
 inline void
@@ -182,10 +169,7 @@ uiSetSemanticSizeTextCentered(UIElement *element, LoadedFont *font, r32 wScale, 
       textScale.x = textScale.y;
     }
   textDim = hadamard(textScale, textDim);
-    
-  //v2 textOffset = V2(0.5f*(element->parent->semanticDim[UIAxis_x].value - textDim.x),
-  //		     element->parent->semanticDim[UIAxis_y].value - font->verticalAdvance);
-  //uiSetSemanticSizeAbsolute(element, textOffset, textDim);
+      
   v2 textOffset = V2(0.5f*(parentDim.x - textDim.x),
 		     parentDim.y - font->verticalAdvance);
   uiSetSemanticSizeAbsolute(element, textOffset, textDim);
@@ -193,13 +177,14 @@ uiSetSemanticSizeTextCentered(UIElement *element, LoadedFont *font, r32 wScale, 
 }
 
 inline void
-uiBeginLayout(UILayout *layout, v2 screenDimPixels, MouseState *mouse,
+uiBeginLayout(UILayout *layout, v2 screenDimPixels, MouseState *mouse, KeyboardState *keyboard,
 	      v4 color = V4(1, 1, 1, 1))
 {
   ASSERT(layout->elementCount == 0);;
   layout->root = uiMakeElement(layout, "root", 0, color);
   uiSetSemanticSizeAbsolute(layout->root, V2(0, 0), screenDimPixels);
-        
+
+  // NOTE: mouse input
   layout->lastMouseP = layout->mouseP;
   layout->mouseP.xy = mouse->position;
   layout->mouseP.z += (r32)mouse->scrollDelta;
@@ -213,6 +198,14 @@ uiBeginLayout(UILayout *layout, v2 screenDimPixels, MouseState *mouse,
   if(layout->rightButtonPressed) layout->mouseRClickP = layout->mouseP.xy;  
   layout->rightButtonDown = isDown(mouse->buttons[MouseButton_right]);
   layout->rightButtonReleased = wasReleased(mouse->buttons[MouseButton_right]);
+
+  // NOTE: keyboard input
+  layout->tabPressed = wasPressed(keyboard->keys[KeyboardButton_tab]);
+  layout->backspacePressed = wasPressed(keyboard->keys[KeyboardButton_backspace]);
+  layout->enterPressed = wasPressed(keyboard->keys[KeyboardButton_enter]);
+  layout->minusPressed = wasPressed(keyboard->keys[KeyboardButton_minus]);
+  layout->plusPressed = (wasPressed(keyboard->keys[KeyboardButton_equal]) &&
+			 isDown(keyboard->modifiers[KeyboardModifier_shift]));  
 
   ++layout->frameIndex;
 }
@@ -397,20 +390,34 @@ uiCommFromElement(UIElement *element, UILayout *layout)
       if(layout->leftButtonPressed)
 	{
 	  result.flags |= UICommFlag_leftPressed;
-	  //result.element->lastFrameTouched = layout->frameIndex;
 	}
       else if(layout->leftButtonReleased)
 	{
 	  result.flags |= UICommFlag_leftReleased;
-	  //result.element->lastFrameTouched = layout->frameIndex;
 	}
       else
 	{
 	  result.flags |= UICommFlag_hovering;
-	  //result.element->lastFrameTouched = layout->frameIndex;
 	}
       
       result.element->lastFrameTouched = layout->frameIndex;
+    }
+
+  if(uiHashKeysAreEqual(element->hashKey, layout->selectedElement))
+    {
+      result.element->lastFrameTouched = layout->frameIndex;
+      if(layout->enterPressed)
+	{
+	  result.flags |= UICommFlag_enterPressed;
+	}
+      if(layout->minusPressed)
+	{
+	  result.flags |= UICommFlag_minusPressed;
+	}
+      if(layout->plusPressed)
+	{
+	  result.flags |= UICommFlag_plusPressed;
+	}
     }
 
   // TODO: maybe check draggable field here?
@@ -470,6 +477,7 @@ uiMakeSlider(UILayout *layout, char *name, v2 offset, v2 dim, PluginFloatParamet
   UIElement *slider = uiMakeElement(layout, name, flags, color);
   uiSetElementDataFloat(slider, param);
   uiSetSemanticSizeRelative(slider, offset, dim);
+  //uiSetHotRegionRelative(slider, 1.f, 0.1f);
 
   UIComm sliderComm = uiCommFromElement(slider, layout);
 

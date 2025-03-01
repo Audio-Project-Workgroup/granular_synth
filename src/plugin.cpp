@@ -34,6 +34,7 @@
      - allow specification of horizontal vs. vertical slider, or knob for draggable elements
      - render element name, with control over position (ie above, below, left, right)
      - collapsable element groups, sized relative to children
+     - interface for selecting files to load at runtime
 
    - Parameters:
      - come up with what parameters we want to have
@@ -44,7 +45,7 @@
      - more audio file formats (eg flac, ogg, mp3)
      - speed up reads (ie SIMD)
      - better samplerate conversion (ie FFT method (TODO: speed up fft and czt))
-     - load in batches to pass to ML model (maybe)
+     - load in batches to pass to ML model (maybe)     
 
    - MIDI:
      - pass timestamps to the midi buffer, and read new messages based on timestamps
@@ -52,8 +53,6 @@
      - handle more message codes
 
    - Make the audioProcess() do granular synth things
-
-   - Integrate with the ML system
 */  
 
 #include <stdio.h>
@@ -270,19 +269,14 @@ RENDER_NEW_FRAME(renderNewFrame)
       printButtonState(input->keyboardState.keys[KeyboardButton_tab], "tab");
       printButtonState(input->keyboardState.keys[KeyboardButton_backspace], "backspace");
 #endif
-
-      //v2 dMouseP = pluginState->mouseP.xy - pluginState->lastMouseP.xy;      
       
-      //v4 defaultColor = V4(1, 1, 1, 1);
-      //v4 hoverColor = V4(1, 1, 0, 1);
-      //v4 activeColor = V4(0.8f, 0.8f, 0, 1);
-
       u32 windowWidth = renderCommands->widthInPixels;
       u32 windowHeight = renderCommands->heightInPixels;
-      //LoadedFont *font = &pluginState->testFont;
-#if 1     
+
+      // NOTE: UI layout
       UILayout *layout = &pluginState->layout;
-      uiBeginLayout(layout, V2(windowWidth, windowHeight), &input->mouseState);
+      uiBeginLayout(layout, V2(windowWidth, windowHeight), &input->mouseState, &input->keyboardState);
+      
 #if 0
       printf("\nlayout:\n  mouseP: (%.2f, %.2f)\n  left pressed: %s\n  left released: %s\n  left down: %s\n",
 	     layout->mouseP.x, layout->mouseP.y,
@@ -290,14 +284,14 @@ RENDER_NEW_FRAME(renderNewFrame)
 	     layout->leftButtonReleased ? "true" : "false",
 	     layout->leftButtonDown ? "true" : "false");
 #endif
+      
       UIComm title = uiMakeTextElement(layout, "I Will Become a Granular Synthesizer!", 0.75f, 0.f);
       (void)title;
       
       UIComm play = uiMakeButton(layout, "play", V2(0.75f, 0.75f), V2(0.1f, 0.1f),
 				     &pluginState->soundIsPlaying, V4(0, 0, 1, 1));
-      if(play.flags & UICommFlag_leftPressed)
-	{
-	  //pluginState->loadedSound.isPlaying = true;
+      if(play.flags & UICommFlag_pressed)
+	{	  
 	  ASSERT(play.element->parameterType = UIParameter_boolean);
 	  pluginSetBooleanParameter(play.element->bParam, true);
 
@@ -317,24 +311,41 @@ RENDER_NEW_FRAME(renderNewFrame)
 	     volume.element->region.min.x, volume.element->region.min.y,
 	     volume.element->region.max.x, volume.element->region.max.y);
 #endif
-      if(volume.flags & UICommFlag_leftDragging)
+      if(volume.flags & UICommFlag_dragging)
 	{
-	  v2 dMouseP = layout->mouseP.xy - layout->lastMouseP.xy;	  
+	  Rect2 volumeRegion = volume.element->region;
+	  v2 regionDim = getDim(volumeRegion);
+	  
 	  ASSERT(volume.element->parameterType == UIParameter_float);
-	  //r32 *parameter = (r32 *)volume.element->data;	  
-	  //r32 oldVal = *parameter;
 	  r32 oldVal = pluginReadFloatParameter(volume.element->fParam);
-	  //r32 newVal = clampToRange(oldVal + dMouseP.y/(r32)windowHeight, volume.element->range);
-	  r32 newVal = oldVal + dMouseP.y/getDim(volume.element->region).y;
-	  //*parameter = newVal;
+	  r32 newVal = oldVal;
+	  if(volume.flags & UICommFlag_leftDragging)
+	    {  
+	      v2 clippedMouseP = clipToRect(layout->mouseP.xy, volumeRegion);	  
+	      newVal = (clippedMouseP.y - volumeRegion.min.y)/regionDim.y;
+	    }
+	  else if(volume.flags & UICommFlag_minusPressed)
+	    {
+	      newVal -= 0.02f*getLength(volume.element->fParam->range);
+	    }
+	  else if(volume.flags & UICommFlag_plusPressed)
+	    {
+	      newVal += 0.02f*getLength(volume.element->fParam->range);
+	    }
+#if 0
+	  printf("mouseP: (%.2f, %.2f)\n", layout->mouseP.x, layout->mouseP.y);
+	  printf("clippedMouseP: (%.2f, %.2f)\n", clippedMouseP.x, clippedMouseP.y);	  
+	  printf("newVolume: %.2f\n", newVal);
+	  printf("volume dim: %.2f\n", getDim(volume.element->region).y);
+#endif
+	  
 	  pluginSetFloatParameter(volume.element->fParam, newVal);
 	}
 
+      // NOTE: keyboard navigation
       if(wasPressed(input->keyboardState.keys[KeyboardButton_tab]))
 	{
-	  layout->selectedElementOrdinal = (layout->selectedElementOrdinal + 1) % (layout->elementCount + 1);
-
-	  //layout->selectedElement->isActive = false;
+	  layout->selectedElementOrdinal = (layout->selectedElementOrdinal + 1) % (layout->elementCount);	  
 	  layout->selectedElement = {};
 	}
       
@@ -345,12 +356,12 @@ RENDER_NEW_FRAME(renderNewFrame)
 	      --layout->selectedElementOrdinal;
 	    }	  
 
-	  //layout->selectedElement->isActive = false;
 	  layout->selectedElement = {};
 	}
 
+      //printf("element ordinal: %u\n", layout->selectedElementOrdinal);
       UIElement *selectedElement = 0;
-      for(u32 i = 0; i < layout->selectedElementOrdinal; ++i)
+      for(u32 i = 0; i <= layout->selectedElementOrdinal; ++i)
 	{	  
 	  if(selectedElement)
 	    {
@@ -380,126 +391,18 @@ RENDER_NEW_FRAME(renderNewFrame)
 	      selectedElement = layout->root;
 	    }
 	}
-
-      // TODO: merge this keyboard interaction codepath with the mouse interaction codepath
+      
       if(selectedElement)
-	{
-	  selectedElement->lastFrameTouched = layout->frameIndex;
-	  //selectedElement->isActive = true;
-
-	  if(selectedElement->flags & UIElementFlag_draggable)
-	    {	      
-	      if(selectedElement->parameterType == UIParameter_float)
-		{
-		  r32 parameter = pluginReadFloatParameter(selectedElement->fParam);//(r32 *)selectedElement->data;
-		  r32 newParameter = parameter;
-		  if(wasPressed(input->keyboardState.keys[KeyboardButton_minus]))
-		    {
-		      newParameter = parameter - 0.02f*getLength(selectedElement->fParam->range);
-		      //newParameter = clampToRange(newParameter, selectedElement->range);			  
-		      //*parameter = newParameter;		      
-		    }
-		      
-		  if(wasPressed(input->keyboardState.keys[KeyboardButton_equal]) &&
-		     isDown(input->keyboardState.modifiers[KeyboardModifier_shift]))
-		    {
-		      newParameter = parameter + 0.02f*getLength(selectedElement->fParam->range);
-		      //newParameter = clampToRange(newParameter, selectedElement->range);			  
-		      //*parameter = newParameter;
-		    }
-		  
-		  pluginSetFloatParameter(selectedElement->fParam, newParameter);
-		}
-	    }
-	  else if(selectedElement->flags & UIElementFlag_clickable)
-	    {	      
-	      if(selectedElement->parameterType == UIParameter_boolean)
-		{
-		  bool parameter = pluginReadBooleanParameter(selectedElement->bParam);
-		  if(wasPressed(input->keyboardState.keys[KeyboardButton_enter]))
-		    {
-		      //bool oldVal = *parameter;
-		      bool newVal = !parameter;		      
-		      //*parameter = newVal;
-		      pluginSetBooleanParameter(selectedElement->bParam, newVal);
-		    }
-		}
-	    }
-
-	  //UIElement *persistentSelectedElement = uiCacheElement(selectedElement, layout);
-	  //layout->selectedElement = persistentSelectedElement;
+	{	
 	  layout->selectedElement = selectedElement->hashKey;
 	}      
       
       //uiPrintLayout(layout);
       renderPushUILayout(renderCommands, layout);
       uiEndLayout(layout);
-      printf("permanent arena used %zu bytes\n", pluginState->permanentArena.used);
-
-#else
-      v2 textOutAt = V2(0, windowHeight);
-      textOutAt = renderPushText(renderCommands, font, "", textOutAt);
-
-      char *message = "I Will Become a Granular Synthesizer!";
-      //Rectangle2 messageRect = getTextRectangle(font, message, windowWidth, windowHeight);
-      //renderPushRectOutline(renderCommands, messageRect, 0.01f, V4(1, 1, 0, 1));
-      //TextArgs textArgs = {};
-      //textArgs.flags |= (TextFlag_centered | TextFlag_scaleAspect);
-      //textArgs.hScale = 0.5f;
-      textOutAt = renderPushText(renderCommands, font, message, textOutAt);
-
-      renderPushQuad(renderCommands, rectCenterDim(V2(0, 0), V2(0.5f, 0.5f)), &pluginState->testBitmap);
-
-      v2 playButtonDim = V2(0.1f, 0.1f);
-      Rect2 playButton = rectCenterDim(V2(0.5f, 0.5f), playButtonDim);
-      renderPushQuad(renderCommands, playButton, V4(0, 0, 1, 1));
-
-      v4 playColor = defaultColor;
-      if(isInRectangle(playButton, pluginState->mouseP.xy))
-	{
-	  if(isDown(input->mouseButtons[MouseButton_left]))
-	    {
-	      playColor = activeColor;
-	      pluginState->loadedSound.isPlaying = true;
-	    }
-	  else
-	    {
-	      playColor = hoverColor;
-	    }
-	}
-      Vertex playVertex1 = makeVertex(playButton.min + V2(0.2f*playButtonDim.x, 0.2f*playButtonDim.y),
-				      V2(0, 0), playColor);
-      Vertex playVertex2 = makeVertex(playButton.min + V2(0.2f*playButtonDim.x, 0.8f*playButtonDim.y),
-				      V2(0, 0), playColor);
-      Vertex playVertex3 = makeVertex(playButton.min + V2(0.8f*playButtonDim.x, 0.5f*playButtonDim.y),
-				      V2(0, 0), playColor);
-      renderPushTriangle(renderCommands, playVertex1, playVertex2, playVertex3);
-
-      v2 faderBarCenter = V2(-0.8f, 0);
-      v2 faderBarDim = V2(0.02f, 1.5f);
-      Rect2 faderBar = rectCenterDim(faderBarCenter, faderBarDim);      
-      renderPushQuad(renderCommands, faderBar, V4(0, 0, 0, 1));
-
-      Rect2 fader = rectCenterDim(faderBarCenter + V2(0, (pluginState->volume - 0.5f)*faderBarDim.y),
-				  V2(0.1f, 0.1f));
-      v4 faderColor = defaultColor;
-      if(isInRectangle(fader, pluginState->mouseP.xy))
-	{
-	  if(isDown(input->mouseButtons[MouseButton_left]))
-	    {
-	      faderColor = activeColor;
-	      pluginState->volume += dMouseP.y;	      
-	    }
-	  else
-	    {
-	      faderColor = hoverColor;	      
-	    }
-	}      
-      renderPushQuad(renderCommands, fader, faderColor);
-#endif
-
-      //pluginState->lastMouseP = pluginState->mouseP;
+      
       arenaEnd(&pluginState->frameArena);
+      printf("permanent arena used %zu bytes\n", pluginState->permanentArena.used);
     }  
 }
 

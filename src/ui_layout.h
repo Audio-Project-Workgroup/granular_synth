@@ -133,6 +133,12 @@ struct UILayout
   bool rightButtonReleased;
   bool rightButtonDown;
 
+  bool tabPressed;
+  bool backspacePressed;
+  bool enterPressed;
+  bool minusPressed;
+  bool plusPressed;
+
   u32 frameIndex;
 };
 
@@ -159,17 +165,19 @@ enum UICommFlags : u32
   UICommFlag_rightDoubleClicked = (1 << 9),
 
   // NOTE: key pressed while element focused
-  UICommFlag_keyPressed = (1 << 10),
+  UICommFlag_enterPressed = (1 << 10),
+  UICommFlag_minusPressed = (1 << 11),
+  UICommFlag_plusPressed = (1 << 12),
 
   // NOTE: mouse over element
-  UICommFlag_hovering = (1 << 11),
+  UICommFlag_hovering = (1 << 13),
 
   // NOTE: combos
-  UICommFlag_pressed = UICommFlag_leftPressed | UICommFlag_keyPressed,
+  UICommFlag_pressed = UICommFlag_leftPressed | UICommFlag_enterPressed,
   UICommFlag_released = UICommFlag_leftReleased,
-  UICommFlag_clicked = UICommFlag_leftClicked | UICommFlag_keyPressed,
+  UICommFlag_clicked = UICommFlag_leftClicked | UICommFlag_enterPressed,
   UICommFlag_doubleClicked = UICommFlag_leftDoubleClicked,
-  UICommFlag_dragging = UICommFlag_leftDragging,
+  UICommFlag_dragging = UICommFlag_leftDragging | UICommFlag_minusPressed | UICommFlag_plusPressed,
 };
 
 struct UIComm

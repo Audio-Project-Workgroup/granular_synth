@@ -238,19 +238,7 @@ inline void
 renderPushUIElement(RenderCommands *commands, UILayout *layout, UIElement *element)
 {
   element->region = renderComputeUIElementRegion(commands, element);
-  /*
-  UIElement *persistentElement = uiGetCachedElement(element, layout);
-  v4 color = V4(0, 0, 0, 1);
-  if(persistentElement)
-    {
-      if(persistentElement->isActive)
-	{
-	  color = V4(1, 0.5f, 0, 1);
-	}
-    }
-  */
-  //v4 color = (uiHashKeysAreEqual(element->hashKey, layout->selectedElement)) ? V4(1, 0.5f, 0, 1) : V4(0, 0, 0, 1);
-  //renderPushRectOutline(commands, element->region, 4.f, color);
+  //element->hotRegion = element->region;
   
   if(element->flags & UIElementFlag_drawText)
     {      
@@ -275,14 +263,13 @@ renderPushUIElement(RenderCommands *commands, UILayout *layout, UIElement *eleme
 
       if(element->parameterType == UIParameter_float)
 	{
-	  r32 paramValue = pluginReadFloatParameter(element->fParam);//*(r32 *)element->data;
+	  r32 paramValue = pluginReadFloatParameter(element->fParam);
 	  r32 paramPercentage = (paramValue - element->fParam->range.min)/(element->fParam->range.max - element->fParam->range.min);
 	  v2 faderCenter = V2(elementRegionCenter.x, element->region.min.y + paramPercentage*elementRegionDim.y);
 	  Rect2 faderRect = rectCenterDim(faderCenter, V2(elementRegionDim.x, 0.1f*elementRegionDim.y));
 	  renderPushQuad(commands, faderRect, element->color);
 	}
     }
-
 
   if(element->next)
     {

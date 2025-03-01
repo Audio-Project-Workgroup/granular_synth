@@ -13,7 +13,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "common.h"
+#include "platform.h"
+
+#if OS_MAC || OS_LINUX
 #include <GL/glew.h>
+#endif
 #include <GLFW/glfw3.h>
 
 #define GL_PRINT_ERROR(msg, ...) do {		\
@@ -24,9 +29,6 @@
   } while(0)
 
 #include "miniaudio.h"
-
-#include "common.h"
-#include "platform.h"
 
 #include "render.cpp"
 #include "onnx.cpp"
@@ -51,35 +53,43 @@ glfwKeyCallback(GLFWwindow *window, int key, int scancode, int action, int mods)
     }
   else if(key == GLFW_KEY_LEFT_SHIFT || key == GLFW_KEY_RIGHT_SHIFT)
     {
-      glfwProcessButtonPress(&newInput->keyboardState.modifiers[KeyboardModifier_shift], action == GLFW_PRESS);
+      glfwProcessButtonPress(&newInput->keyboardState.modifiers[KeyboardModifier_shift],
+			     action == GLFW_PRESS || action == GLFW_REPEAT);
     }
   else if(key == GLFW_KEY_LEFT_CONTROL || key == GLFW_KEY_RIGHT_CONTROL)
     {
-      glfwProcessButtonPress(&newInput->keyboardState.modifiers[KeyboardModifier_control], action == GLFW_PRESS);
+      glfwProcessButtonPress(&newInput->keyboardState.modifiers[KeyboardModifier_control],
+			     action == GLFW_PRESS || action == GLFW_REPEAT);
     }
   else if(key == GLFW_KEY_LEFT_ALT || key == GLFW_KEY_RIGHT_ALT)
     {
-      glfwProcessButtonPress(&newInput->keyboardState.modifiers[KeyboardModifier_alt], action == GLFW_PRESS);
+      glfwProcessButtonPress(&newInput->keyboardState.modifiers[KeyboardModifier_alt],
+			     action == GLFW_PRESS || action == GLFW_REPEAT);
     }
   else if(key == GLFW_KEY_TAB)
     {
-      glfwProcessButtonPress(&newInput->keyboardState.keys[KeyboardButton_tab], action == GLFW_PRESS);
+      glfwProcessButtonPress(&newInput->keyboardState.keys[KeyboardButton_tab],
+			     action == GLFW_PRESS || action == GLFW_REPEAT);
     }
   else if(key == GLFW_KEY_BACKSPACE)
     {
-      glfwProcessButtonPress(&newInput->keyboardState.keys[KeyboardButton_backspace], action == GLFW_PRESS);
+      glfwProcessButtonPress(&newInput->keyboardState.keys[KeyboardButton_backspace],
+			     action == GLFW_PRESS || action == GLFW_REPEAT);
     }
   else if(key == GLFW_KEY_MINUS)
     {
-      glfwProcessButtonPress(&newInput->keyboardState.keys[KeyboardButton_minus], action == GLFW_PRESS);
+      glfwProcessButtonPress(&newInput->keyboardState.keys[KeyboardButton_minus],
+			     action == GLFW_PRESS || action == GLFW_REPEAT);
     }
   else if(key == GLFW_KEY_EQUAL)
     {
-      glfwProcessButtonPress(&newInput->keyboardState.keys[KeyboardButton_equal], action == GLFW_PRESS);
+      glfwProcessButtonPress(&newInput->keyboardState.keys[KeyboardButton_equal],
+			     action == GLFW_PRESS || action == GLFW_REPEAT);
     }
   else if(key == GLFW_KEY_ENTER)
     {
-      glfwProcessButtonPress(&newInput->keyboardState.keys[KeyboardButton_enter], action == GLFW_PRESS);
+      glfwProcessButtonPress(&newInput->keyboardState.keys[KeyboardButton_enter],
+			     action == GLFW_PRESS || action == GLFW_REPEAT);
     }
 }
 
@@ -283,7 +293,8 @@ main(int argc, char **argv)
 			  double mouseX, mouseY;
 			  glfwGetCursorPos(window, &mouseX, &mouseY);
 			  newInput->mouseState.position = V2(mouseX, (r64)windowHeight - mouseY);
-			  newInput->frameMillisecondsElapsed = frameElapsedTime;
+			  //printf("mouseP: (%.2f, %.2f)", newInput->mouseState.position.x, newInput->mouseState.position.y);
+			  newInput->frameMillisecondsElapsed = frameElapsedTime;			  
 
 			  // render new frame
 
