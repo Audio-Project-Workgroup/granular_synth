@@ -30,6 +30,7 @@ uiAllocateElement(UILayout *layout, char *name, u32 flags, v4 color)
 {
   UIElement *result = arenaPushStruct(layout->frameArena, UIElement, arenaFlagsZeroNoAlign());      
   result->name = arenaPushString(layout->frameArena, name);
+  result->textScale = V2(1, 1);
   result->flags = flags;
   result->color = color;
 
@@ -173,7 +174,7 @@ uiSetSemanticSizeTextCentered(UIElement *element, LoadedFont *font, r32 wScale, 
   v2 textOffset = V2(0.5f*(parentDim.x - textDim.x),
 		     parentDim.y - font->verticalAdvance);
   uiSetSemanticSizeAbsolute(element, textOffset, textDim);
-  
+  element->textScale = textScale;
 }
 
 inline void
@@ -473,7 +474,8 @@ inline UIComm
 uiMakeSlider(UILayout *layout, char *name, v2 offset, v2 dim, PluginFloatParameter *param,
 	     v4 color = V4(1, 1, 1, 1))
 {
-  u32 flags = UIElementFlag_clickable | UIElementFlag_draggable | UIElementFlag_drawBorder;
+  u32 flags = (UIElementFlag_clickable | UIElementFlag_draggable | UIElementFlag_drawBorder |
+	       UIElementFlag_drawLabelAbove | UIElementFlag_drawLabelBelow);
   UIElement *slider = uiMakeElement(layout, name, flags, color);
   uiSetElementDataFloat(slider, param);
   uiSetSemanticSizeRelative(slider, offset, dim);

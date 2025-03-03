@@ -63,79 +63,17 @@ renderPushTriangle(RenderCommands *commands, Vertex v1, Vertex v2, Vertex v3, Lo
 }
 
 static inline v2
-renderPushText(RenderCommands *commands, LoadedFont *font, u8 *string, Rect2 textRect,//v2 startPos, v2 textDim,
+renderPushText(RenderCommands *commands, LoadedFont *font, u8 *string,
+	       v2 textMin, v2 textScale,
+	       //Rect2 textRect,
 	       v4 color = V4(1, 1, 1, 1))
 {
-#if 0
-  // TODO: maybe make opengl do this transformation
-  v2 pixelsToRenderCoords;
-  if(commands->widthInPixels && commands->heightInPixels)
-    {
-      pixelsToRenderCoords = V2(2.f/(r32)commands->widthInPixels, 2.f/(r32)commands->heightInPixels);
-    }
-  else
-    {
-      pixelsToRenderCoords = V2(0.003f, 0.004f); // NOTE: in the absence of information, resort to dead reckoning
-    }
+  /* v2 textDimBase = getTextDim(font, string); */
+  /* v2 textDim = getDim(textRect); */
+  /* v2 textScale = V2(textDim.x/textDimBase.x, textDim.y/textDimBase.y); */
 
-  v2 textScale = pixelsToRenderCoords;
-  v2 textDimPixels = getTextDim(font, string);
-  v2 textDim = hadamard(textScale, textDimPixels);
-
-  v2 textRectDim = getDim(textRect);
-  if(textRectDim.x)
-    {
-      if(textRectDim.y)
-	{
-	  textScale.x *= textRectDim.x/textDim.x;
-	  textScale.y *= textRectDim.y/textDim.y;
-	}
-      else
-	{
-	  textScale *= textRectDim.x/textDim.x;
-	}
-    }
-  else if(textRectDim.y)
-    {
-      textScale *= textRectDim.y/textDim.y;
-    }
-  textDim = hadamard(textScale, textDimPixels);
-  
-#if 0
-  if(textArgs.flags & TextFlag_scaleAspect)
-    {
-      if(textArgs.hScale)
-	{
-	  textScale *= 2.f*textArgs.hScale/textDim.x;
-	}
-      else if(textArgs.vScale)
-	{
-	  textScale *= 2.f*textArgs.vScale/textDim.y;
-	}
-      else
-	{
-	  fprintf(stderr, "ERROR: expected scale value in textArgs\n");
-	}
-
-      textDim = hadamard(textScale, textDimPixels);
-    }
-#endif
-
-  v2 atPos = textRect.min;
-#if 0
-  if(textArgs.flags & TextFlag_centered)
-    {
-      r32 offset = startPos.x + 0.5f*textDim.x;
-      atPos.x -= offset;
-    }
-#endif
-#endif
-
-  v2 textDimBase = getTextDim(font, string);
-  v2 textDim = getDim(textRect);
-  v2 textScale = V2(textDim.x/textDimBase.x, textDim.y/textDimBase.y);
-
-  v2 atPos = textRect.min;//startPos;
+  //v2 atPos = textRect.min;
+  v2 atPos = textMin;
   u8 *at = string;  
   while(*at)
     {
@@ -148,7 +86,8 @@ renderPushText(RenderCommands *commands, LoadedFont *font, u8 *string, Rect2 tex
       renderPushQuad(commands, glyphRect, glyph, color);
 
       ++at;
-      if(*at) atPos.x += textScale.x*getHorizontalAdvance(font, c, *at);
+      //if(*at)
+      atPos.x += textScale.x*getHorizontalAdvance(font, c, *at);
     }
 
   atPos.y -= textScale.y*font->verticalAdvance;
@@ -239,36 +178,66 @@ renderPushUIElement(RenderCommands *commands, UILayout *layout, UIElement *eleme
 {
   element->region = renderComputeUIElementRegion(commands, element);
   //element->hotRegion = element->region;
-  
+
+  v2 elementRegionCenter = getCenter(element->region);
+  v2 elementRegionDim = getDim(element->region);
+  // TODO: pull out common formatting computations
   if(element->flags & UIElementFlag_drawText)
     {      
-      renderPushText(commands, layout->font, element->name, element->region);
+      //v2 textDim = getTextDim(layout->font, element->name);
+      //v2 textScale = V2(elementRegionDim.x/textDim.x, elementRegionDim.y/textDim.y);
+      renderPushText(commands, layout->font, element->name, element->region.min, element->textScale);
     }
   if(element->flags & UIElementFlag_drawBorder)
     {
       v4 color = (uiHashKeysAreEqual(element->hashKey, layout->selectedElement)) ? V4(1, 0.5f, 0, 1) : V4(0, 0, 0, 1);
+      
       renderPushRectOutline(commands, element->region, 2.f, color);
     }
   if(element->flags & UIElementFlag_drawBackground)
     {
       renderPushQuad(commands, element->region, element->color);
-    }
+    }  
   if(element->flags & UIElementFlag_draggable)
-    {
-      v2 elementRegionCenter = getCenter(element->region);
-      v2 elementRegionDim = getDim(element->region);
+    {            
       v2 travelDim = V2(0.2f*elementRegionDim.x, elementRegionDim.y);
       Rect2 travelRect = rectCenterDim(elementRegionCenter, travelDim);
+      
       renderPushQuad(commands, travelRect, V4(0, 0, 0, 1));
 
       if(element->parameterType == UIParameter_float)
 	{
 	  r32 paramValue = pluginReadFloatParameter(element->fParam);
 	  r32 paramPercentage = (paramValue - element->fParam->range.min)/(element->fParam->range.max - element->fParam->range.min);
+	  
 	  v2 faderCenter = V2(elementRegionCenter.x, element->region.min.y + paramPercentage*elementRegionDim.y);
 	  Rect2 faderRect = rectCenterDim(faderCenter, V2(elementRegionDim.x, 0.1f*elementRegionDim.y));
+	  
 	  renderPushQuad(commands, faderRect, element->color);
 	}
+    }
+  r32 labelVSpace = 5.f;
+  r32 labelHeight = 15.f;
+  v2 textDim = getTextDim(layout->font, element->name);
+  r32 textScale = labelHeight/textDim.y;
+  v2 labelDim = textScale*textDim;      
+  if(element->flags & UIElementFlag_drawLabelAbove)
+    {                                   
+      v2 labelCenter = V2(elementRegionCenter.x,
+			  elementRegionCenter.y + 0.5f*elementRegionDim.y + labelVSpace + 0.5f*labelHeight);
+      Rect2 labelRegion = rectCenterDim(labelCenter, labelDim);
+      
+      renderPushRectOutline(commands, labelRegion, 2.f, V4(0, 0, 0, 1));
+      renderPushText(commands, layout->font, element->name, labelRegion.min, V2(textScale, textScale));
+    }
+  if(element->flags & UIElementFlag_drawLabelBelow)
+    {           
+      v2 labelCenter = V2(elementRegionCenter.x,
+			  elementRegionCenter.y - 0.5f*elementRegionDim.y - labelVSpace - 0.5f*labelHeight);
+      Rect2 labelRegion = rectCenterDim(labelCenter, labelDim);
+      
+      renderPushRectOutline(commands, labelRegion, 2.f, V4(0, 0, 0, 1));
+      renderPushText(commands, layout->font, element->name, labelRegion.min, V2(textScale, textScale));
     }
 
   if(element->next)

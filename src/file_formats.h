@@ -595,7 +595,8 @@ getTextDim(LoadedFont *font, u8 *text)
       result.y = MAX(result.y, (r32)glyph->height);
 
       ++at;
-      if(*at) result.x += (r32)getHorizontalAdvance(font, c, *at); 
+      //if(*at)
+      result.x += (r32)getHorizontalAdvance(font, c, *at); 
     }
 
   return(result);

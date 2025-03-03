@@ -46,6 +46,8 @@ enum UIElementFlags : u32
   UIElementFlag_drawText = (1 << 2),
   UIElementFlag_drawBorder = (1 << 3),
   UIElementFlag_drawBackground = (1 << 4),
+  UIElementFlag_drawLabelAbove = (1 << 5),
+  UIElementFlag_drawLabelBelow = (1 << 6),
   
     //UIElementFlag_focusHot = (1 << 5),
     //UIElementFlag_focusHotOff = (1 << 6),
@@ -82,6 +84,7 @@ struct UIElement
   // NOTE: specified at construction
   u32 flags;
   u8 *name;
+  v2 textScale;
   v4 color;
 
   UIParameter parameterType;
