@@ -63,6 +63,7 @@
 #include "common.h"
 #include "plugin.h"
 
+#include "midi.cpp"
 #include "ui_layout.cpp"
 #include "file_granulator.cpp"
 
@@ -664,74 +665,12 @@ RENDER_NEW_FRAME(renderNewFrame)
     }  
 }
 
-enum MidiStatus : u32
-{
-  MidiStatus_noteOff = 0x80,
-  MidiStatus_noteOn = 0x90,
-  MidiStatus_aftertouch = 0xA0,
-  MidiStatus_continuousController = 0xB0,
-  MidiStatus_patchChange = 0xC0,
-  MidiStatus_channelPressure = 0xD0,
-  MidiStatus_pitchBend = 0xE0,
-  MidiStatus_sysEx = 0xF0,
-};
-
-static inline r32
-hertzFromMidiNoteNumber(u32 noteNumber)
-{
-  r32 result = 440.f;
-  result *= powf(powf(2.f, 1.f/12.f), (r32)((s32)noteNumber - 69));
-
-  return(result);
-}
-
 extern "C"
 AUDIO_PROCESS(audioProcess)
 {  
   PluginState *pluginState = initializePluginState(memory);  
   if(pluginState->initialized)
     {
-      // TODO: This midi parsing is janky and bad. Passing the message length before each message is unnecessary
-      // TODO: move the midi loop inside the output loop, so that we don't only see the most recent midi message
-      u8 *atMidiBuffer = audioBuffer->midiBuffer;
-      while(audioBuffer->midiMessageCount)
-	{
-	  MidiHeader *header = (MidiHeader *)atMidiBuffer;
-	  atMidiBuffer += sizeof(MidiHeader);
-
-	  u32 bytesToRead = header->messageLength;
-	  if(bytesToRead >= 1)
-	    {
-	      u32 midiStatus = *atMidiBuffer & 0xF0;
-	      u32 midiChannelNumber = *atMidiBuffer & 0x0F;
-	      (void)midiChannelNumber;
-	      ++atMidiBuffer;
-	      --bytesToRead;
-
-	      switch(midiStatus)
-		{				  
-		case MidiStatus_noteOn:
-		  {
-		    ASSERT(bytesToRead == 2);
-		    u32 noteNumber = *atMidiBuffer++;
-		    u32 noteVelocity = *atMidiBuffer++;
-		    pluginState->freq = hertzFromMidiNoteNumber(noteNumber);		    
-		    pluginSetFloatParameter(&pluginState->volume, (r32)noteVelocity/127.f);
-		  } break;
-		  
-		default:
-		  {
-		    while(bytesToRead)
-		      {
-			++atMidiBuffer;
-			--bytesToRead;
-		      }
-		  } break;
-		}
-	    }
-
-	  --audioBuffer->midiMessageCount;
-	}
 
       r64 nFreq = M_TAU*pluginState->freq/(r64)audioBuffer->sampleRate;
 
@@ -774,6 +713,9 @@ AUDIO_PROCESS(audioProcess)
       void *genericAudioFrames = audioBuffer->buffer;      
       for(u32 frameIndex = 0; frameIndex < audioBuffer->framesToWrite; ++frameIndex)
 	{
+
+		midi::parseMidiMessage(audioBuffer, pluginState);
+
 	  r32 volume = 0.1f*formatVolumeFactor*pluginReadFloatParameter(&pluginState->volume);	  	  
 		
 	  pluginState->phasor += nFreq;

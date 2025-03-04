@@ -4,6 +4,27 @@
 //#include "platform.h"
 #include "onnx.cpp"
 
+/*! @brief Calculates the milliseconds passed since the last midi event. 
+* For that it uses the juce::Time::getMillisecondCounter() storing the delta time in a uint32_t variable(that is 4 bytes). 
+* @details for more details refer to the juce docs : https://docs.juce.com/master/classTime.html#a8aa2b95bb1fc2fd7a2df29736bad3a37
+* @return The milliseconds passed since the last midi event.
+*/
+struct {
+
+  uint32_t lastTimestamp{juce::Time::getMillisecondCounter()};
+  
+  uint32_t update() {
+    uint32_t currentTimestamp = juce::Time::getMillisecondCounter();
+    uint32_t deltaMs = currentTimestamp - lastTimestamp;
+    lastTimestamp = currentTimestamp;
+
+    // @TODO : We need to somehow ensure that overflow of uint32_t wont happen.
+
+    return deltaMs;
+  }
+
+} midiTimeStamp;
+
 PLATFORM_READ_ENTIRE_FILE(juceReadEntireFile)
 {
   ReadFileResult result = {};
@@ -309,16 +330,24 @@ processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
     {
       auto message = metadata.getMessage();
       int messageLength = message.getRawDataSize();
-      double messageTimestamp = message.getTimeStamp();
       
+      // get timestamp as the delta ms since the last midi message occured
+      // it allocates 4 bytes
+      uint32_t messageTimestamp = midiTimeStamp.update();
+      messageLength+=4;
+
       MidiHeader *messageHeader = (MidiHeader *)atMidiBuffer;
       messageHeader->messageLength = messageLength;      
       atMidiBuffer += sizeof(MidiHeader);
       
-      memcpy(atMidiBuffer, message.getRawData(), messageLength);
-      atMidiBuffer += messageLength;
-      ++audioBuffer.midiMessageCount;      
-    } 
+      memcpy(atMidiBuffer, &messageTimestamp, sizeof(uint32_t));
+      atMidiBuffer += sizeof(int32_t);
+
+      memcpy(atMidiBuffer, message.getRawData(), message.getRawDataSize());
+      atMidiBuffer += message.getRawDataSize();
+
+      ++audioBuffer.midiMessageCount;     
+    }
 
   juce::ScopedNoDenormals noDenormals;
   auto totalNumInputChannels  = getTotalNumInputChannels();
