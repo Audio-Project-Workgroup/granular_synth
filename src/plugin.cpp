@@ -198,6 +198,11 @@ initializePluginState(PluginMemory *memoryBlock)
 	  pluginState->volume.currentValue = 0.8f;
 	  pluginState->volume.targetValue = 0.8f;
 	  pluginState->volume.range = makeRange(0, 1);
+	  
+	  pluginState->density.currentValue = 1.f;
+	  pluginState->density.targetValue = 1.f;
+	  pluginState->density.range = makeRange(0, 20);
+	  
 	  pluginState->soundIsPlaying.value = false;
 
 	  pluginState->loadedSound.sound = loadWav("../data/fingertips_44100_PCM_16.wav",
@@ -340,6 +345,27 @@ RENDER_NEW_FRAME(renderNewFrame)
 #endif
 	  
 	  pluginSetFloatParameter(volume.element->fParam, newVal);
+	}
+
+      UIComm density = uiMakeKnob(layout, "density", V2(0.75f, 0.5f), V2(0.1f, 0.1f),
+				  &pluginState->density, V4(0, 1, 0, 1));
+      if(density.flags & UICommFlag_dragging)
+	{
+	  //Rect2 knobDragRect = rectCenterDim(density.element->mouseClickedP - V2(20, 0), V2(5, 50));	  
+	  //renderPushQuad(renderCommands, knobDragRect, 0, 0, V4(0, 0, 0, 1));
+	  
+	  r32 oldValue = density.element->fParamValueAtClick;	  
+	  v2 dragDelta = layout->mouseP.xy - density.element->mouseClickedP;	  
+	  r32 newValue = oldValue + 0.1f*dragDelta.y;
+#if 0
+	  printf("layoutMouseP: (%.2f, %.2f)\n", layout->mouseP.x, layout->mouseP.y);
+	  printf("mouseClickedP: (%.2f, %.2f)\n", density.element->mouseClickedP.x, density.element->mouseClickedP.y);
+	  printf("oldValue: %.2f\n", oldValue);
+	  printf("newValue: %.2f\n", newValue);
+#endif
+	  
+	  ASSERT(density.element->parameterType == UIParameter_float);
+	  pluginSetFloatParameter(density.element->fParam, newValue);
 	}
 
       // NOTE: keyboard navigation
@@ -516,7 +542,7 @@ AUDIO_PROCESS(audioProcess)
       void *genericAudioFrames = audioBuffer->buffer;      
       for(u32 frameIndex = 0; frameIndex < audioBuffer->framesToWrite; ++frameIndex)
 	{
-	  r32 volume = 0.1f*formatVolumeFactor*pluginReadFloatParameter(&pluginState->volume);
+	  r32 volume = 0.1f*formatVolumeFactor*pluginReadFloatParameter(&pluginState->volume);	  	  
 		
 	  pluginState->phasor += nFreq;
 	  if(pluginState->phasor > M_TAU) pluginState->phasor -= M_TAU;
@@ -577,6 +603,7 @@ AUDIO_PROCESS(audioProcess)
 	    }
 
 	  pluginUpdateFloatParameter(&pluginState->volume);
+	  pluginUpdateFloatParameter(&pluginState->density);
 	}
 
       arenaEndTemporaryMemory(&grainMixerMemory);

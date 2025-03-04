@@ -6,6 +6,8 @@
 #define ASSERT(cond) if(!(cond)) *(int *)0 = 0;
 #endif
 
+#define UNUSED(var) (void)var
+
 #define KILOBYTES(count) (1024LL*count)
 #define MEGABYTES(count) (1024LL*KILOBYTES(count))
 #define GIGABYTES(count) (1024LL*MEGABYTES(count))

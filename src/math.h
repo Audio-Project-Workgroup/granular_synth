@@ -398,6 +398,56 @@ V4(r32 x, r32 y, r32 z, r32 w)
 //
 
 inline mat4
+operator*(mat4 lhs, mat4 rhs)
+{
+  mat4 result = {};
+      
+  r32 *dest = result.E;
+  for(u32 i = 0; i < 4; ++i)
+    {
+      for(u32 j = 0; j < 4; ++j)
+	{
+	  r32 destVal = 0.f;
+	  for(u32 k = 0; k < 4; ++k)
+	    {
+	      r32 lhsVal = lhs.rows[i].E[k];
+	      r32 rhsVal = rhs.rows[k].E[j];
+	      
+	      destVal += lhsVal*rhsVal;
+	    }
+
+	  *dest++ = destVal;
+	}
+    }
+
+  return(result);
+}
+
+inline mat4
+makeTranslationMatrix(v2 center) // NOTE: center to origin
+{
+  mat4 result = {};
+  result.r1 = V4(1, 0, 0, -center.x);
+  result.r2 = V4(0, 1, 0, -center.y);
+  result.r3 = V4(0, 0, 1, 0);
+  result.r4 = V4(0, 0, 0, 1);
+
+  return(result);
+}
+
+inline mat4
+makeRotationMatrixXY(r32 angle)
+{
+  mat4 result = {};
+  result.r1 = V4(Cos(angle), -Sin(angle), 0, 0);
+  result.r2 = V4(Sin(angle), Cos(angle), 0, 0);
+  result.r3 = V4(0, 0, 1, 0);
+  result.r4 = V4(0, 0, 0, 1);
+
+  return(result);
+}
+
+inline mat4
 makeProjectionMatrix(u32 widthInPixels, u32 heightInPixels)
 {
   mat4 result = {};

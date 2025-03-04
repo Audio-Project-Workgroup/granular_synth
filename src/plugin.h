@@ -95,6 +95,7 @@ struct PluginState
   r64 phasor;
   r32 freq;
   PluginFloatParameter volume;
+  PluginFloatParameter density;
   PluginBooleanParameter soundIsPlaying;
 
   PlayingSound loadedSound;

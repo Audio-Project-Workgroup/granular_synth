@@ -43,11 +43,12 @@ enum UIElementFlags : u32
 {
   UIElementFlag_clickable = (1 << 0),
   UIElementFlag_draggable = (1 << 1),
-  UIElementFlag_drawText = (1 << 2),
-  UIElementFlag_drawBorder = (1 << 3),
-  UIElementFlag_drawBackground = (1 << 4),
-  UIElementFlag_drawLabelAbove = (1 << 5),
-  UIElementFlag_drawLabelBelow = (1 << 6),
+  UIElementFlag_turnable = (1 << 2),
+  UIElementFlag_drawText = (1 << 3),
+  UIElementFlag_drawBorder = (1 << 4),
+  UIElementFlag_drawBackground = (1 << 5),
+  UIElementFlag_drawLabelAbove = (1 << 6),
+  UIElementFlag_drawLabelBelow = (1 << 7),
   
     //UIElementFlag_focusHot = (1 << 5),
     //UIElementFlag_focusHotOff = (1 << 6),
@@ -100,6 +101,8 @@ struct UIElement
   // NOTE: computed
   Rect2 region;
   u32 commFlags;
+  v2 mouseClickedP;
+  r32 fParamValueAtClick;
 };
 
 #define ELEMENT_SENTINEL(element) (UIElement *)&element->first
@@ -194,46 +197,3 @@ bool uiHashKeysAreEqual(UIHashKey key1, UIHashKey key2);
 
 UIElement *uiCacheElement(UIElement *element, UILayout *layout);
 UIElement *uiGetCachedElement(UIElement *element, UILayout *layout);
-
-/*
-enum TextFlags : u32
-{
-  TextFlag_none = 0,
-  
-  TextFlag_centered = (1 << 0),
-  TextFlag_scaleAspect = (1 << 1),
-};
-
-struct TextArgs
-{
-  u32 flags;
-  v2 alignment;
-};
-
-inline TextArgs
-defaultTextArgs(void)
-{
-  TextArgs result = {};
-
-  return(result);
-}
-
-inline TextArgs
-centeredTextArgsScaleH(r32 hScale)
-{
-  TextArgs result = defaultTextArgs();
-  result.flags |= TextFlag_centered;
-  result.flags |= TextFlag_scaleAspect;
-  result.alignment.x = hScale;
-
-  return(result);
-}
-
-inline v2
-getTextPos(UIElement *element, UIElement *parent)
-{
-  v2 result = {};
-
-  return(result);
-}
-*/

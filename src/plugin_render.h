@@ -1,3 +1,4 @@
+/*
 static inline void // NOTE: not textured
 renderPushQuad(RenderCommands *commands, Rect2 rect, v4 color = V4(1, 1, 1, 1))
 {
@@ -11,24 +12,25 @@ renderPushQuad(RenderCommands *commands, Rect2 rect, v4 color = V4(1, 1, 1, 1))
   quad->vertices[2] = {bottomLeft + V2(0, dim.y), V2(0, 0), color};
   quad->vertices[3] = {bottomLeft + dim, V2(0, 0), color};
 }
+*/
 
-static inline void // NOTE: textured
-renderPushQuad(RenderCommands *commands, Rect2 rect, LoadedBitmap *texture, v4 color = V4(1, 1, 1, 1))
+static inline void 
+renderPushQuad(RenderCommands *commands, Rect2 rect, LoadedBitmap *texture, r32 angle, v4 color = V4(1, 1, 1, 1))
 {
-  if(texture)
-    {
-      ASSERT(commands->quadCount < commands->quadCapacity);
-      TexturedQuad *quad = commands->quads + commands->quadCount++;
+  ASSERT(commands->quadCount < commands->quadCapacity);
+  TexturedQuad *quad = commands->quads + commands->quadCount++;
 
-      v2 dim = getDim(rect);
-      v2 bottomLeft = rect.min - V2(texture->alignPercentage.x*dim.x, texture->alignPercentage.y*dim.y);      
-      quad->vertices[0] = {bottomLeft, V2(0, 0), color};
-      quad->vertices[1] = {bottomLeft + V2(dim.x, 0), V2(1, 0), color};
-      quad->vertices[2] = {bottomLeft + V2(0, dim.y), V2(0, 1), color};
-      quad->vertices[3] = {bottomLeft + dim, V2(1, 1), color};
+  v2 dim = getDim(rect);
+  v2 bottomLeft = rect.min;
+  if(texture) bottomLeft -= V2(texture->alignPercentage.x*dim.x, texture->alignPercentage.y*dim.y);
   
-      quad->texture = texture;
-    }
+  quad->vertices[0] = {bottomLeft, V2(0, 0), color};
+  quad->vertices[1] = {bottomLeft + V2(dim.x, 0), V2(1, 0), color};
+  quad->vertices[2] = {bottomLeft + V2(0, dim.y), V2(0, 1), color};
+  quad->vertices[3] = {bottomLeft + dim, V2(1, 1), color};
+  
+  quad->texture = texture;
+  quad->angle = angle;
 }
 
 static inline void
@@ -43,10 +45,10 @@ renderPushRectOutline(RenderCommands *commands, Rect2 rect, r32 thickness, v4 co
   v2 bottomMiddle = rect.min + V2(0.5f*rectDim.x, 0);
   v2 topMiddle = rect.max - V2(0.5f*rectDim.x, 0);
   
-  renderPushQuad(commands, rectCenterDim(leftMiddle, vDim), color);
-  renderPushQuad(commands, rectCenterDim(rightMiddle, vDim), color);
-  renderPushQuad(commands, rectCenterDim(bottomMiddle, hDim), color);
-  renderPushQuad(commands, rectCenterDim(topMiddle, hDim), color);
+  renderPushQuad(commands, rectCenterDim(leftMiddle, vDim), 0, 0, color);
+  renderPushQuad(commands, rectCenterDim(rightMiddle, vDim), 0, 0, color);
+  renderPushQuad(commands, rectCenterDim(bottomMiddle, hDim), 0, 0, color);
+  renderPushQuad(commands, rectCenterDim(topMiddle, hDim), 0, 0, color);
 }
 
 static inline void
@@ -83,7 +85,7 @@ renderPushText(RenderCommands *commands, LoadedFont *font, u8 *string,
       v2 glyphDim = V2(glyph->width, glyph->height);
       v2 scaledGlyphDim = hadamard(textScale, glyphDim);
       Rect2 glyphRect = rectMinDim(atPos, scaledGlyphDim);
-      renderPushQuad(commands, glyphRect, glyph, color);
+      renderPushQuad(commands, glyphRect, glyph, 0, color);
 
       ++at;
       //if(*at)
@@ -196,14 +198,14 @@ renderPushUIElement(RenderCommands *commands, UILayout *layout, UIElement *eleme
     }
   if(element->flags & UIElementFlag_drawBackground)
     {
-      renderPushQuad(commands, element->region, element->color);
+      renderPushQuad(commands, element->region, 0, 0, element->color);
     }  
   if(element->flags & UIElementFlag_draggable)
     {            
       v2 travelDim = V2(0.2f*elementRegionDim.x, elementRegionDim.y);
       Rect2 travelRect = rectCenterDim(elementRegionCenter, travelDim);
       
-      renderPushQuad(commands, travelRect, V4(0, 0, 0, 1));
+      renderPushQuad(commands, travelRect, 0, 0, V4(0, 0, 0, 1));
 
       if(element->parameterType == UIParameter_float)
 	{
@@ -213,7 +215,18 @@ renderPushUIElement(RenderCommands *commands, UILayout *layout, UIElement *eleme
 	  v2 faderCenter = V2(elementRegionCenter.x, element->region.min.y + paramPercentage*elementRegionDim.y);
 	  Rect2 faderRect = rectCenterDim(faderCenter, V2(elementRegionDim.x, 0.1f*elementRegionDim.y));
 	  
-	  renderPushQuad(commands, faderRect, element->color);
+	  renderPushQuad(commands, faderRect, 0, 0, element->color);
+	}
+    }
+  if(element->flags & UIElementFlag_turnable)
+    {
+      if(element->parameterType == UIParameter_float)
+	{
+	  r32 paramValue = pluginReadFloatParameter(element->fParam);
+	  r32 paramPercentage = (paramValue - element->fParam->range.min)/(element->fParam->range.max - element->fParam->range.min);
+	  r32 paramAngle = -paramPercentage*M_PI;
+
+	  renderPushQuad(commands, element->region, 0, paramAngle, element->color);
 	}
     }
   r32 labelVSpace = 5.f;

@@ -35,9 +35,8 @@ renderBindTexture(LoadedBitmap *texture, bool generateNewTextures)
 
 static void
 renderCommands(RenderCommands *commands)
-{
-  glMatrixMode(GL_MODELVIEW);
-  glLoadIdentity();
+{      
+  bool textureEnabled = true;
 
   glMatrixMode(GL_TEXTURE);
   glLoadIdentity();
@@ -45,9 +44,7 @@ renderCommands(RenderCommands *commands)
   mat4 projectionMatrix = transpose(makeProjectionMatrix(commands->widthInPixels, commands->heightInPixels));
   glMatrixMode(GL_PROJECTION);
   glLoadMatrixf(projectionMatrix.E);
-  
-  bool textureEnabled = true;
-  
+
   for(u32 quadIndex = 0; quadIndex < commands->quadCount; ++quadIndex)
     {
       TexturedQuad *quad = commands->quads + quadIndex;
@@ -60,6 +57,23 @@ renderCommands(RenderCommands *commands)
 	  glDisable(GL_TEXTURE_2D);
 	  textureEnabled = false;
 	}
+
+      if(quad->angle != 0.f)
+	{
+	  v2 vertexCenter = 0.5f*(quad->vertices[3].vPos + quad->vertices[0].vPos);
+	  mat4 rotationMatrix = makeRotationMatrixXY(quad->angle);	  
+	  mat4 translationMatrix = makeTranslationMatrix(vertexCenter);
+	  mat4 invTranslationMatrix = makeTranslationMatrix(-vertexCenter);
+	  
+	  mat4 mvMat = transpose(invTranslationMatrix*rotationMatrix*translationMatrix);
+	  glMatrixMode(GL_MODELVIEW);
+	  glLoadMatrixf(mvMat.E);
+	}
+      else
+	{
+	  glMatrixMode(GL_MODELVIEW);
+	  glLoadIdentity();
+	}      
       
       glBegin(GL_TRIANGLES);
       {
@@ -107,7 +121,7 @@ renderCommands(RenderCommands *commands)
 	  textureEnabled = true;
 	}
     }
-
+  
   renderEndCommands(commands);  
   
 #if 0

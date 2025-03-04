@@ -90,9 +90,12 @@ uiMakeElement(UILayout *layout, char *name, u32 flags, v4 color)
   UIElement *cachedElement = uiGetCachedElement(result, layout);
   if(cachedElement)
     {
+      // TODO: it should be easier to add new cross-frame stateful data to UIElement
       result->region = cachedElement->region;
       result->commFlags = cachedElement->commFlags;
       result->lastFrameTouched = cachedElement->lastFrameTouched;
+      result->mouseClickedP = cachedElement->mouseClickedP;
+      result->fParamValueAtClick = cachedElement->fParamValueAtClick;
     }
 
   // NOTE: add as a child of the current parent if there is one, else become the parent
@@ -391,6 +394,13 @@ uiCommFromElement(UIElement *element, UILayout *layout)
       if(layout->leftButtonPressed)
 	{
 	  result.flags |= UICommFlag_leftPressed;
+	  
+	  // TODO: too much cross-frame state is being managed here
+	  result.element->mouseClickedP = layout->mouseP.xy;
+	  if(result.element->parameterType == UIParameter_float)
+	    {
+	      result.element->fParamValueAtClick = pluginReadFloatParameter(result.element->fParam);
+	    }
 	}
       else if(layout->leftButtonReleased)
 	{
@@ -484,4 +494,19 @@ uiMakeSlider(UILayout *layout, char *name, v2 offset, v2 dim, PluginFloatParamet
   UIComm sliderComm = uiCommFromElement(slider, layout);
 
   return(sliderComm);
+}
+
+inline UIComm
+uiMakeKnob(UILayout *layout, char *name, v2 offset, v2 dim, PluginFloatParameter *param,
+	   v4 color = V4(1, 1, 1, 1))
+{
+  u32 flags = (UIElementFlag_clickable | UIElementFlag_turnable | UIElementFlag_drawBorder |
+	       UIElementFlag_drawLabelBelow);
+  UIElement *knob = uiMakeElement(layout, name, flags, color);
+  uiSetElementDataFloat(knob, param);
+  uiSetSemanticSizeRelative(knob, offset, dim);
+
+  UIComm knobComm = uiCommFromElement(knob, layout);
+
+  return(knobComm);
 }

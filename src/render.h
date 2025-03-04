@@ -24,6 +24,7 @@ struct Texture
 */
 struct TexturedQuad
 {
+  r32 angle;
   Vertex vertices[4];
   LoadedBitmap *texture;
 };
