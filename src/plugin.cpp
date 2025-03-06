@@ -90,7 +90,14 @@ initializePluginState(PluginMemory *memoryBlock)
 	  pluginState->permanentArena = arenaBegin((u8 *)memory + sizeof(PluginState), MEGABYTES(256));
 	  pluginState->frameArena = arenaSubArena(&pluginState->permanentArena, MEGABYTES(2));
 	  pluginState->loadArena = arenaSubArena(&pluginState->permanentArena, MEGABYTES(128));
-
+	  pluginState->grainArena = arenaSubArena(&pluginState->permanentArena, MEGABYTES(64));
+	  pluginState->GrainManager.grainAllocator = &pluginState->grainArena;
+	  GrainBuffer *buffer = arenaPushStruct(pluginState->GrainManager.grainAllocator, GrainBuffer);
+	  buffer->samples = arenaPushArray(&pluginState->grainArena, 9600, r32);
+	  buffer->bufferSize = 9600;
+	  buffer->writeIndex = 0;
+	  buffer->readIndex = setReadPos(0, 9600);
+	  pluginState->gbuff = buffer;
 #if 0 // NOTE: fft sample rate conversion workbench
 	  r32 sourceSignalFreq = 4.f;
 	  u32 sourceSignalLength = 4410;
@@ -504,12 +511,17 @@ AUDIO_PROCESS(audioProcess)
       r64 nFreq = M_TAU*pluginState->freq/(r64)audioBuffer->sampleRate;
 
       bool soundIsPlaying = pluginReadBooleanParameter(&pluginState->soundIsPlaying);
+	  
       PlayingSound *loadedSound = &pluginState->loadedSound;
+	  GrainManager* gManager = &pluginState->GrainManager;
+	  u32 grainSize = 2400;
+	  //So it gives a pointer to the floats
       r32 *loadedSoundSamples[2] = {};
       if(soundIsPlaying)
 	{
 	  loadedSoundSamples[0] = loadedSound->sound.samples[0] + (u32)loadedSound->samplesPlayed;
 	  loadedSoundSamples[1] = loadedSound->sound.samples[1] + (u32)loadedSound->samplesPlayed;
+	  
 	}
       
       r32 *grainMixBuffers[2];
@@ -565,7 +577,8 @@ AUDIO_PROCESS(audioProcess)
 	      if(soundIsPlaying)		       
 		{
 		  r32 soundReadPosition = sampleRateRatio*frameIndex;
-		  if((loadedSound->samplesPlayed + soundReadPosition + 1) < loadedSound->sound.sampleCount)
+		  u32 currentTime = loadedSound->samplesPlayed + soundReadPosition + 1;
+		  if( currentTime < loadedSound->sound.sampleCount)
 		    {		      
 		      u32 soundReadIndex = (u32)soundReadPosition;
 		      r32 soundReadFrac = soundReadPosition - soundReadIndex;
@@ -573,14 +586,22 @@ AUDIO_PROCESS(audioProcess)
 		      r32 firstSoundVal = loadedSoundSamples[channelIndex][soundReadIndex];
 		      r32 nextSoundVal = loadedSoundSamples[channelIndex][soundReadIndex + 1];
 		      r32 loadedSoundVal = lerp(firstSoundVal, nextSoundVal, soundReadFrac);
-		      //mixedVal += 0.5f*loadedSoundVal;
-		      (void)loadedSoundVal;
+			  
+		      mixedVal += 0.5f*loadedSoundVal;
+		      //mixedVal += 0.3f* pluginState->gbuff->samples[pluginState->gbuff->writeIndex];
+
+			  pluginState->gbuff->samples[pluginState->gbuff->writeIndex] = loadedSoundVal;
+
 		    }
 		  else
 		    {		      
 		      pluginSetBooleanParameter(&pluginState->soundIsPlaying, false);
 		      loadedSound->samplesPlayed = 0;
-		    }		  
+			  pluginState->gbuff->samples[pluginState->GrainManager.grainBuffer->writeIndex] = 0.0f;
+			  pluginState->gbuff->samples[pluginState->GrainManager.grainBuffer->readIndex] = 0.0f;
+			  //buffer->samples[pluginState->GrainManager.grainBuffer->readIndex] = 0.0f;
+
+		    }
 		}
 
 	      switch(audioBuffer->format)
@@ -601,7 +622,9 @@ AUDIO_PROCESS(audioProcess)
 		default: ASSERT(!"ERROR: invalid audio format");
 		}
 	    }
-
+	  pluginState->gbuff->writeIndex = (pluginState->gbuff->writeIndex + 1) % pluginState->gbuff->bufferSize;
+	  pluginState->gbuff->readIndex = (pluginState->gbuff->readIndex + 1) % pluginState->gbuff->bufferSize;
+	  //buffer->readIndex = (pluginState->GrainManager.grainBuffer->readIndex + 1) % pluginState->GrainManager.grainBuffer->bufferSize;
 	  pluginUpdateFloatParameter(&pluginState->volume);
 	  pluginUpdateFloatParameter(&pluginState->density);
 	}
