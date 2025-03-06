@@ -83,7 +83,7 @@ struct PlayingSound
 
 struct GrainBuffer
 {
-    r32* samples;
+    r32* samples[2];
     
     u32 writeIndex;
     u32 readIndex;
@@ -126,7 +126,7 @@ makeNewGrain(GrainManager* grainManager, u32 grainSize)
     }
 
     GrainBuffer* buffer = grainManager->grainBuffer;
-    result->start = buffer->samples + buffer->readIndex;
+    result->start = buffer->samples[0] + buffer->readIndex;
     result->samplesToPlay = grainSize;
 
     result->next = grainManager->grainPlayList;
@@ -157,17 +157,46 @@ u32 setReadPos(u32 write_pos, u32 bufferSize) {
     return scratch_rpos;
 
 }
+//struct PluginState
+//{
+//  
+//  Arena permanentArena;
+//  Arena frameArena;
+//  Arena loadArena; 
+//  
+//  r64 phasor;
+//  r32 freq;
+//  PluginFloatParameter volume;
+//  PluginBooleanParameter soundIsPlaying;
+//
+//    PlayingSound loadedSound;
+//    LoadedBitmap testBitmap;
+//    LoadedFont testFont;
+//
+//    UILayout layout;
+//
+//    
+//    bool initialized;
+//};
+
 struct PluginState
 {
-  Arena grainArena;
-  Arena permanentArena;
-  Arena frameArena;
-  Arena loadArena; 
-  
-  r64 phasor;
-  r32 freq;
-  PluginFloatParameter volume;
-  PluginBooleanParameter soundIsPlaying;
+    u64 osTimerFreq;
+    Arena grainArena;
+    Arena permanentArena;
+    Arena frameArena;
+    Arena loadArena;
+
+    LoadedGrainPackfile loadedGrainPackfile;
+    FileGrainState silo;
+
+    r32 start_pos;
+
+    r64 phasor;
+    r32 freq;
+    PluginFloatParameter volume;
+    PluginFloatParameter density;
+    PluginBooleanParameter soundIsPlaying;
 
     PlayingSound loadedSound;
     LoadedBitmap testBitmap;
@@ -177,6 +206,7 @@ struct PluginState
 
     GrainManager GrainManager;
     GrainBuffer* gbuff;
+
     bool initialized;
 };
 

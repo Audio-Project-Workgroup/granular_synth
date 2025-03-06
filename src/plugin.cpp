@@ -93,7 +93,10 @@ initializePluginState(PluginMemory *memoryBlock)
 	  pluginState->grainArena = arenaSubArena(&pluginState->permanentArena, MEGABYTES(64));
 	  pluginState->GrainManager.grainAllocator = &pluginState->grainArena;
 	  GrainBuffer *buffer = arenaPushStruct(pluginState->GrainManager.grainAllocator, GrainBuffer);
-	  buffer->samples = arenaPushArray(&pluginState->grainArena, 9600, r32);
+	  buffer->samples[0] = arenaPushArray(&pluginState->grainArena, 9600, r32);
+	  buffer->samples[1] = arenaPushArray(&pluginState->grainArena, 9600, r32);
+	  memset(buffer->samples[0], 0, 9600 * sizeof(float));
+	  memset(buffer->samples[1], 0, 9600 * sizeof(float));
 	  buffer->bufferSize = 9600;
 	  buffer->writeIndex = 0;
 	  buffer->readIndex = setReadPos(0, 9600);
@@ -209,12 +212,15 @@ initializePluginState(PluginMemory *memoryBlock)
 	  pluginState->density.currentValue = 1.f;
 	  pluginState->density.targetValue = 1.f;
 	  pluginState->density.range = makeRange(0, 20);
+
+	  
 	  
 	  pluginState->soundIsPlaying.value = false;
 
 	  pluginState->loadedSound.sound = loadWav("../data/fingertips_44100_PCM_16.wav",
 						   &pluginState->loadArena, &pluginState->permanentArena);
-	  pluginState->loadedSound.samplesPlayed = 0;
+	  pluginState->start_pos = 220500;
+	  pluginState->loadedSound.samplesPlayed = (0 + pluginState->start_pos);
 
 	  char *fingertipsPackfilename = "../data/fingertips.grains";
 	  TemporaryMemory packfileMemory = arenaBeginTemporaryMemory(&pluginState->loadArena, MEGABYTES(64));
@@ -519,6 +525,7 @@ AUDIO_PROCESS(audioProcess)
       r32 *loadedSoundSamples[2] = {};
       if(soundIsPlaying)
 	{
+	
 	  loadedSoundSamples[0] = loadedSound->sound.samples[0] + (u32)loadedSound->samplesPlayed;
 	  loadedSoundSamples[1] = loadedSound->sound.samples[1] + (u32)loadedSound->samplesPlayed;
 	  
@@ -571,7 +578,7 @@ AUDIO_PROCESS(audioProcess)
 	      r32 firstGrainVal = grainMixBuffers[channelIndex][grainReadIndex];
 	      r32 nextGrainVal = grainMixBuffers[channelIndex][grainReadIndex + 1];
 	      r32 grainVal = lerp(firstGrainVal, nextGrainVal, grainReadFrac);
-	      mixedVal += 0.5f*grainVal;
+	      //mixedVal += 0.5f*grainVal;
 
 	      soundIsPlaying = pluginReadBooleanParameter(&pluginState->soundIsPlaying);
 	      if(soundIsPlaying)		       
@@ -588,17 +595,17 @@ AUDIO_PROCESS(audioProcess)
 		      r32 loadedSoundVal = lerp(firstSoundVal, nextSoundVal, soundReadFrac);
 			  
 		      mixedVal += 0.5f*loadedSoundVal;
-		      //mixedVal += 0.3f* pluginState->gbuff->samples[pluginState->gbuff->writeIndex];
+		      mixedVal += 0.3f* pluginState->gbuff->samples[channelIndex][pluginState->gbuff->readIndex];
 
-			  pluginState->gbuff->samples[pluginState->gbuff->writeIndex] = loadedSoundVal;
+			  pluginState->gbuff->samples[channelIndex][pluginState->gbuff->writeIndex] = loadedSoundVal;
 
 		    }
 		  else
 		    {		      
 		      pluginSetBooleanParameter(&pluginState->soundIsPlaying, false);
-		      loadedSound->samplesPlayed = 0;
-			  pluginState->gbuff->samples[pluginState->GrainManager.grainBuffer->writeIndex] = 0.0f;
-			  pluginState->gbuff->samples[pluginState->GrainManager.grainBuffer->readIndex] = 0.0f;
+		      loadedSound->samplesPlayed = (0 + pluginState->start_pos);
+			  //pluginState->gbuff->samples[pluginState->GrainManager.grainBuffer->writeIndex] = 0.0f;
+			  //pluginState->gbuff->samples[pluginState->GrainManager.grainBuffer->readIndex] = 0.0f;
 			  //buffer->samples[pluginState->GrainManager.grainBuffer->readIndex] = 0.0f;
 
 		    }
