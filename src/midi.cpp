@@ -17,43 +17,48 @@ namespace midi {
 	typedef void (*MidiHandler)(uint8_t channel, uint8_t* data, uint8_t len, PluginState *pluginState);
 
     // Functions for each MIDI command
-    void NoteOff(uint8_t channel, uint8_t* data, uint8_t len, PluginState *pluginState) {
+    void NoteOff(uint8_t channel, uint8_t* data, uint8_t len, PluginState* pluginState) {
         assert(len == 2);
         uint8_t key = data[0];
         uint8_t velocity = data[1];
-        printf("Note Off: Channel %d Key %d Velocity %d\n",channel,key,velocity);
+        pluginState->freq = hertzFromMidiNoteNumber(key);
+        pluginSetFloatParameter(&pluginState->volume, 0.0);
+        printf("Note Off: Channel %d Key %d Velocity %d\n", channel, key, velocity);
     }
 
-    void NoteOn(uint8_t channel, uint8_t* data, uint8_t len, PluginState *pluginState) {
+    void NoteOn(uint8_t channel, uint8_t* data, uint8_t len, PluginState* pluginState) {
         assert(len == 2);
         uint8_t key = data[0];
         uint8_t velocity = data[1];
 
         pluginState->freq = hertzFromMidiNoteNumber(key);
-
-        printf("Note On: Channel %d Key %d Velocity %d\n",channel,key,velocity);
+        pluginSetFloatParameter(&pluginState->volume, (r32)velocity / 127.f);
+        printf("Note On: Channel %d Key %d Velocity %d\n", channel, key, velocity);
     }
 
-    void Aftertouch(uint8_t channel, uint8_t* data, uint8_t len, PluginState *pluginState) {
+    void Aftertouch(uint8_t channel, uint8_t* data, uint8_t len, PluginState* pluginState) {
         assert(len == 2);
         uint8_t key = data[0];
         uint8_t touch = data[1];
-        printf("Aftertouch: Channel %d Key %d Touch %d\n",channel,key,touch);
+        pluginState->freq = hertzFromMidiNoteNumber(key);
+        pluginSetFloatParameter(&pluginState->volume, (r32)touch / 127.f);
+        printf("Aftertouch: Channel %d Key %d Touch %d\n", channel, key, touch);
     }
 
-    void ContinuousController(uint8_t channel, uint8_t* data, uint8_t len, PluginState *pluginState) {
+    void ContinuousController(uint8_t channel, uint8_t* data, uint8_t len, PluginState* pluginState) {
         assert(len == 2);
-        uint8_t controller = data[0];
+        uint8_t controller = data[0]; 
         uint8_t value = data[1]; 
-        printf("Continuous Controller: Channel %d Controller %d Value %d\n",channel,controller,value);
+        int paramIndex = ccParamTable[controller];
+        pluginSetFloatParameter(&pluginState->parameters[paramIndex], value);
+
+            printf("Continuous Controller: Channel %d Controller %d Value %d\n", channel, controller, value);
     }
 
-    void PatchChange(uint8_t channel, uint8_t* data, uint8_t len, PluginState *pluginState) {
-        // @TODO Apply Testing --> number of parameters 2, what is the second param?
-        assert(len >= 1);
+    void PatchChange(uint8_t channel, uint8_t* data, uint8_t len, PluginState* pluginState) {
+        assert(len == 1);
         uint8_t instument = data[0];
-        uint8_t FIX_ME = data[1];
-        printf("Patch Change: Channel %d instument %d FIX_ME %d\n",channel,instument,FIX_ME);
+        printf("Patch Change: Channel %d instument %d\n", channel, instument);
     }
 
     void ChannelPressure(uint8_t channel, uint8_t* data, uint8_t len, PluginState *pluginState) {
