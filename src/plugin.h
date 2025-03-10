@@ -85,7 +85,7 @@ struct PlayingSound
 
 
 u32 setReadPos(u32 write_pos, u32 bufferSize) {
-    s32 scratch_rpos = write_pos - 9599;
+    s32 scratch_rpos = write_pos - 3200;
 
     if (scratch_rpos < 0) {
         scratch_rpos += bufferSize;

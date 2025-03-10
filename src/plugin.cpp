@@ -226,6 +226,7 @@ initializePluginState(PluginMemory *memoryBlock)
 
 	  pluginState->loadedSound.sound = loadWav("../data/fingertips_44100_PCM_16.wav",
 						   &pluginState->loadArena, &pluginState->permanentArena);
+
 	  pluginState->start_pos = 0;
 	  pluginState->loadedSound.samplesPlayed = (0 + pluginState->start_pos);
 
@@ -575,6 +576,9 @@ AUDIO_PROCESS(audioProcess)
       synthesize(grainMixBuffers[0], grainMixBuffers[1],
 		       1.f, scaledFramesToWrite, gManager);
 
+	  for (u32 sample = 0; sample < gManager->grainBuffer->bufferSize; ++sample) {
+
+	  }
       void *genericAudioFrames = audioBuffer->buffer;      
       for(u32 frameIndex = 0; frameIndex < audioBuffer->framesToWrite; ++frameIndex)
 	{
