@@ -1,6 +1,8 @@
 // operating-system-dependent functions/types
 #pragma once
 
+static u32 syncCompareAndSwap(volatile u32 *value, u32 oldval, u32 newval);
+
 #if OS_WINDOWS
 
 #include <windows.h>
@@ -86,7 +88,14 @@ struct PluginCode
   HMODULE pluginCode;
   RenderNewFrame *renderNewFrame;
   AudioProcess *audioProcess;
+  InitializePluginState *initializePluginState;
 };
+
+static u32
+syncCompareAndSwap(volatile u32 *value, u32 oldval, u32 newval)
+{
+  return(InterlockedCompareExchange(value, newval, oldval));
+}
 
 static PluginCode
 loadPluginCode(char *filename)
@@ -109,7 +118,8 @@ loadPluginCode(char *filename)
 	{
 	  result.renderNewFrame = (RenderNewFrame *)GetProcAddress(result.pluginCode, "renderNewFrame");
 	  result.audioProcess = (AudioProcess *)GetProcAddress(result.pluginCode, "audioProcess");
-	  result.isValid = result.renderNewFrame && result.audioProcess;
+	  result.initializePluginState = (InitializePluginState *)GetProcAddress(result.pluginCode, "initializePluginState");
+	  result.isValid = result.renderNewFrame && result.audioProcess && result.initializePluginState;
 	}
       else
 	{
@@ -301,7 +311,14 @@ struct PluginCode
   void *pluginCode;
   RenderNewFrame *renderNewFrame;
   AudioProcess *audioProcess;
+  InitializePluginState *initializePluginState;
 };
+
+static u32
+syncCompareAndSwap(volatile u32 *value, u32 oldval, u32 newval)
+{
+  return(__sync_val_compare_and_swap(value, oldval, newval));
+}
 
 static PluginCode
 loadPluginCode(char *filename)
@@ -315,8 +332,9 @@ loadPluginCode(char *filename)
 	{
 	  result.renderNewFrame = (RenderNewFrame *)dlsym(result.pluginCode, "renderNewFrame");
 	  result.audioProcess   = (AudioProcess *)dlsym(result.pluginCode, "audioProcess");
+	  result.initializePluginState   = (InitializePluginState *)dlsym(result.pluginCode, "initializePluginState");
 	  
-	  result.isValid = result.renderNewFrame && result.audioProcess;
+	  result.isValid = result.renderNewFrame && result.audioProcess && result.initializePluginState;
 	}
       else
 	{

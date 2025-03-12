@@ -16,7 +16,7 @@ REM lib -OUT:miniaudio.lib miniaudio_impl.obj
 
 REM compile plugin and host
 REM /PDB:plugin_%date:~-4,4%%date:~-10,2%%date:~-7,2%_%time:~0,2%%time:~3,2%%time:~6,2%%time:~9,2%.pdb
-cl %CFLAGS% ..\src\plugin.cpp -Fmplugin.map -LD /link %LFLAGS% -PDB:plugin_%random%.pdb -EXPORT:renderNewFrame -EXPORT:audioProcess
+cl %CFLAGS% ..\src\plugin.cpp -Fmplugin.map -LD /link %LFLAGS% -PDB:plugin_%random%.pdb -EXPORT:renderNewFrame -EXPORT:audioProcess -EXPORT:initializePluginState
 
 set PLUGIN_STATUS=%ERRORLEVEL%
 

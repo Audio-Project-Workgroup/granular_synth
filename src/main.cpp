@@ -34,6 +34,39 @@
 #include "onnx.cpp"
 
 static PluginInput *newInput;
+static GLFWcursor *standardCursor;
+static GLFWcursor *hResizeCursor;
+static GLFWcursor *vResizeCursor;
+static GLFWcursor *handCursor;
+static GLFWcursor *textCursor;
+
+static inline void
+glfwSetCursorState(GLFWwindow *window, RenderCursorState cursorState)
+{
+  switch(cursorState)
+    {
+    case CursorState_default:
+      {
+	glfwSetCursor(window, standardCursor);
+      } break;
+    case CursorState_hArrow:
+      {
+	glfwSetCursor(window, hResizeCursor);
+      } break;
+    case CursorState_vArrow:
+      {
+	glfwSetCursor(window, vResizeCursor);
+      } break;
+    case CursorState_hand:
+      {
+	glfwSetCursor(window, handCursor);
+      } break;
+    case CursorState_text:
+      {
+	glfwSetCursor(window, textCursor);
+      } break;     
+    }
+}
 
 static inline void
 glfwProcessButtonPress(ButtonState *newState, bool pressed)
@@ -163,6 +196,12 @@ main(int argc, char **argv)
       GLFWwindow *window = glfwCreateWindow(640, 480, "glfw_miniaudio", NULL, NULL);
       if(window)	
 	{
+	  standardCursor = glfwCreateStandardCursor(GLFW_ARROW_CURSOR);
+	  hResizeCursor = glfwCreateStandardCursor(GLFW_HRESIZE_CURSOR);
+	  vResizeCursor = glfwCreateStandardCursor(GLFW_VRESIZE_CURSOR);
+	  handCursor = glfwCreateStandardCursor(GLFW_HAND_CURSOR);
+	  textCursor = glfwCreateStandardCursor(GLFW_IBEAM_CURSOR);
+
 	  // input setup
 	  
 	  PluginInput pluginInput[2] = {};
@@ -312,6 +351,7 @@ main(int argc, char **argv)
 			  if(plugin.renderNewFrame)
 			    {
 			      plugin.renderNewFrame(&pluginMemory, oldInput, &commands);
+			      glfwSetCursorState(window, commands.cursorState);
 			      renderCommands(&commands);
 			    }
 
@@ -382,6 +422,12 @@ main(int argc, char **argv)
 	      onnxState.api->ReleaseSession(onnxState.session);
 	      onnxState.api->ReleaseEnv(onnxState.env);
 	    }
+
+	  glfwDestroyCursor(standardCursor);
+	  glfwDestroyCursor(hResizeCursor);
+	  glfwDestroyCursor(vResizeCursor);
+	  glfwDestroyCursor(handCursor);
+	  glfwDestroyCursor(textCursor);
 	  
 	  glfwDestroyWindow(window);
 	}

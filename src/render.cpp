@@ -34,6 +34,32 @@ renderBindTexture(LoadedBitmap *texture, bool generateNewTextures)
 }
 
 static void
+renderSortQuads(TexturedQuad *quads, u32 quadCount)
+{
+  // NOTE: bubble sort
+  for(u32 outer = 0; outer < quadCount; ++outer)
+    {
+      bool quadsSorted = true;
+      for(u32 inner = 0; inner < quadCount - 1; ++inner)
+	{
+	  TexturedQuad *q0 = quads + inner;
+	  TexturedQuad *q1 = quads + inner + 1;
+	  
+	  if(q0->level > q1->level)
+	    {
+	      TexturedQuad temp = *q0;
+	      *q0 = *q1;
+	      *q1 = temp;
+
+	      quadsSorted = false;
+	    }
+	}
+
+      if(quadsSorted) break;
+    }
+}
+
+static void
 renderCommands(RenderCommands *commands)
 {      
   bool textureEnabled = true;
@@ -44,6 +70,8 @@ renderCommands(RenderCommands *commands)
   mat4 projectionMatrix = transpose(makeProjectionMatrix(commands->widthInPixels, commands->heightInPixels));
   glMatrixMode(GL_PROJECTION);
   glLoadMatrixf(projectionMatrix.E);
+
+  renderSortQuads(commands->quads, commands->quadCount);
 
   for(u32 quadIndex = 0; quadIndex < commands->quadCount; ++quadIndex)
     {

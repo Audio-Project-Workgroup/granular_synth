@@ -393,6 +393,94 @@ V4(r32 x, r32 y, r32 z, r32 w)
   return(result);
 }
 
+inline v4
+operator+(v4 v, v4 w)
+{
+  v4 result = {v.x + w.x, v.y + w.y, v.z + w.z, v.w + w.w};
+
+  return(result);
+}
+
+inline v4 & 
+operator+=(v4 &v, v4 w)
+{
+  v = v + w;
+  
+  return(v);
+}
+
+inline v4
+operator-(v4 v)
+{
+  v4 result = {-v.x, -v.y, -v.z, -v.w};
+
+  return(result);
+}
+
+inline v4
+operator-(v4 v, v4 w)
+{
+  v4 result = v + (-w);
+
+  return(result);
+}
+
+inline v4 &
+operator-=(v4 &v, v4 w)
+{
+  v = v - w;
+
+  return(v);
+}
+
+inline v4
+operator*(r32 a, v4 v)
+{
+  v4 result = {a*v.x, a*v.y, a*v.z, a*v.w};
+
+  return(result);
+}
+
+inline v4
+operator*(v4 v, r32 a)
+{
+  v4 result = a*v;
+
+  return(result);  
+}
+
+inline v4 &
+operator*=(v4 &v, r32 a)
+{
+  v = v*a;
+
+  return(v);
+}
+
+inline v4
+operator/(v4 v, r32 a)
+{
+  v4 result = v*(1.f/a);
+
+  return(result);
+}
+
+inline v4 &
+operator/=(v4 &v, r32 a)
+{
+  v = v/a;
+
+  return(v);
+}
+
+inline v4
+hadamard(v4 v, v4 w)
+{
+  v4 result = {v.x*w.x, v.y*w.y, v.z*w.z, v.w*w.w};
+
+  return(result);
+}
+
 //
 // mat4
 //
@@ -475,6 +563,65 @@ transpose(mat4 m)
 }
 
 //
+// RangeU32
+//
+
+inline RangeU32
+makeRange(u32 min, u32 max)
+{
+  RangeU32 result = {};
+  result.min = min;
+  result.max = max;
+
+  return(result);
+}
+
+inline u32
+getLength(RangeU32 range)  
+{
+  ASSERT(range.max >= range.min);
+  u32 result = range.max - range.min;
+
+  return(result);
+}
+
+inline u32
+clampToRange(u32 val, RangeU32 range)
+{
+  u32 result = val;
+  if(val > range.max) result = range.max;
+  if(val < range.min) result = range.min;
+
+  return(result);
+}
+
+inline u32
+clampToRange(u32 val, u32 min, u32 max)
+{
+  u32 result = val;
+  if(val > max) result = max;
+  if(val < min) result = min;
+
+  return(result);
+}
+
+inline bool
+isInRange(u32 val, RangeU32 range)
+{
+  bool result = (val <= range.max && val >= range.min);
+
+  return(result);
+}
+
+inline bool
+isInRange(u32 val, u32 min, u32 max)
+{
+  bool result = (val <= max && val >= min);
+
+  return(result);
+}
+
+//
 // RangeR32
 //
 
@@ -502,6 +649,15 @@ clampToRange(r32 val, RangeR32 range)
   r32 result = val;
   if(result > range.max) result = range.max;
   if(result < range.min) result = range.min;
+
+  return(result);
+}
+
+inline r32
+clampToRange(r32 val, r32 min, r32 max)
+{
+  RangeR32 range = makeRange(min, max);
+  r32 result = clampToRange(val, range);
 
   return(result);
 }
@@ -581,6 +737,18 @@ clipToRect(v2 v, Rect2 r)
 
   return(result);
 }
+
+static inline Rect2
+rectAddRadius(Rect2 rect, v2 r)
+{
+  Rect2 result = rectMinMax(rect.min - r, rect.max + r);
+
+  return(result);
+}
+
+//
+// fft
+// 
 
 inline void
 fft(c64 *destBuffer, r32 *sourceBuffer, u32 lengthInit, u32 stride = 1)

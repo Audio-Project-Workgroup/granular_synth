@@ -24,6 +24,11 @@
 
 #define CYCLIC_ARRAY_INDEX(i, len) ((i < len) ? ((i < 0) ? (i + len) : i) : (i - len))
 
+// NOTE: linked-list utilities
+#define STACK_PUSH(head, node) do {node->next = head; head = node;} while(0)
+#define STACK_POP(head) do {head = head->next;} while(0)
+#define DLL_PUSH_BACK(f, l, n) do {((f)==0) ? ((f)=(l)=(n), (n)->next=(n)->prev=0):((n)->prev=(l), (l)->next=(n), (l)=(n), (n)->next=0);} while(0)
+
 #define LINKED_LIST_APPEND(head, new) do {	\
     new->next = head;				\
     head = new;					\
@@ -102,6 +107,33 @@ reverseBits(u64 num)
   v = (v >> 32) | (v << 32);
 
   return(v);
+}
+
+inline bool
+stringsAreEqual(u8 *s1, u8 *s2)
+{
+  bool result = true;
+  
+  u8 *atS1 = s1;
+  u8 *atS2 = s2;
+  while(*atS1 && *atS2)
+    {
+      if(*atS1 != *atS2)
+	{
+	  result = false;
+	  break;
+	}
+
+      ++atS1;
+      ++atS2;
+    }
+
+  if(result)
+    {
+      result = !(*atS1 || *atS2);
+    }
+
+  return(result);
 }
 
 static inline u32

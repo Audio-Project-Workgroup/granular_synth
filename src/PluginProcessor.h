@@ -1,16 +1,9 @@
 #pragma once
 
 #include <juce_audio_processors/juce_audio_processors.h>
+#include "context.h"
 #include "common.h"
 #include "platform.h"
-
-#if 0
-struct PluginCode
-{
-  RenderNewFrame *renderNewFrame;
-  AudioProcess *audioProcess;
-};
-#endif
 
 //==============================================================================
 class AudioPluginAudioProcessor final : public juce::AudioProcessor

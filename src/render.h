@@ -15,16 +15,19 @@ makeVertex(v2 vPos, v2 uv, v4 color)
 
   return(result);
 }
-/*
-struct Texture
+
+enum RenderLevel
 {
-  LoadedBitmap *bitmap;
-  RangeU32 vertexRange;
+  RenderLevel_background,
+  RenderLevel_boxBackground,
+  RenderLevel_front,
 };
-*/
+
 struct TexturedQuad
 {
+  RenderLevel level;
   r32 angle;
+  
   Vertex vertices[4];
   LoadedBitmap *texture;
 };
@@ -61,12 +64,23 @@ struct GLState
   */
 };
 
+enum RenderCursorState
+{
+  CursorState_default,
+  CursorState_hArrow,
+  CursorState_vArrow,
+  CursorState_hand,
+  CursorState_text,
+};
+
 struct RenderCommands
 {
   u32 widthInPixels;
   u32 heightInPixels;
   
   Arena *allocator;
+
+  RenderCursorState cursorState;
 
   u32 quadCount;
   u32 quadCapacity;
@@ -83,9 +97,11 @@ static inline void
 renderBeginCommands(RenderCommands *commands, Arena *perFrameAllocator)
 {  
   commands->allocator = perFrameAllocator;
-  
+
+  commands->cursorState = CursorState_default;
+
   commands->quadCount = 0;
-  commands->quadCapacity = 128;
+  commands->quadCapacity = 256;
   commands->quads = arenaPushArray(commands->allocator, commands->quadCapacity, TexturedQuad);
 
   commands->triangleCount = 0;
@@ -97,6 +113,8 @@ static inline void
 renderEndCommands(RenderCommands *commands)
 {
   commands->allocator = 0;
+
+  commands->cursorState = CursorState_default;
   
   commands->quadCount = 0;
   commands->quadCapacity = 0;

@@ -219,10 +219,17 @@ prepareToPlay(double sampleRate, int samplesPerBlock)
 	{
 	  juce::Logger::writeToLog("failed to load function: renderNewFrame");
 	}
+      
       pluginCode.audioProcess = (AudioProcess *)libPlugin.getFunction("audioProcess");
       if(!pluginCode.audioProcess)
 	{
 	  juce::Logger::writeToLog("failed to load function: audioProcess");
+	}
+
+      pluginCode.initializePluginState = (InitializePluginState *)libPlugin.getFunction("initializePluginState");
+      if(!pluginCode.audioProcess)
+	{
+	  juce::Logger::writeToLog("failed to load function: initializePluginState");
 	}     
     }
   else
@@ -230,11 +237,14 @@ prepareToPlay(double sampleRate, int samplesPerBlock)
       juce::Logger::writeToLog("failed to open dynamic library");
     }
 
-  if(!pluginCode.renderNewFrame || !pluginCode.audioProcess)
+  if(!pluginCode.renderNewFrame || !pluginCode.audioProcess || !pluginCode.initializePluginState)
     {      
       pluginCode.renderNewFrame = nullptr;
       pluginCode.audioProcess = nullptr;
+      pluginCode.initializePluginState = nullptr;
     }
+
+  pluginCode.initializePluginState(&pluginMemory);
 
   audioBuffer = {};
   audioBuffer.format = AudioFormat_r32;
@@ -308,7 +318,7 @@ processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
       memcpy(atMidiBuffer, message.getRawData(), messageLength);
       atMidiBuffer += messageLength;
       ++audioBuffer.midiMessageCount;      
-    }
+    } 
 
   juce::ScopedNoDenormals noDenormals;
   auto totalNumInputChannels  = getTotalNumInputChannels();

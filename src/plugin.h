@@ -73,6 +73,7 @@ struct PluginParameter
 #include "file_granulator.h"
 #include "file_formats.h"
 #include "ui_layout.h"
+#include "plugin_ui.h"
 #include "plugin_render.h"
 
 struct PlayingSound
@@ -102,7 +103,11 @@ struct PluginState
   LoadedBitmap testBitmap;
   LoadedFont testFont;
 
-  UILayout layout;
+  //UILayout layout;
+  UIContext uiContext;
 
+  UIPanel *rootPanel;  
+
+  volatile u32 initializationMutex;
   bool initialized;
 };

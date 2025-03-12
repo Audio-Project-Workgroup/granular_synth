@@ -216,3 +216,8 @@ struct PluginAudioBuffer
 
 #define AUDIO_PROCESS(name) void (name)(PluginMemory *memory, PluginAudioBuffer *audioBuffer)
 typedef AUDIO_PROCESS(AudioProcess);
+
+
+struct PluginState;
+#define INITIALIZE_PLUGIN_STATE(name) PluginState *(name)(PluginMemory *memoryBlock)
+typedef INITIALIZE_PLUGIN_STATE(InitializePluginState);

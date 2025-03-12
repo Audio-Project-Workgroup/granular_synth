@@ -2,9 +2,10 @@ enum UISizeType : u32
 {
   UISizeType_none,
   UISizeType_pixels,
+  UISizeType_text,
   UISizeType_glCoords,
   UISizeType_percentOfParentDim,
-  UISizeType_percentOfOwnDim,
+  //UISizeType_percentOfOwnDim,
   UISizeType_sumOfChildren,
 };
 
@@ -32,7 +33,7 @@ defaultUISize(void)
   return(result);
 }
 
-enum UIAxes
+enum UIAxis
 {
   UIAxis_x,
   UIAxis_y,
@@ -41,14 +42,15 @@ enum UIAxes
 
 enum UIElementFlags : u32
 {
-  UIElementFlag_clickable = (1 << 0),
-  UIElementFlag_draggable = (1 << 1),
-  UIElementFlag_turnable = (1 << 2),
-  UIElementFlag_drawText = (1 << 3),
-  UIElementFlag_drawBorder = (1 << 4),
-  UIElementFlag_drawBackground = (1 << 5),
-  UIElementFlag_drawLabelAbove = (1 << 6),
-  UIElementFlag_drawLabelBelow = (1 << 7),
+  UIElementFlag_clickable      = (1 << 0),
+  UIElementFlag_draggable      = (1 << 1),
+  UIElementFlag_turnable       = (1 << 2),
+  UIElementFlag_collapsible    = (1 << 3),
+  UIElementFlag_drawText       = (1 << 4),
+  UIElementFlag_drawBorder     = (1 << 5),
+  UIElementFlag_drawBackground = (1 << 6),
+  UIElementFlag_drawLabelAbove = (1 << 7),
+  UIElementFlag_drawLabelBelow = (1 << 8),
   
     //UIElementFlag_focusHot = (1 << 5),
     //UIElementFlag_focusHotOff = (1 << 6),
@@ -67,65 +69,13 @@ struct UIHashKey
   u8 *name;
 };
 
-struct UIElement
-{
-  // NOTE: tree links
-  // IMPORTANT: **do not** change the order of these pointers, for any reason! (it will fuck shit up)
-  UIElement *next;
-  UIElement *prev;
-  UIElement *first;
-  UIElement *last;  
-  UIElement *parent;
-
-  // NOTE: hashing utility
-  UIHashKey hashKey;
-  u32 lastFrameTouched;
-  UIElement *nextInHash;
-
-  // NOTE: specified at construction
-  u32 flags;
-  u8 *name;
-  v2 textScale;
-  v4 color;
-
-  UIParameter parameterType;
-  union // TODO: maybe there could be a use for an element that has both a boolean and a float parameter attached
-  {
-    PluginBooleanParameter *bParam;
-    PluginFloatParameter *fParam;
-  };  
-  
-  UISize semanticDim[UIAxis_COUNT];
-  UISize semanticOffset[UIAxis_COUNT];
-
-  // NOTE: computed
-  Rect2 region;
-  u32 commFlags;
-  v2 mouseClickedP;
-  r32 fParamValueAtClick;
-};
-
-#define ELEMENT_SENTINEL(element) (UIElement *)&element->first
-
-struct UILayout
+struct UIContext
 {
   Arena *frameArena;
   Arena *permanentArena;
 
   LoadedFont *font;
-
-  u32 elementCount;
-  UIElement *root;  
   
-  UIElement *currentParent;
-  
-  UIElement *elementCache[512];
-  UIElement *elementFreeList;
-
-  //UIElement *hotElementStack[32];
-  u32 selectedElementOrdinal;
-  UIHashKey selectedElement;
-
   // NOTE: interaction state
   v3 mouseP;
   v3 lastMouseP;
@@ -146,7 +96,93 @@ struct UILayout
   bool plusPressed;
 
   u32 frameIndex;
+
+  u32 layoutCount;
+  u32 processedElementCount;
+  u32 selectedElementOrdinal;
+  u32 selectedElementLayoutIndex;
+  UIHashKey selectedElement;  
 };
+
+struct UILayout;
+struct UIElement
+{
+  // NOTE: tree links
+  // IMPORTANT: **do not** change the order of these pointers, for any reason! (it will fuck shit up)
+  UIElement *next;
+  UIElement *prev;
+  UIElement *first;
+  UIElement *last;  
+  UIElement *parent;
+
+  // NOTE: hashing utility
+  UIHashKey hashKey;
+  u32 lastFrameTouched;
+  UIElement *nextInHash;
+
+  // NOTE: specified at construction
+  UILayout *layout;
+  u32 flags;
+  u8 *name;
+  v2 textScale;
+  v4 color;
+
+  UIParameter parameterType;
+  union // TODO: maybe there could be a use for an element that has both a boolean and a float parameter attached
+  {
+    PluginBooleanParameter *bParam;
+    PluginFloatParameter *fParam;
+  };  
+  
+  UISize semanticDim[UIAxis_COUNT];
+  UISize semanticOffset[UIAxis_COUNT];
+
+  // NOTE: computed
+  Rect2 region;
+  u32 commFlags;
+  v2 mouseClickedP;
+  r32 fParamValueAtClick;
+  v2 dragData;
+  bool showChildren;
+};
+
+#define ELEMENT_SENTINEL(element) (UIElement *)&element->first
+
+inline void
+uiStoreDragData(UIElement *element, v2 dragData)
+{
+  element->dragData = dragData;
+}
+
+inline v2
+uiLoadDragData(UIElement *element)
+{
+  return(element->dragData);
+}
+
+struct UILayout
+{  
+  UIContext *context;
+  
+  u32 elementCount;
+  UIElement *root;  
+  
+  UIElement *currentParent;
+  
+  UIElement *elementCache[512];
+  UIElement *elementFreeList;
+
+  u32 index;
+ 
+  //u32 selectedElementOrdinal;
+  UIHashKey selectedElement;  
+};
+
+inline v2
+uiGetDragDelta(UIElement *element)
+{
+  return(element->layout->context->mouseP.xy - element->mouseClickedP);
+}
 
 enum UICommFlags : u32
 {
@@ -195,5 +231,5 @@ struct UIComm
 UIHashKey uiHashKeyFromString(u8 *name);
 bool uiHashKeysAreEqual(UIHashKey key1, UIHashKey key2);
 
-UIElement *uiCacheElement(UIElement *element, UILayout *layout);
-UIElement *uiGetCachedElement(UIElement *element, UILayout *layout);
+UIElement *uiCacheElement(UIElement *element);
+UIElement *uiGetCachedElement(UIElement *element);
