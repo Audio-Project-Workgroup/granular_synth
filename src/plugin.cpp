@@ -63,7 +63,7 @@
 
 #include "ui_layout.cpp"
 #include "file_granulator.cpp"
-//#include "internal_granulator.cpp"
+#include "internal_granulator.cpp"
 
 PlatformAPI globalPlatform;
 
@@ -218,7 +218,7 @@ initializePluginState(PluginMemory *memoryBlock)
 	  pluginState->density.targetValue = 1.f;
 	  pluginState->density.range = makeRange(0, 20);
 	  
-	  pluginState->t_density = 20;
+	  pluginState->t_density = 5;
 
 	  
 	  
@@ -528,9 +528,9 @@ AUDIO_PROCESS(audioProcess)
 	  
       PlayingSound *loadedSound = &pluginState->loadedSound;
 	  GrainManager* gManager = &pluginState->GrainManager;
-	  r32 iot = 1/pluginState->t_density;
+	  r32 iot = 1/pluginState->density.currentValue;
 	  
-	  u32 grainSize = 2400;
+	  u32 grainSize = 2600;
 
 	  if (!gManager->grainPlayList)
 	  {
@@ -576,9 +576,12 @@ AUDIO_PROCESS(audioProcess)
       synthesize(grainMixBuffers[0], grainMixBuffers[1],
 		       1.f, scaledFramesToWrite, gManager);
 
-	  for (u32 sample = 0; sample < gManager->grainBuffer->bufferSize; ++sample) {
-
-	  }
+	 /* for (u32 sample = 0; sample < gManager->grainBuffer->bufferSize; ++sample) {
+		  for (u32 channels = 0; channels < 2; ++channels) {
+			  *gManager->grainBuffer->samples[channels] = *(loadedSound->sound.samples[channels] + sample);
+				  
+		  }
+	  }*/
       void *genericAudioFrames = audioBuffer->buffer;      
       for(u32 frameIndex = 0; frameIndex < audioBuffer->framesToWrite; ++frameIndex)
 	{
@@ -590,8 +593,7 @@ AUDIO_PROCESS(audioProcess)
 	  r32 sinVal = sin(pluginState->phasor);
 	  for(u32 channelIndex = 0; channelIndex < audioBuffer->channels; ++channelIndex)
 	    {
-	      r32 mixedVal = 0.5f*sinVal;
-	      
+		  //pluginState->gbuff->samples[channelIndex][pluginState->gbuff->writeIndex] = 0.5 * sinVal;
 	      r32 grainReadPosition = sampleRateRatio*frameIndex;
 	      u32 grainReadIndex = (u32)grainReadPosition;
 	      r32 grainReadFrac = grainReadPosition - grainReadIndex;
@@ -599,7 +601,7 @@ AUDIO_PROCESS(audioProcess)
 	      r32 firstGrainVal = grainMixBuffers[channelIndex][grainReadIndex];
 	      r32 nextGrainVal = grainMixBuffers[channelIndex][grainReadIndex + 1];
 	      r32 grainVal = lerp(firstGrainVal, nextGrainVal, grainReadFrac);
-	      mixedVal += 0.5f*grainVal;
+	      r32 mixedVal = 0.5f*grainVal;
 
 
 
@@ -617,10 +619,10 @@ AUDIO_PROCESS(audioProcess)
 		      r32 nextSoundVal = loadedSoundSamples[channelIndex][soundReadIndex + 1];
 		      r32 loadedSoundVal = lerp(firstSoundVal, nextSoundVal, soundReadFrac);
 			  
-		      //mixedVal += 0.5f*loadedSoundVal;
+			  pluginState->gbuff->samples[channelIndex][pluginState->gbuff->writeIndex] += 0.5f*loadedSoundVal;
 		      //mixedVal += 0.3f* pluginState->gbuff->samples[channelIndex][pluginState->gbuff->readIndex];
 
-			  pluginState->gbuff->samples[channelIndex][pluginState->gbuff->writeIndex] = loadedSoundVal;
+			  
 
 		    }
 		  else
