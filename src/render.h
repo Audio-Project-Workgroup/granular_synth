@@ -91,6 +91,7 @@ struct RenderCommands
   TexturedTriangle *triangles;
 
   bool generateNewTextures;
+  bool windowResized;
 };
 
 static inline void

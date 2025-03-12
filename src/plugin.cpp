@@ -313,7 +313,7 @@ RENDER_NEW_FRAME(renderNewFrame)
       //UILayout *layout = &pluginState->layout;
       //uiBeginLayout(layout, V2(windowWidth, windowHeight), &input->mouseState, &input->keyboardState);
       UIContext *uiContext = &pluginState->uiContext;
-      uiContextNewFrame(uiContext, &input->mouseState, &input->keyboardState);
+      uiContextNewFrame(uiContext, &input->mouseState, &input->keyboardState, renderCommands->windowResized);
       
       TemporaryMemory scratchMemory = arenaBeginTemporaryMemory(&pluginState->frameArena, KILOBYTES(128));           
       

@@ -213,11 +213,15 @@ main(int argc, char **argv)
 	  glfwMakeContextCurrent(window);
 
 	  glfwSwapInterval(1);
+	  
 	  glEnable(GL_TEXTURE_2D);
 	  GL_PRINT_ERROR("GL ERROR %u: enable texture 2D failed at startup\n");
+	  
 	  glEnable(GL_BLEND);
 	  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	  GL_PRINT_ERROR("GL ERROR %u: enable alpha blending failed at startup\n");
+
+	  glEnable(GL_SCISSOR_TEST);
 	  
 	  // memory/grahics setup
 
@@ -305,7 +309,10 @@ main(int argc, char **argv)
 			    }		      
 
 			  // handle input
-		      
+
+			  int framebufferWidth, framebufferHeight;
+			  glfwGetFramebufferSize(window, &framebufferWidth, &framebufferHeight);
+
 			  for(u32 buttonIndex = 0; buttonIndex < MouseButton_COUNT; ++buttonIndex)
 			    {
 			      newInput->mouseState.buttons[buttonIndex].halfTransitionCount = 0;
@@ -326,27 +333,53 @@ main(int argc, char **argv)
 			    }
 
 			  // TODO: what's the difference between window size and framebuffer size? do we need both?
-			  int windowWidth, windowHeight;
-			  glfwGetWindowSize(window, &windowWidth, &windowHeight);		      
-
-			  double mouseX, mouseY;
-			  glfwGetCursorPos(window, &mouseX, &mouseY);
-			  newInput->mouseState.position = V2(mouseX, (r64)windowHeight - mouseY);
-			  //printf("mouseP: (%.2f, %.2f)", newInput->mouseState.position.x, newInput->mouseState.position.y);
+			  //int windowWidth, windowHeight;
+			  //glfwGetWindowSize(window, &windowWidth, &windowHeight);
+			  
 			  newInput->frameMillisecondsElapsed = frameElapsedTime;			  
 
-			  // render new frame
+			  // render new frame			  
 
-			  int width, height;
-			  glfwGetFramebufferSize(window, &width, &height);
-			  glViewport(0, 0, width, height);
-			  commands.widthInPixels = width;
-			  commands.heightInPixels = height;
-
-			  GL_PRINT_ERROR("GL ERROR: %u at frame start\n");		      
+			  glViewport(0, 0, framebufferWidth, framebufferHeight);
+			  glScissor(0, 0, framebufferWidth, framebufferHeight);
 
 			  glClearColor(0.2f, 0.2f, 0.2f, 0.f);
 			  glClear(GL_COLOR_BUFFER_BIT);		      
+
+			  r32 targetAspectRatio = 16.f/9.f;
+			  r32 windowAspectRatio = (r32)framebufferWidth/(r32)framebufferHeight;
+			  v2 viewportMin, viewportDim;
+			  if(windowAspectRatio < targetAspectRatio)
+			    {
+			      // NOTE: width constrained
+			      viewportDim.x = (r32)framebufferWidth;
+			      viewportDim.y = viewportDim.x/targetAspectRatio;
+			      viewportMin = V2(0, ((r32)framebufferHeight - viewportDim.y)*0.5f);
+			    }
+			  else
+			    {
+			      // NOTE: height constrained
+			      viewportDim.y = (r32)framebufferHeight;
+			      viewportDim.x = viewportDim.y*targetAspectRatio;
+			      viewportMin = V2(((r32)framebufferWidth - viewportDim.x)*0.5f, 0);
+			    }
+		      		          
+			  commands.windowResized = (commands.widthInPixels != (u32)viewportDim.x ||
+						    commands.heightInPixels != (u32)viewportDim.y);
+			  commands.widthInPixels = (u32)viewportDim.x;
+			  commands.heightInPixels = (u32)viewportDim.y;
+			  
+			  glViewport((GLint)viewportMin.x, (GLint)viewportMin.y,
+				     (GLsizei)viewportDim.x, (GLsizei)viewportDim.y);
+			  glScissor((GLint)viewportMin.x, (GLint)viewportMin.y,
+				    (GLsizei)viewportDim.x, (GLsizei)viewportDim.y);
+
+			  GL_PRINT_ERROR("GL ERROR: %u at frame start\n");
+
+			  double mouseX, mouseY;
+			  glfwGetCursorPos(window, &mouseX, &mouseY);
+			  newInput->mouseState.position = V2(mouseX, (r64)framebufferHeight - mouseY) - viewportMin;
+			  printf("mouseP: (%.2f, %.2f)", newInput->mouseState.position.x, newInput->mouseState.position.y);
 
 			  if(plugin.renderNewFrame)
 			    {

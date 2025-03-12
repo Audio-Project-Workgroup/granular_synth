@@ -75,7 +75,7 @@ struct UIContext
   Arena *permanentArena;
 
   LoadedFont *font;
-  
+
   // NOTE: interaction state
   v3 mouseP;
   v3 lastMouseP;
@@ -94,6 +94,8 @@ struct UIContext
   bool enterPressed;
   bool minusPressed;
   bool plusPressed;
+
+  bool windowResized;
 
   u32 frameIndex;
 
@@ -171,6 +173,8 @@ struct UILayout
   
   UIElement *elementCache[512];
   UIElement *elementFreeList;
+
+  Rect2 regionRemaining;
 
   u32 index;
  

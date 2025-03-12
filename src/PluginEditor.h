@@ -32,9 +32,17 @@ public:
 private:
 
   AudioPluginAudioProcessor& processorRef;
+  
   juce::OpenGLContext glContext;
+
+  juce::MouseCursor editorMouseCursor;
+
   RenderCommands commands;  
-    
+
+  r32 targetAspectRatio;
+  u32 editorWidth, editorHeight;
+  v2 displayDim, displayMin;
+
   PluginInput pluginInput[2];
   PluginInput *newInput;
   PluginInput *oldInput;

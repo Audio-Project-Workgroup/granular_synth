@@ -224,7 +224,7 @@ uiInitializeContext(Arena *frameArena, Arena *permanentArena, LoadedFont *font)
 }
 
 static void
-uiContextNewFrame(UIContext *context, MouseState *mouse, KeyboardState *keyboard)
+uiContextNewFrame(UIContext *context, MouseState *mouse, KeyboardState *keyboard, bool windowResized)
 {  
   // NOTE: mouse input
   context->lastMouseP = context->mouseP;
@@ -249,7 +249,9 @@ uiContextNewFrame(UIContext *context, MouseState *mouse, KeyboardState *keyboard
   context->enterPressed = wasPressed(keyboard->keys[KeyboardButton_enter]);
   context->minusPressed = wasPressed(keyboard->keys[KeyboardButton_minus]);
   context->plusPressed = (wasPressed(keyboard->keys[KeyboardButton_equal]) &&
-			 isDown(keyboard->modifiers[KeyboardModifier_shift]));  
+			 isDown(keyboard->modifiers[KeyboardModifier_shift]));
+  
+  context->windowResized = windowResized;
 
   ++context->frameIndex;
   context->layoutCount = 0;
@@ -298,6 +300,7 @@ uiBeginLayout(UILayout *layout, UIContext *context, Rect2 parentRect, v4 color =
   layout->root->flags |= UIElementFlag_drawBorder;
   layout->root->lastFrameTouched = context->frameIndex;
   uiSetSemanticSizeAbsolute(layout->root, parentRect.min, getDim(parentRect));
+  layout->regionRemaining = parentRect;
 }
 
 inline void
@@ -317,6 +320,7 @@ inline UIElement *
 uiCacheElement(UIElement *element)
 {
   UILayout *layout = element->layout;
+  UIContext *context = layout->context;
   
   UIHashKey hashKey = element->hashKey;
   u64 cacheIndex = hashKey.key % ARRAY_COUNT(layout->elementCache);
@@ -325,7 +329,7 @@ uiCacheElement(UIElement *element)
     {
       if(uiHashKeysAreEqual(hashKey, cachedElement->hashKey))
 	{
-	  if(element->lastFrameTouched > cachedElement->lastFrameTouched)
+	  if(element->lastFrameTouched > cachedElement->lastFrameTouched || context->windowResized)
 	    {
 	      element->nextInHash = cachedElement->nextInHash;
 	      //COPY_SIZE(cachedElement, element, sizeof(*element));
@@ -339,7 +343,7 @@ uiCacheElement(UIElement *element)
 	      cachedElement = cachedElement->nextInHash;
 	      if(uiHashKeysAreEqual(hashKey, cachedElement->hashKey))
 		{
-		  if(element->lastFrameTouched > cachedElement->lastFrameTouched)
+		  if(element->lastFrameTouched > cachedElement->lastFrameTouched || context->windowResized)
 		    {
 		      element->nextInHash = cachedElement->nextInHash;
 		      //COPY_SIZE(cachedElement, element, sizeof(UIElement));

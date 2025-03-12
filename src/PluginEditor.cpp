@@ -20,15 +20,36 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
     // Make sure that before the constructor has finished, you've set the
     // editor's size to whatever you need it to be.
   setSize(400, 300);
+  setResizable(true, true);
   
   glContext.setRenderer(this);
   glContext.setContinuousRepainting(true);
-  glContext.attachTo(*this);
+  glContext.attachTo(*this);  
+
+  editorWidth = getWidth();
+  editorHeight = getHeight();
+
+  targetAspectRatio = 16.f/9.f;
+  r32 editorAspectRatio = (r32)editorWidth/(r32)editorHeight;
+  if(editorAspectRatio < targetAspectRatio)
+    {
+      // NOTE: width constrained
+      displayDim.x = (r32)editorWidth;
+      displayDim.y = displayDim.x/targetAspectRatio;
+      displayMin = V2(0, ((r32)editorHeight - displayDim.y)*0.5f);
+    }
+  else
+    {
+      // NOTE: height constrained
+      displayDim.y = (r32)editorHeight;
+      displayDim.x = displayDim.y*targetAspectRatio;
+      displayMin = V2(((r32)editorWidth - displayDim.x)*0.5f, 0);
+    }
 
   commands = {};
   commands.generateNewTextures = true;
-  commands.widthInPixels = getWidth();
-  commands.heightInPixels = getHeight();
+  commands.widthInPixels = (u32)displayDim.x;
+  commands.heightInPixels = (u32)displayDim.y; 
 
   //commands = {};
   //commands.vertexCapacity = 512;
@@ -70,24 +91,47 @@ AudioPluginAudioProcessorEditor::paint(juce::Graphics& g)
 void
 AudioPluginAudioProcessorEditor::resized()
 {
-  commands.widthInPixels = getWidth();
-  commands.heightInPixels = getHeight();
+  editorWidth = getWidth();
+  editorHeight = getHeight();
+  r32 targetAspectRatio = 16.f/9.f;
+  r32 editorAspectRatio = (r32)editorWidth/(r32)editorHeight;
+
+  if(editorAspectRatio < targetAspectRatio)
+    {
+      // NOTE: width constrained
+      displayDim.x = (r32)editorWidth;
+      displayDim.y = displayDim.x/targetAspectRatio;
+      displayMin = V2(0, ((r32)editorHeight - displayDim.y)*0.5f);
+    }
+  else
+    {
+      // NOTE: height constrained
+      displayDim.y = (r32)editorHeight;
+      displayDim.x = displayDim.y*targetAspectRatio;
+      displayMin = V2(((r32)editorWidth - displayDim.x)*0.5f, 0);
+    }
+
+  commands.windowResized = true;
+  commands.widthInPixels = (u32)displayDim.x;
+  commands.heightInPixels = (u32)displayDim.y;
 }
 
 void
 AudioPluginAudioProcessorEditor::mouseMove(const juce::MouseEvent &event)
 {
   juce::Point<int> mousePosition = event.getPosition();
-  newInput->mouseState.position.x = mousePosition.getX();//2.f*((r32)mousePosition.getX()/(r32)getWidth()) - 1.f;
-  newInput->mouseState.position.y = getHeight() - mousePosition.getY();//-2.f*((r32)mousePosition.getY()/(r32)getHeight()) + 1.f;
+  newInput->mouseState.position = V2(mousePosition.getX(), editorHeight - mousePosition.getY()) - displayMin;
+
+  setMouseCursor(editorMouseCursor);
 }
 
 void
 AudioPluginAudioProcessorEditor::mouseDrag(const juce::MouseEvent &event)
 {
   juce::Point<int> mousePosition = event.getPosition();
-  newInput->mouseState.position.x = mousePosition.getX();//2.f*((r32)mousePosition.getX()/(r32)getWidth()) - 1.f;
-  newInput->mouseState.position.y = getHeight() - mousePosition.getY();//-2.f*((r32)mousePosition.getY()/(r32)getHeight()) + 1.f;
+  newInput->mouseState.position = V2(mousePosition.getX(), editorHeight - mousePosition.getY()) - displayMin;
+
+  setMouseCursor(editorMouseCursor);
 }
 
 void
@@ -95,15 +139,11 @@ AudioPluginAudioProcessorEditor::mouseDown(const juce::MouseEvent &event)
 {
   if(event.mods.isLeftButtonDown())
     {
-      juceProcessButtonPress(&newInput->mouseState.buttons[MouseButton_left], true);
-      //newInput->mouseButtons[MouseButton_left].endedDown = true;
-      //++newInput->mouseButtons[MouseButton_left].halfTransitionCount;
+      juceProcessButtonPress(&newInput->mouseState.buttons[MouseButton_left], true);      
     }
   if(event.mods.isRightButtonDown())
     {
       juceProcessButtonPress(&newInput->mouseState.buttons[MouseButton_right], true);
-      //newInput->mouseButtons[MouseButton_right].endedDown = true;
-      //++newInput->mouseButtons[MouseButton_right].halfTransitionCount;
     }
 }
 
@@ -114,14 +154,10 @@ AudioPluginAudioProcessorEditor::mouseUp(const juce::MouseEvent &event)
   if(event.mods.isLeftButtonDown())
     {
       juceProcessButtonPress(&newInput->mouseState.buttons[MouseButton_left], false);
-      //newInput->mouseButtons[MouseButton_left].endedDown = false;
-      //++newInput->mouseButtons[MouseButton_left].halfTransitionCount;
     }
   if(event.mods.isRightButtonDown())
     {
       juceProcessButtonPress(&newInput->mouseState.buttons[MouseButton_right], false);
-      //newInput->mouseButtons[MouseButton_right].endedDown = false;
-      //++newInput->mouseButtons[MouseButton_right].halfTransitionCount;
     }
 }
 
@@ -205,14 +241,47 @@ AudioPluginAudioProcessorEditor::newOpenGLContextCreated(void)
 
 void
 AudioPluginAudioProcessorEditor::renderOpenGL(void)
-{    
+{
+  glViewport(0, 0, editorWidth, editorHeight);
+  glScissor(0, 0, editorWidth, editorHeight);
+
   glClearColor(0.2f, 0.2f, 0.2f, 0.f);
   glClear(GL_COLOR_BUFFER_BIT);
 
+  glViewport(displayMin.x, displayMin.y, displayDim.x, displayDim.y);
+  glScissor(displayMin.x, displayMin.y, displayDim.x, displayDim.y);
+
   if(processorRef.pluginCode.renderNewFrame)
     {
-      processorRef.pluginCode.renderNewFrame(&processorRef.pluginMemory, newInput, &commands);
+      processorRef.pluginCode.renderNewFrame(&processorRef.pluginMemory, newInput, &commands);      
+
+      // NOTE: it's so cool that you can't set the mouse cursor here and have to defer setting it in a mouse callback
+      switch(commands.cursorState)
+	{
+	case CursorState_default:
+	  {
+	    editorMouseCursor = juce::MouseCursor::NormalCursor;
+	  } break;
+	case CursorState_hArrow:
+	  {	   
+	    editorMouseCursor = juce::MouseCursor::LeftRightResizeCursor;
+	  } break;
+	case CursorState_vArrow:
+	  {
+	    editorMouseCursor = juce::MouseCursor::UpDownResizeCursor;
+	  } break;
+	case CursorState_hand:
+	  {
+	    editorMouseCursor = juce::MouseCursor::DraggingHandCursor;
+	  } break;
+	case CursorState_text:
+	  {
+	    editorMouseCursor = juce::MouseCursor::IBeamCursor;
+	  } break;
+	}
+      
       renderCommands(&commands);
+      //repaint();
     }
 
   PluginInput *temp = newInput;
