@@ -148,7 +148,7 @@ namespace midi {
     #ifdef MIDI_VERBOSE
             printf("AFTER PARSING : 0x%x | %d timeStamp(ms passed) | %d bytes to read | data points to 0x%x | midiBuffer ptr points to 0x%x\n", 
                 (int)commandByte,
-                // timeStamp, 
+                timeStamp, 
                 (int)bytesToRead, 
                 (int)data[0], 
                 (int)atMidiBuffer[0]);
