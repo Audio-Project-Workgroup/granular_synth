@@ -240,17 +240,10 @@ prepareToPlay(double sampleRate, int samplesPerBlock)
 	{
 	  juce::Logger::writeToLog("failed to load function: renderNewFrame");
 	}
-      
       pluginCode.audioProcess = (AudioProcess *)libPlugin.getFunction("audioProcess");
       if(!pluginCode.audioProcess)
 	{
 	  juce::Logger::writeToLog("failed to load function: audioProcess");
-	}
-
-      pluginCode.initializePluginState = (InitializePluginState *)libPlugin.getFunction("initializePluginState");
-      if(!pluginCode.audioProcess)
-	{
-	  juce::Logger::writeToLog("failed to load function: initializePluginState");
 	}     
     }
   else
@@ -258,14 +251,11 @@ prepareToPlay(double sampleRate, int samplesPerBlock)
       juce::Logger::writeToLog("failed to open dynamic library");
     }
 
-  if(!pluginCode.renderNewFrame || !pluginCode.audioProcess || !pluginCode.initializePluginState)
+  if(!pluginCode.renderNewFrame || !pluginCode.audioProcess)
     {      
       pluginCode.renderNewFrame = nullptr;
       pluginCode.audioProcess = nullptr;
-      pluginCode.initializePluginState = nullptr;
     }
-
-  pluginCode.initializePluginState(&pluginMemory);
 
   audioBuffer = {};
   audioBuffer.format = AudioFormat_r32;
@@ -321,13 +311,30 @@ isBusesLayoutSupported(const BusesLayout& layouts) const
 #endif
 }
 
+#include "midiTest.cpp"
+
 void AudioPluginAudioProcessor::
 processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
   audioBuffer.midiMessageCount = 0;
   u8 *atMidiBuffer = audioBuffer.midiBuffer;
+  
+// Midi-Parsing Tests
+// add the tests before any actual midi messages. They ll run just once 
+  static bool testRun = true;
+  if (testRun){
+    addNoteOnMessage(atMidiBuffer);
+    addNoteOffMessage(atMidiBuffer);
+    addCCMessage_1(atMidiBuffer);
+    testRun=false;
+    // testRun--;
+    audioBuffer.midiMessageCount+=3;
+  }
+// Midi-Parsing Tests (end)
+  
   for(const auto metadata : midiMessages)
     {
+
       auto message = metadata.getMessage();
       int messageLength = message.getRawDataSize();
       
