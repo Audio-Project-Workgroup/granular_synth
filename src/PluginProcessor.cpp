@@ -323,12 +323,17 @@ processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 // add the tests before any actual midi messages. They ll run just once 
   static bool testRun = true;
   if (testRun){
-    addNoteOnMessage(atMidiBuffer);
-    addNoteOffMessage(atMidiBuffer);
-    addCCMessage_1(atMidiBuffer);
+    atMidiBuffer+=addNoteOnMessage(atMidiBuffer);
+    audioBuffer.midiMessageCount++;
+
+    atMidiBuffer+=addNoteOffMessage(atMidiBuffer);
+    audioBuffer.midiMessageCount++;
+    
+    atMidiBuffer+=addCCMessage_1(atMidiBuffer);
+    audioBuffer.midiMessageCount++;
+    
     testRun=false;
     // testRun--;
-    audioBuffer.midiMessageCount+=3;
   }
 // Midi-Parsing Tests (end)
   

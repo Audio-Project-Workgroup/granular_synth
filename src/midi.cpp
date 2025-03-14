@@ -113,6 +113,7 @@ namespace midi {
         if(audioBuffer->midiMessageCount){
 
     #ifdef MIDI_VERBOSE
+            printf("atMidiBuffer address in parseMidiMessage %d\n",atMidiBuffer);
             printf("ALL BYTES : ");
             size_t numberOfBytesAheadToPrint = 10;
             for (size_t i = 0; i < numberOfBytesAheadToPrint; ++i) {
@@ -155,6 +156,10 @@ namespace midi {
             printf("\n\n");
     #endif
             --audioBuffer->midiMessageCount;
+            /// CRITICAL BUG --> CONSUMING ONE BY ONE THE MIDI MESSAGES, REQUIRES THAT WE MOVE THE audioBuffer->midiBuffer FORWARD EACH TIME.
+            audioBuffer->midiBuffer = atMidiBuffer;
+
+
         }
     }
 }
