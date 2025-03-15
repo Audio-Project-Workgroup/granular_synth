@@ -22,7 +22,7 @@ namespace midi {
         uint8_t key = data[0];
         uint8_t velocity = data[1];
         pluginState->freq = hertzFromMidiNoteNumber(key);
-        pluginSetFloatParameter(&pluginState->volume, 0.0);
+        pluginSetFloatParameter(&pluginState->parameters[PluginParameter_volume], 0.0);
         printf("Note Off: Channel %d Key %d Velocity %d\n", channel, key, velocity);
     }
 
@@ -32,7 +32,7 @@ namespace midi {
         uint8_t velocity = data[1];
 
         pluginState->freq = hertzFromMidiNoteNumber(key);
-        pluginSetFloatParameter(&pluginState->volume, (r32)velocity / 127.f);
+        pluginSetFloatParameter(&pluginState->parameters[PluginParameter_volume], (r32)velocity / 127.f);
         printf("Note On: Channel %d Key %d Velocity %d\n", channel, key, velocity);
     }
 
@@ -41,7 +41,7 @@ namespace midi {
         uint8_t key = data[0];
         uint8_t touch = data[1];
         pluginState->freq = hertzFromMidiNoteNumber(key);
-        pluginSetFloatParameter(&pluginState->volume, (r32)touch / 127.f);
+        pluginSetFloatParameter(&pluginState->parameters[PluginParameter_volume], (r32)touch / 127.f);
         printf("Aftertouch: Channel %d Key %d Touch %d\n", channel, key, touch);
     }
 
