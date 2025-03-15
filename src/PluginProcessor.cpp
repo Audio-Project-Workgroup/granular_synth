@@ -331,6 +331,21 @@ processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
     
     atMidiBuffer+=addCCMessage_1(atMidiBuffer);
     audioBuffer.midiMessageCount++;
+    
+    atMidiBuffer+=addCCMessage_2(atMidiBuffer);
+    audioBuffer.midiMessageCount++;
+
+    atMidiBuffer+=addCCMessage_3(atMidiBuffer);
+    audioBuffer.midiMessageCount++;
+
+    atMidiBuffer+=addCCMessage_4(atMidiBuffer);
+    audioBuffer.midiMessageCount++;
+
+    atMidiBuffer+=addCCMessage_5(atMidiBuffer);
+    audioBuffer.midiMessageCount++;
+
+    atMidiBuffer+=addCCMessage_6(atMidiBuffer);
+    audioBuffer.midiMessageCount++;
 
     atMidiBuffer+=addPitchBend_1(atMidiBuffer);
     audioBuffer.midiMessageCount++;
