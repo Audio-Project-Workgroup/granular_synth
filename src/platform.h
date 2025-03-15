@@ -1,7 +1,11 @@
 // operating-system-dependent functions/types
 #pragma once
 
-static u32 syncCompareAndSwap(volatile u32 *value, u32 oldval, u32 newval);
+static u32 atomicLoad(volatile u32 *src);
+static u32 atomicStore(volatile u32 *dest, u32 value);
+static u32 atomicAdd(volatile u32 *addend, u32 value);
+static u32 atomicCompareAndSwap(volatile u32 *value, u32 oldval, u32 newval);
+static void *atomicCompareAndSwapPointers(volatile void *value, void *oldval, void *newval);
 
 #if OS_WINDOWS
 
@@ -79,6 +83,48 @@ msecWait(u32 msecsToWait)
   Sleep(msecsToWait);
 }
 
+//
+// atomic operations
+//
+
+static u32
+atomicLoad(volatile u32 *src)
+{
+  return(*src);
+}
+
+static u32
+atomicStore(volatile u32 *dest, u32 value)
+{
+  u32 result = atomicLoad(dest);
+  *dest = value;
+
+  return(result);
+}
+
+static u32
+atomicAdd(volatile u32 *addend, u32 value)
+{
+  InterlockedAdd((LONG *)addend, value);
+  return(atomicLoad(addend));
+}
+
+static u32
+atomicCompareAndSwap(volatile u32 *value, u32 oldval, u32 newval)
+{
+  return(InterlockedCompareExchange(value, newval, oldval));
+}
+
+static void *
+atomicCompareAndSwapPointers(volatile void *value, void *oldval, void *newval)
+{
+  return(InterlockedCompareExchangePointer((PVOID *)value, newval, oldval));
+}
+
+//
+// plugin code loading
+//
+
 struct PluginCode
 {
   bool isValid;
@@ -90,12 +136,6 @@ struct PluginCode
   AudioProcess *audioProcess;
   InitializePluginState *initializePluginState;
 };
-
-static u32
-syncCompareAndSwap(volatile u32 *value, u32 oldval, u32 newval)
-{
-  return(InterlockedCompareExchange(value, newval, oldval));
-}
 
 static PluginCode
 loadPluginCode(char *filename)
@@ -152,6 +192,10 @@ unloadPluginCode(PluginCode *code)
   code->renderNewFrame = 0;
   code->audioProcess = 0;
 }
+
+//
+// file operations
+//
 
 static PLATFORM_READ_ENTIRE_FILE(platformReadEntireFile)
 {
@@ -303,6 +347,47 @@ msecWait(u32 msecsToWait)
   usleep(1000*msecsToWait);
 }
 
+//
+// atomic operations
+// 
+  
+static u32
+atomicLoad(volatile u32 *src)
+{
+  return(__atomic_load_n(src, __ATOMIC_ACQ));
+}
+
+static u32
+atomicStore(volatile u32 *dest, u32 value)
+{
+  u32 result = atomicLoad(dest);
+  __atomic_store_n(dest, value, __ATOMIC_REL);
+
+  return(result);
+}
+
+static u32
+atomicAdd(volatile u32 *addend, u32 value)
+{
+  return(__atomic_fetch_add(addend, value, __ATOMIC_ACQ));
+}
+
+static u32
+atomicCompareAndSwap(volatile u32 *value, u32 oldval, u32 newval)
+{
+  return(__atomic_val_compare_and_swap(value, oldval, newval, __ATOMIC_ACQ_REL));
+}
+
+static void *
+atomicCompareAndSwapPointers(volatile void *value, void *oldval, void *newval)
+{
+  return(__atomic_val_compare_and_swap(value, oldval, newval, __ATOMIC_ACQ_REL));
+}
+
+//
+// plugin code loading
+//
+
 struct PluginCode
 {
   bool isValid;
@@ -313,12 +398,6 @@ struct PluginCode
   AudioProcess *audioProcess;
   InitializePluginState *initializePluginState;
 };
-
-static u32
-syncCompareAndSwap(volatile u32 *value, u32 oldval, u32 newval)
-{
-  return(__sync_val_compare_and_swap(value, oldval, newval));
-}
 
 static PluginCode
 loadPluginCode(char *filename)
@@ -367,6 +446,10 @@ unloadPluginCode(PluginCode *code)
   code->renderNewFrame = 0;
   code->audioProcess = 0;
 }
+
+//
+// file operations
+//
 
 typedef ssize_t ssz;
 #define PLATFORM_MAX_READ_SIZE 0x7FFFF000

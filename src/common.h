@@ -38,6 +38,23 @@ typedef PLATFORM_FREE_FILE_MEMORY(PlatformFreeFileMemory);
 #define PLATFORM_WRITE_ENTIRE_FILE(name) void (name)(char *filename, void *fileMemory, usz fileSize)
 typedef PLATFORM_WRITE_ENTIRE_FILE(PlatformWriteEntireFile);
 
+// atomics
+
+#define ATOMIC_LOAD(name) u32 (name)(volatile u32 *src)
+typedef ATOMIC_LOAD(AtomicLoad);
+
+#define ATOMIC_STORE(name) u32 (name)(volatile u32 *dest, u32 value)
+typedef ATOMIC_STORE(AtomicStore);
+
+#define ATOMIC_ADD(name) u32 (name)(volatile u32 *addend, u32 value)
+typedef ATOMIC_ADD(AtomicAdd);
+
+#define ATOMIC_COMPARE_AND_SWAP(name) u32 (name)(volatile u32 *value, u32 oldval, u32 newval)
+typedef ATOMIC_COMPARE_AND_SWAP(AtomicCompareAndSwap);
+
+#define ATOMIC_COMPARE_AND_SWAP_POINTERS(name) void *(name)(volatile void *value, void *oldval, void *newval)
+typedef ATOMIC_COMPARE_AND_SWAP_POINTERS(AtomicCompareAndSwapPointers);
+
 struct PlatformAPI
 {
   PlatformReadEntireFile *readEntireFile;  
@@ -47,6 +64,12 @@ struct PlatformAPI
   PlatformRunModel *runModel;
 
   PlatformGetCurrentTimestamp *getCurrentTimestamp;
+
+  AtomicLoad *atomicLoad;
+  AtomicStore *atomicStore;
+  AtomicAdd *atomicAdd;
+  AtomicCompareAndSwap *atomicCompareAndSwap;
+  AtomicCompareAndSwapPointers *atomicCompareAndSwapPointers;
 };
 
 extern PlatformAPI globalPlatform;

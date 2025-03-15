@@ -205,6 +205,12 @@ prepareToPlay(double sampleRate, int samplesPerBlock)
   //pluginMemory.platformAPI.freeFileMemory = platformFreeFileMemory;
   pluginMemory.platformAPI.runModel = platformRunModel;
 
+  pluginMemory.platformAPI.atomicLoad = atomicLoad;
+  pluginMemory.platformAPI.atomicStore = atomicStore;
+  pluginMemory.platformAPI.atomicAdd = atomicAdd;
+  pluginMemory.platformAPI.atomicCompareAndSwap = atomicCompareAndSwap;
+  pluginMemory.platformAPI.atomicCompareAndSwapPointers = atomicCompareAndSwapPointers;
+
   juce::String pluginPath(DYNAMIC_PLUGIN_PATH);
   juce::Logger::writeToLog(pluginPath);  
 

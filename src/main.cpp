@@ -228,11 +228,20 @@ main(int argc, char **argv)
 	  PluginMemory pluginMemory = {};
 	  pluginMemory.memory = calloc(MEGABYTES(512), 1);
 	  pluginMemory.osTimerFreq = getOSTimerFreq();
-	  pluginMemory.platformAPI.readEntireFile = platformReadEntireFile;
-	  pluginMemory.platformAPI.freeFileMemory = platformFreeFileMemory;
+	  
+	  pluginMemory.platformAPI.readEntireFile  = platformReadEntireFile;
+	  pluginMemory.platformAPI.freeFileMemory  = platformFreeFileMemory;
 	  pluginMemory.platformAPI.writeEntireFile = platformWriteEntireFile;
+	  
 	  pluginMemory.platformAPI.runModel = platformRunModel;
+	  
 	  pluginMemory.platformAPI.getCurrentTimestamp = platformGetCurrentTimestamp;
+
+	  pluginMemory.platformAPI.atomicLoad			= atomicLoad;
+	  pluginMemory.platformAPI.atomicStore			= atomicStore;
+	  pluginMemory.platformAPI.atomicAdd			= atomicAdd;
+	  pluginMemory.platformAPI.atomicCompareAndSwap		= atomicCompareAndSwap;
+	  pluginMemory.platformAPI.atomicCompareAndSwapPointers = atomicCompareAndSwapPointers;
 
 	  RenderCommands commands = {};	  
 
