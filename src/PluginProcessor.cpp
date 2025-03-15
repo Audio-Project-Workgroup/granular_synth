@@ -331,6 +331,9 @@ processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
     
     atMidiBuffer+=addCCMessage_1(atMidiBuffer);
     audioBuffer.midiMessageCount++;
+
+    atMidiBuffer+=addPitchBend_1(atMidiBuffer);
+    audioBuffer.midiMessageCount++;
     
     testRun=false;
     // testRun--;

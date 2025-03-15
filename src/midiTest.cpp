@@ -37,6 +37,18 @@ size_t addCCMessage_1(uint8_t *atMidiBuffer){
     return 8*sizeof(uint8_t);
 }
 
+size_t addPitchBend_1(uint8_t *atMidiBuffer){
+    atMidiBuffer[0] = 0x07;
+    atMidiBuffer[1] = 0x55;
+    atMidiBuffer[2] = 0x00;
+    atMidiBuffer[3] = 0x00;
+    atMidiBuffer[4] = 0x00;
+    atMidiBuffer[5] = 0xE0; //Pitch Bend
+    atMidiBuffer[6] = 0x00; // lsb = 0
+    atMidiBuffer[7] = 0x40; // msb = 64 --> 0x40
+                            // this should result in 8192, which means no bend.
+    return 8*sizeof(uint8_t);
+}
 // void add_new_message(uint8_t *atMidiBuffer){
     // adding a new message, you define a new test. This is done with:
     

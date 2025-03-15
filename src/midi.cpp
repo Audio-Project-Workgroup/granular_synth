@@ -71,7 +71,11 @@ namespace midi {
         assert(len == 2);
         uint8_t lsb = data[0];
         uint8_t msb = data[1]; 
-        printf("Pitch Bend: Channel %d lsb %d msb %d\n",channel,lsb,msb);
+
+        // Combine the MSB and LSB to get the pitch bend value source:https://sites.uci.edu/camp2014/2014/04/30/managing-midi-pitchbend-messages/
+        uint16_t bendValue = (msb << 7) | lsb;
+
+        printf("Pitch Bend: Channel %d lsb %d msb %d bendValue : %d\n",channel,lsb,msb,bendValue);
     }
 
     void SystemMessages(uint8_t channel, uint8_t* data, uint8_t len, PluginState *pluginState) {
