@@ -662,6 +662,22 @@ clampToRange(r32 val, r32 min, r32 max)
   return(result);
 }
 
+inline bool
+isInRange(r32 val, RangeR32 range)
+{
+  bool result = (val <= range.max && range.min <= val);
+
+  return(result);
+}
+
+inline bool
+isInRange(r32 val, r32 min, r32 max)
+{
+  bool result = (val <= max && min <= val);
+
+  return(result);
+}
+
 //
 // Rect2
 //
@@ -681,6 +697,14 @@ rectMinDim(v2 min, v2 dim)
 {
   Rect2 result = rectMinMax(min, min + dim);
     
+  return(result);
+}
+
+static inline Rect2
+rectMaxNegDim(v2 max, v2 negDim)
+{
+  Rect2 result = rectMinMax(max + negDim, max);
+
   return(result);
 }
 

@@ -122,6 +122,7 @@ uiSetElementDataFloat(UIElement *element, PluginFloatParameter *param)
   element->fParam = param;
 }
 
+#if 0
 inline void
 uiSetSemanticSizeAbsolute(UIElement *element, v2 offset, v2 dim)
 {
@@ -211,6 +212,7 @@ uiSetSemanticSizeText(UIElement *element, LoadedFont *font, v2 offset, v2 scale)
   uiSetSemanticSizeAbsolute(element, offset, textDim);
   element->textScale = textScale;
 }
+#endif
 
 inline UIContext
 uiInitializeContext(Arena *frameArena, Arena *permanentArena, LoadedFont *font)
@@ -299,7 +301,8 @@ uiBeginLayout(UILayout *layout, UIContext *context, Rect2 parentRect, v4 color =
   layout->root = uiMakeElement(layout, "root", 0, color);
   layout->root->flags |= UIElementFlag_drawBorder;
   layout->root->lastFrameTouched = context->frameIndex;
-  uiSetSemanticSizeAbsolute(layout->root, parentRect.min, getDim(parentRect));
+  //uiSetSemanticSizeAbsolute(layout->root, parentRect.min, getDim(parentRect));
+  layout->root->region = parentRect;
   layout->regionRemaining = parentRect;
 }
 
@@ -557,11 +560,30 @@ uiCommFromElement(UIElement *element)
 //
 
 inline UIComm
-uiMakeTextElement(UILayout *layout, char *message, r32 wScale, r32 hScale, v4 color = V4(1, 1, 1, 1))
+uiMakeTextElement(UILayout *layout, char *message, r32 desiredTextScale, v4 color = V4(1, 1, 1, 1))
 {
   UIContext *context = layout->context;
   UIElement *text = uiMakeElement(layout, message, UIElementFlag_drawText | UIElementFlag_drawBorder, color);
-  uiSetSemanticSizeTextCentered(text, context->font, wScale, hScale);
+
+  v2 messageRectDim = desiredTextScale*getTextDim(context->font, (u8 *)message);
+  v2 layoutRegionRemainingDim = getDim(layout->regionRemaining);
+
+  r32 textScale = desiredTextScale;
+  v2 textOffset = layout->regionRemaining.min;
+  if(messageRectDim.x <= layoutRegionRemainingDim.x)
+    {      
+      textOffset.x += 0.5f*(layoutRegionRemainingDim.x - messageRectDim.x);
+    }
+  else
+    {
+      textScale = desiredTextScale*layoutRegionRemainingDim.x/messageRectDim.x;
+    }
+  textOffset.y += layoutRegionRemainingDim.y - textScale*context->font->verticalAdvance;
+
+  text->textScale = V2(textScale, textScale);
+  text->region = rectMinDim(textOffset, textScale*messageRectDim);
+  
+  layout->regionRemaining.max.y = text->region.min.y;
 
   UIComm textComm = uiCommFromElement(text);
 
@@ -572,7 +594,7 @@ inline UIComm
 uiMakeBox(UILayout *layout, char *name, Rect2 rect, u32 flags = 0, v4 color = V4(1, 1, 1, 1))
 {
   UIElement *box = uiMakeElement(layout, name, flags, color);
-  uiSetSemanticSizeAbsolute(box, rect);
+  box->region = rect;
 
   UIComm boxComm = uiCommFromElement(box);
   
@@ -580,13 +602,16 @@ uiMakeBox(UILayout *layout, char *name, Rect2 rect, u32 flags = 0, v4 color = V4
 }
 
 inline UIComm
-uiMakeButton(UILayout *layout, char *name, v2 offset, v2 dim, PluginBooleanParameter *param,
-	     v4 color = V4(1, 1, 1, 1))
+uiMakeButton(UILayout *layout, char *name,
+	     v2 offset, r32 sizePercentOfParent,	     
+	     PluginBooleanParameter *param, v4 color = V4(1, 1, 1, 1))
 {
   u32 flags = UIElementFlag_clickable | UIElementFlag_drawBackground | UIElementFlag_drawBorder;
   UIElement *button = uiMakeElement(layout, name, flags, color);
   uiSetElementDataBoolean(button, param);
-  uiSetSemanticSizeRelative(button, offset, dim);
+
+  button->region = uiComputeElementRegion(button, offset, UIAxis_y, sizePercentOfParent, 1);
+  layout->regionRemaining.max.y = button->region.min.y;
 
   UIComm buttonComm = uiCommFromElement(button);
 
@@ -594,30 +619,35 @@ uiMakeButton(UILayout *layout, char *name, v2 offset, v2 dim, PluginBooleanParam
 }
 
 inline UIComm
-uiMakeSlider(UILayout *layout, char *name, v2 offset, v2 dim, PluginFloatParameter *param,
-	     v4 color = V4(1, 1, 1, 1))
+uiMakeSlider(UILayout *layout, char *name,
+	     v2 offset, UIAxis sizeDim, r32 sizePercentOfParent,
+	     //r32 aspectRatio,
+	     PluginFloatParameter *param, v4 color = V4(1, 1, 1, 1))
 {
   u32 flags = (UIElementFlag_clickable | UIElementFlag_draggable | UIElementFlag_drawBorder |
 	       UIElementFlag_drawLabelAbove | UIElementFlag_drawLabelBelow);
   UIElement *slider = uiMakeElement(layout, name, flags, color);
   uiSetElementDataFloat(slider, param);
-  uiSetSemanticSizeRelative(slider, offset, dim);
-  //uiSetHotRegionRelative(slider, 1.f, 0.1f);
 
+  slider->region = uiComputeElementRegion(slider, offset, sizeDim, sizePercentOfParent, 0.2f);
+  
   UIComm sliderComm = uiCommFromElement(slider);
 
   return(sliderComm);
 }
 
 inline UIComm
-uiMakeKnob(UILayout *layout, char *name, v2 offset, v2 dim, PluginFloatParameter *param,
-	   v4 color = V4(1, 1, 1, 1))
+uiMakeKnob(UILayout *layout, char *name,
+	   v2 offset, r32 sizePercentOfParent,
+	   PluginFloatParameter *param, v4 color = V4(1, 1, 1, 1))
 {
   u32 flags = (UIElementFlag_clickable | UIElementFlag_turnable | UIElementFlag_drawBorder |
 	       UIElementFlag_drawLabelBelow);
   UIElement *knob = uiMakeElement(layout, name, flags, color);
   uiSetElementDataFloat(knob, param);
-  uiSetSemanticSizeRelative(knob, offset, dim);
+
+  knob->region = uiComputeElementRegion(knob, offset, UIAxis_y, sizePercentOfParent, 1);
+  layout->regionRemaining.max.y = knob->region.min.y;
 
   UIComm knobComm = uiCommFromElement(knob);
 
@@ -627,10 +657,10 @@ uiMakeKnob(UILayout *layout, char *name, v2 offset, v2 dim, PluginFloatParameter
 inline UIComm
 uiMakeCollapsibleList(UILayout *layout, char *text, v2 offset, v2 scale, v4 color = V4(1, 1, 1, 1))
 {
-  UIContext *context = layout->context;
+  //UIContext *context = layout->context;
   u32 flags = UIElementFlag_clickable | UIElementFlag_collapsible | UIElementFlag_drawText | UIElementFlag_drawBorder;
   UIElement *list = uiMakeElement(layout, text, flags, color);
-  uiSetSemanticSizeText(list, context->font, offset, scale);
+  //uiSetSemanticSizeText(list, context->font, offset, scale);
 
   UIComm listComm = uiCommFromElement(list);
   return(listComm);

@@ -88,7 +88,7 @@ renderChangeCursorState(RenderCommands *commands, RenderCursorState cursorState)
 {
   commands->cursorState = cursorState;
 }
-
+#if 0
 inline Rect2
 renderComputeUIElementRegion(RenderCommands *commands, UIElement *element)
 {
@@ -167,6 +167,7 @@ renderComputeUIElementRegion(RenderCommands *commands, UIElement *element)
   Rect2 elementRect = rectMinDim(elementMin, elementDim);
   return(elementRect);
 }
+#endif
 
 inline void
 renderPushUIElement(RenderCommands *commands, UIElement *element)
@@ -174,7 +175,7 @@ renderPushUIElement(RenderCommands *commands, UIElement *element)
   UILayout *layout = element->layout;
   //UIContext *context = layout->context;
   
-  element->region = renderComputeUIElementRegion(commands, element);
+  //element->region = renderComputeUIElementRegion(commands, element);
   //element->hotRegion = element->region;
 
   v2 elementRegionCenter = getCenter(element->region);

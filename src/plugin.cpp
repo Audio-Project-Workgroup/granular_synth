@@ -333,6 +333,18 @@ RENDER_NEW_FRAME(renderNewFrame)
 		  Rect2 childRect = uiComputeChildPanelRect(child, panelRect);
 		  Rect2 boundaryRect = childRect;
 		  UIAxis splitAxis = panel->splitAxis;
+
+		  if(splitAxis == UIAxis_x)
+		    {
+		      child->fringeFlags |= UIFringeFlag_right;
+		      child->next->fringeFlags |= UIFringeFlag_left;
+		    }
+		  else
+		    {
+		      child->fringeFlags |= UIFringeFlag_top;
+		      child->next->fringeFlags |= UIFringeFlag_bottom;
+		    }
+		    
 		  boundaryRect.min.E[splitAxis] = boundaryRect.max.E[splitAxis];
 		  boundaryRect.min.E[splitAxis] -= 2;
 		  boundaryRect.max.E[splitAxis] += 2;
@@ -373,16 +385,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 		      r32 maxChildPercentPostDrag = maxChildPixelsPostDrag/panelDim.E[splitAxis];
 		      minChild->sizePercentOfParent = clampToRange(minChildPercentPostDrag, 0, 1);
 		      maxChild->sizePercentOfParent = clampToRange(maxChildPercentPostDrag, 0, 1);
-	
-		      //v2 mouseDelta = (isInRectangle(panelRect, layout->mouseP.xy) ?
-		      //		   (layout->lastMouseP.xy - layout->mouseP.xy) : V2(0, 0));
-		      //printf("mouseDelta: (%.2f, %.2f)\n", mouseDelta.x, mouseDelta.y);
-		      //r32 sizeChange = mouseDelta.E[child->splitAxis]/windowDim.E[child->splitAxis];
-		      //child->sizePercentOfParent -= sizeChange;
-		      //child->next->sizePercentOfParent += sizeChange;
-		    }
-
-		  //renderPushQuad(renderCommands, boundaryRect, 0, 0, RenderLevel_front);
+		    }	
 		}
 
 	      renderPushUILayout(renderCommands, panelLayout);
@@ -411,14 +414,17 @@ RENDER_NEW_FRAME(renderNewFrame)
 	      //     panelLayout->root->region.min.x, panelLayout->root->region.min.y,
 	      //     panelLayout->root->region.max.x, panelLayout->root->region.max.y);
 
-	      UIComm text = uiMakeTextElement(panelLayout, (char *)panel->name, 0.2f, 0.f);
+	      UIComm text = uiMakeTextElement(panelLayout, (char *)panel->name, 1.5);
 	      UNUSED(text);
 
 	      // TODO: don't use strings to check which panel we are in
 	      if(stringsAreEqual(panel->name, (u8 *)"left"))
 		{
-		  UIComm volume = uiMakeSlider(panelLayout, "volume", V2(0.1f, 0.1f), V2(0.1f, 0.5f),
+		  UIComm volume = uiMakeSlider(panelLayout, "volume", V2(30.f, 30.f), UIAxis_y, 0.6f,
 					       &pluginState->volume, V4(0.8f, 0.8f, 0.8f, 1));
+
+		  renderPushRectOutline(renderCommands, volume.element->parent->region, 2, RenderLevel_front,
+					  V4(1, 1, 0, 1));
 
 		  if(volume.flags & UICommFlag_hovering)
 		    {
@@ -453,42 +459,54 @@ RENDER_NEW_FRAME(renderNewFrame)
 		  //
 		  // play
 		  //
-		  UIComm play = uiMakeButton(panelLayout, "play", V2(0.7f, 0.7f), V2(0.2f, 0.2f),
-					     &pluginState->soundIsPlaying, V4(0, 0, 1, 1));
+		  {
+		    v2 dim = getDim(panelLayout->regionRemaining);
+		    r32 sizePOP = 0.15f;		    
+		    r32 offsetPixels = 20.f;		    
+		    v2 offset = offsetPixels*V2(1, 1);
+		    UIComm play = uiMakeButton(panelLayout, "play", offset, -sizePOP,
+					       &pluginState->soundIsPlaying, V4(0, 0, 1, 1));
 
-		  bool oldPlay = pluginReadBooleanParameter(play.element->bParam);
-		  bool newPlay = oldPlay;
-		  if(play.flags & UICommFlag_pressed)
-		    {
-		      newPlay = !oldPlay;
-		      // TODO: stop doing the queue here: we don't want to have to synchronize grain (de)queueing
-		      //       across the audio and video threads (once we actually have them on their own threads)
-		      queueAllGrainsFromFile(&pluginState->silo, &pluginState->loadedGrainPackfile);
-		    }
+		    bool oldPlay = pluginReadBooleanParameter(play.element->bParam);
+		    bool newPlay = oldPlay;
+		    if(play.flags & UICommFlag_pressed)
+		      {
+			newPlay = !oldPlay;
+			// TODO: stop doing the queue here: we don't want to have to synchronize grain (de)queueing
+			//       across the audio and video threads (once we actually have them on their own threads)
+			queueAllGrainsFromFile(&pluginState->silo, &pluginState->loadedGrainPackfile);
+		      }
 
-		  pluginSetBooleanParameter(play.element->bParam, newPlay);
-
+		    pluginSetBooleanParameter(play.element->bParam, newPlay);
+		  }
+		  
 		  //
 		  // density
 		  //
-		  UIComm density = uiMakeKnob(panelLayout, "density", V2(0.7f, 0.3f), V2(0.2f, 0.2f),
-					      &pluginState->density, V4(0, 1, 0, 1));
+		  {		   
+		    v2 dim = getDim(panelLayout->regionRemaining);
+		    r32 sizePOP = 0.15f;
+		    r32 offsetPixels = 20.f;
+		    v2 offset = offsetPixels*V2(1, 1);
+		    UIComm density = uiMakeKnob(panelLayout, "density", offset, -sizePOP,
+						&pluginState->density, V4(0, 1, 0, 1));		   
 		  
-		  r32 oldDensity = pluginReadFloatParameter(density.element->fParam);
-		  r32 newDensity = oldDensity;
-		  printf("oldDensity: %.2f\n", oldDensity);		  
-		  if(density.flags & UICommFlag_dragging)
-		    {
-		      v2 dragDelta = uiGetDragDelta(density.element);
-		      printf("dragDelta: (%.2f, %.2f)\n", dragDelta.x, dragDelta.y);
+		    r32 oldDensity = pluginReadFloatParameter(density.element->fParam);
+		    r32 newDensity = oldDensity;
+		    printf("oldDensity: %.2f\n", oldDensity);		  
+		    if(density.flags & UICommFlag_dragging)
+		      {
+			v2 dragDelta = uiGetDragDelta(density.element);
+			printf("dragDelta: (%.2f, %.2f)\n", dragDelta.x, dragDelta.y);
 		      
-		      newDensity = density.element->fParamValueAtClick + 0.1f*dragDelta.y;
-		      printf("newDensity: %.2f\n", newDensity);
-		    }
+			newDensity = density.element->fParamValueAtClick + 0.1f*dragDelta.y;
+			printf("newDensity: %.2f\n", newDensity);
+		      }
 
-		  pluginSetFloatParameter(density.element->fParam, newDensity);
+		    pluginSetFloatParameter(density.element->fParam, newDensity);
+		  }
 		}
-
+	      
 	      renderPushUILayout(renderCommands, panelLayout);
 	      uiEndLayout(panelLayout);
 	    }	  

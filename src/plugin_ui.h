@@ -1,3 +1,11 @@
+enum UIFringeFlags
+{
+  UIFringeFlag_right  = 1 << 0,
+  UIFringeFlag_top    = 1 << 1,
+  UIFringeFlag_left   = 1 << 2,
+  UIFringeFlag_bottom = 1 << 3,
+};
+
 struct UIPanel
 {
   UIPanel *first;
@@ -11,7 +19,8 @@ struct UIPanel
   u8 *name;
   v4 color;
 
-  Rect2 region;  
+  u32 fringeFlags;
+  Rect2 region;
 
   UILayout layout;
 };

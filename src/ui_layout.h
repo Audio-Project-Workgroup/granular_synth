@@ -136,8 +136,17 @@ struct UIElement
     PluginFloatParameter *fParam;
   };  
   
-  UISize semanticDim[UIAxis_COUNT];
-  UISize semanticOffset[UIAxis_COUNT];
+  //UISize semanticDim[UIAxis_COUNT];
+  //UISize semanticOffset[UIAxis_COUNT];
+  r32 aspectRatio;
+  UIAxis sizingDim;
+  union
+  {
+    r32 size;
+    r32 heightPercentOfLayoutRegionRemaining;
+    r32 widthPercentOfLayoutRegionRemaining;    
+  };
+  v2 offset;
 
   // NOTE: computed
   Rect2 region;
@@ -173,7 +182,7 @@ struct UILayout
   
   UIElement *elementCache[512];
   UIElement *elementFreeList;
-
+  
   Rect2 regionRemaining;
 
   u32 index;
@@ -186,6 +195,75 @@ inline v2
 uiGetDragDelta(UIElement *element)
 {
   return(element->layout->context->mouseP.xy - element->mouseClickedP);
+}
+
+inline Rect2
+uiComputeElementRegion(UIElement *element, v2 offset, UIAxis sizeDim, r32 sizePercentOfParent, r32 aspectRatio)
+{
+  ASSERT(isInRange(sizePercentOfParent, -1.f, 1.f));
+  bool invertElementRect = isInRange(sizePercentOfParent, -1.f, 0.f);
+  //if(invertElementRect) sizePercentOfParent = -sizePercentOfParent;
+
+  Rect2 layoutRegion = element->layout->regionRemaining;
+  Rect2 parentRegion = element->parent->region;
+  v2 layoutRegionDim = getDim(layoutRegion);
+  v2 parentRegionDim = getDim(parentRegion);
+
+  // NOTE: adjust size for layout region
+  v2 elementDim = V2(0, 0);
+  if(sizeDim == UIAxis_x)
+    {
+      elementDim.x = sizePercentOfParent*parentRegionDim.x;            
+      elementDim.y = elementDim.x/aspectRatio;
+      if(Abs(elementDim.x) > layoutRegionDim.x)
+	{
+	  elementDim.x = invertElementRect ? -layoutRegionDim.x : layoutRegionDim.x;
+	  elementDim.y = elementDim.x/aspectRatio;
+	}      
+      if(Abs(elementDim.y) > layoutRegionDim.y)
+	{
+	  elementDim.y = invertElementRect ? -layoutRegionDim.y : layoutRegionDim.y;
+	  elementDim.x = elementDim.y*aspectRatio;
+	}      
+    }
+  else if(sizeDim == UIAxis_y)
+    {
+      elementDim.y = sizePercentOfParent*parentRegionDim.y;
+      elementDim.x = elementDim.y*aspectRatio;
+      if(Abs(elementDim.y) > layoutRegionDim.y)
+	{
+	  elementDim.y = invertElementRect ? -layoutRegionDim.y : layoutRegionDim.y;
+	  elementDim.x = elementDim.y*aspectRatio;
+	}      
+      if(Abs(elementDim.x) > layoutRegionDim.x)
+	{
+	  elementDim.x = invertElementRect ? -layoutRegionDim.x : layoutRegionDim.x;
+	  elementDim.y = elementDim.x/aspectRatio;
+	}      
+    }
+  else
+    {
+      ASSERT(!"ERROR: invalid sizeDim");
+    }
+
+  // NOTE: adjust offset for layout region
+  v2 elementOffset = offset;
+  if(elementOffset.x + Abs(elementDim.x) > layoutRegionDim.x)
+    elementOffset.x = layoutRegionDim.x - Abs(elementDim.x);
+  if(elementOffset.y + Abs(elementDim.y) > layoutRegionDim.y)
+    elementOffset.y = layoutRegionDim.y - Abs(elementDim.y);
+
+  Rect2 elementRegion;
+  if(invertElementRect)
+    {
+      elementRegion = rectMaxNegDim(layoutRegion.max - elementOffset, elementDim);
+    }
+  else
+    {
+      elementRegion = rectMinDim(elementOffset + layoutRegion.min, elementDim);
+    }
+
+  return(elementRegion); 
 }
 
 enum UICommFlags : u32
