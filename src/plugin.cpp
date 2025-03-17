@@ -63,8 +63,10 @@
 #include "common.h"
 #include "plugin.h"
 
+
 #include "ui_layout.cpp"
 #include "file_granulator.cpp"
+#include "internal_granulator.cpp"
 
 PlatformAPI globalPlatform;
 
@@ -97,7 +99,24 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 	      pluginState->permanentArena = arenaBegin((u8 *)memory + sizeof(PluginState), MEGABYTES(256));
 	      pluginState->frameArena = arenaSubArena(&pluginState->permanentArena, MEGABYTES(2));
 	      pluginState->loadArena = arenaSubArena(&pluginState->permanentArena, MEGABYTES(128));
-
+	      pluginState->grainArena = arenaSubArena(&pluginState->permanentArena, MEGABYTES(64));
+	      	      
+	      pluginState->gbuff = arenaPushStruct(&pluginState->permanentArena, GrainBuffer);
+	      
+	      GrainBuffer *buffer = pluginState->gbuff;
+	      buffer->bufferSize = 9600;
+	      buffer->samples[0] = arenaPushArray(&pluginState->permanentArena, buffer->bufferSize, r32);
+	      buffer->samples[1] = arenaPushArray(&pluginState->permanentArena, buffer->bufferSize, r32);
+	      //memset(buffer->samples[0], 0, 9600 * sizeof(r32));
+	      //memset(buffer->samples[1], 0, 9600 * sizeof(r32));	      
+	      buffer->writeIndex = 0;
+	      buffer->readIndex = setReadPos(60, buffer->bufferSize);
+	      
+	      pluginState->GrainManager.grainAllocator = &pluginState->grainArena;
+	      pluginState->GrainManager.grainBuffer = pluginState->gbuff;
+	      pluginState->GrainManager.internal_clock = 0;
+	      pluginState->GrainManager.grainPlayList = 0;
+	      
 #if 0 // NOTE: fft sample rate conversion workbench
 	      r32 sourceSignalFreq = 4.f;
 	      u32 sourceSignalLength = 4410;
@@ -210,11 +229,13 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 	      pluginState->density.targetValue = 1.f;
 	      pluginState->density.range = makeRange(0.f, 20.f);
 	  
+	      pluginState->t_density = 20;
+	      pluginState->start_pos = 0;
+	  	  
 	      pluginState->soundIsPlaying.value = false;
-
 	      pluginState->loadedSound.sound = loadWav("../data/fingertips_44100_PCM_16.wav",
-						       &pluginState->loadArena, &pluginState->permanentArena);
-	      pluginState->loadedSound.samplesPlayed = 0;
+						       &pluginState->loadArena, &pluginState->permanentArena);	      
+	      pluginState->loadedSound.samplesPlayed = (0 + pluginState->start_pos);
 
 	      char *fingertipsPackfilename = "../data/fingertips.grains";
 	      TemporaryMemory packfileMemory = arenaBeginTemporaryMemory(&pluginState->loadArena, MEGABYTES(64));
@@ -474,7 +495,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 			newPlay = !oldPlay;
 			// TODO: stop doing the queue here: we don't want to have to synchronize grain (de)queueing
 			//       across the audio and video threads (once we actually have them on their own threads)
-			queueAllGrainsFromFile(&pluginState->silo, &pluginState->loadedGrainPackfile);
+			//queueAllGrainsFromFile(&pluginState->silo, &pluginState->loadedGrainPackfile);
 		      }
 
 		    pluginSetBooleanParameter(play.element->bParam, newPlay);
@@ -754,12 +775,27 @@ AUDIO_PROCESS(audioProcess)
       r64 nFreq = M_TAU*pluginState->freq/(r64)audioBuffer->sampleRate;
 
       bool soundIsPlaying = pluginReadBooleanParameter(&pluginState->soundIsPlaying);
+	  
       PlayingSound *loadedSound = &pluginState->loadedSound;
+      GrainManager* gManager = &pluginState->GrainManager;
+      r32 iot = 1/pluginState->t_density; // TODO: don't know what this is
+      
+      u32 grainSize = 2600;
+      WindowType window = TRIANGLE;
+
+      // TODO: don't know why this is needed
+      if (!gManager->grainPlayList)
+	{
+	  makeNewGrain(gManager, grainSize, TRIANGLE);
+	}
+
       r32 *loadedSoundSamples[2] = {};
       if(soundIsPlaying)
 	{
+	
 	  loadedSoundSamples[0] = loadedSound->sound.samples[0] + (u32)loadedSound->samplesPlayed;
 	  loadedSoundSamples[1] = loadedSound->sound.samples[1] + (u32)loadedSound->samplesPlayed;
+	  
 	}
       
       r32 *grainMixBuffers[2];
@@ -770,6 +806,8 @@ AUDIO_PROCESS(audioProcess)
       r32 formatVolumeFactor = 1.f;
       u32 destSampleRate = audioBuffer->sampleRate;
       r32 sampleRateRatio = (r32)INTERNAL_SAMPLE_RATE/(r32)destSampleRate;
+
+      r32 iot_samples = INTERNAL_SAMPLE_RATE * iot * sampleRateRatio;
       switch(audioBuffer->format)
 	{
 	case AudioFormat_s16:
@@ -786,8 +824,8 @@ AUDIO_PROCESS(audioProcess)
 					  arenaFlagsZeroNoAlign());
       grainMixBuffers[1] = arenaPushArray((Arena *)&grainMixerMemory, scaledFramesToWrite, r32,
 					  arenaFlagsZeroNoAlign());
-      mixPlayingGrains(grainMixBuffers[0], grainMixBuffers[1],
-		       1.f, scaledFramesToWrite, &pluginState->silo);
+      synthesize(grainMixBuffers[0], grainMixBuffers[1],
+		 1.f, scaledFramesToWrite, gManager);
 
       void *genericAudioFrames = audioBuffer->buffer;      
       for(u32 frameIndex = 0; frameIndex < audioBuffer->framesToWrite; ++frameIndex)
@@ -798,10 +836,10 @@ AUDIO_PROCESS(audioProcess)
 	  if(pluginState->phasor > M_TAU) pluginState->phasor -= M_TAU;
 				  
 	  r32 sinVal = sin(pluginState->phasor);
+	  (void)sinVal;
 	  for(u32 channelIndex = 0; channelIndex < audioBuffer->channels; ++channelIndex)
 	    {
-	      r32 mixedVal = 0.5f*sinVal;
-	      
+	      // TODO: reading from the grain buffer does not have to do interpolation since it runs at the internal sample rate
 	      r32 grainReadPosition = sampleRateRatio*frameIndex;
 	      u32 grainReadIndex = (u32)grainReadPosition;
 	      r32 grainReadFrac = grainReadPosition - grainReadIndex;
@@ -809,13 +847,14 @@ AUDIO_PROCESS(audioProcess)
 	      r32 firstGrainVal = grainMixBuffers[channelIndex][grainReadIndex];
 	      r32 nextGrainVal = grainMixBuffers[channelIndex][grainReadIndex + 1];
 	      r32 grainVal = lerp(firstGrainVal, nextGrainVal, grainReadFrac);
-	      mixedVal += 0.5f*grainVal;
+	      r32 mixedVal = 0.5*grainVal;
 
 	      soundIsPlaying = pluginReadBooleanParameter(&pluginState->soundIsPlaying);
 	      if(soundIsPlaying)		       
 		{
 		  r32 soundReadPosition = sampleRateRatio*frameIndex;
-		  if((loadedSound->samplesPlayed + soundReadPosition + 1) < loadedSound->sound.sampleCount)
+		  u32 currentTime = loadedSound->samplesPlayed + soundReadPosition + 1;
+		  if(currentTime < loadedSound->sound.sampleCount)
 		    {		      
 		      u32 soundReadIndex = (u32)soundReadPosition;
 		      r32 soundReadFrac = soundReadPosition - soundReadIndex;
@@ -823,14 +862,19 @@ AUDIO_PROCESS(audioProcess)
 		      r32 firstSoundVal = loadedSoundSamples[channelIndex][soundReadIndex];
 		      r32 nextSoundVal = loadedSoundSamples[channelIndex][soundReadIndex + 1];
 		      r32 loadedSoundVal = lerp(firstSoundVal, nextSoundVal, soundReadFrac);
-		      //mixedVal += 0.5f*loadedSoundVal;
-		      (void)loadedSoundVal;
+			  
+		      pluginState->gbuff->samples[channelIndex][pluginState->gbuff->writeIndex] = 0.5f*loadedSoundVal;
 		    }
 		  else
 		    {		      
 		      pluginSetBooleanParameter(&pluginState->soundIsPlaying, false);
-		      loadedSound->samplesPlayed = 0;
-		    }		  
+		      loadedSound->samplesPlayed = (0 + pluginState->start_pos);
+		    }
+		  
+		}
+	      else
+		{
+		  pluginState->gbuff->samples[channelIndex][pluginState->gbuff->writeIndex] = 0.f;
 		}
 
 	      switch(audioBuffer->format)
@@ -854,6 +898,22 @@ AUDIO_PROCESS(audioProcess)
 
 	  pluginUpdateFloatParameter(&pluginState->volume);
 	  pluginUpdateFloatParameter(&pluginState->density);
+
+	  // TODO: not sure how this works
+	  gManager->internal_clock++;
+	  bool shouldMakeNewGrain = ((gManager->internal_clock >= iot_samples) &&
+				     (gManager->grainCount <= pluginState->t_density));
+	  if(shouldMakeNewGrain)
+	    {
+	      makeNewGrain(gManager, grainSize, window);
+	      gManager->internal_clock = 0;
+	    }
+	  
+	  ++pluginState->gbuff->writeIndex;
+	  pluginState->gbuff->writeIndex %= pluginState->gbuff->bufferSize;
+	  
+	  ++pluginState->gbuff->readIndex;
+	  pluginState->gbuff->readIndex %= pluginState->gbuff->bufferSize;
 	}
 
       arenaEndTemporaryMemory(&grainMixerMemory);
