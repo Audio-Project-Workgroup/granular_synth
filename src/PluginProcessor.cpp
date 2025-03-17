@@ -211,6 +211,19 @@ prepareToPlay(double sampleRate, int samplesPerBlock)
   pluginMemory.platformAPI.atomicCompareAndSwap = atomicCompareAndSwap;
   pluginMemory.platformAPI.atomicCompareAndSwapPointers = atomicCompareAndSwapPointers;
 
+  pluginMemory.platformAPI.wideLoadFloats	 = wideLoadFloats;
+  pluginMemory.platformAPI.wideLoadInts		 = wideLoadInts;
+  pluginMemory.platformAPI.wideSetConstantFloats = wideSetConstantFloats;
+  pluginMemory.platformAPI.wideSetConstantInts	 = wideSetConstantInts;
+  pluginMemory.platformAPI.wideStoreFloats	 = wideStoreFloats;
+  pluginMemory.platformAPI.wideStoreInts	 = wideStoreInts;
+  pluginMemory.platformAPI.wideAddFloats	 = wideAddFloats;
+  pluginMemory.platformAPI.wideAddInts		 = wideAddInts;
+  pluginMemory.platformAPI.wideSubFloats	 = wideSubFloats;
+  pluginMemory.platformAPI.wideSubInts		 = wideSubInts;
+  pluginMemory.platformAPI.wideMulFloats	 = wideMulFloats;
+  pluginMemory.platformAPI.wideMulInts		 = wideMulInts;
+
   juce::String pluginPath(DYNAMIC_PLUGIN_PATH);
   juce::Logger::writeToLog(pluginPath);  
 

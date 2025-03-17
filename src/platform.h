@@ -350,7 +350,9 @@ msecWait(u32 msecsToWait)
 //
 // atomic operations
 // 
-  
+
+#if COMPILER_GCC || COMPILER_CLANG
+
 static u32
 atomicLoad(volatile u32 *src)
 {
@@ -383,6 +385,10 @@ atomicCompareAndSwapPointers(volatile void *value, void *oldval, void *newval)
 {
   return(__atomic_val_compare_and_swap(value, oldval, newval, __ATOMIC_ACQ_REL));
 }
+
+#else
+#error ERROR: unsupported compiler
+#endif
 
 //
 // plugin code loading
@@ -568,3 +574,16 @@ estimateCPUCyclesPerSecond(void)
     }
 }
 #endif
+
+static WIDE_LOAD_FLOATS(wideLoadFloats);
+static WIDE_LOAD_INTS(wideLoadInts);
+static WIDE_STORE_FLOATS(wideStoreFloats);
+static WIDE_STORE_INTS(wideStoreInts);
+static WIDE_ADD_FLOATS(wideAddFloats);
+static WIDE_ADD_INTS(wideAddInts);
+static WIDE_SUB_FLOATS(wideSubFloats);
+static WIDE_SUB_INTS(wideSubInts);
+static WIDE_MUL_FLOATS(wideMulFloats);
+static WIDE_MUL_INTS(wideMulInts);
+
+#include "simd_intrinsics.h"

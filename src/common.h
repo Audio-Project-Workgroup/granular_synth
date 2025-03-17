@@ -55,6 +55,46 @@ typedef ATOMIC_COMPARE_AND_SWAP(AtomicCompareAndSwap);
 #define ATOMIC_COMPARE_AND_SWAP_POINTERS(name) void *(name)(volatile void *value, void *oldval, void *newval)
 typedef ATOMIC_COMPARE_AND_SWAP_POINTERS(AtomicCompareAndSwapPointers);
 
+// simd
+
+struct WideFloat;
+struct WideInt;
+#define WIDE_LOAD_FLOATS(name) WideFloat (name)(r32 *src)
+typedef WIDE_LOAD_FLOATS(WideLoadFloats);
+
+#define WIDE_LOAD_INTS(name) WideInt (name)(u32 *src)
+typedef WIDE_LOAD_INTS(WideLoadInts);
+
+#define WIDE_SET_CONSTANT_FLOATS(name) WideFloat (name)(r32 src)
+typedef WIDE_SET_CONSTANT_FLOATS(WideSetConstantFloats);
+
+#define WIDE_SET_CONSTANT_INTS(name) WideInt (name)(u32 src)
+typedef WIDE_SET_CONSTANT_INTS(WideSetConstantInts);
+
+#define WIDE_STORE_FLOATS(name) void (name)(r32 *dest, WideFloat src)
+typedef WIDE_STORE_FLOATS(WideStoreFloats);
+
+#define WIDE_STORE_INTS(name) void (name)(u32 *dest, WideInt src)
+typedef WIDE_STORE_INTS(WideStoreInts);
+
+#define WIDE_ADD_FLOATS(name) WideFloat (name)(WideFloat a, WideFloat b)
+typedef WIDE_ADD_FLOATS(WideAddFloats);
+
+#define WIDE_ADD_INTS(name) WideInt (name)(WideInt a, WideInt b)
+typedef WIDE_ADD_INTS(WideAddInts);
+
+#define WIDE_SUB_FLOATS(name) WideFloat (name)(WideFloat a, WideFloat b)
+typedef WIDE_SUB_FLOATS(WideSubFloats);
+
+#define WIDE_SUB_INTS(name) WideInt (name)(WideInt a, WideInt b)
+typedef WIDE_SUB_INTS(WideSubInts);
+
+#define WIDE_MUL_FLOATS(name) WideFloat (name)(WideFloat a, WideFloat b)
+typedef WIDE_MUL_FLOATS(WideMulFloats);
+
+#define WIDE_MUL_INTS(name) WideInt (name)(WideInt a, WideInt b)
+typedef WIDE_MUL_INTS(WideMulInts);
+
 struct PlatformAPI
 {
   PlatformReadEntireFile *readEntireFile;  
@@ -70,6 +110,19 @@ struct PlatformAPI
   AtomicAdd *atomicAdd;
   AtomicCompareAndSwap *atomicCompareAndSwap;
   AtomicCompareAndSwapPointers *atomicCompareAndSwapPointers;
+
+  WideLoadFloats *wideLoadFloats;
+  WideLoadInts *wideLoadInts;
+  WideSetConstantFloats *wideSetConstantFloats;
+  WideSetConstantInts *wideSetConstantInts;
+  WideStoreFloats *wideStoreFloats;
+  WideStoreInts *wideStoreInts;
+  WideAddFloats *wideAddFloats;
+  WideAddInts *wideAddInts;
+  WideSubFloats *wideSubFloats;
+  WideSubInts *wideSubInts;
+  WideMulFloats *wideMulFloats;
+  WideMulInts *wideMulInts;
 };
 
 extern PlatformAPI globalPlatform;
