@@ -86,7 +86,7 @@ struct PlayingSound
 
 
 u32 setReadPos(u32 write_pos, u32 bufferSize) {
-    s32 scratch_rpos = write_pos - 9000;
+    s32 scratch_rpos = write_pos - 1000;
 
     if (scratch_rpos < 0) {
         scratch_rpos += bufferSize;
@@ -98,30 +98,6 @@ u32 setReadPos(u32 write_pos, u32 bufferSize) {
     return scratch_rpos;
 
 }
-//struct PluginState
-//{
-//  
-//  Arena permanentArena;
-//  Arena frameArena;
-//  Arena loadArena; 
-//  
-//  r64 phasor;
-//  r32 freq;
-//  PluginFloatParameter volume;
-//  PluginBooleanParameter soundIsPlaying;
-//
-//    PlayingSound loadedSound;
-//    LoadedBitmap testBitmap;
-//    LoadedFont testFont;
-//
-//    UILayout layout;
-//
-//    
-//    bool initialized;
-//};
-
-
-
 
 struct PluginState
 {
@@ -156,8 +132,4 @@ struct PluginState
     bool initialized;
 };
 
-/*
-    Frequency of time between new grains and old grains. Ok so what I could do
-*/
-#
 

@@ -1,8 +1,9 @@
 static void
-makeNewGrain(GrainManager* grainManager, u32 grainSize)
+makeNewGrain(GrainManager* grainManager, u32 grainSize, WindowType windowParam)
 {
     printf("NEW GRAIN\n");
     Grain* result;
+    //TODO: Add some logic that could update based off of position so it doesn't just re-use the same grains over n over
     if (grainManager->grainFreeList)
     {
         result = grainManager->grainFreeList;
@@ -18,10 +19,16 @@ makeNewGrain(GrainManager* grainManager, u32 grainSize)
     result->start[0] = buffer->samples[0] + buffer->readIndex;
     result->start[1] = buffer->samples[1] + buffer->readIndex;
     result->samplesToPlay = grainSize;
+    result->length = grainSize;
 
+    result->rewrap_counter = 0;
+    result->samplesTillRewrap = buffer->bufferSize - buffer->readIndex;
     result->next = grainManager->grainPlayList;
     grainManager->grainPlayList = result;
 
+    result->window = windowParam;
+
+    printf("%d, %d, %d!!!!!!!!!\n", result->rewrap_counter, result->samplesTillRewrap, buffer->bufferSize);
     ++grainManager->grainCount;
 }
 static void
@@ -48,6 +55,20 @@ destroyGrain(GrainManager* grainManager, Grain* grain)
 
 }
 
+inline r32 applyWindow(r32 sample, u32 index, u32 length, WindowType window) {
+    switch (window) {
+    case HANN:
+        return sample * (0.5 * (1 - cos(2 * M_PI * index / length)));
+    case SINE:
+        return sample * sin((M_PI * index) / length);
+    case RECTANGULAR:
+        return sample * 1; 
+    case TRIANGLE:
+        return sample * (1.0 - Abs((index - (length - 1) / 2.0) / ((length - 1) / 2.0)));
+    default:
+        return sample;
+    }
+}
 static void
 synthesize(r32* destBufferLInit, r32* destBufferRInit,
     r32 volumeInit, u32 samplesToWrite, GrainManager* grainManager)
@@ -58,40 +79,13 @@ synthesize(r32* destBufferLInit, r32* destBufferRInit,
     r32* destBufferR = destBufferRInit;
     for (u32 sampleIndex = 0; sampleIndex < samplesToWrite; ++sampleIndex)
     {
-        //if (nextGrainInQueue)
-        //{
-        //	//r64 currentTimestamp = sampleIndex*internalSamplePeriod + callerTimestamp;
-        //	//if(nextGrainInQueue->startTimestamp <= currentTimestamp)
-        //	if (grainState->samplesElapsedSinceLastQueue >= nextGrainInQueue->startSampleIndex)
-        //	{
-        //		// NOTE: dequeue the next grain and put it on the playlist	      
-        //		PlayingGrain* playlistSentinel = grainState->playlistSentinel;
-        //		nextGrainInQueue->nextPlaying = playlistSentinel;
-        //		nextGrainInQueue->prevPlaying = playlistSentinel->prevPlaying;
-        //		nextGrainInQueue->nextPlaying->prevPlaying = nextGrainInQueue;
-        //		nextGrainInQueue->prevPlaying->nextPlaying = nextGrainInQueue;
-
-        //		nextGrainInQueue = nextGrainInQueue->nextQueued;
-        //		grainState->grainQueue = nextGrainInQueue;
-
-        //		--grainState->queuedGrainCount;
-        //		++grainState->playingGrainCount;
-        //	}
-        //}
-
-        // NOTE: loop over playing grains and mix their samples
-        //for(PlayingGrain *grain = grainState->playlistSentinel;
-        //	  grain && grain->nextPlaying != grainState->playlistSentinel;
-        //	  grain = grain->nextPlaying)
         for (Grain* c_grain = grainManager->grainPlayList;
             c_grain != 0;
             c_grain = c_grain->next)
         {
             
-            if (c_grain->samplesToPlay > 0)
-            {
-                u32 samplesTillRewrap = grainManager->grainBuffer->bufferSize - c_grain->samplesToPlay -1;
-                if (samplesTillRewrap <= c_grain->rewrap_counter) {
+            if (c_grain->samplesToPlay > 0){
+                if (c_grain->samplesTillRewrap <= c_grain->rewrap_counter) {
                     c_grain->start[0] = grainManager->grainBuffer->samples[0];
                     c_grain->start[1] = grainManager->grainBuffer->samples[1];
                     c_grain->rewrap_counter = 0;
@@ -99,45 +93,21 @@ synthesize(r32* destBufferLInit, r32* destBufferRInit,
                 r32 sampleToWriteL = *c_grain->start[0]++;
                 r32 sampleToWriteR = *c_grain->start[1]++;
 
-                //r32 evenlopedL = sampleToWriteL;
-                //r32 evenlopedR = sampleToWriteR;
-                r32 envelopedL = sampleToWriteL * (0.5 * (1 - cos(2 * M_PI * (c_grain->length - c_grain->samplesToPlay) / 2047)));
-                r32 envelopedR = sampleToWriteR * (0.5 * (1 - cos(2 * M_PI * (c_grain->length - c_grain->samplesToPlay) / 2047)));
+                r32 envelopedL = applyWindow(sampleToWriteL, c_grain->length - c_grain->samplesToPlay, c_grain->length, HANN);
+                r32 envelopedR = applyWindow(sampleToWriteR, c_grain->length - c_grain->samplesToPlay, c_grain->length, HANN); 
 
                 --c_grain->samplesToPlay;
                 ++c_grain->rewrap_counter;
                 *destBufferL += volume * envelopedL;
                 *destBufferR += volume * envelopedR;
-                if (sampleToWriteL == 0 && sampleToWriteR == 0) {
-                    //printf("HELP\n");
-                }
             }
 
             else
             {
-                //// NOTE: remove from playing chain
-                //c_grain->prev->next = c_grain->next;
-                //c_grain->next->prev = c_grain->prev;
-                ////grain->nextPlaying = 0;
-                ////grain->prevPlaying = 0;
-
-                //// NOTE: append to free list
-                //c_grain->onFreeList = true;
-                //c_grain->next = grainManager->grainFreeList;
                 destroyGrain(grainManager, c_grain);
 
             }
-            //printf("%d!\n", grainManager->grainCount);
         }
-
-        //if (grainState->queuedGrainCount && !grainState->playingGrainCount)
-        //{
-        //	printf("FUCK! need grains!: %u\n", grainState->queuedGrainCount);
-        //}
-        //else if (grainState->playingGrainCount > 1)
-        //{
-        //	printf("FUCK! too many grains!: %u\n", grainState->playingGrainCount);
-        //}
 
         ++destBufferL;
         ++destBufferR;

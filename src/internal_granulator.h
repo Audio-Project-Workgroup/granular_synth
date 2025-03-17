@@ -8,12 +8,20 @@ struct GrainBuffer
     u32 bufferSize;
 };
 
+enum WindowType {
+    HANN,
+    SINE,
+    TRIANGLE,
+    RECTANGULAR
+};
+
 struct Grain
 {
-
+    WindowType window;
     s32 samplesToPlay;
     u32 length;
-    u32 rewrap_counter = 0;
+    u32 rewrap_counter;
+    u32 samplesTillRewrap;
     Grain* next;
     Grain* prev;
     bool onFreeList;
@@ -31,3 +39,5 @@ struct GrainManager
 
     Grain* grainFreeList;
 };
+
+
