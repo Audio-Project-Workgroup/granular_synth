@@ -117,10 +117,11 @@ namespace midi {
         midiCommandTable[commandByte](channel,data,len,pluginState); // commandByte & 0xF0 will zero down the last 4 bits
     }
 
-    void parseMidiMessage(PluginAudioBuffer *audioBuffer, PluginState *pluginState){
-        u8 *atMidiBuffer = audioBuffer->midiBuffer;
+    void parseMidiMessage(u8 **atMidiBufferPtr, u32 &midiMessageCount, PluginState *pluginState){
         
-        if(audioBuffer->midiMessageCount){
+        u8 *atMidiBuffer = *atMidiBufferPtr;
+
+        if(midiMessageCount){
 
     #ifdef MIDI_VERBOSE
             printf("atMidiBuffer address in parseMidiMessage %d\n",atMidiBuffer);
@@ -165,11 +166,8 @@ namespace midi {
                 (int)atMidiBuffer[0]);
             printf("\n\n");
     #endif
-            --audioBuffer->midiMessageCount;
-            /// CRITICAL BUG --> CONSUMING ONE BY ONE THE MIDI MESSAGES, REQUIRES THAT WE MOVE THE audioBuffer->midiBuffer FORWARD EACH TIME.
-            audioBuffer->midiBuffer = atMidiBuffer;
-
-
+            --midiMessageCount;
+            atMidiBufferPtr = &atMidiBuffer;
         }
     }
 }
