@@ -67,11 +67,21 @@ namespace midi {
         printf("Channel Pressure: Channel %d pressure %d\n",channel,pressure);
     }
 
-    void PitchBend(uint8_t channel, uint8_t* data, uint8_t len, PluginState *pluginState) {
+    void PitchBend(uint8_t channel, uint8_t* data, uint8_t len, PluginState* pluginState) {
+
         assert(len == 2);
         uint8_t lsb = data[0];
-        uint8_t msb = data[1]; 
-        printf("Pitch Bend: Channel %d lsb %d msb %d\n",channel,lsb,msb);
+        uint8_t msb = data[1];
+        s16 pitchbenddata = (static_cast<s16>(msb) << 7) | lsb;
+
+        pitchbenddata -= 8192;
+
+        r32 pitchRange = 2.0f; //Semitones range
+        r32 normalizedBend = (r32)pitchbenddata / 8192.0f; // Change made so we work in [-1,1] range
+        r32 pitchFactor = powf(2.0f, normalizedBend * pitchRange / 12.0f); // semitones calculation 2^(ST/12)
+
+        //pluginState->freq[channel] = pluginState->freq[channel] * pitchFactor;
+        printf("Pitch Bend: Channel %d pitchFactor %d \n", channel, pitchFactor);
     }
 
     void SystemMessages(uint8_t channel, uint8_t* data, uint8_t len, PluginState *pluginState) {
