@@ -275,9 +275,10 @@ main(int argc, char **argv)
 	      void *audioBufferData = calloc(audioBufferFrameCount, CHANNELS*sizeof(s16));
 
 	      PluginAudioBuffer audioBuffer = {};
-	      audioBuffer.format = AudioFormat_s16;
-	      audioBuffer.sampleRate = SR;
-	      audioBuffer.channels = CHANNELS;
+	      audioBuffer.outputFormat = AudioFormat_s16;
+	      audioBuffer.outputSampleRate = SR;
+	      audioBuffer.outputChannels = CHANNELS;
+	      audioBuffer.outputStride = 2*sizeof(s16);
 	      audioBuffer.midiMessageCount = 0; // TODO: send midi messages to the plugin
 	      audioBuffer.midiBuffer = (u8 *)calloc(KILOBYTES(1), 1);
 	  
@@ -436,7 +437,9 @@ main(int argc, char **argv)
 					audioProcessCallTime - lastAudioProcessCallTime;
 				      lastAudioProcessCallTime = audioProcessCallTime;
 
-				      audioBuffer.buffer = writePtr;
+				      //audioBuffer.buffer = writePtr;
+				      audioBuffer.outputBuffer[0] = writePtr;
+				      audioBuffer.outputBuffer[1] = (u8 *)writePtr + sizeof(s16);
 				      audioBuffer.framesToWrite = framesToWrite;
 				      plugin.audioProcess(&pluginMemory, &audioBuffer);
 				    }

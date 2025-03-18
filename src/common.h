@@ -278,11 +278,17 @@ struct PluginAudioBuffer
 {
   u64 millisecondsElapsedSinceLastCall;
 
-  AudioFormat format;
-  void *buffer;
+  AudioFormat outputFormat;
+  void *outputBuffer[2];
+  u32 outputSampleRate;
+  u32 outputChannels;
+  u32 outputStride;
 
-  u32 sampleRate;
-  u32 channels;
+  AudioFormat inputFormat;
+  const void *inputBuffer[2];
+  u32 inputSampleRate;
+  u32 inputChannels;
+  u32 inputStride;
 
   u32 framesToWrite;
 
@@ -292,7 +298,6 @@ struct PluginAudioBuffer
 
 #define AUDIO_PROCESS(name) void (name)(PluginMemory *memory, PluginAudioBuffer *audioBuffer)
 typedef AUDIO_PROCESS(AudioProcess);
-
 
 struct PluginState;
 #define INITIALIZE_PLUGIN_STATE(name) PluginState *(name)(PluginMemory *memoryBlock)

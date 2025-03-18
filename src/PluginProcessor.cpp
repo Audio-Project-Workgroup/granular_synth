@@ -266,10 +266,10 @@ prepareToPlay(double sampleRate, int samplesPerBlock)
   pluginCode.initializePluginState(&pluginMemory);
 
   audioBuffer = {};
-  audioBuffer.format = AudioFormat_r32;
-  audioBuffer.sampleRate = sampleRate;
-  audioBuffer.channels = 1;
-  audioBuffer.buffer = calloc(samplesPerBlock, 2*sizeof(float));
+  audioBuffer.inputFormat = audioBuffer.outputFormat = AudioFormat_r32;
+  audioBuffer.inputSampleRate = audioBuffer.outputSampleRate = sampleRate;
+  //audioBuffer.channels = 1;
+  //audioBuffer.buffer = calloc(samplesPerBlock, 2*sizeof(float));
   audioBuffer.midiBuffer = (u8 *)calloc(KILOBYTES(1), 1);
   
   resourcesReleased = false;
@@ -286,7 +286,7 @@ releaseResources()
   //       everyone involved in its creation was very clever and thought through everything they did perfectly
   if(!resourcesReleased)
     {
-      free(audioBuffer.buffer);
+      //free(audioBuffer.buffer);
       free(audioBuffer.midiBuffer);
       free(pluginMemory.memory);  
       libPlugin.close();
@@ -340,15 +340,24 @@ processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
     } 
 
   juce::ScopedNoDenormals noDenormals;
-  auto totalNumInputChannels  = getTotalNumInputChannels();
-  auto totalNumOutputChannels = getTotalNumOutputChannels();
   
-  for(auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
-    buffer.clear(i, 0, buffer.getNumSamples());  
+  audioBuffer.inputChannels  = MIN(getTotalNumInputChannels(),  ARRAY_COUNT(audioBuffer.inputBuffer));  
+  audioBuffer.outputChannels = MIN(getTotalNumOutputChannels(), ARRAY_COUNT(audioBuffer.outputBuffer));
+  audioBuffer.inputStride = audioBuffer.outputStride = sizeof(r32);
+  
+  //for(auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
+  //buffer.clear(i, 0, buffer.getNumSamples());
+  // NOTE: copy input samples
+  for(u32 inChannelIndex = 0; inChannelIndex < audioBuffer.inputChannels; ++inChannelIndex)
+    {      
+      //memcpy(audioBuffer.inputBuffer[inChannelIndex], inChannel, sizeof(*inChannel)*buffer.getNumSamples());
+    }
 
-  // TODO: we are assuming these are float-pointers above, so we should make that explicit here
-  auto *lChannel = buffer.getWritePointer(0);
-  auto *rChannel = buffer.getWritePointer(1);
+  audioBuffer.inputBuffer[0] = buffer.getReadPointer(0);
+  audioBuffer.inputBuffer[1] = buffer.getReadPointer(1);
+
+  audioBuffer.outputBuffer[0] = buffer.getWritePointer(0);
+  audioBuffer.outputBuffer[1] = buffer.getWritePointer(1);
   
   if(pluginCode.audioProcess)
     {
@@ -356,8 +365,8 @@ processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
       pluginCode.audioProcess(&pluginMemory, &audioBuffer);
 
       // TODO: make this not dual mono
-      memcpy(lChannel, audioBuffer.buffer, sizeof(*lChannel)*buffer.getNumSamples());
-      memcpy(rChannel, audioBuffer.buffer, sizeof(*rChannel)*buffer.getNumSamples());
+      //memcpy(lChannel, audioBuffer.buffer, sizeof(*lChannel)*buffer.getNumSamples());
+      //memcpy(rChannel, audioBuffer.buffer, sizeof(*rChannel)*buffer.getNumSamples());
     }  
 }
 
