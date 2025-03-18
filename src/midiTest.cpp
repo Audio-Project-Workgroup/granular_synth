@@ -32,7 +32,7 @@ size_t addCCMessage_1(uint8_t *atMidiBuffer){
     atMidiBuffer[3] = 0x00;
     atMidiBuffer[4] = 0x00;
     atMidiBuffer[5] = 0xB0; //CC message
-    atMidiBuffer[6] = 0x01; // Controller
+    atMidiBuffer[6] = 0x07; // Controller
     atMidiBuffer[7] = 0x02; // Value
     return 8*sizeof(uint8_t);
 }
@@ -44,8 +44,8 @@ size_t addCCMessage_2(uint8_t *atMidiBuffer){
     atMidiBuffer[3] = 0x00;
     atMidiBuffer[4] = 0x00;
     atMidiBuffer[5] = 0xB0; //CC message
-    atMidiBuffer[6] = 0x01; // Controller
-    atMidiBuffer[7] = 0xFF; // Value
+    atMidiBuffer[6] = 0x07; // Controller
+    atMidiBuffer[7] = 0x7F; // Value
     return 8*sizeof(uint8_t);
 }
 
@@ -56,8 +56,8 @@ size_t addCCMessage_3(uint8_t *atMidiBuffer){
     atMidiBuffer[3] = 0x00;
     atMidiBuffer[4] = 0x00;
     atMidiBuffer[5] = 0xB0; //CC message
-    atMidiBuffer[6] = 0x01; // Controller
-    atMidiBuffer[7] = 0xFE; // Value
+    atMidiBuffer[6] = 0x0B; // Controller
+    atMidiBuffer[7] = 0x7E; // Value
     return 8*sizeof(uint8_t);
 }
 
@@ -68,7 +68,7 @@ size_t addCCMessage_4(uint8_t *atMidiBuffer){
     atMidiBuffer[3] = 0x00;
     atMidiBuffer[4] = 0x00;
     atMidiBuffer[5] = 0xB0; //CC message
-    atMidiBuffer[6] = 0x01; // Controller
+    atMidiBuffer[6] = 0x07; // Controller 0000 0001
     atMidiBuffer[7] = 0x7F; // Value
     return 8*sizeof(uint8_t);
 }
@@ -80,7 +80,7 @@ size_t addCCMessage_5(uint8_t *atMidiBuffer){
     atMidiBuffer[3] = 0x00;
     atMidiBuffer[4] = 0x00;
     atMidiBuffer[5] = 0xB0; //CC message
-    atMidiBuffer[6] = 0x05; // Controller
+    atMidiBuffer[6] = 0x07; // Controller
     atMidiBuffer[7] = 0x80; // Value
     return 8*sizeof(uint8_t);
 }
@@ -92,7 +92,7 @@ size_t addCCMessage_6(uint8_t *atMidiBuffer){
     atMidiBuffer[3] = 0x00;
     atMidiBuffer[4] = 0x00;
     atMidiBuffer[5] = 0xB0; //CC message
-    atMidiBuffer[6] = 0x03; // Controller
+    atMidiBuffer[6] = 0x0B; // Controller
     atMidiBuffer[7] = 0x81; // Value
     return 8*sizeof(uint8_t);
 }

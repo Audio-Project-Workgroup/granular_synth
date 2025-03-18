@@ -50,9 +50,11 @@ namespace midi {
         uint8_t controller = data[0]; 
         uint8_t value = data[1]; 
         int paramIndex = ccParamTable[controller];
-
-// task 2: normalize the value
-r32 normalizedValue = (r32)value / 255.f; //std::numeric_limits<T>::max();
+        
+        // normalize the value
+        r32 min = pluginState->parameters[paramIndex].range.min ;
+        r32 max = pluginState->parameters[paramIndex].range.max ;
+        r32 normalizedValue = ((max-min) * (r32)value /  127.f) + min;
 
         pluginSetFloatParameter(&pluginState->parameters[paramIndex], normalizedValue);
 
