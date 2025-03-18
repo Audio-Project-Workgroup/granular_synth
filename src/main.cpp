@@ -402,7 +402,7 @@ main(int argc, char **argv)
 			  double mouseX, mouseY;
 			  glfwGetCursorPos(window, &mouseX, &mouseY);
 			  newInput->mouseState.position = V2(mouseX, (r64)framebufferHeight - mouseY) - viewportMin;
-			  printf("mouseP: (%.2f, %.2f)", newInput->mouseState.position.x, newInput->mouseState.position.y);
+			  //printf("mouseP: (%.2f, %.2f)\n", newInput->mouseState.position.x, newInput->mouseState.position.y);
 
 			  if(plugin.renderNewFrame)
 			    {

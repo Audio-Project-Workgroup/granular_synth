@@ -1,7 +1,7 @@
 static void
 makeNewGrain(GrainManager* grainManager, u32 grainSize, WindowType windowParam)
 {
-  printf("NEW GRAIN\n");
+  //printf("NEW GRAIN\n");
   Grain* result;
   //TODO: Add some logic that could update based off of position so it doesn't just re-use the same grains over n over
   if (grainManager->grainFreeList)
@@ -29,7 +29,7 @@ makeNewGrain(GrainManager* grainManager, u32 grainSize, WindowType windowParam)
   result->next = grainManager->grainPlayList;
   grainManager->grainPlayList = result;
 
-  printf("%d, %d, %d!!!!!!!!!\n", result->rewrap_counter, result->samplesTillRewrap, buffer->bufferSize);
+  //printf("%d, %d, %d!!!!!!!!!\n", result->rewrap_counter, result->samplesTillRewrap, buffer->bufferSize);
   ++grainManager->grainCount;
 }
 

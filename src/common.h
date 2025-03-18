@@ -52,7 +52,7 @@ typedef ATOMIC_ADD(AtomicAdd);
 #define ATOMIC_COMPARE_AND_SWAP(name) u32 (name)(volatile u32 *value, u32 oldval, u32 newval)
 typedef ATOMIC_COMPARE_AND_SWAP(AtomicCompareAndSwap);
 
-#define ATOMIC_COMPARE_AND_SWAP_POINTERS(name) void *(name)(volatile void *value, void *oldval, void *newval)
+#define ATOMIC_COMPARE_AND_SWAP_POINTERS(name) void *(name)(volatile void **value, void *oldval, void *newval)
 typedef ATOMIC_COMPARE_AND_SWAP_POINTERS(AtomicCompareAndSwapPointers);
 
 // simd

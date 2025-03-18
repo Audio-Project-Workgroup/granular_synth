@@ -312,11 +312,11 @@ RENDER_NEW_FRAME(renderNewFrame)
       renderBeginCommands(renderCommands, &pluginState->frameArena);
 
       // TODO: maybe make a logging system?
-#if 0
+#if 1
       printf("mouseP: (%.2f, %.2f)\n",
 	     input->mouseState.position.x, input->mouseState.position.y);
-      printButtonState(input->mouseState.buttons[MouseButton_left], "left");
-      printButtonState(input->mouseState.buttons[MouseButton_right], "right");     
+      //printButtonState(input->mouseState.buttons[MouseButton_left], "left");
+      //printButtonState(input->mouseState.buttons[MouseButton_right], "right");     
 #endif
 
 #if 0
@@ -393,8 +393,8 @@ RENDER_NEW_FRAME(renderNewFrame)
 		  
 		      v2 dragData = uiLoadDragData(hresize.element);
 		      v2 dragDelta = uiGetDragDelta(hresize.element);
-		      printf("dragData: (%.2f, %.2f)\n", dragData.x, dragData.y);
-		      printf("dragDelta: (%.2f, %.2f)\n", dragDelta.x, dragDelta.y);
+		      //printf("dragData: (%.2f, %.2f)\n", dragData.x, dragData.y);
+		      //printf("dragDelta: (%.2f, %.2f)\n", dragDelta.x, dragDelta.y);
 		  
 		      r32 minChildPercentPreDrag = dragData.x;
 		      r32 maxChildPercentPreDrag = dragData.y;
@@ -459,7 +459,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 		      if(volume.flags & UICommFlag_leftDragging)
 			{	
 			  v2 dragDelta = uiGetDragDelta(volume.element);
-			  printf("dragDelta: (%.2f, %.2f)\n", dragDelta.x, dragDelta.y);
+			  //printf("dragDelta: (%.2f, %.2f)\n", dragDelta.x, dragDelta.y);
 		      
 			  newVolume = volume.element->fParamValueAtClick + dragDelta.y/getDim(volume.element->region).y;
 			}
@@ -514,14 +514,14 @@ RENDER_NEW_FRAME(renderNewFrame)
 		  
 		    r32 oldDensity = pluginReadFloatParameter(density.element->fParam);
 		    r32 newDensity = oldDensity;
-		    printf("oldDensity: %.2f\n", oldDensity);		  
+		    //printf("oldDensity: %.2f\n", oldDensity);		  
 		    if(density.flags & UICommFlag_dragging)
 		      {
 			v2 dragDelta = uiGetDragDelta(density.element);
-			printf("dragDelta: (%.2f, %.2f)\n", dragDelta.x, dragDelta.y);
+			//printf("dragDelta: (%.2f, %.2f)\n", dragDelta.x, dragDelta.y);
 		      
 			newDensity = density.element->fParamValueAtClick + 0.1f*dragDelta.y;
-			printf("newDensity: %.2f\n", newDensity);
+			//printf("newDensity: %.2f\n", newDensity);
 		      }
 
 		    pluginSetFloatParameter(density.element->fParam, newDensity);

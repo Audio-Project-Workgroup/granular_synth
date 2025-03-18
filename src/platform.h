@@ -105,7 +105,7 @@ atomicStore(volatile u32 *dest, u32 value)
 static u32
 atomicAdd(volatile u32 *addend, u32 value)
 {
-  InterlockedAdd((LONG *)addend, value);
+  InterlockedAdd((volatile LONG *)addend, value);
   return(atomicLoad(addend));
 }
 
@@ -116,9 +116,9 @@ atomicCompareAndSwap(volatile u32 *value, u32 oldval, u32 newval)
 }
 
 static void *
-atomicCompareAndSwapPointers(volatile void *value, void *oldval, void *newval)
+atomicCompareAndSwapPointers(volatile void **value, void *oldval, void *newval)
 {
-  return(InterlockedCompareExchangePointer((PVOID *)value, newval, oldval));
+  return(InterlockedCompareExchangePointer((volatile PVOID *)value, newval, oldval));
 }
 
 //
@@ -356,14 +356,14 @@ msecWait(u32 msecsToWait)
 static u32
 atomicLoad(volatile u32 *src)
 {
-  return(__atomic_load_n(src, __ATOMIC_ACQ));
+  return(__atomic_load_n(src, __ATOMIC_ACQUIRE));
 }
 
 static u32
 atomicStore(volatile u32 *dest, u32 value)
 {
   u32 result = atomicLoad(dest);
-  __atomic_store_n(dest, value, __ATOMIC_REL);
+  __atomic_store_n(dest, value, __ATOMIC_RELEASE);
 
   return(result);
 }
@@ -371,19 +371,27 @@ atomicStore(volatile u32 *dest, u32 value)
 static u32
 atomicAdd(volatile u32 *addend, u32 value)
 {
-  return(__atomic_fetch_add(addend, value, __ATOMIC_ACQ));
+  return(__atomic_fetch_add(addend, value, __ATOMIC_ACQUIRE));
 }
 
 static u32
 atomicCompareAndSwap(volatile u32 *value, u32 oldval, u32 newval)
 {
-  return(__atomic_val_compare_and_swap(value, oldval, newval, __ATOMIC_ACQ_REL));
+  u32 *expectedPtr = &oldval;
+  bool success = __atomic_compare_exchange(value, expectedPtr, newval, false, __ATOMIC_ACQ_REL, __ATOMIC_RELAXED);
+
+  u32 result = success ? newval : oldval;
+  return(result);
 }
 
 static void *
-atomicCompareAndSwapPointers(volatile void *value, void *oldval, void *newval)
+atomicCompareAndSwapPointers(volatile void **value, void *oldval, void *newval)
 {
-  return(__atomic_val_compare_and_swap(value, oldval, newval, __ATOMIC_ACQ_REL));
+  void **expectedPtr = &oldval;
+  bool success = __atomic_compare_exchange(value, expectedPtr, newval, false, __ATOMIC_ACQ_REL, __ATOMIC_RELAXED);
+
+  void *result = success ? newval : oldval;
+  return(result);
 }
 
 #else

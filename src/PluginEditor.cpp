@@ -24,8 +24,8 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
   
   glContext.setRenderer(this);
   glContext.setContinuousRepainting(true);
-  glContext.attachTo(*this);  
-
+  glContext.attachTo(*this);
+  
   editorWidth = getWidth();
   editorHeight = getHeight();
 
@@ -237,6 +237,12 @@ keyPressed(const juce::KeyPress &key)
 void
 AudioPluginAudioProcessorEditor::newOpenGLContextCreated(void)
 {
+  juce::gl::glDebugMessageControl(juce::gl::GL_DEBUG_SOURCE_API,
+				  juce::gl::GL_DEBUG_TYPE_OTHER,
+				  juce::gl::GL_DEBUG_SEVERITY_NOTIFICATION,
+				  0,
+				  0,
+				  juce::gl::GL_FALSE );
 }
 
 void
@@ -253,6 +259,9 @@ AudioPluginAudioProcessorEditor::renderOpenGL(void)
 
   if(processorRef.pluginCode.renderNewFrame)
     {
+      juce::Logger::writeToLog("mouseP: (" + juce::String(newInput->mouseState.position.x) +
+			       ", " + juce::String(newInput->mouseState.position.y) + ")");
+      
       processorRef.pluginCode.renderNewFrame(&processorRef.pluginMemory, newInput, &commands);      
 
       // NOTE: it's so cool that you can't set the mouse cursor here and have to defer setting it in a mouse callback
