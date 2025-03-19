@@ -4,6 +4,7 @@
 #include "types.h"
 #include "utils.h"
 #include "arena.h"
+#include "simd_intrinsics.h"
 #include "math.h"
 #include "render.h"
 
@@ -57,43 +58,39 @@ typedef ATOMIC_COMPARE_AND_SWAP_POINTERS(AtomicCompareAndSwapPointers);
 
 // simd
 
-struct WideFloat;
-struct WideInt;
-#define WIDE_LOAD_FLOATS(name) WideFloat (name)(r32 *src)
-typedef WIDE_LOAD_FLOATS(WideLoadFloats);
+/*
+#if ARCH_X86 || ARCH_X64
 
-#define WIDE_LOAD_INTS(name) WideInt (name)(u32 *src)
-typedef WIDE_LOAD_INTS(WideLoadInts);
+#include <immintrin.h>
 
-#define WIDE_SET_CONSTANT_FLOATS(name) WideFloat (name)(r32 src)
-typedef WIDE_SET_CONSTANT_FLOATS(WideSetConstantFloats);
+struct WideFloat
+{
+  __m128 val;
+};
 
-#define WIDE_SET_CONSTANT_INTS(name) WideInt (name)(u32 src)
-typedef WIDE_SET_CONSTANT_INTS(WideSetConstantInts);
+struct WideInt
+{
+  __m128i val;
+};
 
-#define WIDE_STORE_FLOATS(name) void (name)(r32 *dest, WideFloat src)
-typedef WIDE_STORE_FLOATS(WideStoreFloats);
+#elif ARCH_ARM || ARCH_ARM64
 
-#define WIDE_STORE_INTS(name) void (name)(u32 *dest, WideInt src)
-typedef WIDE_STORE_INTS(WideStoreInts);
+#include <arm_neon.h>
 
-#define WIDE_ADD_FLOATS(name) WideFloat (name)(WideFloat a, WideFloat b)
-typedef WIDE_ADD_FLOATS(WideAddFloats);
+struct WideFloat
+{
+  float32x4_t val;
+};
 
-#define WIDE_ADD_INTS(name) WideInt (name)(WideInt a, WideInt b)
-typedef WIDE_ADD_INTS(WideAddInts);
+struct WideInt
+{
+  uint32x4_t val;
+};
 
-#define WIDE_SUB_FLOATS(name) WideFloat (name)(WideFloat a, WideFloat b)
-typedef WIDE_SUB_FLOATS(WideSubFloats);
-
-#define WIDE_SUB_INTS(name) WideInt (name)(WideInt a, WideInt b)
-typedef WIDE_SUB_INTS(WideSubInts);
-
-#define WIDE_MUL_FLOATS(name) WideFloat (name)(WideFloat a, WideFloat b)
-typedef WIDE_MUL_FLOATS(WideMulFloats);
-
-#define WIDE_MUL_INTS(name) WideInt (name)(WideInt a, WideInt b)
-typedef WIDE_MUL_INTS(WideMulInts);
+#else
+#error ERROR: unsupported architecture
+#endif
+*/
 
 struct PlatformAPI
 {
@@ -111,21 +108,25 @@ struct PlatformAPI
   AtomicCompareAndSwap *atomicCompareAndSwap;
   AtomicCompareAndSwapPointers *atomicCompareAndSwapPointers;
 
-  WideLoadFloats *wideLoadFloats;
-  WideLoadInts *wideLoadInts;
-  WideSetConstantFloats *wideSetConstantFloats;
-  WideSetConstantInts *wideSetConstantInts;
-  WideStoreFloats *wideStoreFloats;
-  WideStoreInts *wideStoreInts;
-  WideAddFloats *wideAddFloats;
-  WideAddInts *wideAddInts;
-  WideSubFloats *wideSubFloats;
-  WideSubInts *wideSubInts;
-  WideMulFloats *wideMulFloats;
-  WideMulInts *wideMulInts;
+  /* WideLoadFloats *wideLoadFloats; */
+  /* WideLoadInts *wideLoadInts; */
+  /* WideSetConstantFloats *wideSetConstantFloats; */
+  /* WideSetConstantInts *wideSetConstantInts; */
+  /* WideStoreFloats *wideStoreFloats; */
+  /* WideStoreInts *wideStoreInts; */
+  /* WideAddFloats *wideAddFloats; */
+  /* WideAddInts *wideAddInts; */
+  /* WideSubFloats *wideSubFloats; */
+  /* WideSubInts *wideSubInts; */
+  /* WideMulFloats *wideMulFloats; */
+  /* WideMulInts *wideMulInts; */
 };
 
 extern PlatformAPI globalPlatform;
+
+// TODO: its annoying having to put these includes here.
+//       should we just include simd_intrinsics.h at the top instead of using function pointers in globalPlatform?
+//       we already have to preprcessor branch on cpu architecture to define the types anyway...
 
 struct PluginMemory
 {

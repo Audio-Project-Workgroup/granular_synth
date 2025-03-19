@@ -380,7 +380,7 @@ atomicCompareAndSwap(volatile u32 *value, u32 oldval, u32 newval)
   u32 *expectedPtr = &oldval;
   bool success = __atomic_compare_exchange_n(value, expectedPtr, newval, false, __ATOMIC_ACQ_REL, __ATOMIC_RELAXED);
 
-  u32 result = success ? newval : oldval;
+  u32 result = success ? oldval : newval;
   return(result);
 }
 
@@ -388,9 +388,9 @@ static void *
 atomicCompareAndSwapPointers(volatile void **value, void *oldval, void *newval)
 {
   usz *expectedPtr = (usz *)&oldval;
-  bool success = __atomic_compare_exchange_n( (volatile usz*)value, expectedPtr, (usz)newval, false, __ATOMIC_ACQ_REL, __ATOMIC_RELAXED);
+  bool success = __atomic_compare_exchange_n((volatile usz *)value, expectedPtr, (usz)newval, false, __ATOMIC_ACQ_REL, __ATOMIC_RELAXED);
 
-  void *result = success ? newval : oldval;
+  void *result = success ? oldval : newVal;
   return(result);
 }
 
@@ -583,15 +583,15 @@ estimateCPUCyclesPerSecond(void)
 }
 #endif
 
-static WIDE_LOAD_FLOATS(wideLoadFloats);
-static WIDE_LOAD_INTS(wideLoadInts);
-static WIDE_STORE_FLOATS(wideStoreFloats);
-static WIDE_STORE_INTS(wideStoreInts);
-static WIDE_ADD_FLOATS(wideAddFloats);
-static WIDE_ADD_INTS(wideAddInts);
-static WIDE_SUB_FLOATS(wideSubFloats);
-static WIDE_SUB_INTS(wideSubInts);
-static WIDE_MUL_FLOATS(wideMulFloats);
-static WIDE_MUL_INTS(wideMulInts);
+/* static WIDE_LOAD_FLOATS(wideLoadFloats); */
+/* static WIDE_LOAD_INTS(wideLoadInts); */
+/* static WIDE_STORE_FLOATS(wideStoreFloats); */
+/* static WIDE_STORE_INTS(wideStoreInts); */
+/* static WIDE_ADD_FLOATS(wideAddFloats); */
+/* static WIDE_ADD_INTS(wideAddInts); */
+/* static WIDE_SUB_FLOATS(wideSubFloats); */
+/* static WIDE_SUB_INTS(wideSubInts); */
+/* static WIDE_MUL_FLOATS(wideMulFloats); */
+/* static WIDE_MUL_INTS(wideMulInts); */
 
-#include "simd_intrinsics.h"
+/* #include "simd_intrinsics.h" */

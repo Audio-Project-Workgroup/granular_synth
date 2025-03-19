@@ -64,6 +64,7 @@
 #include "plugin.h"
 
 
+#include "fft_test.cpp"
 #include "ui_layout.cpp"
 #include "file_granulator.cpp"
 #include "internal_granulator.cpp"
@@ -116,7 +117,11 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 	      pluginState->GrainManager.grainBuffer = pluginState->gbuff;
 	      pluginState->GrainManager.internal_clock = 0;
 	      pluginState->GrainManager.grainPlayList = 0;
-	      
+
+	      TemporaryMemory fftTestMemory = arenaBeginTemporaryMemory(&pluginState->loadArena, KILOBYTES(1));
+	      bool fftTestResult = fftTest((Arena *)&fftTestMemory);
+	      arenaEndTemporaryMemory(&fftTestMemory);
+
 #if 0 // NOTE: fft sample rate conversion workbench
 	      r32 sourceSignalFreq = 4.f;
 	      u32 sourceSignalLength = 4410;
