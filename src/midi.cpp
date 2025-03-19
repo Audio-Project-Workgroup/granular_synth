@@ -50,9 +50,14 @@ namespace midi {
         uint8_t controller = data[0]; 
         uint8_t value = data[1]; 
         int paramIndex = ccParamTable[controller];
-        pluginSetFloatParameter(&pluginState->parameters[paramIndex], value);
 
-            printf("Continuous Controller: Channel %d Controller %d Value %d\n", channel, controller, value);
+        r32 min = pluginState->parameters[paramIndex].range.min;
+        r32 max = pluginState->parameters[paramIndex].range.max;
+        r32 normalizedValue = ((max - min) * (r32)value / 127.f) + min;
+
+        pluginSetFloatParameter(&pluginState->parameters[paramIndex], normalizedValue);
+
+        printf("Continuous Controller: Channel %d Controller %d Value %d the normalized value is: %.2f\n", channel, controller, value, normalizedValue);
     }
 
     void PatchChange(uint8_t channel, uint8_t* data, uint8_t len, PluginState* pluginState) {
