@@ -203,13 +203,13 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 	  
 	      pluginState->phasor = 0.f;
 	      pluginState->freq = 440.f;	  
-	      pluginState->volume.currentValue = 0.8f;
-	      pluginState->volume.targetValue = 0.8f;
-	      pluginState->volume.range = makeRange(0.f, 1.f);
+	      pluginState->parameters[PluginParameter_volume].currentValue = 0.8f;
+	      pluginState->parameters[PluginParameter_volume].targetValue = 0.8f;
+	      pluginState->parameters[PluginParameter_volume].range = makeRange(0.f, 1.f);
 	  
-	      pluginState->density.currentValue = 1.f;
-	      pluginState->density.targetValue = 1.f;
-	      pluginState->density.range = makeRange(0.f, 20.f);
+	      pluginState->parameters[PluginParameter_density].currentValue = 1.f;
+	      pluginState->parameters[PluginParameter_density].targetValue = 1.f;
+	      pluginState->parameters[PluginParameter_density].range = makeRange(0.f, 20.f);
 	  
 	      pluginState->soundIsPlaying.value = false;
 
@@ -419,7 +419,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 	      if(stringsAreEqual(panel->name, (u8 *)"left"))
 		{
 		  UIComm volume = uiMakeSlider(panelLayout, "volume", V2(0.1f, 0.1f), V2(0.1f, 0.5f),
-					       &pluginState->volume, V4(0.8f, 0.8f, 0.8f, 1));
+					       &pluginState->parameters[PluginParameter_volume], V4(0.8f, 0.8f, 0.8f, 1));
 
 		  if(volume.flags & UICommFlag_hovering)
 		    {
@@ -473,7 +473,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 		  // density
 		  //
 		  UIComm density = uiMakeKnob(panelLayout, "density", V2(0.7f, 0.3f), V2(0.2f, 0.2f),
-					      &pluginState->density, V4(0, 1, 0, 1));
+					      &pluginState->parameters[PluginParameter_density], V4(0, 1, 0, 1));
 		  
 		  r32 oldDensity = pluginReadFloatParameter(density.element->fParam);
 		  r32 newDensity = oldDensity;
@@ -527,7 +527,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 	}
             
       UIComm volume = uiMakeSlider(layout, "volume", V2(0.1f, 0.1f), V2(0.1f, 0.75f),
-				   &pluginState->volume,// makeRange(0.f, 1.f),
+				   &pluginState->parameters[PluginParameter_volume],// makeRange(0.f, 1.f),
 				   V4(0.8f, 0.8f, 0.8f, 1));
 #if 0
       printf("\nvolume flags:\n %u(comm)\n %u(element)\n", volume.flags, volume.element->commFlags);
@@ -567,7 +567,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 	}
 
       UIComm density = uiMakeKnob(layout, "density", V2(0.75f, 0.5f), V2(0.1f, 0.1f),
-				  &pluginState->density, V4(0, 1, 0, 1));
+				  &pluginState->parameters[PluginParameter_density], V4(0, 1, 0, 1));
       if(density.flags & UICommFlag_dragging)
 	{
 	  //Rect2 knobDragRect = rectCenterDim(density.element->mouseClickedP - V2(20, 0), V2(5, 50));	  
@@ -717,7 +717,7 @@ AUDIO_PROCESS(audioProcess)
 
 		midi::parseMidiMessage( &atMidiBuffer, audioBuffer->midiMessageCount, pluginState );
 
-	  r32 volume = 0.1f*formatVolumeFactor*pluginReadFloatParameter(&pluginState->volume);	  	  
+	  r32 volume = 0.1f*formatVolumeFactor*pluginReadFloatParameter(&pluginState->parameters[PluginParameter_volume]);	  	  
 		
 	  pluginState->phasor += nFreq;
 	  if(pluginState->phasor > M_TAU) pluginState->phasor -= M_TAU;
@@ -777,8 +777,8 @@ AUDIO_PROCESS(audioProcess)
 		}
 	    }
 
-	  pluginUpdateFloatParameter(&pluginState->volume);
-	  pluginUpdateFloatParameter(&pluginState->density);
+	  pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_volume]);
+	  pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_density]);
 	}
 
       arenaEndTemporaryMemory(&grainMixerMemory);

@@ -65,6 +65,7 @@ enum PluginParameterEnum {
     PluginParameter_volume,   // 1: Volume
     PluginParameter_pitch,    // 2: Pitch
     PluginParameter_pan,      // 3: Pan
+    PluginParameter_density,
     // Add other parameters here...
     PluginParameter_count     // Total number of parameters (automatically counted)
 };
@@ -105,8 +106,6 @@ struct PluginState
 
   r64 phasor;
   r32 freq;
-  PluginFloatParameter volume;
-  PluginFloatParameter density;
   PluginBooleanParameter soundIsPlaying;
   PluginFloatParameter parameters[PluginParameter_count];
 
