@@ -122,10 +122,11 @@ namespace midi {
         midiCommandTable[commandByte](channel,data,len,pluginState); // commandByte & 0xF0 will zero down the last 4 bits
     }
 
-    void parseMidiMessage(PluginAudioBuffer *audioBuffer, PluginState *pluginState){
-        u8 *atMidiBuffer = audioBuffer->midiBuffer;
+    void parseMidiMessage(u8 **atMidiBufferPtr, u32 &midiMessageCount, PluginState *pluginState){
         
-        if(audioBuffer->midiMessageCount){
+        u8 *atMidiBuffer = *atMidiBufferPtr;
+        
+        if(midiMessageCount){
 
     #ifdef MIDI_VERBOSE
             printf("ALL BYTES : ");
@@ -169,7 +170,8 @@ namespace midi {
                 (int)atMidiBuffer[0]);
             printf("\n\n");
     #endif
-            --audioBuffer->midiMessageCount;
+            --midiMessageCount;
+            atMidiBufferPtr = &atMidiBuffer;
         }
     }
 }

@@ -710,11 +710,12 @@ AUDIO_PROCESS(audioProcess)
       mixPlayingGrains(grainMixBuffers[0], grainMixBuffers[1],
 		       1.f, scaledFramesToWrite, &pluginState->silo);
 
+      u8 *atMidiBuffer = audioBuffer->midiBuffer;
       void *genericAudioFrames = audioBuffer->buffer;      
       for(u32 frameIndex = 0; frameIndex < audioBuffer->framesToWrite; ++frameIndex)
 	{
 
-		midi::parseMidiMessage(audioBuffer, pluginState);
+		midi::parseMidiMessage( &atMidiBuffer, audioBuffer->midiMessageCount, pluginState );
 
 	  r32 volume = 0.1f*formatVolumeFactor*pluginReadFloatParameter(&pluginState->volume);	  	  
 		
