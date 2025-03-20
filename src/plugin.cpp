@@ -63,8 +63,8 @@
 #include "common.h"
 #include "plugin.h"
 
-
 #include "fft_test.cpp"
+#include "midi.cpp"
 #include "ui_layout.cpp"
 #include "file_granulator.cpp"
 #include "internal_granulator.cpp"
@@ -226,13 +226,13 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 	  
 	      pluginState->phasor = 0.f;
 	      pluginState->freq = 440.f;	  
-	      pluginState->volume.currentValue = 0.8f;
-	      pluginState->volume.targetValue = 0.8f;
-	      pluginState->volume.range = makeRange(0.f, 1.f);
+	      pluginState->parameters[PluginParameter_volume].currentValue = 0.8f;
+	      pluginState->parameters[PluginParameter_volume].targetValue = 0.8f;
+	      pluginState->parameters[PluginParameter_volume].range = makeRange(0.f, 1.f);
 	  
-	      pluginState->density.currentValue = 1.f;
-	      pluginState->density.targetValue = 1.f;
-	      pluginState->density.range = makeRange(0.f, 20.f);
+	      pluginState->parameters[PluginParameter_density].currentValue = 1.f;
+	      pluginState->parameters[PluginParameter_density].targetValue = 1.f;
+	      pluginState->parameters[PluginParameter_density].range = makeRange(0.f, 20.f);
 	  
 	      pluginState->t_density = 20;
 	      pluginState->start_pos = 0;
@@ -447,7 +447,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 	      if(stringsAreEqual(panel->name, (u8 *)"left"))
 		{
 		  UIComm volume = uiMakeSlider(panelLayout, "volume", V2(30.f, 30.f), UIAxis_y, 0.6f,
-					       &pluginState->volume, V4(0.8f, 0.8f, 0.8f, 1));
+					       &pluginState->parameters[PluginParameter_volume], V4(0.8f, 0.8f, 0.8f, 1));
 
 		  renderPushRectOutline(renderCommands, volume.element->parent->region, 2, RenderLevel_front,
 					  V4(1, 1, 0, 1));
@@ -509,13 +509,13 @@ RENDER_NEW_FRAME(renderNewFrame)
 		  //
 		  // density
 		  //
-		  {		   
+		  {
 		    v2 dim = getDim(panelLayout->regionRemaining);
 		    r32 sizePOP = 0.15f;
 		    r32 offsetPixels = 20.f;
-		    v2 offset = offsetPixels*V2(1, 1);
+		    v2 offset = offsetPixels*V2(1, 1);    
 		    UIComm density = uiMakeKnob(panelLayout, "density", offset, -sizePOP,
-						&pluginState->density, V4(0, 1, 0, 1));		   
+						&pluginState->parameters[PluginParameter_density], V4(0, 1, 0, 1));
 		  
 		    r32 oldDensity = pluginReadFloatParameter(density.element->fParam);
 		    r32 newDensity = oldDensity;
@@ -570,7 +570,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 	}
             
       UIComm volume = uiMakeSlider(layout, "volume", V2(0.1f, 0.1f), V2(0.1f, 0.75f),
-				   &pluginState->volume,// makeRange(0.f, 1.f),
+				   &pluginState->parameters[PluginParameter_volume],// makeRange(0.f, 1.f),
 				   V4(0.8f, 0.8f, 0.8f, 1));
 #if 0
       printf("\nvolume flags:\n %u(comm)\n %u(element)\n", volume.flags, volume.element->commFlags);
@@ -610,7 +610,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 	}
 
       UIComm density = uiMakeKnob(layout, "density", V2(0.75f, 0.5f), V2(0.1f, 0.1f),
-				  &pluginState->density, V4(0, 1, 0, 1));
+				  &pluginState->parameters[PluginParameter_density], V4(0, 1, 0, 1));
       if(density.flags & UICommFlag_dragging)
 	{
 	  //Rect2 knobDragRect = rectCenterDim(density.element->mouseClickedP - V2(20, 0), V2(5, 50));	  
@@ -706,27 +706,6 @@ RENDER_NEW_FRAME(renderNewFrame)
       arenaEnd(&pluginState->frameArena);
       printf("permanent arena used %zu bytes\n", pluginState->permanentArena.used);
     }  
-}
-
-enum MidiStatus : u32
-{
-  MidiStatus_noteOff = 0x80,
-  MidiStatus_noteOn = 0x90,
-  MidiStatus_aftertouch = 0xA0,
-  MidiStatus_continuousController = 0xB0,
-  MidiStatus_patchChange = 0xC0,
-  MidiStatus_channelPressure = 0xD0,
-  MidiStatus_pitchBend = 0xE0,
-  MidiStatus_sysEx = 0xF0,
-};
-
-static inline r32
-hertzFromMidiNoteNumber(u32 noteNumber)
-{
-  r32 result = 440.f;
-  result *= powf(powf(2.f, 1.f/12.f), (r32)((s32)noteNumber - 69));
-
-  return(result);
 }
 
 extern "C"
@@ -877,9 +856,10 @@ AUDIO_PROCESS(audioProcess)
 	{
 	  loadedSound->samplesPlayed += audioBuffer->framesToWrite;//*sampleRateRatio
 	}      
-      
+
+#if 0
       // TODO: This midi parsing is janky and bad. Passing the message length before each message is unnecessary
-      // TODO: move the midi loop inside the output loop, so that we don't only see the most recent midi message
+      // TODO: move the midi loop inside the output loop, so that we don't only see the most recent midi message      
       u8 *atMidiBuffer = audioBuffer->midiBuffer;
       while(audioBuffer->midiMessageCount)
 	{
@@ -919,6 +899,7 @@ AUDIO_PROCESS(audioProcess)
 
 	  --audioBuffer->midiMessageCount;
 	}
+#endif
 
       r64 nFreq = M_TAU*pluginState->freq/(r64)audioBuffer->outputSampleRate;
 
@@ -967,10 +948,14 @@ AUDIO_PROCESS(audioProcess)
       void *genericOutputFrames[2] = {};
       genericOutputFrames[0] = audioBuffer->outputBuffer[0];
       genericOutputFrames[1] = audioBuffer->outputBuffer[1];
-      
+
+      u8 *atMidiBuffer = audioBuffer->midiBuffer;
+
       for(u32 frameIndex = 0; frameIndex < audioBuffer->framesToWrite; ++frameIndex)
 	{
-	  r32 volume = formatVolumeFactor*pluginReadFloatParameter(&pluginState->volume);	  	  
+	  midi::parseMidiMessage( &atMidiBuffer, audioBuffer->midiMessageCount, pluginState );
+
+	  r32 volume = formatVolumeFactor*pluginReadFloatParameter(&pluginState->parameters[PluginParameter_volume]);
 		
 	  pluginState->phasor += nFreq;
 	  if(pluginState->phasor > M_TAU) pluginState->phasor -= M_TAU;
@@ -1010,8 +995,8 @@ AUDIO_PROCESS(audioProcess)
 		}
 	    }
 
-	  pluginUpdateFloatParameter(&pluginState->volume);
-	  pluginUpdateFloatParameter(&pluginState->density);
+	  pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_volume]);
+	  pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_density]);
 
 	  // TODO: not sure how this works
 	  gManager->internal_clock++;
