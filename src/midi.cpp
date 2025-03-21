@@ -12,10 +12,10 @@ hertzFromMidiNoteNumber(u8 noteNumber)
   return(result);
 }
 
-namespace midi {
-  // Function pointer type for MIDI handlers
+namespace midi {  
+  // NOTE: using a macro so that if you wanna change the signature (ie remove 'len') then you do it once here
 #define MIDI_HANDLER(name) void (name)(u8 channel, u8* data, u8 len, PluginState *pluginState)
-  typedef MIDI_HANDLER(MidiHandler);
+  typedef MIDI_HANDLER(MidiHandler); // Function pointer type for MIDI handlers
 
   // Functions for each MIDI command
   //void NoteOff(u8 channel, u8* data, u8 len, PluginState* pluginState) {
@@ -149,9 +149,10 @@ namespace midi {
     ASSERT(commandTableIndex < ARRAY_COUNT(midiCommandTable));
     midiCommandTable[commandTableIndex](channel, data, len, pluginState);
   }
-
+ 
   static void parseMidiMessage(u8 **atMidiBufferPtrInOut, u32 &midiMessageCount, PluginState *pluginState){
-        
+
+
     u8 *atMidiBuffer = *atMidiBufferPtrInOut;
         
     if(midiMessageCount){
@@ -201,7 +202,7 @@ namespace midi {
 #endif
       
       --midiMessageCount;
-      *atMidiBufferPtrInOut = atMidiBuffer;
+      *atMidiBufferPtrInOut = atMidiBuffer;    
     }
   }
 }

@@ -2,7 +2,7 @@
 
 /* NOTE:
    - elements are passed to the renderer in pixel space (where (0, 0) is the bottom-left of the
-     screen, and (windowWidthInPixels, windowHeightInPixels) is the top-right).
+     drawing region, and (windowWidthInPixels, windowHeightInPixels) is the top-right).
      
    - the mouse position is in these coordinates as well, for ease of intersection testing
    
@@ -35,14 +35,13 @@
      - render element name, with control over position (ie above, below, left, right)
      - collapsable element groups, sized relative to children
      - tooltips when hovering (eg show numeric parameter value)
-     - resizable regions
-     - specify render order
      - interface for selecting files to load at runtime
+     - interface for remapping midi cc channels with parameters
+     - display the state of grains and the grain buffer
 
    - Parameters:
      - come up with what parameters we want to have
      - make parameter reads/updates atomic
-     - put parameters in an array (or multiple), for keyboard/midi mapping
 
    - File Loading:
      - more audio file formats (eg flac, ogg, mp3)
@@ -52,10 +51,20 @@
 
    - MIDI:
      - pass timestamps to the midi buffer, and read new messages based on timestamps
-     - map midi channels to parameters
-     - handle more message codes
 
-   - Make the audioProcess() do granular synth things
+   - Grains:
+     - fix grain synthesis, so that it's not so choppy
+     - simplify/clean up grain creation/destruction timing logic
+     - use the plugin parameters in the grain loop
+     - use lookup tables for grain windowing
+     - add grain post-processing effects like pitch-shifting and time-stretching
+
+   - Misc:
+     - speed up fft
+     - pull native executable audio loop into its own thread
+     - work queues?
+     - logging?
+     - allocate hardware ring buffer?
 */  
 
 #include <stdio.h>

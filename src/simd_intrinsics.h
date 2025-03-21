@@ -6,11 +6,12 @@ struct WideInt;
 static WideFloat wideLoadFloats(r32 *src);
 static WideFloat wideSetConstantFloats(r32 src);
 static WideFloat wideSetFloats(r32 a, r32 b, r32 c, r32 d);
+static void      wideSetLaneFloats(WideFloat *w, r32 val, u32 lane);
 static void	 wideStoreFloats(r32 *dest, WideFloat src);
 static WideFloat wideAddFloats(WideFloat a, WideFloat b);
 static WideFloat wideSubFloats(WideFloat a, WideFloat b);
 static WideFloat wideMulFloats(WideFloat a, WideFloat b);
-static WideFloat wideMaskFloats(WideFloat a, WideInt mask);
+static WideFloat wideMaskFloats(WideFloat a, WideFloat mask);
 
 static WideInt	 wideLoadInts(u32 *src);
 static WideInt	 wideSetConstantInts(u32 src);
@@ -74,6 +75,13 @@ wideSetFloats(r32 a, r32 b, r32 c, r32 d)
   val[3] = d;
 
   return(result);
+}
+
+static void
+wideSetLaneFloats(WideFloat *w, r32 val, u32 lane)
+{
+  r32 *vals = (r32 *)&w->val;
+  vals[lane] = val;
 }
 
 static WideInt
@@ -163,12 +171,14 @@ wideMulFloats(WideFloat a, WideFloat b)
 }
 
 static WideFloat
-wideMaskFloats(WideFloat a, WideInt mask)
-{
-  WideFloat result = {};
-  __m128 fmask = _mm_cvtepi32_ps(mask.val);
+wideMaskFloats(WideFloat a, WideFloat mask)
+{  
+  //__m128i aInt = _mm_cvtps_epi32(a.val);
+  //__m128i resultInt = _mm_and_si128(aInt, mask.val);
 
-  result.val = _mm_and_ps(a.val, fmask);
+  WideFloat result = {};
+  result.val = _mm_and_ps(a.val, mask.val);
+  //result.val = _mm_cvtepi32_ps(resultInt);
   return(result);
 }
 

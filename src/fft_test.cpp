@@ -19,13 +19,18 @@ fftTest(Arena *allocator)
 
   r32 *testIfftResult = arenaPushArray(allocator, testSignalLength, r32, arenaFlagsZeroAlign(4));
   r32 *testIfftTemp = arenaPushArray(allocator, testSignalLength, r32, arenaFlagsZeroAlign(4));
+  
+  //ifft(testIfftResult, testIfftTemp, testDestComplex, testSignalLength);
   ifft_real_permute(testIfftResult, testIfftTemp, testDestRe, testDestIm, testSignalLength);
 
-  bool result = true;
-  for(u32 i = 0; result && i < testSignalLength; ++i)
+  r32 maxErr = 0.f;
+  r32 errTol = 0.001f;
+  for(u32 i = 0; i < testSignalLength; ++i)
     {
-      result = (testSignal[i] == testIfftResult[i]);
+      r32 err = Abs(testSignal[i] - testIfftResult[i]);
+      maxErr = MAX(maxErr, err);
     }
 
+  bool result = (maxErr <= errTol);
   return(result);
 }

@@ -1,7 +1,7 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
-//#include "platform.h"
+#include "platform.h"
 #include "onnx.cpp"
 
 /*! @brief Calculates the milliseconds passed since the last midi event. 
