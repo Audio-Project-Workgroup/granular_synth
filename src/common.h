@@ -5,6 +5,7 @@
 #include "utils.h"
 #include "arena.h"
 #include "simd_intrinsics.h"
+#include "profile.h"
 #include "math.h"
 #include "render.h"
 
@@ -56,42 +57,6 @@ typedef ATOMIC_COMPARE_AND_SWAP(AtomicCompareAndSwap);
 #define ATOMIC_COMPARE_AND_SWAP_POINTERS(name) void *(name)(volatile void **value, void *oldval, void *newval)
 typedef ATOMIC_COMPARE_AND_SWAP_POINTERS(AtomicCompareAndSwapPointers);
 
-// simd
-
-/*
-#if ARCH_X86 || ARCH_X64
-
-#include <immintrin.h>
-
-struct WideFloat
-{
-  __m128 val;
-};
-
-struct WideInt
-{
-  __m128i val;
-};
-
-#elif ARCH_ARM || ARCH_ARM64
-
-#include <arm_neon.h>
-
-struct WideFloat
-{
-  float32x4_t val;
-};
-
-struct WideInt
-{
-  uint32x4_t val;
-};
-
-#else
-#error ERROR: unsupported architecture
-#endif
-*/
-
 struct PlatformAPI
 {
   PlatformReadEntireFile *readEntireFile;  
@@ -107,31 +72,16 @@ struct PlatformAPI
   AtomicAdd *atomicAdd;
   AtomicCompareAndSwap *atomicCompareAndSwap;
   AtomicCompareAndSwapPointers *atomicCompareAndSwapPointers;
-
-  /* WideLoadFloats *wideLoadFloats; */
-  /* WideLoadInts *wideLoadInts; */
-  /* WideSetConstantFloats *wideSetConstantFloats; */
-  /* WideSetConstantInts *wideSetConstantInts; */
-  /* WideStoreFloats *wideStoreFloats; */
-  /* WideStoreInts *wideStoreInts; */
-  /* WideAddFloats *wideAddFloats; */
-  /* WideAddInts *wideAddInts; */
-  /* WideSubFloats *wideSubFloats; */
-  /* WideSubInts *wideSubInts; */
-  /* WideMulFloats *wideMulFloats; */
-  /* WideMulInts *wideMulInts; */
 };
 
 extern PlatformAPI globalPlatform;
 
-// TODO: its annoying having to put these includes here.
-//       should we just include simd_intrinsics.h at the top instead of using function pointers in globalPlatform?
-//       we already have to preprcessor branch on cpu architecture to define the types anyway...
-
 struct PluginMemory
 {
   void *memory;
+  
   u64 osTimerFreq;
+  
   PlatformAPI platformAPI;
 };
 

@@ -15,13 +15,15 @@ fftTest(Arena *allocator)
   c64 *testDestComplex = arenaPushArray(allocator, testSignalLength, c64, arenaFlagsZeroAlign(4));
 
   fft(testDestComplex, testSignal, testSignalLength);
-  fft_real_permute(testDestRe, testDestIm, testSignal, testSignalLength);  
+  //fft_real_permute(testDestRe, testDestIm, testSignal, testSignalLength);
+  fft_real_noPermute(testDestRe, testDestIm, testSignal, testSignalLength);
 
   r32 *testIfftResult = arenaPushArray(allocator, testSignalLength, r32, arenaFlagsZeroAlign(4));
   r32 *testIfftTemp = arenaPushArray(allocator, testSignalLength, r32, arenaFlagsZeroAlign(4));
   
   //ifft(testIfftResult, testIfftTemp, testDestComplex, testSignalLength);
-  ifft_real_permute(testIfftResult, testIfftTemp, testDestRe, testDestIm, testSignalLength);
+  //ifft_real_permute(testIfftResult, testIfftTemp, testDestRe, testDestIm, testSignalLength);
+  ifft_real_noPermute(testIfftResult, testIfftTemp, testDestRe, testDestIm, testSignalLength);
 
   r32 maxErr = 0.f;
   r32 errTol = 0.001f;
