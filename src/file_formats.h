@@ -258,7 +258,7 @@ loadWav(char *filename, Arena *loadAllocator, Arena *permanentAllocator)
 	{
 #if 1
 	  // NOTE: stupid linear interpolation until the fft method (or another better one) works
-	  Arena tempAllocator = arenaSubArena(loadAllocator, 2*sourceSampleCount*sizeof(r32));
+	  Arena tempAllocator = arenaSubArena(loadAllocator, 2*sourceSampleCount*sizeof(r32) + 1);
 	  r32 *tempL = arenaPushArray(&tempAllocator, sourceSampleCount, r32);
 	  r32 *tempR = arenaPushArray(&tempAllocator, sourceSampleCount, r32);
 	  for(u32 index = 0; index < sourceSampleCount; ++index)

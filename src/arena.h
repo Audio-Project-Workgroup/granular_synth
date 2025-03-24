@@ -64,9 +64,12 @@ arenaBegin(void *memory, usz capacity)
 static inline u8 *
 arenaPushSize_(Arena *arena, usz size, ArenaPushFlags flags = defaultArenaPushFlags())
 {
-  ASSERT(size + arena->used <=  arena->capacity);
-  u8 *result = arena->base + arena->used;
-  arena->used += size;
+  usz resultInit = (usz)arena->base + arena->used;
+  usz alignmentOffset = flags.alignment ? (ALIGN_POW_2(resultInit, flags.alignment) - resultInit) : 0; 
+
+  ASSERT(size + arena->used + alignmentOffset < arena->capacity);
+  u8 *result = arena->base + arena->used + alignmentOffset;
+  arena->used += size + alignmentOffset;
 
   if(flags.clearToZero)
     {

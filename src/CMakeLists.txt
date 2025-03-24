@@ -28,6 +28,8 @@ set(DATA_DIR "${BASE_DIR}/data")
 set(ONNX_MODEL_PATH ${BASE_DIR}/data/test_model.onnx)
 
 if(WIN32)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc")
+
   set(DYNAMIC_PLUGIN_PATH "${BUILD_DIR}/plugin.dll")
 
   set(ONNX_LIBRARY_DIR "${BASE_DIR}/src/libs")

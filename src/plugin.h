@@ -21,15 +21,26 @@ struct PluginFloatParameter
 {
   RangeR32 range;
 
-  //r32 oldValue;
-  r32 currentValue;
-  r32 targetValue;
+  union
+  {
+    struct
+    {
+      r32 currentValue;
+      r32 targetValue;
+    };
+    struct
+    {
+      u32 currentValue_AsInt;
+      u32 targetValue_AsInt;
+    };
+  };
+  
   r32 dValue;
 };
 
 inline r32
 pluginReadFloatParameter(PluginFloatParameter *param)
-{
+{ 
   return(param->currentValue);
 }
 
