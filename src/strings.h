@@ -1,4 +1,5 @@
 // structures/functions for making string processing and amalgamation convenient
+#include <stdio.h>
 #include <stdarg.h>
 
 // base string types
@@ -64,6 +65,17 @@ getCStringLength(char *cstr)
 #define STR8_CSTR(cstr) makeString8((u8 *)cstr, getCStringLength(cstr))
 #define STR8_LIT(lit) makeString8((u8 *)lit, sizeof(lit)-1)
 
+inline String8
+arenaPushString(Arena *arena, String8 string)
+{
+  String8 result = {};
+  result.size = string.size;
+  result.str = arenaPushSize(arena, result.size);
+  COPY_SIZE(result.str, string.str, result.size);
+
+  return(result);
+}
+
 // string list functions
 inline void
 stringListPushNode(String8List *list, String8Node *node)
@@ -85,7 +97,7 @@ inline void
 stringListPush(Arena *arena, String8List *list, String8 str)
 {
   String8Node *node = arenaPushStruct(arena, String8Node);
-  node->string = str;
+  node->string = arenaPushString(arena, str);
 
   stringListPushNode(list, node);
 }
@@ -94,7 +106,7 @@ inline void
 stringListPushFront(Arena *arena, String8List *list, String8 str)
 {
   String8Node *node = arenaPushStruct(arena, String8Node);
-  node->string = str;
+  node->string = arenaPushString(arena, str);
 
   stringListPushNodeFront(list, node);
 }
@@ -112,6 +124,15 @@ stringListPushFormat(Arena *arena, String8List *list, char *fmt, ...)
   stringListPush(arena, list, string);
 }
 
+inline void
+stringListPushFormatV(Arena *arena, String8List *list, char *fmt, va_list vaArgs)
+{
+  char buffer[256] = {};
+  int len = vsnprintf(buffer, ARRAY_COUNT(buffer), fmt, vaArgs);
+
+  String8 string = makeString8((u8 *)buffer, len);
+  stringListPush(arena, list, string);
+}
 
 
 

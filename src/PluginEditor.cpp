@@ -291,6 +291,29 @@ AudioPluginAudioProcessorEditor::renderOpenGL(void)
       
       renderCommands(&commands);
       //repaint();
+
+      PluginLogger *pluginLogger = processorRef.pluginMemory.logger;
+      for(;;)
+	{
+	  if(atomicCompareAndSwap(&pluginLogger->mutex, 0, 1) == 0)
+	    {	    
+	      for(String8Node *node = pluginLogger->log.first; node; node = node->next)
+		{
+		  String8 string = node->string;
+		  if(string.str)
+		    {  
+		      //fwrite(string.str, sizeof(*string.str), string.size, stdout);
+		      juce::Logger::writeToLog(juce::String((const char *)string.str, string.size));
+		    }
+		}
+
+	      pluginLogger->log.first = 0;
+	      arenaEnd(pluginLogger->logArena);
+	      
+	      atomicStore(&pluginLogger->mutex, 0);
+	      break;
+	    }
+	}      
     }
 
   PluginInput *temp = newInput;

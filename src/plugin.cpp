@@ -67,7 +67,7 @@
      - allocate hardware ring buffer?
 */  
 
-#include <stdio.h>
+//#include <stdio.h>
 
 #include "common.h"
 #include "plugin.h"
@@ -79,7 +79,7 @@
 #include "internal_granulator.cpp"
 
 PlatformAPI globalPlatform;
-PluginLogger globalLogger;
+PluginLogger *globalLogger;
 
 inline void
 printButtonState(ButtonState button, char *name)
@@ -328,12 +328,13 @@ RENDER_NEW_FRAME(renderNewFrame)
       renderBeginCommands(renderCommands, &pluginState->frameArena);
 
       // TODO: maybe make a logging system?
-#if 1
-      printf("mouseP: (%.2f, %.2f)\n",
-	     input->mouseState.position.x, input->mouseState.position.y);
+
+      //printf("mouseP: (%.2f, %.2f)\n", input->mouseState.position.x, input->mouseState.position.y);      
       //printButtonState(input->mouseState.buttons[MouseButton_left], "left");
-      //printButtonState(input->mouseState.buttons[MouseButton_right], "right");     
-#endif
+      //printButtonState(input->mouseState.buttons[MouseButton_right], "right");
+
+      //stringListPushFormat(globalLogger->logArena, &globalLogger->log, "mouseP: (%.2f, %.2f)\n", input->mouseState.position.x, input->mouseState.position.y);
+      logFormatString("mouseP: (%.2f, %.2f)\n", input->mouseState.position.x, input->mouseState.position.y);
 
 #if 0
       printButtonState(input->keyboardState.keys[KeyboardButton_tab], "tab");
@@ -715,7 +716,9 @@ RENDER_NEW_FRAME(renderNewFrame)
 #endif
       
       arenaEnd(&pluginState->frameArena);
-      printf("permanent arena used %zu bytes\n", pluginState->permanentArena.used);
+      //printf("permanent arena used %zu bytes\n", pluginState->permanentArena.used);
+      //stringListPushFormat(globalLogger->logArena, &globalLogger->log, "permanent arena used %zu bytes\n", pluginState->permanentArena.used);
+      logFormatString("permanent arena used %zu bytes\n", pluginState->permanentArena.used);
     }  
 }
 
@@ -769,7 +772,7 @@ AUDIO_PROCESS(audioProcess)
 			  }		  
 		      }
 
-		    ASSERT(readIndex + 1 < framesToRead);
+		    ASSERT((readIndex + 1 < framesToRead) || readFrac == 0);
 		    r32 inSample0 = (r32)inputFrames[channelIndex][readIndex]/(r32)S16_MAX;
 		    r32 inSample1 = (r32)inputFrames[channelIndex][readIndex + 1]/(r32)S16_MAX;
 		    r32 inputSample = lerp(inSample0, inSample1, readFrac);
@@ -817,7 +820,7 @@ AUDIO_PROCESS(audioProcess)
 			  }		  
 		      }		    
 
-		    ASSERT(readIndex + 1 < framesToRead);
+		    ASSERT((readIndex + 1 < framesToRead) || readFrac == 0);
 		    r32 inSample0 = inputFrames[channelIndex][readIndex];
 		    r32 inSample1 = inputFrames[channelIndex][readIndex + 1];
 		    r32 inputSample = lerp(inSample0, inSample1, readFrac);

@@ -259,7 +259,11 @@ main(int argc, char **argv)
 	  usz loggerMemorySize = KILOBYTES(32);
 	  void *loggerMemory = calloc(loggerMemorySize, 1);
 	  Arena loggerArena = arenaBegin(loggerMemory, loggerMemorySize);
-	  pluginMemory.logger.logArena = &loggerArena;
+	  
+	  PluginLogger logger = {};
+	  logger.logArena = &loggerArena;
+
+	  pluginMemory.logger = &logger;
 
 	  RenderCommands commands = {};	  
 
@@ -414,6 +418,18 @@ main(int argc, char **argv)
 			      plugin.renderNewFrame(&pluginMemory, oldInput, &commands);
 			      glfwSetCursorState(window, commands.cursorState);
 			      renderCommands(&commands);
+			      
+			      for(String8Node *node = pluginMemory.logger->log.first; node; node = node->next)
+				{
+				  String8 string = node->string;
+				  if(string.str)
+				    {  
+				      fwrite(string.str, sizeof(*string.str), string.size, stdout);
+				    }
+				}
+
+			      pluginMemory.logger->log.first = 0;
+			      arenaEnd(pluginMemory.logger->logArena);
 			    }
 
 			  glfwSwapBuffers(window);

@@ -79,10 +79,11 @@ struct PluginLogger
 {
   Arena *logArena;
   String8List log;
+  volatile u32 mutex;
 };
 
 extern PlatformAPI globalPlatform;
-extern PluginLogger globalLogger;
+extern PluginLogger *globalLogger;
 
 struct PluginMemory
 {
@@ -92,7 +93,7 @@ struct PluginMemory
   
   PlatformAPI platformAPI;
 
-  PluginLogger logger;
+  PluginLogger *logger;
 };
 
 // input

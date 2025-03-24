@@ -51,6 +51,11 @@ public:
 private:  
   juce::DynamicLibrary libPlugin;  
   PluginAudioBuffer audioBuffer;
+  
+  PluginLogger pluginLogger;
+  void *loggerMemory;
+  Arena loggerArena;
+
   void *audioBufferMemory;
   bool resourcesReleased;
 
