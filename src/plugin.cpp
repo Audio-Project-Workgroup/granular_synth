@@ -79,6 +79,7 @@
 #include "internal_granulator.cpp"
 
 PlatformAPI globalPlatform;
+PluginLogger globalLogger;
 
 inline void
 printButtonState(ButtonState button, char *name)
@@ -103,13 +104,14 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 	  //if(globalPlatform.syncCompareAndSwap(&pluginState->initializationMutex, 0, 1) == 1)
 	    {
 	      globalPlatform = memoryBlock->platformAPI;
+	      globalLogger = memoryBlock->logger;
 
 	      pluginState->osTimerFreq = memoryBlock->osTimerFreq;
 
-	      pluginState->permanentArena = arenaBegin((u8 *)memory + sizeof(PluginState), MEGABYTES(256));
+	      pluginState->permanentArena = arenaBegin((u8 *)memory + sizeof(PluginState), MEGABYTES(512));
 	      pluginState->frameArena = arenaSubArena(&pluginState->permanentArena, MEGABYTES(2));
 	      pluginState->loadArena = arenaSubArena(&pluginState->permanentArena, MEGABYTES(128));
-	      pluginState->grainArena = arenaSubArena(&pluginState->permanentArena, MEGABYTES(64));
+	      pluginState->grainArena = arenaSubArena(&pluginState->permanentArena, MEGABYTES(32));
 	      	      
 	      pluginState->gbuff = arenaPushStruct(&pluginState->permanentArena, GrainBuffer);
 	      
@@ -723,8 +725,10 @@ AUDIO_PROCESS(audioProcess)
   PluginState *pluginState = initializePluginState(memory);  
   if(pluginState->initialized)
     {
-      // NOTE: copy plugin input audio to the grain buffer      
-      r32 inputBufferReadSpeed = (r32)INTERNAL_SAMPLE_RATE/audioBuffer->inputSampleRate;      
+      // NOTE: copy plugin input audio to the grain buffer
+      u32 framesToRead = audioBuffer->framesToWrite;      
+      //r32 inputBufferReadSpeed = (r32)INTERNAL_SAMPLE_RATE/audioBuffer->inputSampleRate;
+      r32 inputBufferReadSpeed = (r32)audioBuffer->inputSampleRate/(r32)INTERNAL_SAMPLE_RATE;
       GrainBuffer *gbuff = pluginState->gbuff;
       PlayingSound *loadedSound = &pluginState->loadedSound;
       
@@ -737,7 +741,7 @@ AUDIO_PROCESS(audioProcess)
 	    inputFrames[0] = (s16 *)audioBuffer->inputBuffer[0];
 	    inputFrames[1] = (s16 *)audioBuffer->inputBuffer[1];
 	    
-	    for(u32 frameIndex = 0; frameIndex < audioBuffer->framesToWrite; ++frameIndex)
+	    for(u32 frameIndex = 0; frameIndex < framesToRead; ++frameIndex)
 	      {
 		r32 readPosition = inputBufferReadSpeed*frameIndex;
 		u32 readIndex = (u32)readPosition;
@@ -765,9 +769,11 @@ AUDIO_PROCESS(audioProcess)
 			  }		  
 		      }
 
-		    r32 inSample0 = (r32)inputFrames[channelIndex][readIndex];
-		    r32 inSample1 = (r32)inputFrames[channelIndex][readIndex + 1];
+		    ASSERT(readIndex + 1 < framesToRead);
+		    r32 inSample0 = (r32)inputFrames[channelIndex][readIndex]/(r32)S16_MAX;
+		    r32 inSample1 = (r32)inputFrames[channelIndex][readIndex + 1]/(r32)S16_MAX;
 		    r32 inputSample = lerp(inSample0, inSample1, readFrac);
+		    ASSERT(isInRange(inputSample, -1.f, 1.f));
 
 		    mixedVal += 0.5f*inputSample;
 		    gbuff->samples[channelIndex][gbuff->writeIndex] = 32000.f*mixedVal;
@@ -783,7 +789,7 @@ AUDIO_PROCESS(audioProcess)
 	    inputFrames[0] = (r32 *)audioBuffer->inputBuffer[0];
 	    inputFrames[1] = (r32 *)audioBuffer->inputBuffer[1];
 	    
-	    for(u32 frameIndex = 0; frameIndex < audioBuffer->framesToWrite; ++frameIndex)
+	    for(u32 frameIndex = 0; frameIndex < framesToRead; ++frameIndex)
 	      {
 		r32 readPosition = inputBufferReadSpeed*frameIndex;
 		u32 readIndex = (u32)readPosition;
@@ -811,6 +817,7 @@ AUDIO_PROCESS(audioProcess)
 			  }		  
 		      }		    
 
+		    ASSERT(readIndex + 1 < framesToRead);
 		    r32 inSample0 = inputFrames[channelIndex][readIndex];
 		    r32 inSample1 = inputFrames[channelIndex][readIndex + 1];
 		    r32 inputSample = lerp(inSample0, inSample1, readFrac);
@@ -962,7 +969,7 @@ AUDIO_PROCESS(audioProcess)
 
       for(u32 frameIndex = 0; frameIndex < audioBuffer->framesToWrite; ++frameIndex)
 	{
-	  midi::parseMidiMessage( &atMidiBuffer, audioBuffer->midiMessageCount, pluginState );
+	  midi::parseMidiMessage(&atMidiBuffer, audioBuffer->midiMessageCount, pluginState);
 
 	  r32 volume = formatVolumeFactor*pluginReadFloatParameter(&pluginState->parameters[PluginParameter_volume]);
 		
@@ -979,7 +986,8 @@ AUDIO_PROCESS(audioProcess)
 	      r32 grainReadPosition = sampleRateRatio*frameIndex;
 	      u32 grainReadIndex = (u32)grainReadPosition;
 	      r32 grainReadFrac = grainReadPosition - grainReadIndex;
-	      
+
+	      ASSERT(grainReadIndex + 1 < scaledFramesToWrite);
 	      r32 firstGrainVal = grainMixBuffers[channelIndex][grainReadIndex];
 	      r32 nextGrainVal = grainMixBuffers[channelIndex][grainReadIndex + 1];
 	      r32 grainVal = lerp(firstGrainVal, nextGrainVal, grainReadFrac);

@@ -39,6 +39,11 @@ typedef double   r64;
 
 #define r32_MAX FLT_MAX;
 
+#define S8_MIN  (0X80)
+#define S16_MIN (0x8000)
+#define S32_MIN (0x80000000)
+#define S64_MIN (0x8000000000000000)
+
 struct c64
 {
   r32 re, im;

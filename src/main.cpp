@@ -256,6 +256,11 @@ main(int argc, char **argv)
 	  // pluginMemory.platformAPI.wideMulFloats	 = wideMulFloats;
 	  // pluginMemory.platformAPI.wideMulInts		 = wideMulInts;
 
+	  usz loggerMemorySize = KILOBYTES(32);
+	  void *loggerMemory = calloc(loggerMemorySize, 1);
+	  Arena loggerArena = arenaBegin(loggerMemory, loggerMemorySize);
+	  pluginMemory.logger.logArena = &loggerArena;
+
 	  RenderCommands commands = {};	  
 
 	  // plugin setup

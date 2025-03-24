@@ -3,8 +3,6 @@ cmake_minimum_required(VERSION 3.22)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_BUILD_TYPE Debug)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
-
 project(GranularSynthTest VERSION 0.0.1)
 
 add_subdirectory(JUCE)
@@ -41,6 +39,8 @@ if(WIN32)
   #set(JUCE_VST3_COPY_DIR ${USER_ROOT}AppData/Local/Programs/Common/VST3)
   #set(JUCE_COPY_PLUGIN_AFTER_BUILD ON)
 elseif(APPLE)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
+  
   set(DYNAMIC_PLUGIN_PATH "${BUILD_DIR}/plugin.dylib")
   #set(ONNX_LIBRARY "${ONNX_LIBRARY_DIR}/libonnxruntime.dylib")
 
@@ -56,6 +56,8 @@ elseif(APPLE)
   message("${JUCE_VST3_COPY_DIR}")
   set(JUCE_COPY_PLUGIN_AFTER_BUILD ON)
 elseif(UNIX)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
+  
   set(DYNAMIC_PLUGIN_PATH "${BUILD_DIR}/plugin.so")
   #set(ONNX_LIBRARY "${ONNX_LIBRARY_DIR}/libonnxruntime.so")
 

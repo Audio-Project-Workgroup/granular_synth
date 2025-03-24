@@ -245,6 +245,11 @@ prepareToPlay(double sampleRate, int samplesPerBlock)
   // pluginMemory.platformAPI.wideMulFloats	 = wideMulFloats;
   // pluginMemory.platformAPI.wideMulInts		 = wideMulInts;
 
+  usz loggerMemorySize = KILOBYTES(32);
+  void *loggerMemory = calloc(loggerMemorySize, 1);
+  Arena loggerArena = arenaBegin(loggerMemory, loggerMemorySize);
+  pluginMemory.logger.logArena = &loggerArena;
+
   juce::String pluginPath(DYNAMIC_PLUGIN_PATH);
   juce::Logger::writeToLog(pluginPath);  
 

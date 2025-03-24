@@ -27,6 +27,10 @@
 // NOTE: linked-list utilities
 #define STACK_PUSH(head, node) do {node->next = head; head = node;} while(0)
 #define STACK_POP(head) do {head = head->next;} while(0)
+
+#define QUEUE_PUSH(f, l, n) do {(f) ? (f)=(l)=(n) : ((l->next=(n),(l)=(n)),(n)->next=0);} while(0)
+#define QUEUE_PUSH_FRONT(f, l, n) do {(f) ? (f)=(l)=(n),(n)->next=0 : (((n)->next=(f),(f)=(n)));} while(0)
+
 #define DLL_PUSH_BACK(f, l, n) do {((f)==0) ? ((f)=(l)=(n), (n)->next=(n)->prev=0):((n)->prev=(l), (l)->next=(n), (l)=(n), (n)->next=0);} while(0)
 
 #define LINKED_LIST_APPEND(head, new) do {	\

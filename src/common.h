@@ -4,6 +4,7 @@
 #include "types.h"
 #include "utils.h"
 #include "arena.h"
+#include "strings.h"
 #include "simd_intrinsics.h"
 #include "profile.h"
 #include "math.h"
@@ -74,7 +75,14 @@ struct PlatformAPI
   AtomicCompareAndSwapPointers *atomicCompareAndSwapPointers;
 };
 
+struct PluginLogger
+{
+  Arena *logArena;
+  String8List log;
+};
+
 extern PlatformAPI globalPlatform;
+extern PluginLogger globalLogger;
 
 struct PluginMemory
 {
@@ -83,6 +91,8 @@ struct PluginMemory
   u64 osTimerFreq;
   
   PlatformAPI platformAPI;
+
+  PluginLogger logger;
 };
 
 // input
