@@ -176,7 +176,7 @@ namespace midi {
     if(midiMessageCount){
 #ifdef MIDI_VERBOSE
       printf("ALL BYTES : ");
-      size_t numberOfBytesAheadToPrint = 10;
+      size_t numberOfBytesAheadToPrint = 15;
       for (size_t i = 0; i < numberOfBytesAheadToPrint; ++i) {
 	printf("0x%02x ", (unsigned char)atMidiBuffer[i]);
       }
@@ -191,9 +191,9 @@ namespace midi {
       // get the timestamp
       // TODO: only consume the message if its timestamp is earlier than the current time.
       //       so we'll need to track the current time in a manner comparable to what juce gives us
-      u32 timeStamp = *((u32*)atMidiBuffer);
-      atMidiBuffer += sizeof(u32); // forward atMidiBuffer pointer past the command byte
-      bytesToRead-=4;
+      r64 timeStamp = *((r64*)atMidiBuffer);
+      atMidiBuffer += sizeof(r64); // forward atMidiBuffer pointer past the command byte
+      bytesToRead-=8;
             
       // get the command byte (command byte include both command and channel info within it)
       u8 commandByte = *atMidiBuffer;
@@ -210,7 +210,7 @@ namespace midi {
       processMidiCommand(commandByte, data, bytesToRead, pluginState);
 
 #ifdef MIDI_VERBOSE
-      printf("AFTER PARSING : 0x%x | %d timeStamp(ms passed) | %d bytes to read | data points to 0x%x | midiBuffer ptr points to 0x%x\n", 
+      printf("AFTER PARSING : 0x%x | %.3f timeStamp(ms passed) | %d bytes to read | data points to 0x%x | midiBuffer ptr points to 0x%x\n", 
 	     (int)commandByte,
 	     timeStamp, 
 	     (int)bytesToRead, 
