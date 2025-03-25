@@ -9,10 +9,10 @@ struct GrainBuffer
 };
 
 enum WindowType {
-  HANN,
-  SINE,
-  TRIANGLE,
-  RECTANGULAR
+  HANN = 1,
+  SINE = 2,
+  TRIANGLE = 3,
+  RECTANGULAR = 4
 };
 
 struct Grain
@@ -41,9 +41,11 @@ struct GrainManager
   Grain* grainPlayList;
   Grain* grainFreeList;
   
-  GrainBuffer* grainBuffer;    
-
-  r32 internal_clock;  
+  GrainBuffer* grainBuffer;
+  /*We calculate what the interonset times are and set them here. We start this var at 0, so in the first
+  call to the synthesize function, we make a new grain, and set current_iot to whatever we compute it to be.*/
+  s32 current_iot;
+  r32* windowBuffer[4];
 };
 
 
