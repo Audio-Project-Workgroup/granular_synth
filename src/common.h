@@ -42,8 +42,9 @@ typedef PLATFORM_FREE_FILE_MEMORY(PlatformFreeFileMemory);
 typedef PLATFORM_WRITE_ENTIRE_FILE(PlatformWriteEntireFile);
 
 // atomics
+// NOTE: atomic operations return initial values
 
-#define ATOMIC_LOAD(name) u32 (name)(volatile u32 *src)
+#define ATOMIC_LOAD(name) u32 (name)(volatile u32 *src) 
 typedef ATOMIC_LOAD(AtomicLoad);
 
 #define ATOMIC_STORE(name) u32 (name)(volatile u32 *dest, u32 value)

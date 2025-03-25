@@ -90,14 +90,15 @@ msecWait(u32 msecsToWait)
 static u32
 atomicLoad(volatile u32 *src)
 {
-  return(*src);
+  u32 result = InterlockedExchangeAdd(src, 0);
+  
+  return(result);
 }
 
 static u32
 atomicStore(volatile u32 *dest, u32 value)
-{
-  u32 result = atomicLoad(dest);
-  *dest = value;
+{ 
+  u32 result = InterlockedExchange(dest, value);
 
   return(result);
 }
@@ -105,8 +106,10 @@ atomicStore(volatile u32 *dest, u32 value)
 static u32
 atomicAdd(volatile u32 *addend, u32 value)
 {
+  u32 result = atomicLoad(addend);
   InterlockedAdd((volatile LONG *)addend, value);
-  return(atomicLoad(addend));
+
+  return(result);
 }
 
 static u32
@@ -390,7 +393,7 @@ atomicCompareAndSwapPointers(volatile void **value, void *oldval, void *newval)
   usz *expectedPtr = (usz *)&oldval;
   bool success = __atomic_compare_exchange_n((volatile usz *)value, expectedPtr, (usz)newval, false, __ATOMIC_ACQ_REL, __ATOMIC_RELAXED);
 
-  void *result = success ? oldval : newVal;
+  void *result = success ? oldval : newval;
   return(result);
 }
 

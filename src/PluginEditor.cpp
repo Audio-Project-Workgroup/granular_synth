@@ -248,6 +248,7 @@ AudioPluginAudioProcessorEditor::newOpenGLContextCreated(void)
 void
 AudioPluginAudioProcessorEditor::renderOpenGL(void)
 {
+  
   glViewport(0, 0, editorWidth, editorHeight);
   glScissor(0, 0, editorWidth, editorHeight);
 
@@ -259,8 +260,8 @@ AudioPluginAudioProcessorEditor::renderOpenGL(void)
 
   if(processorRef.pluginCode.renderNewFrame)
     {
-      juce::Logger::writeToLog("mouseP: (" + juce::String(newInput->mouseState.position.x) +
-			       ", " + juce::String(newInput->mouseState.position.y) + ")");
+      //juce::Logger::writeToLog("mouseP: (" + juce::String(newInput->mouseState.position.x) +
+      //		       ", " + juce::String(newInput->mouseState.position.y) + ")");
       
       processorRef.pluginCode.renderNewFrame(&processorRef.pluginMemory, newInput, &commands);      
 
@@ -316,10 +317,14 @@ AudioPluginAudioProcessorEditor::renderOpenGL(void)
 	}      
     }
 
+  // TODO: it seems that input is still not being handled correctly.
+  //       when resizing panels, the cursor shape sometimes does not update,
+  //       and sometimes press interactions aren't registered
   PluginInput *temp = newInput;
   newInput = oldInput;
   oldInput = temp;
 
+  newInput->mouseState.position = oldInput->mouseState.position;
   for(u32 buttonIndex = 0; buttonIndex < MouseButton_COUNT; ++buttonIndex)
     {
       newInput->mouseState.buttons[buttonIndex].halfTransitionCount = 0;
@@ -338,6 +343,7 @@ AudioPluginAudioProcessorEditor::renderOpenGL(void)
       newInput->keyboardState.modifiers[modifierIndex].endedDown =
 	oldInput->keyboardState.modifiers[modifierIndex].endedDown;
     }
+
 }
 
 void

@@ -425,6 +425,7 @@ main(int argc, char **argv)
 				  if(string.str)
 				    {  
 				      fwrite(string.str, sizeof(*string.str), string.size, stdout);
+				      fprintf(stdout, "\n");
 				    }
 				}
 

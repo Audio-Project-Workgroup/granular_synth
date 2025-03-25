@@ -131,6 +131,7 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 
 	      TemporaryMemory fftTestMemory = arenaBeginTemporaryMemory(&pluginState->loadArena, KILOBYTES(1));
 	      bool fftTestResult = fftTest((Arena *)&fftTestMemory);
+	      UNUSED(fftTestResult);
 	      arenaEndTemporaryMemory(&fftTestMemory);
 
 #if 0 // NOTE: fft sample rate conversion workbench
@@ -326,16 +327,15 @@ RENDER_NEW_FRAME(renderNewFrame)
     {
       //renderCommands->arena = &pluginState->frameArena;
       renderBeginCommands(renderCommands, &pluginState->frameArena);
-
-      // TODO: maybe make a logging system?
-
-      //printf("mouseP: (%.2f, %.2f)\n", input->mouseState.position.x, input->mouseState.position.y);      
-      //printButtonState(input->mouseState.buttons[MouseButton_left], "left");
-      //printButtonState(input->mouseState.buttons[MouseButton_right], "right");
-
-      //stringListPushFormat(globalLogger->logArena, &globalLogger->log, "mouseP: (%.2f, %.2f)\n", input->mouseState.position.x, input->mouseState.position.y);
-      logFormatString("mouseP: (%.2f, %.2f)\n", input->mouseState.position.x, input->mouseState.position.y);
-
+     
+      logFormatString("mouseP: (%.2f, %.2f)", input->mouseState.position.x, input->mouseState.position.y);
+      logFormatString("mouseLeft: %s, %s",
+		      wasPressed(input->mouseState.buttons[MouseButton_left]) ? "pressed" : "not pressed",
+		      isDown(input->mouseState.buttons[MouseButton_left]) ? "down" : "up");
+      logFormatString("mouseRight: %s, %s",
+		      wasPressed(input->mouseState.buttons[MouseButton_right]) ? "pressed" : "not pressed",
+		      isDown(input->mouseState.buttons[MouseButton_right]) ? "down" : "up");
+      
 #if 0
       printButtonState(input->keyboardState.keys[KeyboardButton_tab], "tab");
       printButtonState(input->keyboardState.keys[KeyboardButton_backspace], "backspace");
@@ -384,8 +384,8 @@ RENDER_NEW_FRAME(renderNewFrame)
 		    }
 		    
 		  boundaryRect.min.E[splitAxis] = boundaryRect.max.E[splitAxis];
-		  boundaryRect.min.E[splitAxis] -= 2;
-		  boundaryRect.max.E[splitAxis] += 2;
+		  boundaryRect.min.E[splitAxis] -= 3;
+		  boundaryRect.max.E[splitAxis] += 3;
 	      
 		  UIComm hresize = uiMakeBox(&panel->layout, "hresize", boundaryRect,
 					     UIElementFlag_clickable |
@@ -397,7 +397,8 @@ RENDER_NEW_FRAME(renderNewFrame)
 					      (splitAxis == UIAxis_x) ? CursorState_hArrow : CursorState_vArrow);
 		    }
 		  UIPanel *minChild = child;
-		  UIPanel *maxChild = child->next;
+		  UIPanel *maxChild = child->next;		 
+
 		  if(hresize.flags & UICommFlag_pressed)
 		    {
 		      uiStoreDragData(hresize.element,
@@ -469,8 +470,8 @@ RENDER_NEW_FRAME(renderNewFrame)
 		      volume.element->color = hadamard(volume.element->color, V4(1, 1, 0, 1));
 		    }
 
-		  r32 oldVolume = pluginReadFloatParameter(volume.element->fParam);
-		  r32 newVolume = oldVolume;
+		  //r32 oldVolume = pluginReadFloatParameter(volume.element->fParam);
+		  //r32 newVolume = oldVolume;
 		  if(volume.flags & UICommFlag_dragging)
 		    {
 		      if(volume.flags & UICommFlag_leftDragging)
@@ -478,19 +479,24 @@ RENDER_NEW_FRAME(renderNewFrame)
 			  v2 dragDelta = uiGetDragDelta(volume.element);
 			  //printf("dragDelta: (%.2f, %.2f)\n", dragDelta.x, dragDelta.y);
 		      
-			  newVolume = volume.element->fParamValueAtClick + dragDelta.y/getDim(volume.element->region).y;
+			  r32 newVolume = volume.element->fParamValueAtClick + dragDelta.y/getDim(volume.element->region).y;
+			  pluginSetFloatParameter(volume.element->fParam, newVolume);
 			}
 		      else if(volume.flags & UICommFlag_minusPressed)
 			{
-			  newVolume -= 0.02f;
+			  r32 oldVolume = pluginReadFloatParameter(volume.element->fParam);
+			  r32 newVolume = oldVolume - 0.02f;
+
+			  pluginSetFloatParameter(volume.element->fParam, newVolume);
 			}
 		      else if(volume.flags & UICommFlag_plusPressed)
 			{
-			  newVolume += 0.02f;
-			}
-		    }		  
+			  r32 oldVolume = pluginReadFloatParameter(volume.element->fParam);
+			  r32 newVolume = oldVolume + 0.02f;
 
-		  pluginSetFloatParameter(volume.element->fParam, newVolume);
+			  pluginSetFloatParameter(volume.element->fParam, newVolume);
+			}
+		    }		  		  
 		}
 	      else if(stringsAreEqual(panel->name, (u8 *)"right"))
 		{
@@ -504,18 +510,16 @@ RENDER_NEW_FRAME(renderNewFrame)
 		    v2 offset = offsetPixels*V2(1, 1);
 		    UIComm play = uiMakeButton(panelLayout, "play", offset, -sizePOP,
 					       &pluginState->soundIsPlaying, V4(0, 0, 1, 1));
-
-		    bool oldPlay = pluginReadBooleanParameter(play.element->bParam);
-		    bool newPlay = oldPlay;
+		    
 		    if(play.flags & UICommFlag_pressed)
 		      {
-			newPlay = !oldPlay;
+			bool oldPlay = pluginReadBooleanParameter(play.element->bParam);
+			bool newPlay = !oldPlay;
+			pluginSetBooleanParameter(play.element->bParam, newPlay);
 			// TODO: stop doing the queue here: we don't want to have to synchronize grain (de)queueing
 			//       across the audio and video threads (once we actually have them on their own threads)
 			//queueAllGrainsFromFile(&pluginState->silo, &pluginState->loadedGrainPackfile);
-		      }
-
-		    pluginSetBooleanParameter(play.element->bParam, newPlay);
+		      }		    
 		  }
 		  
 		  //
@@ -529,19 +533,18 @@ RENDER_NEW_FRAME(renderNewFrame)
 		    UIComm density = uiMakeKnob(panelLayout, "density", offset, -sizePOP,
 						&pluginState->parameters[PluginParameter_density], V4(0, 1, 0, 1));
 		  
-		    r32 oldDensity = pluginReadFloatParameter(density.element->fParam);
-		    r32 newDensity = oldDensity;
+		    //r32 oldDensity = pluginReadFloatParameter(density.element->fParam);
+		    //r32 newDensity = oldDensity;
 		    //printf("oldDensity: %.2f\n", oldDensity);		  
 		    if(density.flags & UICommFlag_dragging)
 		      {
 			v2 dragDelta = uiGetDragDelta(density.element);
 			//printf("dragDelta: (%.2f, %.2f)\n", dragDelta.x, dragDelta.y);
 		      
-			newDensity = density.element->fParamValueAtClick + 0.1f*dragDelta.y;
+			r32 newDensity = density.element->fParamValueAtClick + 0.1f*dragDelta.y;
+			pluginSetFloatParameter(density.element->fParam, newDensity);
 			//printf("newDensity: %.2f\n", newDensity);
-		      }
-
-		    pluginSetFloatParameter(density.element->fParam, newDensity);
+		      }		    
 		  }
 		}
 	      
@@ -718,7 +721,7 @@ RENDER_NEW_FRAME(renderNewFrame)
       arenaEnd(&pluginState->frameArena);
       //printf("permanent arena used %zu bytes\n", pluginState->permanentArena.used);
       //stringListPushFormat(globalLogger->logArena, &globalLogger->log, "permanent arena used %zu bytes\n", pluginState->permanentArena.used);
-      logFormatString("permanent arena used %zu bytes\n", pluginState->permanentArena.used);
+      logFormatString("permanent arena used %zu bytes", pluginState->permanentArena.used);
     }  
 }
 
@@ -979,7 +982,8 @@ AUDIO_PROCESS(audioProcess)
 	  pluginState->phasor += nFreq;
 	  if(pluginState->phasor > M_TAU) pluginState->phasor -= M_TAU;
 				  
-	  r32 sinVal = sin(pluginState->phasor);	  
+	  r32 sinVal = sin(pluginState->phasor);
+	  UNUSED(sinVal);
 	  for(u32 channelIndex = 0; channelIndex < audioBuffer->outputChannels; ++channelIndex)
 	    {
 	      r32 mixedVal = 0.f;
