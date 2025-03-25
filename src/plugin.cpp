@@ -246,7 +246,7 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 	      pluginState->parameters[PluginParameter_density].targetValue = 1.f;
 	      pluginState->parameters[PluginParameter_density].range = makeRange(0.f, 20.f);
 	  
-	      pluginState->t_density = 20;
+	      pluginState->t_density = 5;
 	      pluginState->start_pos = 0;
 	  	  
 	      pluginState->soundIsPlaying.value = false;
@@ -967,7 +967,6 @@ AUDIO_PROCESS(audioProcess)
 	  for(u32 channelIndex = 0; channelIndex < audioBuffer->outputChannels; ++channelIndex)
 	    {
 	      r32 mixedVal = 0.f;
-	      
 	      
 	      r32 grainVal = grainMixBuffers[channelIndex][frameIndex];
 	      mixedVal += 0.5*grainVal;

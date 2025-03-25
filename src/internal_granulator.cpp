@@ -40,7 +40,6 @@ destroyGrain(GrainManager* grainManager, Grain* grain)
     grainManager->grainFreeList = grain;
   }
   else {
-    printf("NUH UH");
     grain->prev->next = grain->next;
 
     grain->next = grainManager->grainFreeList;
@@ -66,27 +65,6 @@ applyWindow(r32 sample, u32 index, u32 length, WindowType window) {
     return sample;
   }
 }
-
-//inline void
-//intialiseWindow(WindowType window, GrainManager* GrainManager, u32 size)
-//{
-//    for (int i = 0; i < size; ++i)
-//    {
-//        GrainManager->windowBuffer[window][i] = (0.5 * (1 - cos(2 * M_PI * i / size)));
-//    }
-//    for (int i = 0; i < size; ++i)
-//    {
-//        GrainManager->windowBuffer[window][i] = (0.5 * (1 - cos(2 * M_PI * i / size)));
-//    }
-//    for (int i = 0; i < size; ++i)
-//    {
-//        GrainManager->windowBuffer[window][i] = (0.5 * (1 - cos(2 * M_PI * i / size)));
-//    }
-//    for (int i = 0; i < size; ++i)
-//    {
-//        GrainManager->windowBuffer[window][i] = (0.5 * (1 - cos(2 * M_PI * i / size)));
-//    }
-//}
 
 static void
 synthesize(r32* destBufferLInit, r32* destBufferRInit,
