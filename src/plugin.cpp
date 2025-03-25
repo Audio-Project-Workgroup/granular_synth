@@ -927,10 +927,10 @@ AUDIO_PROCESS(audioProcess)
 
       r64 nFreq = M_TAU*pluginState->freq/(r64)audioBuffer->outputSampleRate;
 
-      GrainManager* gManager = &pluginState->GrainManager;
-      
+      GrainManager* gManager = &pluginState->GrainManager;      
       
       u32 grainSize = 2600;
+      r32 iot = (r32)grainSize / pluginState->t_density;
       WindowType window = HANN;
       UNUSED(window);
       
@@ -939,9 +939,7 @@ AUDIO_PROCESS(audioProcess)
 
       r32 formatVolumeFactor = 1.f;
       u32 destSampleRate = audioBuffer->outputSampleRate;
-      r32 sampleRateRatio = (r32)INTERNAL_SAMPLE_RATE/(r32)destSampleRate;
-
-	  r32 iot = grainSize / pluginState->t_density;
+      r32 sampleRateRatio = (r32)INTERNAL_SAMPLE_RATE/(r32)destSampleRate;      
 
       switch(audioBuffer->outputFormat)
 	{

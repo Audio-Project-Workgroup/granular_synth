@@ -43,9 +43,7 @@ struct GrainManager
   
   GrainBuffer* grainBuffer;
   /*We calculate what the interonset times are and set them here. We start this var at 0, so in the first
-  call to the synthesize function, we make a new grain, and set current_iot to whatever we compute it to be.*/
+    call to the synthesize function, we make a new grain, and set current_iot to whatever we compute it to be.*/
   s32 current_iot;
   r32* windowBuffer[4];
 };
-
-

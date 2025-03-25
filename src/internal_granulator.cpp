@@ -77,10 +77,11 @@ synthesize(r32* destBufferLInit, r32* destBufferRInit,
   for (u32 sampleIndex = 0; sampleIndex < samplesToWrite; ++sampleIndex)
     {
       if (grainManager->current_iot <= 0)
-      {
+	{
           makeNewGrain(grainManager, grainSize, HANN);
           grainManager->current_iot = iot;
-      }
+	}
+      
       for (Grain* c_grain = grainManager->grainPlayList;
 	   c_grain != 0;
 	   c_grain = c_grain->next)
@@ -89,11 +90,11 @@ synthesize(r32* destBufferLInit, r32* destBufferRInit,
 	    {
 	      // TODO: this wrap-checking logic seems unnecessarily compilated. compare pointers.
 	      if (c_grain->samplesTillRewrap <= c_grain->rewrap_counter)
-		  {
-		      c_grain->start[0] = grainManager->grainBuffer->samples[0];
-		      c_grain->start[1] = grainManager->grainBuffer->samples[1];
-		      c_grain->rewrap_counter = 0;
-          }
+		{
+		  c_grain->start[0] = grainManager->grainBuffer->samples[0];
+		  c_grain->start[1] = grainManager->grainBuffer->samples[1];
+		  c_grain->rewrap_counter = 0;
+		}
 	      
 	      r32 sampleToWriteL = *c_grain->start[0]++;
 	      r32 sampleToWriteR = *c_grain->start[1]++;
@@ -103,15 +104,18 @@ synthesize(r32* destBufferLInit, r32* destBufferRInit,
 
 	      --c_grain->samplesToPlay;
 	      ++c_grain->rewrap_counter;
+	      
 	      *destBufferL += volume * envelopedL;
 	      *destBufferR += volume * envelopedR;
             }
 	  else
             {
-	            destroyGrain(grainManager, c_grain);
+	      destroyGrain(grainManager, c_grain);
             }
         }
+      
       --grainManager->current_iot;
+      
       ++destBufferL;
       ++destBufferR;
     }
