@@ -168,10 +168,11 @@ namespace midi {
     midiCommandTable[commandTableIndex](channel, data, len, pluginState);
   }
  
-  static void parseMidiMessage(u8 **atMidiBufferPtrInOut, u32 &midiMessageCount, PluginState *pluginState){
+  static u8 *parseMidiMessage(u8 *atMidiBufferInit, PluginState *pluginState, u32 &midiMessageCount, u32 sampleIndex){
 
 
-    u8 *atMidiBuffer = *atMidiBufferPtrInOut;
+    //u8 *atMidiBuffer = *atMidiBufferPtrInOut;
+    u8 *atMidiBuffer = atMidiBufferInit;
         
     if(midiMessageCount){
 #ifdef MIDI_VERBOSE
@@ -183,44 +184,45 @@ namespace midi {
       printf("\n");
 #endif
       
-      // get the bytes to read
-      MidiHeader *header = (MidiHeader *)atMidiBuffer;
-      atMidiBuffer += sizeof(MidiHeader); // forward atMidiBuffer pointer past the header byte
+      // get header metadata to check if we should consume the message
+      MidiHeader *header = (MidiHeader *)atMidiBuffer;      
       u8 bytesToRead = header->messageLength;
-
-      // get the timestamp
-      // TODO: only consume the message if its timestamp is earlier than the current time.
-      //       so we'll need to track the current time in a manner comparable to what juce gives us
-      r64 timeStamp = *((r64*)atMidiBuffer);
-      atMidiBuffer += sizeof(r64); // forward atMidiBuffer pointer past the command byte
-      bytesToRead-=8;
+      u64 timestamp = header->timestamp;      
+      if(sampleIndex >= timestamp)
+	{
+	  //logFormatString("midi message consumed:\n  timestamp: %zu\n  sampleIndex: %u",
+	  //		  timestamp, sampleIndex);
+	  atMidiBuffer += sizeof(MidiHeader); // forward atMidiBuffer pointer past the header
             
-      // get the command byte (command byte include both command and channel info within it)
-      u8 commandByte = *atMidiBuffer;
-      atMidiBuffer += sizeof(u8); // forward atMidiBuffer pointer past the command byte
-      --bytesToRead;
+	  // get the command byte (command byte include both command and channel info within it)
+	  u8 commandByte = *atMidiBuffer;
+	  atMidiBuffer += sizeof(u8); // forward atMidiBuffer pointer past the command byte
+	  --bytesToRead;
 
-      // get the rest of the data byte
-      u8 *data = atMidiBuffer;
-      atMidiBuffer += (bytesToRead*sizeof(u8));  // forward to the end of the message
+	  // get the rest of the data byte
+	  u8 *data = atMidiBuffer;
+	  atMidiBuffer += (bytesToRead*sizeof(u8));  // forward to the end of the message
 
-      // apply check for command and data 
+	  // apply check for command and data 
 
-      // pass commandByte, the number of remaining bytes, and the pointer to them
-      processMidiCommand(commandByte, data, bytesToRead, pluginState);
+	  // pass commandByte, the number of remaining bytes, and the pointer to them
+	  processMidiCommand(commandByte, data, bytesToRead, pluginState);
 
 #ifdef MIDI_VERBOSE
-      printf("AFTER PARSING : 0x%x | %.3f timeStamp(ms passed) | %d bytes to read | data points to 0x%x | midiBuffer ptr points to 0x%x\n", 
-	     (int)commandByte,
-	     timeStamp, 
-	     (int)bytesToRead, 
-	     (int)data[0], 
-	     (int)atMidiBuffer[0]);
-      printf("\n\n");
+	  printf("AFTER PARSING : 0x%x | %zu timeStamp(ms passed) | %d bytes to read | data points to 0x%x | midiBuffer ptr points to 0x%x\n", 
+		 (int)commandByte,
+		 timestamp, 
+		 (int)bytesToRead, 
+		 (int)data[0], 
+		 (int)atMidiBuffer[0]);
+	  printf("\n\n");
 #endif
       
-      --midiMessageCount;
-      *atMidiBufferPtrInOut = atMidiBuffer;    
+	  --midiMessageCount;
+	  //*atMidiBufferPtrInOut = atMidiBuffer;    
+	}
     }
+
+    return(atMidiBuffer);
   }
 }

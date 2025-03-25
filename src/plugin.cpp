@@ -968,7 +968,8 @@ AUDIO_PROCESS(audioProcess)
 
       for(u32 frameIndex = 0; frameIndex < audioBuffer->framesToWrite; ++frameIndex)
 	{
-	  midi::parseMidiMessage(&atMidiBuffer, audioBuffer->midiMessageCount, pluginState);
+	  atMidiBuffer = midi::parseMidiMessage(atMidiBuffer, pluginState,
+						audioBuffer->midiMessageCount, frameIndex);
 
 	  r32 volume = formatVolumeFactor*pluginReadFloatParameter(&pluginState->parameters[PluginParameter_volume]);
 		

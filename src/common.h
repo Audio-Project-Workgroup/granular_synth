@@ -235,6 +235,7 @@ enum AudioFormat
 struct MidiHeader
 {
   u8 messageLength;
+  u64 timestamp;
 };
 
 struct PluginAudioBuffer

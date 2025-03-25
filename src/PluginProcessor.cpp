@@ -337,18 +337,15 @@ processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
       auto message = metadata.getMessage();
       int messageLength = message.getRawDataSize();
       r64 messageTimestamp = message.getTimeStamp();
-      messageLength+=8;
 
       MidiHeader *messageHeader = (MidiHeader *)atMidiBuffer;
       // TODO: we probably don't need to have the message length in the header anymore
-      messageHeader->messageLength = messageLength;      
+      messageHeader->messageLength = messageLength;
+      messageHeader->timestamp = (u64)messageTimestamp;
       atMidiBuffer += sizeof(MidiHeader);
-      
-      memcpy(atMidiBuffer, &messageTimestamp, sizeof(r64));
-      atMidiBuffer += sizeof(r64);
-
-      memcpy(atMidiBuffer, message.getRawData(), message.getRawDataSize());
-      atMidiBuffer += message.getRawDataSize();
+            
+      memcpy(atMidiBuffer, message.getRawData(), messageLength);
+      atMidiBuffer += messageLength;
 
       ++audioBuffer.midiMessageCount;     
     }
@@ -359,14 +356,6 @@ processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
   audioBuffer.outputChannels = MIN(getTotalNumOutputChannels(), ARRAY_COUNT(audioBuffer.outputBuffer));
   audioBuffer.inputStride = audioBuffer.outputStride = sizeof(r32);
   
-  //for(auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
-  //buffer.clear(i, 0, buffer.getNumSamples());
-  // NOTE: copy input samples
-  for(u32 inChannelIndex = 0; inChannelIndex < audioBuffer.inputChannels; ++inChannelIndex)
-    {      
-      //memcpy(audioBuffer.inputBuffer[inChannelIndex], inChannel, sizeof(*inChannel)*buffer.getNumSamples());
-    }
-
   audioBuffer.inputBuffer[0] = buffer.getReadPointer(0);
   audioBuffer.inputBuffer[1] = buffer.getReadPointer(1);
 
@@ -377,10 +366,6 @@ processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
     {
       audioBuffer.framesToWrite = buffer.getNumSamples();      
       pluginCode.audioProcess(&pluginMemory, &audioBuffer);
-
-      // TODO: make this not dual mono
-      //memcpy(lChannel, audioBuffer.buffer, sizeof(*lChannel)*buffer.getNumSamples());
-      //memcpy(rChannel, audioBuffer.buffer, sizeof(*rChannel)*buffer.getNumSamples());
     }  
 }
 
