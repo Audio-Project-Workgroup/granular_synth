@@ -390,7 +390,7 @@ atomicCompareAndSwapPointers(volatile void **value, void *oldval, void *newval)
   usz *expectedPtr = (usz *)&oldval;
   bool success = __atomic_compare_exchange_n((volatile usz *)value, expectedPtr, (usz)newval, false, __ATOMIC_ACQ_REL, __ATOMIC_RELAXED);
 
-  void *result = success ? oldval : newVal;
+  void *result = success ? oldval : newval;
   return(result);
 }
 
