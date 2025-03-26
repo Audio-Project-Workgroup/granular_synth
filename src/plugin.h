@@ -140,13 +140,13 @@ struct PluginState
   LoadedGrainPackfile loadedGrainPackfile;
   FileGrainState silo;
 
-  r32 start_pos;
+  //r32 start_pos;
 
   r64 phasor;
   r32 freq;
   PluginBooleanParameter soundIsPlaying;
   PluginFloatParameter parameters[PluginParameter_count];
-  r32 t_density; // TODO: this is unnecessary. use density parameter
+  //r32 t_density; // TODO: this is unnecessary. use density parameter
 
   PlayingSound loadedSound;
   LoadedBitmap testBitmap;

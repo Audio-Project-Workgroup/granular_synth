@@ -38,32 +38,30 @@
      - interface for selecting files to load at runtime
      - interface for remapping midi cc channels with parameters
      - display the state of grains and the grain buffer
+     - make panel resizing not jank
 
    - Parameters:
-     - come up with what parameters we want to have
-     - make parameter reads/updates atomic
+     - more parameters
+     - make parameters visible to the daw to enable parameter modification via automation
 
-   - File Loading:
+   - File Loading: (on hold)
      - more audio file formats (eg flac, ogg, mp3)
      - speed up reads (ie SIMD)
      - better samplerate conversion (ie FFT method (TODO: speed up fft and czt))
      - load in batches to pass to ML model (maybe)     
 
    - MIDI:
-     - pass timestamps to the midi buffer, and read new messages based on timestamps
+     - cc channel - parameter remapping at runtime
 
    - Grains:
-     - fix grain synthesis, so that it's not so choppy
-     - simplify/clean up grain creation/destruction timing logic
-     - use the plugin parameters in the grain loop
+     - more grain parameters
      - use lookup tables for grain windowing
-     - add grain post-processing effects like pitch-shifting and time-stretching
+     - add grain post-processing effects like pitch-shifting, time-stretching and stereo-widening
 
    - Misc:
-     - speed up fft
+     - speed up fft (aligned loads/stores, different radix?)
      - pull native executable audio loop into its own thread
      - work queues?
-     - logging?
      - allocate hardware ring buffer?
 */  
 
@@ -228,10 +226,10 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 	  
 	      pluginState->parameters[PluginParameter_density].currentValue = 1.f;
 	      pluginState->parameters[PluginParameter_density].targetValue = 1.f;
-	      pluginState->parameters[PluginParameter_density].range = makeRange(0.f, 20.f);
+	      pluginState->parameters[PluginParameter_density].range = makeRange(0.1f, 20.f);
 	  
-	      pluginState->t_density = 1;
-	      pluginState->start_pos = 0;
+	      //pluginState->t_density = 1;
+	      //pluginState->start_pos = 0;
 
 	      pluginState->grainBuffer = initializeGrainBuffer(pluginState, 9600);
 	      pluginState->grainManager = initializeGrainManager(pluginState);
@@ -239,7 +237,7 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 	      pluginState->soundIsPlaying.value = false;
 	      pluginState->loadedSound.sound = loadWav("../data/fingertips_44100_PCM_16.wav",
 						       &pluginState->loadArena, &pluginState->permanentArena);	      
-	      pluginState->loadedSound.samplesPlayed = (0 + pluginState->start_pos);
+	      pluginState->loadedSound.samplesPlayed = 0;// + pluginState->start_pos);
 
 	      char *fingertipsPackfilename = "../data/fingertips.grains";
 	      TemporaryMemory packfileMemory = arenaBeginTemporaryMemory(&pluginState->loadArena, MEGABYTES(64));
@@ -720,7 +718,9 @@ AUDIO_PROCESS(audioProcess)
     {
       // NOTE: copy plugin input audio to the grain buffer
       u32 framesToRead = audioBuffer->framesToWrite;      
-      r32 inputBufferReadSpeed = (r32)audioBuffer->inputSampleRate/(r32)INTERNAL_SAMPLE_RATE;
+      r32 inputBufferReadSpeed = ((audioBuffer->inputSampleRate != 0) ?
+				  (r32)INTERNAL_SAMPLE_RATE/(r32)audioBuffer->inputSampleRate : 1.f);
+      r32 scaledFramesToRead = inputBufferReadSpeed*framesToRead;
       
       GrainBuffer *gbuff = &pluginState->grainBuffer;
       PlayingSound *loadedSound = &pluginState->loadedSound;
@@ -735,37 +735,33 @@ AUDIO_PROCESS(audioProcess)
 	    inputFrames[1] = (s16 *)audioBuffer->inputBuffer[1];
 	    
 	    for(u32 frameIndex = 0; frameIndex < framesToRead; ++frameIndex)
-	      {
-		r32 readPosition = inputBufferReadSpeed*frameIndex;
-		u32 readIndex = (u32)readPosition;
-		r32 readFrac = readPosition - readIndex;
-
-		bool soundIsPlaying = pluginReadBooleanParameter(&pluginState->soundIsPlaying);
-		u32 currentTime = loadedSound->samplesPlayed + frameIndex;
+	      {		
+		bool soundIsPlaying = pluginReadBooleanParameter(&pluginState->soundIsPlaying);       
+		r32 currentTime = (r32)loadedSound->samplesPlayed + inputBufferReadSpeed*(r32)frameIndex;
+		u32 soundReadIndex = (u32)currentTime;
+		r32 soundReadFrac = currentTime - (r32)soundReadIndex;		
 
 		for(u32 channelIndex = 0; channelIndex < audioBuffer->inputChannels; ++channelIndex)
 		  {
-		    r32 mixedVal = 0.f;
-		   
+		    r32 mixedVal = 0.f;		   
 		    if(soundIsPlaying)		       
 		      {			
 			if(currentTime < loadedSound->sound.sampleCount)
 			  {
-			    r32 loadedSoundSample = loadedSound->sound.samples[channelIndex][currentTime];
+			    r32 loadedSoundSample0 = loadedSound->sound.samples[channelIndex][soundReadIndex];
+			    r32 loadedSoundSample1 = loadedSound->sound.samples[channelIndex][soundReadIndex + 1];
+			    r32 loadedSoundSample = lerp(loadedSoundSample0, loadedSoundSample1, soundReadFrac);
 
 			    mixedVal += 0.5f*loadedSoundSample;
 			  }
 			else
 			  {		      
 			    pluginSetBooleanParameter(&pluginState->soundIsPlaying, false);
-			    loadedSound->samplesPlayed = (0 + pluginState->start_pos);
+			    loadedSound->samplesPlayed = 0;// + pluginState->start_pos);
 			  }		  
 		      }
 
-		    ASSERT((readIndex + 1 < framesToRead) || readFrac == 0);
-		    r32 inSample0 = (r32)inputFrames[channelIndex][readIndex]/(r32)S16_MAX;
-		    r32 inSample1 = (r32)inputFrames[channelIndex][readIndex + 1]/(r32)S16_MAX;
-		    r32 inputSample = lerp(inSample0, inSample1, readFrac);
+		    r32 inputSample = inputFrames[channelIndex][frameIndex]/(r32)S16_MAX;
 		    ASSERT(isInRange(inputSample, -1.f, 1.f));
 
 		    mixedVal += 0.5f*inputSample;
@@ -783,40 +779,37 @@ AUDIO_PROCESS(audioProcess)
 	    inputFrames[1] = (r32 *)audioBuffer->inputBuffer[1];
 	    
 	    for(u32 frameIndex = 0; frameIndex < framesToRead; ++frameIndex)
-	      {
-		r32 readPosition = inputBufferReadSpeed*frameIndex;
-		u32 readIndex = (u32)readPosition;
-		r32 readFrac = readPosition - readIndex;
-
-		bool soundIsPlaying = pluginReadBooleanParameter(&pluginState->soundIsPlaying);
-		u32 currentTime = loadedSound->samplesPlayed + frameIndex;
+	      {		
+		bool soundIsPlaying = pluginReadBooleanParameter(&pluginState->soundIsPlaying);	
+		r32 currentTime = (r32)loadedSound->samplesPlayed + inputBufferReadSpeed*(r32)frameIndex;
+		u32 soundReadIndex = (u32)currentTime;
+		r32 soundReadFrac = currentTime - (r32)soundReadIndex;
 		
 		for(u32 channelIndex = 0; channelIndex < audioBuffer->inputChannels; ++channelIndex)
 		  {
-		    r32 mixedVal = 0.f;
-		    
+		    r32 mixedVal = 0.f;		    		    
 		    if(soundIsPlaying)		       
 		      {			
 			if(currentTime < loadedSound->sound.sampleCount)
 			  {
-			    r32 loadedSoundSample = loadedSound->sound.samples[channelIndex][currentTime];
+			    r32 loadedSoundSample0 = loadedSound->sound.samples[channelIndex][soundReadIndex];
+			    r32 loadedSoundSample1 = loadedSound->sound.samples[channelIndex][soundReadIndex + 1];
+			    r32 loadedSoundSample = lerp(loadedSoundSample0, loadedSoundSample1, soundReadFrac);
 		
-			    mixedVal += 0.5f*loadedSoundSample;
+			    mixedVal += 0.5f*loadedSoundSample;			   
 			  }
 			else
 			  {		      
 			    pluginSetBooleanParameter(&pluginState->soundIsPlaying, false);
-			    loadedSound->samplesPlayed = (0 + pluginState->start_pos);
+			    loadedSound->samplesPlayed = 0;// + pluginState->start_pos);
 			  }		  
 		      }		    
 
-		    ASSERT((readIndex + 1 < framesToRead) || readFrac == 0);
-		    r32 inSample0 = inputFrames[channelIndex][readIndex];
-		    r32 inSample1 = inputFrames[channelIndex][readIndex + 1];
-		    r32 inputSample = lerp(inSample0, inSample1, readFrac);
+		    r32 inputSample = inputFrames[channelIndex][frameIndex];
 		    ASSERT(isInRange(inputSample, -1.f, 1.f));
 
-		    mixedVal += 0.5f*inputSample;		    
+		    mixedVal += 0.5f*inputSample;
+		    
 		    gbuff->samples[channelIndex][gbuff->writeIndex] = mixedVal;
 		  }
 
@@ -829,24 +822,27 @@ AUDIO_PROCESS(audioProcess)
 	    for(u32 frameIndex = 0; frameIndex < audioBuffer->framesToWrite; ++frameIndex)
 	      {
 		bool soundIsPlaying = pluginReadBooleanParameter(&pluginState->soundIsPlaying);
-		u32 currentTime = loadedSound->samplesPlayed + frameIndex;
+		r32 currentTime = (r32)loadedSound->samplesPlayed + inputBufferReadSpeed*(r32)frameIndex;
+		u32 soundReadIndex = (u32)currentTime;
+		r32 soundReadFrac = currentTime - (r32)soundReadIndex;
 		
 		for(u32 channelIndex = 0; channelIndex < 2; ++channelIndex)
 		  {
-		    r32 mixedVal = 0.f;
-		    
+		    r32 mixedVal = 0.f;		    
 		    if(soundIsPlaying)		       
 		      {			
 			if(currentTime < loadedSound->sound.sampleCount)
 			  {
-			    r32 loadedSoundSample = loadedSound->sound.samples[channelIndex][currentTime];
-			    
+			    r32 loadedSoundSample0 = loadedSound->sound.samples[channelIndex][soundReadIndex];
+			    r32 loadedSoundSample1 = loadedSound->sound.samples[channelIndex][soundReadIndex + 1];
+			    r32 loadedSoundSample = lerp(loadedSoundSample0, loadedSoundSample1, soundReadFrac);
+
 			    mixedVal += 0.5f*loadedSoundSample;
 			  }
 			else
 			  {		      
 			    pluginSetBooleanParameter(&pluginState->soundIsPlaying, false);
-			    loadedSound->samplesPlayed = (0 + pluginState->start_pos);
+			    loadedSound->samplesPlayed = 0;// + pluginState->start_pos);
 			  }		  
 		      }
 		
@@ -858,73 +854,36 @@ AUDIO_PROCESS(audioProcess)
 	      }
 	  } break;
 	}
-
+      
       bool soundIsPlaying = pluginReadBooleanParameter(&pluginState->soundIsPlaying);
       if(soundIsPlaying)
 	{
-	  loadedSound->samplesPlayed += audioBuffer->framesToWrite;//*sampleRateRatio
+	  loadedSound->samplesPlayed += scaledFramesToRead;
 	}      
 
-#if 0
-      // TODO: This midi parsing is janky and bad. Passing the message length before each message is unnecessary
-      // TODO: move the midi loop inside the output loop, so that we don't only see the most recent midi message      
-      u8 *atMidiBuffer = audioBuffer->midiBuffer;
-      while(audioBuffer->midiMessageCount)
-	{
-	  MidiHeader *header = (MidiHeader *)atMidiBuffer;
-	  atMidiBuffer += sizeof(MidiHeader);
-
-	  u32 bytesToRead = header->messageLength;
-	  if(bytesToRead >= 1)
-	    {
-	      u32 midiStatus = *atMidiBuffer & 0xF0;
-	      u32 midiChannelNumber = *atMidiBuffer & 0x0F;
-	      (void)midiChannelNumber;
-	      ++atMidiBuffer;
-	      --bytesToRead;
-
-	      switch(midiStatus)
-		{				  
-		case MidiStatus_noteOn:
-		  {
-		    ASSERT(bytesToRead == 2);
-		    u32 noteNumber = *atMidiBuffer++;
-		    u32 noteVelocity = *atMidiBuffer++;
-		    pluginState->freq = hertzFromMidiNoteNumber(noteNumber);		    
-		    pluginSetFloatParameter(&pluginState->volume, (r32)noteVelocity/127.f);
-		  } break;
-		  
-		default:
-		  {
-		    while(bytesToRead)
-		      {
-			++atMidiBuffer;
-			--bytesToRead;
-		      }
-		  } break;
-		}
-	    }
-
-	  --audioBuffer->midiMessageCount;
-	}
-#endif
-
-      r64 nFreq = M_TAU*pluginState->freq/(r64)audioBuffer->outputSampleRate;
-
-      GrainManager* gManager = &pluginState->grainManager;      
-      
-      u32 grainSize = 2600;
-      r32 iot = (r32)grainSize / pluginState->t_density;
-      WindowType window = HANN;
-      UNUSED(window);
-      
-      r32 *grainMixBuffers[2];
+      // NOTE: grain playback
+      GrainManager* gManager = &pluginState->grainManager;
       u32 framesToWrite = audioBuffer->framesToWrite;
+      //u32 destSampleRate = audioBuffer->outputSampleRate;
+      //r32 sampleRateRatio = (r32)INTERNAL_SAMPLE_RATE/(r32)destSampleRate;
+      //u32 scaledFramesToWrite = (u32)(sampleRateRatio*framesToWrite);
+      
+      u32 grainSize = 2600; // TODO: make this a parameter
+      
+      TemporaryMemory grainMixerMemory = arenaBeginTemporaryMemory(&pluginState->permanentArena, KILOBYTES(128));
+      r32 *grainMixBuffers[2] = {};
+      grainMixBuffers[0] = arenaPushArray((Arena *)&grainMixerMemory, framesToWrite, r32,
+					  arenaFlagsZeroNoAlign());
+      grainMixBuffers[1] = arenaPushArray((Arena *)&grainMixerMemory, framesToWrite, r32,
+					  arenaFlagsZeroNoAlign());
+      synthesize(grainMixBuffers[0], grainMixBuffers[1],
+		 gManager, pluginState,
+		 framesToWrite, grainSize);
 
-      r32 formatVolumeFactor = 1.f;
-      u32 destSampleRate = audioBuffer->outputSampleRate;
-      r32 sampleRateRatio = (r32)INTERNAL_SAMPLE_RATE/(r32)destSampleRate;      
+      // NOTE: audio output
+      r64 nFreq = M_TAU*pluginState->freq/(r64)audioBuffer->outputSampleRate;                 
 
+      r32 formatVolumeFactor = 1.f;      
       switch(audioBuffer->outputFormat)
 	{
 	case AudioFormat_s16:
@@ -934,16 +893,7 @@ AUDIO_PROCESS(audioProcess)
 	case AudioFormat_r32: break;
 	default: { ASSERT(!"invalid audio format"); } break;
 	}
-            
-      TemporaryMemory grainMixerMemory = arenaBeginTemporaryMemory(&pluginState->permanentArena, KILOBYTES(128));
-      u32 scaledFramesToWrite = (u32)(sampleRateRatio*framesToWrite);
-      grainMixBuffers[0] = arenaPushArray((Arena *)&grainMixerMemory, scaledFramesToWrite, r32,
-					  arenaFlagsZeroNoAlign());
-      grainMixBuffers[1] = arenaPushArray((Arena *)&grainMixerMemory, scaledFramesToWrite, r32,
-					  arenaFlagsZeroNoAlign());
-      synthesize(grainMixBuffers[0], grainMixBuffers[1],
-		 scaledFramesToWrite, gManager, grainSize, iot);
-
+      
       void *genericOutputFrames[2] = {};
       genericOutputFrames[0] = audioBuffer->outputBuffer[0];
       genericOutputFrames[1] = audioBuffer->outputBuffer[1];
@@ -976,8 +926,9 @@ AUDIO_PROCESS(audioProcess)
 	      r32 firstGrainVal = grainMixBuffers[channelIndex][grainReadIndex];
 	      r32 nextGrainVal = grainMixBuffers[channelIndex][grainReadIndex + 1];
 	      r32 grainVal = lerp(firstGrainVal, nextGrainVal, grainReadFrac);
-#endif
+#else
 	      r32 grainVal = grainMixBuffers[channelIndex][frameIndex];
+#endif
 	      mixedVal += 0.5*grainVal;
 	      
 	      switch(audioBuffer->outputFormat)

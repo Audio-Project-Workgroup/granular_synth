@@ -4,6 +4,8 @@ struct GrainBuffer
 
   u32 writeIndex;
   u32 readIndex;
+  /* r32 writePosition; */
+  /* r32 readPosition; */
 
   u32 bufferCount;
 };

@@ -90,22 +90,27 @@ applyWindow(r32 sample, u32 index, u32 length, WindowType window) {
 // TODO: look up density and size parameters in this function, instead of passing fixed parameters
 static void
 synthesize(r32* destBufferLInit, r32* destBufferRInit,
-	   u32 samplesToWrite, GrainManager* grainManager, u32 grainSize, u32 iot)
+	   GrainManager* grainManager, PluginState *pluginState,
+	   u32 samplesToWrite, u32 grainSize)
 {
   GrainBuffer *buffer = grainManager->grainBuffer;
-  //r32 volume = volumeInit;
-  r32 volume = (r32)iot/(r32)grainSize;
+  //r32 volume = volumeInit;  
 
   r32* destBufferL = destBufferLInit;
   r32* destBufferR = destBufferRInit;
   for (u32 sampleIndex = 0; sampleIndex < samplesToWrite; ++sampleIndex)
     {
 #if 1
-      if(grainManager->samplesProcessedSinceLastSeed == iot)
+      r32 density = pluginReadFloatParameter(&pluginState->parameters[PluginParameter_density]);
+      r32 iot = (r32)grainSize/density;
+      r32 volume = MAX(1.f/density, 1.f); // TODO: how to adapt volume to prevent clipping?
+      if(grainManager->samplesProcessedSinceLastSeed >= iot)
 	{
           makeNewGrain(grainManager, grainSize, HANN);         
 	}      
 
+      r32 outSampleL = 0.f;
+      r32 outSampleR = 0.f;
       for (Grain* c_grain = grainManager->grainPlayList->next;
 	   c_grain && c_grain != grainManager->grainPlayList;
 	   ) // TODO: it's weird not having the increment be in the loop statement
@@ -125,13 +130,15 @@ synthesize(r32* destBufferLInit, r32* destBufferRInit,
 	      r32 sampleToWriteR = *c_grain->start[1]++;
 
 	      u32 samplesPlayed = c_grain->length - c_grain->samplesToPlay;
-	      r32 envelopedL = applyWindow(sampleToWriteL, samplesPlayed, c_grain->length, c_grain->window);
-	      r32 envelopedR = applyWindow(sampleToWriteR, samplesPlayed, c_grain->length, c_grain->window);
+	      //r32 envelopedL = applyWindow(sampleToWriteL, samplesPlayed, c_grain->length, c_grain->window);
+	      //r32 envelopedR = applyWindow(sampleToWriteR, samplesPlayed, c_grain->length, c_grain->window);
+	      outSampleL += applyWindow(sampleToWriteL, samplesPlayed, c_grain->length, c_grain->window);
+	      outSampleR += applyWindow(sampleToWriteR, samplesPlayed, c_grain->length, c_grain->window);
 
 	      --c_grain->samplesToPlay;
 	      
-	      *destBufferL += volume * envelopedL;
-	      *destBufferR += volume * envelopedR;
+	      //*destBufferL += volume * envelopedL;
+	      //*destBufferR += volume * envelopedR;
 	      
 	      c_grain = c_grain->next;
             }
@@ -165,7 +172,9 @@ synthesize(r32* destBufferLInit, r32* destBufferRInit,
       ++buffer->readIndex;
       buffer->readIndex %= buffer->bufferCount;
 
-      ++destBufferL;
-      ++destBufferR;
+      //++destBufferL;
+      //++destBufferR;
+      *destBufferL++ = clampToRange(volume*outSampleL, -1.f, 1.f);
+      *destBufferR++ = clampToRange(volume*outSampleR, -1.f, 1.f);
     }
 }
