@@ -57,7 +57,7 @@ getCStringLength(char *cstr)
 {
   u64 result = 0;
   char *at = cstr;
-  while(*at) ++at; ++result;
+  while(*at) {++at; ++result;}
 
   return(result);
 }

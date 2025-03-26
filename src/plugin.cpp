@@ -111,27 +111,8 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 	      pluginState->permanentArena = arenaBegin((u8 *)memory + sizeof(PluginState), MEGABYTES(512));
 	      pluginState->frameArena = arenaSubArena(&pluginState->permanentArena, MEGABYTES(2));
 	      pluginState->loadArena = arenaSubArena(&pluginState->permanentArena, MEGABYTES(128));
-	      pluginState->grainArena = arenaSubArena(&pluginState->permanentArena, MEGABYTES(32));
-	      	      
-	      pluginState->gbuff = arenaPushStruct(&pluginState->permanentArena, GrainBuffer);
-	      
-	      GrainBuffer *buffer = pluginState->gbuff;
-	      buffer->bufferSize = 9600;
-	      buffer->samples[0] = arenaPushArray(&pluginState->permanentArena, buffer->bufferSize, r32);
-	      buffer->samples[1] = arenaPushArray(&pluginState->permanentArena, buffer->bufferSize, r32);
-		  
-	      buffer->writeIndex = 0; 
-	      buffer->readIndex = setReadPos(60, buffer->bufferSize);
-	      
-	      pluginState->GrainManager.grainAllocator = &pluginState->grainArena;
-	      pluginState->GrainManager.grainBuffer = pluginState->gbuff;
-		  pluginState->GrainManager.windowBuffer[0] = arenaPushArray(&pluginState->permanentArena, buffer->bufferSize, r32);
-		  pluginState->GrainManager.windowBuffer[1] = arenaPushArray(&pluginState->permanentArena, buffer->bufferSize, r32);
-		  pluginState->GrainManager.windowBuffer[2] = arenaPushArray(&pluginState->permanentArena, buffer->bufferSize, r32);
-		  pluginState->GrainManager.windowBuffer[3] = arenaPushArray(&pluginState->permanentArena, buffer->bufferSize, r32);
-	      pluginState->GrainManager.current_iot = 0;
-	      pluginState->GrainManager.grainPlayList = 0;
-
+	      pluginState->grainArena = arenaSubArena(&pluginState->permanentArena, KILOBYTES(32));
+	      	      	     
 	      TemporaryMemory fftTestMemory = arenaBeginTemporaryMemory(&pluginState->loadArena, KILOBYTES(1));
 	      bool fftTestResult = fftTest((Arena *)&fftTestMemory);
 	      UNUSED(fftTestResult);
@@ -249,8 +230,11 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 	      pluginState->parameters[PluginParameter_density].targetValue = 1.f;
 	      pluginState->parameters[PluginParameter_density].range = makeRange(0.f, 20.f);
 	  
-	      pluginState->t_density = 5;
+	      pluginState->t_density = 1;
 	      pluginState->start_pos = 0;
+
+	      pluginState->grainBuffer = initializeGrainBuffer(pluginState, 9600);
+	      pluginState->grainManager = initializeGrainManager(pluginState);
 	  	  
 	      pluginState->soundIsPlaying.value = false;
 	      pluginState->loadedSound.sound = loadWav("../data/fingertips_44100_PCM_16.wav",
@@ -736,9 +720,9 @@ AUDIO_PROCESS(audioProcess)
     {
       // NOTE: copy plugin input audio to the grain buffer
       u32 framesToRead = audioBuffer->framesToWrite;      
-      //r32 inputBufferReadSpeed = (r32)INTERNAL_SAMPLE_RATE/audioBuffer->inputSampleRate;
       r32 inputBufferReadSpeed = (r32)audioBuffer->inputSampleRate/(r32)INTERNAL_SAMPLE_RATE;
-      GrainBuffer *gbuff = pluginState->gbuff;
+      
+      GrainBuffer *gbuff = &pluginState->grainBuffer;
       PlayingSound *loadedSound = &pluginState->loadedSound;
       
       switch(audioBuffer->inputFormat)
@@ -789,7 +773,7 @@ AUDIO_PROCESS(audioProcess)
 		  }
 
 		++gbuff->writeIndex;
-		gbuff->writeIndex %= gbuff->bufferSize;
+		gbuff->writeIndex %= gbuff->bufferCount;
 	      }	  
 	  } break;
 	case AudioFormat_r32:
@@ -837,7 +821,7 @@ AUDIO_PROCESS(audioProcess)
 		  }
 
 		++gbuff->writeIndex;
-		gbuff->writeIndex %= gbuff->bufferSize;
+		gbuff->writeIndex %= gbuff->bufferCount;
 	      }
 	  } break;
 	default:
@@ -870,7 +854,7 @@ AUDIO_PROCESS(audioProcess)
 		  }
 
 		++gbuff->writeIndex;
-		gbuff->writeIndex %= gbuff->bufferSize;
+		gbuff->writeIndex %= gbuff->bufferCount;
 	      }
 	  } break;
 	}
@@ -927,7 +911,7 @@ AUDIO_PROCESS(audioProcess)
 
       r64 nFreq = M_TAU*pluginState->freq/(r64)audioBuffer->outputSampleRate;
 
-      GrainManager* gManager = &pluginState->GrainManager;      
+      GrainManager* gManager = &pluginState->grainManager;      
       
       u32 grainSize = 2600;
       r32 iot = (r32)grainSize / pluginState->t_density;
@@ -958,7 +942,7 @@ AUDIO_PROCESS(audioProcess)
       grainMixBuffers[1] = arenaPushArray((Arena *)&grainMixerMemory, scaledFramesToWrite, r32,
 					  arenaFlagsZeroNoAlign());
       synthesize(grainMixBuffers[0], grainMixBuffers[1],
-		 1.f, scaledFramesToWrite, gManager, grainSize, iot);
+		 scaledFramesToWrite, gManager, grainSize, iot);
 
       void *genericOutputFrames[2] = {};
       genericOutputFrames[0] = audioBuffer->outputBuffer[0];
@@ -1017,10 +1001,6 @@ AUDIO_PROCESS(audioProcess)
 
 	  pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_volume]);
 	  pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_density]);
-
-
-	  ++pluginState->gbuff->readIndex;
-	  pluginState->gbuff->readIndex %= pluginState->gbuff->bufferSize;
 	}
 
       arenaEndTemporaryMemory(&grainMixerMemory);      

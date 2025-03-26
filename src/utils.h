@@ -26,8 +26,8 @@
 #define CYCLIC_ARRAY_INDEX(i, len) ((i < len) ? ((i < 0) ? (i + len) : i) : (i - len))
 
 // NOTE: linked-list utilities
-#define STACK_PUSH(head, node) do {node->next = head; head = node;} while(0)
-#define STACK_POP(head) do {head = head->next;} while(0)
+#define STACK_PUSH(head, node) do {(node)->next = (head); (head) = (node);} while(0)
+#define STACK_POP(head) do {(head) = (head)->next;} while(0)
 
 #define QUEUE_PUSH(f, l, n) do {(f) ? ((l->next=(n),(l)=(n)),(n)->next=0) : (f)=(l)=(n);} while(0)
 #define QUEUE_PUSH_FRONT(f, l, n) do {(f) ? (((n)->next=(f),(f)=(n))) : (f)=(l)=(n),(n)->next=0;} while(0)
@@ -44,6 +44,11 @@
     new->prev = sentinel->prev;			\
     new->next->prev = new;			\
     new->prev->next = new;			\
+  } while(0)
+
+#define DLINKED_LIST_REMOVE(sentinel, dead) do {	\
+    (dead)->prev->next = (dead)->next;			\
+    (dead)->next->prev = (dead)->prev;			\
   } while(0)
 
 #define ZERO_SIZE(ptr, size) do {		\

@@ -129,20 +129,6 @@ struct PlayingSound
   r32 samplesPlayed;  
 };
 
-u32 setReadPos(u32 write_pos, u32 bufferSize) {
-  s32 scratch_rpos = write_pos - 1000;
-
-  if (scratch_rpos < 0) {
-    scratch_rpos += bufferSize;
-  }
-  else {
-    scratch_rpos %= bufferSize;
-  }
-    
-  return scratch_rpos;
-
-}
-
 struct PluginState
 {
   u64 osTimerFreq;
@@ -170,8 +156,8 @@ struct PluginState
   UIContext uiContext;
   UIPanel *rootPanel;  
 
-  GrainManager GrainManager;
-  GrainBuffer* gbuff;
+  GrainManager grainManager;
+  GrainBuffer grainBuffer;
 
   volatile u32 initializationMutex;
   bool initialized;

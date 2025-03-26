@@ -296,7 +296,8 @@ releaseResources()
     {
       //free(audioBuffer.buffer);
       free(audioBuffer.midiBuffer);
-      free(pluginMemory.memory);  
+      free(pluginMemory.memory);
+      free(loggerMemory);
       libPlugin.close();
       resourcesReleased = true;
     }

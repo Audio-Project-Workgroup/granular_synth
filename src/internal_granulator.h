@@ -5,8 +5,23 @@ struct GrainBuffer
   u32 writeIndex;
   u32 readIndex;
 
-  u32 bufferSize;
+  u32 bufferCount;
 };
+
+inline u32
+grainBufferSetReadPos(u32 write_pos, u32 bufferSize)
+{
+  // TODO: dunno why this is the way that it is
+  s32 scratch_rpos = write_pos - 1000;
+
+  if (scratch_rpos < 0) {
+    scratch_rpos += bufferSize;
+  } else {
+    scratch_rpos %= bufferSize;
+  }
+    
+  return scratch_rpos;
+}
 
 enum WindowType {
   HANN = 1,
@@ -18,19 +33,15 @@ enum WindowType {
 struct Grain
 {
   Grain* next;
-  Grain* prev; // TODO: prev pointer unused
+  Grain* prev;
 
   r32* start[2];
   WindowType window;
   
   s32 samplesToPlay;
   u32 length;
-
-  // TODO: these fields are probably unnecessary
-  u32 rewrap_counter;
-  u32 samplesTillRewrap;
   
-  bool onFreeList;
+  //bool onFreeList;
 };
 
 struct GrainManager
@@ -41,9 +52,11 @@ struct GrainManager
   Grain* grainPlayList;
   Grain* grainFreeList;
   
-  GrainBuffer* grainBuffer;
+  GrainBuffer *grainBuffer;
   /*We calculate what the interonset times are and set them here. We start this var at 0, so in the first
     call to the synthesize function, we make a new grain, and set current_iot to whatever we compute it to be.*/
-  s32 current_iot;
+  //s32 current_iot;
+  u32 samplesProcessedSinceLastSeed;
+  
   r32* windowBuffer[4];
 };

@@ -1,3 +1,35 @@
+static GrainBuffer
+initializeGrainBuffer(PluginState *pluginState, u32 bufferCount)
+{
+  GrainBuffer grainBuffer = {};
+  grainBuffer.bufferCount = bufferCount;
+  grainBuffer.samples[0] = arenaPushArray(&pluginState->permanentArena, bufferCount, r32);
+  grainBuffer.samples[1] = arenaPushArray(&pluginState->permanentArena, bufferCount, r32);
+  grainBuffer.writeIndex = 0;
+  grainBuffer.readIndex = grainBufferSetReadPos(60, bufferCount);
+
+  return(grainBuffer);
+}
+
+static GrainManager
+initializeGrainManager(PluginState *pluginState)
+{
+  GrainManager result = {};
+  result.grainBuffer = &pluginState->grainBuffer;
+  
+  result.windowBuffer[0] = arenaPushArray(&pluginState->permanentArena, 1024, r32);
+  result.windowBuffer[1] = arenaPushArray(&pluginState->permanentArena, 1024, r32);
+  result.windowBuffer[2] = arenaPushArray(&pluginState->permanentArena, 1024, r32);
+  result.windowBuffer[3] = arenaPushArray(&pluginState->permanentArena, 1024, r32);
+  
+  result.grainAllocator = &pluginState->grainArena;
+  result.grainPlayList = arenaPushStruct(result.grainAllocator, Grain);
+  result.grainPlayList->next = result.grainPlayList;
+  result.grainPlayList->prev = result.grainPlayList;
+
+  return(result);
+}
+
 static void
 makeNewGrain(GrainManager* grainManager, u32 grainSize, WindowType windowParam)
 {
@@ -7,7 +39,7 @@ makeNewGrain(GrainManager* grainManager, u32 grainSize, WindowType windowParam)
     {
       result = grainManager->grainFreeList;
       grainManager->grainFreeList = result->next;
-      result->next = 0;
+      //result->next = 0;
     }
   else
     {
@@ -22,11 +54,9 @@ makeNewGrain(GrainManager* grainManager, u32 grainSize, WindowType windowParam)
   result->length = grainSize;
   result->window = windowParam;
 
-  result->rewrap_counter = 0;
-  result->samplesTillRewrap = buffer->bufferSize - buffer->readIndex;
-    
-  result->next = grainManager->grainPlayList;
-  grainManager->grainPlayList = result;
+  DLINKED_LIST_APPEND(grainManager->grainPlayList, result);
+
+  grainManager->samplesProcessedSinceLastSeed = 0;
   ++grainManager->grainCount;
 }
 
@@ -35,18 +65,9 @@ destroyGrain(GrainManager* grainManager, Grain* grain)
 {
   --grainManager->grainCount;
 
-  if (grain->prev == 0) {
-    grainManager->grainPlayList = grain->next;
-    grainManager->grainFreeList = grain;
-  }
-  else {
-    grain->prev->next = grain->next;
-
-    grain->next = grainManager->grainFreeList;
-
-    grainManager->grainFreeList = grain;
-
-  }
+  DLINKED_LIST_REMOVE(grainManager->grainPlayList, grain);
+  STACK_PUSH(grainManager->grainFreeList, grain);
+  grain->prev = 0;
 }
 
 // TODO: use lookup tables for windowing, rather than having to branch so much
@@ -66,56 +87,84 @@ applyWindow(r32 sample, u32 index, u32 length, WindowType window) {
   }
 }
 
+// TODO: look up density and size parameters in this function, instead of passing fixed parameters
 static void
 synthesize(r32* destBufferLInit, r32* destBufferRInit,
-	   r32 volumeInit, u32 samplesToWrite, GrainManager* grainManager, u32 grainSize, r32 iot)
+	   u32 samplesToWrite, GrainManager* grainManager, u32 grainSize, u32 iot)
 {
-  r32 volume = volumeInit;
+  GrainBuffer *buffer = grainManager->grainBuffer;
+  //r32 volume = volumeInit;
+  r32 volume = (r32)iot/(r32)grainSize;
 
   r32* destBufferL = destBufferLInit;
   r32* destBufferR = destBufferRInit;
   for (u32 sampleIndex = 0; sampleIndex < samplesToWrite; ++sampleIndex)
     {
-      if (grainManager->current_iot <= 0)
+#if 1
+      if(grainManager->samplesProcessedSinceLastSeed == iot)
 	{
-          makeNewGrain(grainManager, grainSize, HANN);
-          grainManager->current_iot = iot;
-	}
-      
-      for (Grain* c_grain = grainManager->grainPlayList;
-	   c_grain != 0;
-	   c_grain = c_grain->next)
+          makeNewGrain(grainManager, grainSize, HANN);         
+	}      
+
+      for (Grain* c_grain = grainManager->grainPlayList->next;
+	   c_grain && c_grain != grainManager->grainPlayList;
+	   ) // TODO: it's weird not having the increment be in the loop statement
         {            
 	  if (c_grain->samplesToPlay > 0)
 	    {
-	      // TODO: this wrap-checking logic seems unnecessarily compilated. compare pointers.
-	      if (c_grain->samplesTillRewrap <= c_grain->rewrap_counter)
+	      // NOTE: since the left and right channels of the grain buffer are stored contiguously, we can
+	      //       compare the left grain read pointer to the right grain buffer pointer to check if we
+	      //       need to wrap the grain reading
+	      ASSERT(buffer->samples[1] - buffer->samples[0] == buffer->bufferCount);
+	      if(c_grain->start[0] == buffer->samples[1])
 		{
-		  c_grain->start[0] = grainManager->grainBuffer->samples[0];
-		  c_grain->start[1] = grainManager->grainBuffer->samples[1];
-		  c_grain->rewrap_counter = 0;
+		  c_grain->start[0] = buffer->samples[0];
+		  c_grain->start[1] = buffer->samples[1];
 		}
-	      
 	      r32 sampleToWriteL = *c_grain->start[0]++;
 	      r32 sampleToWriteR = *c_grain->start[1]++;
 
-	      r32 envelopedL = applyWindow(sampleToWriteL, c_grain->length - c_grain->samplesToPlay, c_grain->length, HANN);
-	      r32 envelopedR = applyWindow(sampleToWriteR, c_grain->length - c_grain->samplesToPlay, c_grain->length, HANN); 
+	      u32 samplesPlayed = c_grain->length - c_grain->samplesToPlay;
+	      r32 envelopedL = applyWindow(sampleToWriteL, samplesPlayed, c_grain->length, c_grain->window);
+	      r32 envelopedR = applyWindow(sampleToWriteR, samplesPlayed, c_grain->length, c_grain->window);
 
 	      --c_grain->samplesToPlay;
-	      ++c_grain->rewrap_counter;
 	      
 	      *destBufferL += volume * envelopedL;
 	      *destBufferR += volume * envelopedR;
+	      
+	      c_grain = c_grain->next;
             }
 	  else
             {
-	      destroyGrain(grainManager, c_grain);
+	      Grain *oldGrain = c_grain;
+	      c_grain = c_grain->next;
+	      destroyGrain(grainManager, oldGrain);
             }
         }
+#else
+      ASSERT(buffer->readIndex < buffer->bufferCount);
+      *destBufferL = volume*buffer->samples[0][buffer->readIndex];
+      *destBufferR = volume*buffer->samples[0][buffer->readIndex];
+#endif
       
-      --grainManager->current_iot;
+#if 0
+      if(grainManager->grainCount == 0)
+	{
+	  logString("NEED GRAINS!");
+	}
+      else if(grainManager->grainCount > 1) // NOCHECKIN
+	{
+	  logFormatString("TOO MANY GRAINS!\n  count: %u\n  sample: %u\n  readIndex: %u\n",
+			  grainManager->grainCount, sampleIndex, buffer->readIndex);
+	}
+#endif
       
+      ++grainManager->samplesProcessedSinceLastSeed;
+      
+      ++buffer->readIndex;
+      buffer->readIndex %= buffer->bufferCount;
+
       ++destBufferL;
       ++destBufferR;
     }
