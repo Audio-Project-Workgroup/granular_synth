@@ -1,3 +1,5 @@
+#define TABLE_LENGTH 1024
+
 struct GrainBuffer
 {
   r32* samples[2];
@@ -26,10 +28,10 @@ grainBufferSetReadPos(u32 write_pos, u32 bufferSize)
 }
 
 enum WindowType {
-  HANN = 1,
-  SINE = 2,
-  TRIANGLE = 3,
-  RECTANGULAR = 4
+  HANN = 0,
+  SINE = 1,
+  TRIANGLE = 2,
+  RECTANGULAR = 3
 };
 
 struct Grain
@@ -42,7 +44,7 @@ struct Grain
   
   s32 samplesToPlay;
   u32 length;
-  
+  r32 sizeInv;
   //bool onFreeList;
 };
 
@@ -62,3 +64,5 @@ struct GrainManager
   
   r32* windowBuffer[4];
 };
+
+
