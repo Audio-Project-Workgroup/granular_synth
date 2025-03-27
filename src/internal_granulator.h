@@ -1,4 +1,4 @@
-#define TABLE_LENGTH 1024
+#define WINDOW_LENGTH 1024
 
 struct GrainBuffer
 {
@@ -44,7 +44,7 @@ struct Grain
   
   s32 samplesToPlay;
   u32 length;
-  r32 sizeInv;
+  r32 lengthInv;
   //bool onFreeList;
 };
 
