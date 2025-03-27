@@ -41,7 +41,7 @@ static WideFloat
 wideLoadFloats(r32 *src)
 {
   WideFloat result = {};
-  result.val = _mm_loadu_ps(src);
+  result.val = _mm_load_ps(src);
 
   return(result);
 }
@@ -116,7 +116,7 @@ wideSetLaneInts(WideInt *w, u32 val, u32 lane)
 static void
 wideStoreFloats(r32 *dest, WideFloat src)
 {
-  _mm_storeu_ps(dest, src.val);
+  _mm_store_ps(dest, src.val);
 }
 
 static void
