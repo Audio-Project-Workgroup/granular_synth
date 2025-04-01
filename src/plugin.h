@@ -158,6 +158,7 @@ struct PluginState
 
   GrainManager grainManager;
   GrainBuffer grainBuffer;
+  GrainStateView grainStateView;
 
   volatile u32 initializationMutex;
   bool initialized;

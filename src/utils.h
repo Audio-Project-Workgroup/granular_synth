@@ -12,6 +12,10 @@
 #define MEGABYTES(count) (1024LL*KILOBYTES(count))
 #define GIGABYTES(count) (1024LL*MEGABYTES(count))
 
+#define THOUSAND(count) (1000LL*count)
+#define MILLION(count) (1000LL*THOUSAND(count))
+#define BILLION(count) (1000LL*MILLION(count))
+
 #define MIN(a, b) ((a) > (b)) ? (b) : (a)
 #define MAX(a, b) ((a) > (b)) ? (a) : (b)
 
@@ -52,20 +56,22 @@
   } while(0)
 
 #define ZERO_SIZE(ptr, size) do {		\
-    u8 *p = (u8 *)ptr;				\
-    for(u32 i = 0; i < size; ++i) *p++ = 0;	\
+    u8 *p = (u8 *)(ptr);				\
+    for(u32 i = 0; i < (size); ++i) *p++ = 0;		\
   } while(0)
 
 #define ZERO_STRUCT(s) do {					\
     usz size = sizeof(s);					\
-    u8 *data = (u8 *)&s;					\
-    for(u32 byte = 0; byte < size; ++byte) data[byte] = 0;	\
+    u8 *data = (u8 *)&(s);					\
+    for(u32 byte = 0; byte < (size); ++byte) data[byte] = 0;	\
   } while(0)
 
+#define ZERO_ARRAY(ptr, count, type) ZERO_SIZE((ptr), (count)*sizeof(type))
+
 #define COPY_SIZE(dest, src, size) do {			\
-    u8 *destP = (u8 *)dest;				\
-    u8 *srcP = (u8 *)src;				\
-    for(u32 i = 0; i < size; ++i) *destP++ = *srcP++;	\
+    u8 *destP = (u8 *)(dest);				\
+    u8 *srcP = (u8 *)(src);				\
+    for(u32 i = 0; i < (size); ++i) *destP++ = *srcP++;	\
   } while(0)
 
 #define COPY_ARRAY(dest, src, count, type) COPY_SIZE(dest, src, (count)*sizeof(type))
@@ -198,5 +204,36 @@ separateExtensionAndFilepath(char *filepath, char *resultPath, char *resultExten
 	    }
 	}
     }
+}
+
+inline u32
+roundR32ToU32(r32 num)
+{
+  u32 result = (u32)num;
+  if((num - result) >= 0.5f) ++result;
+
+  return(result);
+}
+
+inline v4
+colorV4FromU32(u32 c)
+{
+  v4 result=  {(r32)((c & (0xFF << 3*8)) >> 3*8)/255.f,
+	       (r32)((c & (0xFF << 2*8)) >> 2*8)/255.f,
+	       (r32)((c & (0xFF << 1*8)) >> 1*8)/255.f,
+	       (r32)((c & (0xFF << 0*8)) >> 0*8)/255.f};
+
+  return(result);
+}
+
+inline u32
+colorU32FromV4(v4 c)
+{
+  u32 result = ((roundR32ToU32(c.a*255.f) << 3*8) |
+		(roundR32ToU32(c.b*255.f) << 2*8) |
+		(roundR32ToU32(c.g*255.f) << 1*8) |
+		(roundR32ToU32(c.r*255.f) << 0*8));
+
+  return(result);
 }
 

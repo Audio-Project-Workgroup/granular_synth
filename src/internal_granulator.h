@@ -64,5 +64,68 @@ struct GrainManager
   
   r32* windowBuffer[4];
 };
+#if 0
+struct GrainViewNode
+{
+  GrainViewNode *next;
 
+  u32 readIndex;
+};
 
+struct GrainBufferViewNode
+{
+  volatile GrainBufferViewNode *next;
+  GrainBufferViewNode *nextFree;
+
+  u32 bufferReadIndex;
+  u32 bufferWriteIndex;  
+  r32 *bufferSamples[2];
+
+  u32 grainCount;
+  GrainViewNode *head;
+};
+
+struct GrainStateView
+{
+  volatile GrainBufferViewNode *head;
+  volatile GrainBufferViewNode *tail;
+
+  Arena *arena;  
+
+  GrainBufferViewNode *grainBufferViewFreelist;
+  GrainViewNode *grainViewFreelist;
+};
+#else
+struct GrainViewEntry
+{
+  //u32 readIndex;
+  u32 startIndex;
+  u32 endIndex;
+};
+
+struct GrainBufferViewEntry
+{
+  //u32 bufferReadIndex;
+  //u32 bufferWriteIndex;
+  //r32 *bufferSamples[2];
+  u32 sampleCount;
+  u32 sampleCapacity;
+  r32 *bufferSamples[2];
+
+  u32 grainCount;
+  GrainViewEntry grainViews[32];
+};
+
+struct GrainStateView
+{
+  volatile u32 readIndex;  
+  volatile u32 writeIndex;
+  volatile u32 entriesQueued;
+
+  GrainBufferViewEntry views[32];
+
+  r32 *viewSamples[2];
+  u32 viewBufferReadIndex;
+  u32 viewBufferWriteIndex;
+};
+#endif

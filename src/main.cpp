@@ -238,6 +238,7 @@ main(int argc, char **argv)
 	  pluginMemory.platformAPI.getCurrentTimestamp = platformGetCurrentTimestamp;
 
 	  pluginMemory.platformAPI.atomicLoad			= atomicLoad;
+	  pluginMemory.platformAPI.atomicLoadPointer		= atomicLoadPointer;
 	  pluginMemory.platformAPI.atomicStore			= atomicStore;
 	  pluginMemory.platformAPI.atomicAdd			= atomicAdd;
 	  pluginMemory.platformAPI.atomicCompareAndSwap		= atomicCompareAndSwap;

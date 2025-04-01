@@ -95,6 +95,14 @@ atomicLoad(volatile u32 *src)
   return(result);
 }
 
+static void *
+atomicLoadPointer(volatile void **src)
+{
+  void *result = InterlockedCompareExchangePointer((volatile PVOID *)src, 0, 0);
+
+  return(result);
+}
+
 static u32
 atomicStore(volatile u32 *dest, u32 value)
 { 
@@ -358,6 +366,12 @@ msecWait(u32 msecsToWait)
 
 static u32
 atomicLoad(volatile u32 *src)
+{
+  return(__atomic_load_n(src, __ATOMIC_ACQUIRE));
+}
+
+static void *
+atomicLoadPointer(volatile void **src)
 {
   return(__atomic_load_n(src, __ATOMIC_ACQUIRE));
 }

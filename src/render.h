@@ -1,17 +1,35 @@
-struct Vertex
+struct TexturedVertex
 {
   v2 vPos;
   v2 uv;
-  v4 color;
+  //v4 color;
+  u32 color;
 };
 
+struct Vertex
+{
+  v2 vPos;
+  //v4 color;
+  u32 color;
+};
+
+static inline TexturedVertex
+makeTexturedVertex(v2 vPos, v2 uv, v4 color)
+{
+  TexturedVertex result = {};
+  result.vPos = vPos;
+  result.uv = uv;
+  result.color = colorU32FromV4(color);
+
+  return(result);
+}
+
 static inline Vertex
-makeVertex(v2 vPos, v2 uv, v4 color)
+makeVertex(v2 vPos, v4 color)
 {
   Vertex result = {};
   result.vPos = vPos;
-  result.uv = uv;
-  result.color = color;
+  result.color = colorU32FromV4(color);
 
   return(result);
 }
@@ -20,7 +38,16 @@ enum RenderLevel
 {
   RenderLevel_background,
   RenderLevel_boxBackground,
+  
   RenderLevel_front,
+};
+
+struct Quad
+{
+  RenderLevel level;
+  r32 angle;
+
+  Vertex vertices[4];  
 };
 
 struct TexturedQuad
@@ -28,13 +55,13 @@ struct TexturedQuad
   RenderLevel level;
   r32 angle;
   
-  Vertex vertices[4];
+  TexturedVertex vertices[4];
   LoadedBitmap *texture;
 };
 
 struct TexturedTriangle
 {
-  Vertex vertices[3];
+  TexturedVertex vertices[3];
   LoadedBitmap *texture;
 };
 
@@ -82,9 +109,13 @@ struct RenderCommands
 
   RenderCursorState cursorState;
 
+  u32 texturedQuadCount;
+  u32 texturedQuadCapacity;
+  TexturedQuad *texturedQuads;
+
   u32 quadCount;
   u32 quadCapacity;
-  TexturedQuad *quads;
+  Quad *quads;
 
   u32 triangleCount;
   u32 triangleCapacity;
@@ -101,9 +132,13 @@ renderBeginCommands(RenderCommands *commands, Arena *perFrameAllocator)
 
   commands->cursorState = CursorState_default;
 
+  commands->texturedQuadCount = 0;
+  commands->texturedQuadCapacity = 512;
+  commands->texturedQuads = arenaPushArray(commands->allocator, commands->texturedQuadCapacity, TexturedQuad);
+
   commands->quadCount = 0;
-  commands->quadCapacity = 256;
-  commands->quads = arenaPushArray(commands->allocator, commands->quadCapacity, TexturedQuad);
+  commands->quadCapacity = THOUSAND(16);
+  commands->quads = arenaPushArray(commands->allocator, commands->quadCapacity, Quad);
 
   commands->triangleCount = 0;
   commands->triangleCapacity = 32;
@@ -120,6 +155,10 @@ renderEndCommands(RenderCommands *commands)
   commands->quadCount = 0;
   commands->quadCapacity = 0;
   commands->quads = 0;
+
+  commands->texturedQuadCount = 0;
+  commands->texturedQuadCapacity = 0;
+  commands->texturedQuads = 0;
 
   commands->triangleCount = 0;
   commands->triangleCapacity = 0;

@@ -54,8 +54,7 @@
      - cc channel - parameter remapping at runtime
 
    - Grains:
-     - more grain parameters
-     - use lookup tables for grain windowing
+     - more grain parameters    
      - add grain post-processing effects like pitch-shifting, time-stretching and stereo-widening
 
    - Misc:
@@ -107,7 +106,7 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 	      pluginState->osTimerFreq = memoryBlock->osTimerFreq;
 
 	      pluginState->permanentArena = arenaBegin((u8 *)memory + sizeof(PluginState), MEGABYTES(512));
-	      pluginState->frameArena = arenaSubArena(&pluginState->permanentArena, MEGABYTES(2));
+	      pluginState->frameArena = arenaSubArena(&pluginState->permanentArena, MEGABYTES(64));
 	      pluginState->loadArena = arenaSubArena(&pluginState->permanentArena, MEGABYTES(128));
 	      pluginState->grainArena = arenaSubArena(&pluginState->permanentArena, KILOBYTES(32));
 	      	      	     
@@ -231,8 +230,27 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 	      //pluginState->t_density = 1;
 	      //pluginState->start_pos = 0;
 
-	      pluginState->grainBuffer = initializeGrainBuffer(pluginState, 9600);
+	      u32 grainBufferCount = 48000;
+	      pluginState->grainBuffer = initializeGrainBuffer(pluginState, grainBufferCount);
 	      pluginState->grainManager = initializeGrainManager(pluginState);
+
+#if 1
+	      GrainStateView *grainStateView = &pluginState->grainStateView;
+	      grainStateView->writeIndex = 1;
+	      grainStateView->viewSamples[0] = arenaPushArray(&pluginState->permanentArena, grainBufferCount, r32);
+	      grainStateView->viewSamples[1] = arenaPushArray(&pluginState->permanentArena, grainBufferCount, r32);
+	      grainStateView->viewBufferReadIndex = pluginState->grainBuffer.readIndex;
+	      grainStateView->viewBufferWriteIndex = pluginState->grainBuffer.writeIndex;
+
+	      u32 grainViewSampleCapacity = 4096;
+	      for(u32 i = 0; i < ARRAY_COUNT(grainStateView->views); ++i)
+		{
+		  GrainBufferViewEntry *view = grainStateView->views + i;
+		  view->sampleCapacity = grainViewSampleCapacity;
+		  view->bufferSamples[0] = arenaPushArray(&pluginState->permanentArena, grainViewSampleCapacity, r32);
+		  view->bufferSamples[1] = arenaPushArray(&pluginState->permanentArena, grainViewSampleCapacity, r32);
+		}
+#endif
 	  	  
 	      pluginState->soundIsPlaying.value = false;
 	      pluginState->loadedSound.sound = loadWav("../data/fingertips_44100_PCM_16.wav",
@@ -448,7 +466,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 					       &pluginState->parameters[PluginParameter_volume], V4(0.8f, 0.8f, 0.8f, 1));
 
 		  renderPushRectOutline(renderCommands, volume.element->parent->region, 2, RenderLevel_front,
-					  V4(1, 1, 0, 1));
+					V4(1, 1, 0, 1));
 
 		  if(volume.flags & UICommFlag_hovering)
 		    {
@@ -531,6 +549,178 @@ RENDER_NEW_FRAME(renderNewFrame)
 			//printf("newDensity: %.2f\n", newDensity);
 		      }		    
 		  }
+		}
+	      else if(stringsAreEqual(panel->name, (u8 *)"bottom"))
+		{
+		  logString("\ndisplaying grain buffer\n");
+
+		  v2 dim = getDim(panelLayout->regionRemaining);
+		  v2 min = panelLayout->regionRemaining.min;
+
+		  r32 middleBarThickness = 4.f;
+		  Rect2 middleBar = rectMinDim(min + V2(0, 0.5f*dim.y),
+					       V2(dim.x, middleBarThickness));
+		  renderPushQuad(renderCommands, middleBar, 0, 0.f, RenderLevel_front, V4(0, 0, 0, 1));
+
+		  v2 upperRegionMin = min + V2(0, 0.5f*(dim.y + middleBarThickness));
+		  v2 lowerRegionMin = min;
+		  v2 regionDim = V2(dim.x, 0.5f*dim.y - middleBarThickness);
+		  v2 lowerRegionMiddle = lowerRegionMin + V2(0, 0.5f*regionDim.y);
+		  v2 upperRegionMiddle = upperRegionMin + V2(0, 0.5f*regionDim.y);
+
+		  u32 grainBufferCount = pluginState->grainBuffer.bufferCount;
+		  GrainStateView *grainStateView = &pluginState->grainStateView;
+		  
+		  u32 viewEntryReadIndex = grainStateView->readIndex;
+		  u32 entriesQueued = globalPlatform.atomicLoad(&grainStateView->entriesQueued);
+		  logFormatString("entriesQueued: %u", entriesQueued);
+		  
+		  for(u32 entryIndex = 0; entryIndex < entriesQueued; ++entryIndex)
+		    {
+		      u32 bufferReadIndex = grainStateView->viewBufferReadIndex;
+		      u32 bufferWriteIndex = grainStateView->viewBufferWriteIndex;
+		  
+		      GrainBufferViewEntry *view = (grainStateView->views +
+						    ((viewEntryReadIndex + entryIndex) %
+						     ARRAY_COUNT(grainStateView->views)));
+
+		      // NOTE: update view buffer with new view data
+		      u32 viewSampleCount = view->sampleCount;
+		      u32 samplesToEndOfViewBuffer = grainBufferCount - bufferReadIndex;
+		      u32 samplesToCopy = MIN(viewSampleCount, samplesToEndOfViewBuffer);
+		      COPY_ARRAY(grainStateView->viewSamples[0] + bufferReadIndex, view->bufferSamples[0], samplesToCopy, r32);
+		      COPY_ARRAY(grainStateView->viewSamples[1] + bufferReadIndex, view->bufferSamples[1], samplesToCopy, r32);
+		      if(viewSampleCount > samplesToCopy)
+			{
+			  u32 samplesToCopyAfterWrap = viewSampleCount - samplesToCopy;
+			  COPY_ARRAY(grainStateView->viewSamples[0], view->bufferSamples[0] + samplesToCopy, samplesToCopyAfterWrap, r32);
+			  COPY_ARRAY(grainStateView->viewSamples[1], view->bufferSamples[1] + samplesToCopy, samplesToCopyAfterWrap, r32);
+			}
+
+		      // NOTE: display view read and write positions
+		      r32 barThickness = 2.f;
+		      //u32 readIndex = view->bufferReadIndex;
+		      //u32 readIndex = pluginState->grainBuffer.readIndex;
+		      u32 readIndex = bufferReadIndex;
+		      r32 readPosition = (r32)readIndex/(r32)grainBufferCount;
+		      r32 readBarPosition = readPosition*dim.x;
+		      Rect2 readBar = rectMinDim(min + V2(readBarPosition, 0.f),
+						 V2(barThickness, dim.y));
+		      renderPushQuad(renderCommands, readBar, 0, 0.f, RenderLevel_front, V4(1, 0, 0, 1));
+
+		      //u32 writeIndex = view->bufferWriteIndex;
+		      //u32 writeIndex = pluginState->grainBuffer.writeIndex;
+		      u32 writeIndex = bufferWriteIndex;
+		      r32 writePosition = (r32)writeIndex/(r32)grainBufferCount;
+		      r32 writeBarPosition = writePosition*dim.x;
+		      Rect2 writeBar = rectMinDim(min + V2(writeBarPosition, 0.f),
+						  V2(barThickness, dim.y));
+		      renderPushQuad(renderCommands, writeBar, 0, 0.f, RenderLevel_front, V4(1, 1, 1, 1));
+
+		      // NOTE: display playing grain start and end positions
+#if 1
+		      v4 grainWindowColors[] =
+			{
+			  //colorV4FromU32(0xFF4000FF),
+			  colorV4FromU32(0xFF8000FF),
+			  colorV4FromU32(0xFFBF00FF),
+			  colorV4FromU32(0xFFFF00FF),
+			  
+			  colorV4FromU32(0xBFFF00FF),
+			  colorV4FromU32(0x80FF00FF),
+			  colorV4FromU32(0x40FF00FF),
+			  colorV4FromU32(0x00FF00FF),
+
+			  colorV4FromU32(0x00FF40FF),
+			  colorV4FromU32(0x00FF80FF),
+			  colorV4FromU32(0x00FFBFFF),
+			  colorV4FromU32(0x00FFFFFF),
+
+			  colorV4FromU32(0x00BFFFFF),
+			  colorV4FromU32(0x0080FFFF),
+			  colorV4FromU32(0x0040FFFF),
+			  colorV4FromU32(0x0000FFFF),
+
+			  colorV4FromU32(0x4000FFFF),
+			  colorV4FromU32(0x8000FFFF),
+			  colorV4FromU32(0xBF00FFFF),
+			  colorV4FromU32(0xFF00FFFF),
+
+			  colorV4FromU32(0xFF00BFFF),
+			  colorV4FromU32(0xFF0080FF),
+			  //colorV4FromU32(0xFF0040FF),
+			};
+
+		      for(u32 grainViewIndex = 0; grainViewIndex < view->grainCount; ++grainViewIndex)
+			{
+			  GrainViewEntry *grainView = view->grainViews + grainViewIndex;
+			  //u32 grainReadIndex = grainView->readIndex;
+			  u32 grainStartIndex = grainView->startIndex;
+			  u32 grainEndIndex = grainView->endIndex;			  
+			  r32 grainStartPosition = (r32)grainStartIndex/(r32)grainBufferCount;
+			  r32 grainEndPosition = (r32)grainEndIndex/(r32)grainBufferCount;
+			  r32 grainStartBarPosition = grainStartPosition*dim.x;
+			  r32 grainEndBarPosition = grainEndPosition*dim.x;
+			  Rect2 grainStartBar = rectMinDim(min + V2(grainStartBarPosition, 0.f),
+							   V2(barThickness, dim.y));
+			  Rect2 grainEndBar = rectMinDim(min + V2(grainEndBarPosition, 0.f),
+							 V2(barThickness, dim.y));
+			  v4 grainWindowColor = grainWindowColors[grainViewIndex];
+			  renderPushQuad(renderCommands, grainStartBar, 0, 0.f, RenderLevel_front, grainWindowColor);
+			  renderPushQuad(renderCommands, grainEndBar, 0, 0.f, RenderLevel_front, grainWindowColor);
+			}
+#endif
+		      grainStateView->viewBufferReadIndex =
+			(grainStateView->viewBufferReadIndex + view->sampleCount) % grainBufferCount;
+		      grainStateView->viewBufferWriteIndex =
+			(grainStateView->viewBufferWriteIndex + view->sampleCount) % grainBufferCount;
+		    }
+
+#if 1		  
+		  r32 samplesPerPixel = (r32)grainBufferCount/dim.x;
+		  u32 lastSampleIndex = 0;
+		  u32 widthInPixels = (u32)dim.x;
+		  for(u32 pixel = 0; pixel < widthInPixels; ++pixel)
+		    {
+		      r32 samplePosition = samplesPerPixel*pixel;
+		      u32 sampleIndex = (u32)samplePosition;
+		      r32 sampleL = 0.f;
+		      r32 sampleR = 0.f;
+		      for(u32 i = lastSampleIndex; i < sampleIndex; ++i)
+			{
+			  sampleL += grainStateView->viewSamples[0][i];
+			  sampleR += grainStateView->viewSamples[1][i];
+			}
+		      sampleL /= samplesPerPixel;
+		      sampleR /= samplesPerPixel;
+		      		      
+		      Rect2 sampleLBar = rectMinDim(lowerRegionMiddle + V2(pixel, 0.f),
+						    V2(1.f, 0.5f*sampleL*regionDim.y));
+		      Rect2 sampleRBar = rectMinDim(upperRegionMiddle + V2(pixel, 0.f),
+						    V2(1.f, 0.5f*sampleR*regionDim.y));
+		      renderPushQuad(renderCommands, sampleLBar, 0, 0.f, RenderLevel_front, V4(0, 1, 0, 1));
+		      renderPushQuad(renderCommands, sampleRBar, 0, 0.f, RenderLevel_front, V4(0, 1, 0, 1));
+
+		      lastSampleIndex = sampleIndex;
+		    }
+#endif
+
+		  grainStateView->readIndex =
+		    (viewEntryReadIndex + entriesQueued) % ARRAY_COUNT(grainStateView->views);
+		  u32 oldEntriesQueued = entriesQueued;
+		  while(globalPlatform.atomicCompareAndSwap(&grainStateView->entriesQueued,
+							    entriesQueued,
+							    entriesQueued - oldEntriesQueued) != entriesQueued)
+		    {
+		      entriesQueued = globalPlatform.atomicLoad(&grainStateView->entriesQueued);
+		    }
+		  // while(globalPlatform.atomicCompareAndSwap(&grainStateView->entriesQueued, entriesQueued, 0) !=
+		  // 	    entriesQueued)
+		  // 	{
+		  // 	  entriesQueued = globalPlatform.atomicLoad(&grainStateView->entriesQueued);
+		  // 	  grainStateView->readIndex =
+		  // 	    (viewReadIndex + entriesQueued) % ARRAY_COUNT(grainStateView->views);
+		  // 	}
 		}
 	      
 	      renderPushUILayout(renderCommands, panelLayout);

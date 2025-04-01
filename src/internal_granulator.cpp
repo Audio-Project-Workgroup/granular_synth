@@ -133,8 +133,50 @@ synthesize(r32* destBufferLInit, r32* destBufferRInit,
 	   GrainManager* grainManager, PluginState *pluginState,
 	   u32 samplesToWrite, u32 grainSize)
 {
-  GrainBuffer *buffer = grainManager->grainBuffer;
+  logString("\nsynthesize called\n");
 
+  GrainBuffer *buffer = grainManager->grainBuffer;
+  GrainStateView *grainStateView = &pluginState->grainStateView;
+
+  // NOTE: queue a new view and fill out its data
+  u32 viewWriteIndex = (grainStateView->writeIndex + 1) % ARRAY_COUNT(grainStateView->views);  
+  u32 entriesQueued = globalPlatform.atomicLoad(&grainStateView->entriesQueued);
+  GrainBufferViewEntry *newView = grainStateView->views + viewWriteIndex;  
+  newView->grainCount = 0;
+  //newView->bufferWriteIndex = buffer->writeIndex;
+  //newView->bufferReadIndex = buffer->readIndex;
+  ASSERT(samplesToWrite < newView->sampleCapacity);
+  newView->sampleCount = samplesToWrite;
+
+  ZERO_ARRAY(newView->bufferSamples[0], newView->sampleCapacity, r32);
+  ZERO_ARRAY(newView->bufferSamples[1], newView->sampleCapacity, r32);
+
+  u32 samplesToBufferEnd = buffer->bufferCount - buffer->readIndex;
+  u32 samplesToCopy = MIN(samplesToBufferEnd, samplesToWrite);
+  COPY_ARRAY(newView->bufferSamples[0], buffer->samples[0] + buffer->readIndex, samplesToCopy, r32);
+  COPY_ARRAY(newView->bufferSamples[1], buffer->samples[1] + buffer->readIndex, samplesToCopy, r32);
+  
+  if(samplesToWrite > samplesToCopy)
+    {
+      u32 samplesToWriteAfterWrap = samplesToWrite - samplesToCopy;
+      COPY_ARRAY(newView->bufferSamples[0] + samplesToBufferEnd, buffer->samples[0], samplesToWriteAfterWrap, r32);
+      COPY_ARRAY(newView->bufferSamples[1] + samplesToBufferEnd, buffer->samples[1], samplesToWriteAfterWrap, r32);
+    }
+  
+  for(Grain *grain = grainManager->grainPlayList->next;
+      grain && grain != grainManager->grainPlayList;
+      grain = grain->next)
+    {      
+      GrainViewEntry *grainView = newView->grainViews + newView->grainCount++;
+      usz ptrDiff = (usz)grain->start[0] - (usz)buffer->samples[0];
+      u32 readIndex = safeTruncateU64(ptrDiff)/sizeof(*grain->start[0]);
+      grainView->endIndex = (readIndex + grain->samplesToPlay) % buffer->bufferCount;
+      grainView->startIndex = ((grainView->endIndex >= grain->length) ?
+			       (grainView->endIndex - grain->length) :
+			       (buffer->bufferCount + grainView->endIndex - grain->length));      
+    }
+
+  // NOTE: process grains
   r32* destBufferL = destBufferLInit;
   r32* destBufferR = destBufferRInit;
   for (u32 sampleIndex = 0; sampleIndex < samplesToWrite; ++sampleIndex)
@@ -153,7 +195,7 @@ synthesize(r32* destBufferLInit, r32* destBufferRInit,
       for (Grain* c_grain = grainManager->grainPlayList->next;
 	   c_grain && c_grain != grainManager->grainPlayList;
 	   ) // TODO: it's weird not having the increment be in the loop statement
-        {            
+        {	  
 	  if (c_grain->samplesToPlay > 0)
 	    {
 	      // NOTE: since the left and right channels of the grain buffer are stored contiguously, we can
@@ -209,6 +251,13 @@ synthesize(r32* destBufferLInit, r32* destBufferRInit,
     
       *destBufferL++ = clampToRange(volume*outSampleL, -1.f, 1.f);
       *destBufferR++ = clampToRange(volume*outSampleR, -1.f, 1.f);
+    }
+
+  grainStateView->writeIndex = viewWriteIndex;
+  while(globalPlatform.atomicCompareAndSwap(&grainStateView->entriesQueued, entriesQueued, entriesQueued + 1) !=
+	entriesQueued)
+    {
+      entriesQueued = globalPlatform.atomicLoad(&grainStateView->entriesQueued);
     }
 }
 

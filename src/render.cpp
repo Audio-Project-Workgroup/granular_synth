@@ -3,10 +3,19 @@ using namespace juce::gl;
 #endif
 
 static inline void
-renderVertex(Vertex v)
+renderTexturedVertex(TexturedVertex v)
 {  
-  glColor4fv(v.color.E);
+  //glColor4fv(v.color.E);
+  glColor4ubv((const GLubyte *)&v.color);
   glTexCoord2fv(v.uv.E);
+  glVertex2fv(v.vPos.E);
+}
+
+static inline void
+renderVertex(Vertex v)
+{
+  //glColor4fv(v.color.E);
+  glColor4ubv((const GLubyte *)&v.color);
   glVertex2fv(v.vPos.E);
 }
 
@@ -34,7 +43,7 @@ renderBindTexture(LoadedBitmap *texture, bool generateNewTextures)
 }
 
 static void
-renderSortQuads(TexturedQuad *quads, u32 quadCount)
+renderSortTexturedQuads(TexturedQuad *quads, u32 quadCount)
 {
   // NOTE: bubble sort
   for(u32 outer = 0; outer < quadCount; ++outer)
@@ -60,6 +69,32 @@ renderSortQuads(TexturedQuad *quads, u32 quadCount)
 }
 
 static void
+renderSortQuads(Quad *quads, u32 quadCount)
+{
+  // NOTE: bubble sort
+  for(u32 outer = 0; outer < quadCount; ++outer)
+    {
+      bool quadsSorted = true;
+      for(u32 inner = 0; inner < quadCount - 1; ++inner)
+	{
+	  Quad *q0 = quads + inner;
+	  Quad *q1 = quads + inner + 1;
+
+	  if(q0->level > q1->level)
+	    {
+	      Quad temp = *q0;
+	      *q0 = *q1;
+	      *q1 = temp;
+
+	      quadsSorted = false;
+	    }
+	}
+
+      if(quadsSorted) break;
+    }
+}
+
+static void
 renderCommands(RenderCommands *commands)
 {      
   bool textureEnabled = true;
@@ -73,18 +108,58 @@ renderCommands(RenderCommands *commands)
 
   renderSortQuads(commands->quads, commands->quadCount);
 
+  bool drawing = true;  
+  glDisable(GL_TEXTURE_2D);
+  glBegin(GL_TRIANGLES);
   for(u32 quadIndex = 0; quadIndex < commands->quadCount; ++quadIndex)
     {
-      TexturedQuad *quad = commands->quads + quadIndex;
-      if(quad->texture)
-	{	  
-	  renderBindTexture(quad->texture, commands->generateNewTextures);
+      Quad *quad = commands->quads + quadIndex;
+      
+      if(quad->angle != 0.f)
+	{
+	  drawing = false;
+	  glEnd();
+	  
+	  v2 vertexCenter = 0.5f*(quad->vertices[3].vPos + quad->vertices[0].vPos);
+	  mat4 rotationMatrix = makeRotationMatrixXY(quad->angle);	  
+	  mat4 translationMatrix = makeTranslationMatrix(vertexCenter);
+	  mat4 invTranslationMatrix = makeTranslationMatrix(-vertexCenter);
+	  
+	  mat4 mvMat = transpose(invTranslationMatrix*rotationMatrix*translationMatrix);
+	  glMatrixMode(GL_MODELVIEW);
+	  glLoadMatrixf(mvMat.E);
 	}
       else
 	{
-	  glDisable(GL_TEXTURE_2D);
-	  textureEnabled = false;
+	  drawing = false;
+	  glEnd();
+	  
+	  glMatrixMode(GL_MODELVIEW);
+	  glLoadIdentity();
 	}
+
+      if(!drawing)
+	{
+	  drawing = true;
+	  glBegin(GL_TRIANGLES);	  
+	}
+
+      renderVertex(quad->vertices[0]);
+      renderVertex(quad->vertices[1]);
+      renderVertex(quad->vertices[3]);
+      
+      renderVertex(quad->vertices[0]);
+      renderVertex(quad->vertices[3]);
+      renderVertex(quad->vertices[2]);
+    }
+  glEnd();
+
+  renderSortTexturedQuads(commands->texturedQuads, commands->texturedQuadCount);
+  glEnable(GL_TEXTURE_2D);
+  for(u32 quadIndex = 0; quadIndex < commands->texturedQuadCount; ++quadIndex)
+    {
+      TexturedQuad *quad = commands->texturedQuads + quadIndex;
+      renderBindTexture(quad->texture, commands->generateNewTextures);
 
       if(quad->angle != 0.f)
 	{
@@ -105,22 +180,16 @@ renderCommands(RenderCommands *commands)
       
       glBegin(GL_TRIANGLES);
       {
-	renderVertex(quad->vertices[0]);
-	renderVertex(quad->vertices[1]);
-	renderVertex(quad->vertices[3]);
+	renderTexturedVertex(quad->vertices[0]);
+	renderTexturedVertex(quad->vertices[1]);
+	renderTexturedVertex(quad->vertices[3]);
 	
-	renderVertex(quad->vertices[0]);
-	renderVertex(quad->vertices[3]);
-	renderVertex(quad->vertices[2]);
+	renderTexturedVertex(quad->vertices[0]);
+	renderTexturedVertex(quad->vertices[3]);
+	renderTexturedVertex(quad->vertices[2]);
       }
-      glEnd();
-
-      if(!textureEnabled)
-	{
-	  glEnable(GL_TEXTURE_2D);
-	  textureEnabled = true;
-	}
-    }
+      glEnd();     
+    }  
 
   for(u32 triangleIndex = 0; triangleIndex < commands->triangleCount; ++triangleIndex)
     {
@@ -137,9 +206,9 @@ renderCommands(RenderCommands *commands)
       
       glBegin(GL_TRIANGLES);
       {
-	renderVertex(triangle->vertices[0]);
-	renderVertex(triangle->vertices[1]);
-	renderVertex(triangle->vertices[2]);
+	renderTexturedVertex(triangle->vertices[0]);
+	renderTexturedVertex(triangle->vertices[1]);
+	renderTexturedVertex(triangle->vertices[2]);
       }
       glEnd();
 

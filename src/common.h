@@ -47,6 +47,9 @@ typedef PLATFORM_WRITE_ENTIRE_FILE(PlatformWriteEntireFile);
 #define ATOMIC_LOAD(name) u32 (name)(volatile u32 *src) 
 typedef ATOMIC_LOAD(AtomicLoad);
 
+#define ATOMIC_LOAD_POINTER(name) void *(name)(volatile void **src)
+typedef ATOMIC_LOAD_POINTER(AtomicLoadPointer);
+
 #define ATOMIC_STORE(name) u32 (name)(volatile u32 *dest, u32 value)
 typedef ATOMIC_STORE(AtomicStore);
 
@@ -70,6 +73,7 @@ struct PlatformAPI
   PlatformGetCurrentTimestamp *getCurrentTimestamp;
 
   AtomicLoad *atomicLoad;
+  AtomicLoadPointer *atomicLoadPointer;
   AtomicStore *atomicStore;
   AtomicAdd *atomicAdd;
   AtomicCompareAndSwap *atomicCompareAndSwap;
