@@ -25,6 +25,7 @@
 #define IS_MULTIPLE_OF_2(num) (((num) & ((num) - 1)) == (num))
 #define ROUND_UP_TO_MULTIPLE_OF_2(num) (((num) + 1) & (~1))
 #define ALIGN_POW_2(num, alignment) (((num) + ((alignment)-1LL)) & (~((alignment)-1LL)))
+#define ALIGN_DOWN_POW_2(num, alignment) ((num) & ~((alignment) - 1LL))
 #define ROUND_UP_TO_MULTIPLE(num, length) (((num) % (length)) ? ((num) + (length) - ((num) % (length))) : (num))
 
 #define CYCLIC_ARRAY_INDEX(i, len) ((i < len) ? ((i < 0) ? (i + len) : i) : (i - len))

@@ -121,6 +121,7 @@ struct PluginParameter
 #include "ui_layout.h"
 #include "plugin_ui.h"
 #include "plugin_render.h"
+#include "ring_buffer.h"
 #include "internal_granulator.h"
 
 struct PlayingSound
@@ -157,7 +158,8 @@ struct PluginState
   UIPanel *rootPanel;  
 
   GrainManager grainManager;
-  GrainBuffer grainBuffer;
+  //GrainBuffer grainBuffer;
+  AudioRingBuffer grainBuffer;
   GrainStateView grainStateView;
 
   volatile u32 initializationMutex;

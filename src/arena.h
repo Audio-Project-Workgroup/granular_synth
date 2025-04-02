@@ -47,6 +47,15 @@ arenaFlagsZeroAlign(u32 alignment)
   return(result);
 }
 
+inline ArenaPushFlags
+arenaFlagsNoZeroAlign(u32 alignment)
+{
+  ArenaPushFlags result = {};
+  result.alignment = alignment;
+
+  return(result);
+}
+
 static inline Arena
 arenaBegin(void *memory, usz capacity)
 {

@@ -1,16 +1,16 @@
 #define WINDOW_LENGTH 1024
 
-struct GrainBuffer
-{
-  r32* samples[2];
+/* struct GrainBuffer */
+/* { */
+/*   r32* samples[2]; */
 
-  u32 writeIndex;
-  u32 readIndex;
-  /* r32 writePosition; */
-  /* r32 readPosition; */
+/*   u32 writeIndex; */
+/*   u32 readIndex; */
+/*   /\* r32 writePosition; *\/ */
+/*   /\* r32 readPosition; *\/ */
 
-  u32 bufferCount;
-};
+/*   u32 bufferCount; */
+/* }; */
 
 inline u32
 grainBufferSetReadPos(u32 write_pos, u32 bufferSize)
@@ -56,7 +56,8 @@ struct GrainManager
   Grain* grainPlayList;
   Grain* grainFreeList;
   
-  GrainBuffer *grainBuffer;
+  //GrainBuffer *grainBuffer;
+  AudioRingBuffer *grainBuffer;
   /*We calculate what the interonset times are and set them here. We start this var at 0, so in the first
     call to the synthesize function, we make a new grain, and set current_iot to whatever we compute it to be.*/
   //s32 current_iot;
@@ -124,8 +125,9 @@ struct GrainStateView
 
   GrainBufferViewEntry views[32];
 
-  r32 *viewSamples[2];
-  u32 viewBufferReadIndex;
-  u32 viewBufferWriteIndex;
+  /* r32 *viewSamples[2]; */
+  /* u32 viewBufferReadIndex; */
+  /* u32 viewBufferWriteIndex; */
+  AudioRingBuffer viewBuffer;
 };
 #endif

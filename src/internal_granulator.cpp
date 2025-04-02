@@ -17,13 +17,15 @@ initializeWindows(GrainManager* grainManager)
     }
 }
 
-static GrainBuffer
+static AudioRingBuffer
 initializeGrainBuffer(PluginState *pluginState, u32 bufferCount)
 {
-  GrainBuffer grainBuffer = {};
-  grainBuffer.bufferCount = bufferCount;
-  grainBuffer.samples[0] = arenaPushArray(&pluginState->permanentArena, bufferCount, r32);
-  grainBuffer.samples[1] = arenaPushArray(&pluginState->permanentArena, bufferCount, r32);
+  AudioRingBuffer grainBuffer = {};
+  grainBuffer.capacity = bufferCount;
+  grainBuffer.samples[0] = arenaPushArray(&pluginState->permanentArena, bufferCount, r32,
+					  arenaFlagsNoZeroAlign(4*sizeof(r32)));
+  grainBuffer.samples[1] = arenaPushArray(&pluginState->permanentArena, bufferCount, r32,
+					  arenaFlagsNoZeroAlign(4*sizeof(r32)));
   grainBuffer.writeIndex = 0;
   grainBuffer.readIndex = grainBufferSetReadPos(60, bufferCount);
 
@@ -36,10 +38,14 @@ initializeGrainManager(PluginState *pluginState)
   GrainManager result = {};
   result.grainBuffer = &pluginState->grainBuffer;
   
-  result.windowBuffer[0] = arenaPushArray(&pluginState->permanentArena, WINDOW_LENGTH, r32);
-  result.windowBuffer[1] = arenaPushArray(&pluginState->permanentArena, WINDOW_LENGTH, r32);
-  result.windowBuffer[2] = arenaPushArray(&pluginState->permanentArena, WINDOW_LENGTH, r32);
-  result.windowBuffer[3] = arenaPushArray(&pluginState->permanentArena, WINDOW_LENGTH, r32);
+  result.windowBuffer[0] = arenaPushArray(&pluginState->permanentArena, WINDOW_LENGTH, r32,
+					  arenaFlagsNoZeroAlign(4*sizeof(r32)));
+  result.windowBuffer[1] = arenaPushArray(&pluginState->permanentArena, WINDOW_LENGTH, r32,
+					  arenaFlagsNoZeroAlign(4*sizeof(r32)));
+  result.windowBuffer[2] = arenaPushArray(&pluginState->permanentArena, WINDOW_LENGTH, r32,
+					  arenaFlagsNoZeroAlign(4*sizeof(r32)));
+  result.windowBuffer[3] = arenaPushArray(&pluginState->permanentArena, WINDOW_LENGTH, r32,
+					  arenaFlagsNoZeroAlign(4*sizeof(r32)));
   initializeWindows(&result);
   
   result.grainAllocator = &pluginState->grainArena;
@@ -66,7 +72,7 @@ makeNewGrain(GrainManager* grainManager, u32 grainSize, WindowType windowParam)
       result = arenaPushStruct(grainManager->grainAllocator, Grain);
     }
 
-  GrainBuffer* buffer = grainManager->grainBuffer;
+  AudioRingBuffer* buffer = grainManager->grainBuffer;
   result->start[0] = buffer->samples[0] + buffer->readIndex;
   result->start[1] = buffer->samples[1] + buffer->readIndex;
     
@@ -135,7 +141,7 @@ synthesize(r32* destBufferLInit, r32* destBufferRInit,
 {
   logString("\nsynthesize called\n");
 
-  GrainBuffer *buffer = grainManager->grainBuffer;
+  AudioRingBuffer *buffer = grainManager->grainBuffer;
   GrainStateView *grainStateView = &pluginState->grainStateView;
 
   // NOTE: queue a new view and fill out its data
@@ -143,25 +149,15 @@ synthesize(r32* destBufferLInit, r32* destBufferRInit,
   u32 entriesQueued = globalPlatform.atomicLoad(&grainStateView->entriesQueued);
   GrainBufferViewEntry *newView = grainStateView->views + viewWriteIndex;  
   newView->grainCount = 0;
-  //newView->bufferWriteIndex = buffer->writeIndex;
-  //newView->bufferReadIndex = buffer->readIndex;
   ASSERT(samplesToWrite < newView->sampleCapacity);
   newView->sampleCount = samplesToWrite;
 
   ZERO_ARRAY(newView->bufferSamples[0], newView->sampleCapacity, r32);
   ZERO_ARRAY(newView->bufferSamples[1], newView->sampleCapacity, r32);
 
-  u32 samplesToBufferEnd = buffer->bufferCount - buffer->readIndex;
-  u32 samplesToCopy = MIN(samplesToBufferEnd, samplesToWrite);
-  COPY_ARRAY(newView->bufferSamples[0], buffer->samples[0] + buffer->readIndex, samplesToCopy, r32);
-  COPY_ARRAY(newView->bufferSamples[1], buffer->samples[1] + buffer->readIndex, samplesToCopy, r32);
-  
-  if(samplesToWrite > samplesToCopy)
-    {
-      u32 samplesToWriteAfterWrap = samplesToWrite - samplesToCopy;
-      COPY_ARRAY(newView->bufferSamples[0] + samplesToBufferEnd, buffer->samples[0], samplesToWriteAfterWrap, r32);
-      COPY_ARRAY(newView->bufferSamples[1] + samplesToBufferEnd, buffer->samples[1], samplesToWriteAfterWrap, r32);
-    }
+  readSamplesFromAudioRingBuffer(buffer, newView->bufferSamples[0], newView->bufferSamples[1], samplesToWrite, false);
+  grainStateView->viewBuffer.readIndex = ((grainStateView->viewBuffer.readIndex + newView->sampleCount) %
+					  grainStateView->viewBuffer.capacity);
   
   for(Grain *grain = grainManager->grainPlayList->next;
       grain && grain != grainManager->grainPlayList;
@@ -170,10 +166,10 @@ synthesize(r32* destBufferLInit, r32* destBufferRInit,
       GrainViewEntry *grainView = newView->grainViews + newView->grainCount++;
       usz ptrDiff = (usz)grain->start[0] - (usz)buffer->samples[0];
       u32 readIndex = safeTruncateU64(ptrDiff)/sizeof(*grain->start[0]);
-      grainView->endIndex = (readIndex + grain->samplesToPlay) % buffer->bufferCount;
+      grainView->endIndex = (readIndex + grain->samplesToPlay) % buffer->capacity;
       grainView->startIndex = ((grainView->endIndex >= grain->length) ?
 			       (grainView->endIndex - grain->length) :
-			       (buffer->bufferCount + grainView->endIndex - grain->length));      
+			       (buffer->capacity + grainView->endIndex - grain->length));      
     }
 
   // NOTE: process grains
@@ -201,7 +197,7 @@ synthesize(r32* destBufferLInit, r32* destBufferRInit,
 	      // NOTE: since the left and right channels of the grain buffer are stored contiguously, we can
 	      //       compare the left grain read pointer to the right grain buffer pointer to check if we
 	      //       need to wrap the grain reading
-	      ASSERT(buffer->samples[1] - buffer->samples[0] == buffer->bufferCount);
+	      ASSERT(buffer->samples[1] - buffer->samples[0] == buffer->capacity);
 	      if(c_grain->start[0] == buffer->samples[1])
 		{
 		  c_grain->start[0] = buffer->samples[0];
@@ -247,7 +243,7 @@ synthesize(r32* destBufferLInit, r32* destBufferRInit,
       ++grainManager->samplesProcessedSinceLastSeed;
       
       ++buffer->readIndex;
-      buffer->readIndex %= buffer->bufferCount;
+      buffer->readIndex %= buffer->capacity;
     
       *destBufferL++ = clampToRange(volume*outSampleL, -1.f, 1.f);
       *destBufferR++ = clampToRange(volume*outSampleR, -1.f, 1.f);
