@@ -912,49 +912,72 @@ AUDIO_PROCESS(audioProcess)
       inputMixBuffers[1] = arenaPushArray((Arena *)&inputMixerMemory, framesToRead, r32,
 					  arenaFlagsZeroAlign(4*sizeof(r32)));
 
+      const void *genericInputFrames[2] = {};
+      genericInputFrames[0] = audioBuffer->inputBuffer[0];
+      genericInputFrames[1] = audioBuffer->inputBuffer[1];
+
+      for(u32 frameIndex = 0; frameIndex < framesToRead; ++frameIndex)
+	{		
+	  bool soundIsPlaying = pluginReadBooleanParameter(&pluginState->soundIsPlaying);       
+	  r32 currentTime = (r32)loadedSound->samplesPlayed + inputBufferReadSpeed*(r32)frameIndex;
+	  u32 soundReadIndex = (u32)currentTime;
+	  r32 soundReadFrac = currentTime - (r32)soundReadIndex;		
+
+	  for(u32 channelIndex = 0; channelIndex < audioBuffer->inputChannels; ++channelIndex)
+	    {
+	      r32 mixedVal = 0.f;		   
+	      if(soundIsPlaying)		       
+		{			
+		  if(currentTime < loadedSound->sound.sampleCount)
+		    {
+		      r32 loadedSoundSample0 = loadedSound->sound.samples[channelIndex][soundReadIndex];
+		      r32 loadedSoundSample1 = loadedSound->sound.samples[channelIndex][soundReadIndex + 1];
+		      r32 loadedSoundSample = lerp(loadedSoundSample0, loadedSoundSample1, soundReadFrac);
+
+		      mixedVal += 0.5f*loadedSoundSample;
+		    }
+		  else
+		    {		      
+		      pluginSetBooleanParameter(&pluginState->soundIsPlaying, false);
+		      loadedSound->samplesPlayed = 0;// + pluginState->start_pos);
+		    }		  
+		}
+
+	      switch(audioBuffer->inputFormat)
+		{
+		case AudioFormat_s16:
+		  {
+		    s16 *inputFrames = (s16 *)genericInputFrames[channelIndex];
+		    r32 inputSample = (r32)*inputFrames/(r32)S16_MAX;		    
+		    //ASSERT(isInRange(inputSample, -1.f, 1.f));
+		    inputSample = clampToRange(inputSample, -1.f, 1.f);
+		    mixedVal += 0.5f*inputSample;
+
+		    genericInputFrames[channelIndex] = (u8 *)inputFrames + audioBuffer->inputStride;
+		  } break;
+
+		case AudioFormat_r32:
+		  {
+		    r32 *inputFrames = (r32 *)genericInputFrames[channelIndex];
+		    r32 inputSample = *inputFrames;
+		    //ASSERT(isInRange(inputSample, -1.f, 1.f));
+		    inputSample = clampToRange(inputSample, -1.f, 1.f);
+		    mixedVal += 0.5f*inputSample;		    
+
+		    genericInputFrames[channelIndex] = (u8 *)inputFrames + audioBuffer->inputStride;
+		  } break;
+		}
+	      
+	      inputMixBuffers[channelIndex][frameIndex] = mixedVal;		   
+	    }
+	}
+      /*
       switch(audioBuffer->inputFormat)
 	{
 	  // TODO: pull these cases out into a generic function/macro
 	case AudioFormat_s16:
-	  {
-	    s16 *inputFrames[2] = {};
-	    inputFrames[0] = (s16 *)audioBuffer->inputBuffer[0];
-	    inputFrames[1] = (s16 *)audioBuffer->inputBuffer[1];
-	    
-	    for(u32 frameIndex = 0; frameIndex < framesToRead; ++frameIndex)
-	      {		
-		bool soundIsPlaying = pluginReadBooleanParameter(&pluginState->soundIsPlaying);       
-		r32 currentTime = (r32)loadedSound->samplesPlayed + inputBufferReadSpeed*(r32)frameIndex;
-		u32 soundReadIndex = (u32)currentTime;
-		r32 soundReadFrac = currentTime - (r32)soundReadIndex;		
-
-		for(u32 channelIndex = 0; channelIndex < audioBuffer->inputChannels; ++channelIndex)
-		  {
-		    r32 mixedVal = 0.f;		   
-		    if(soundIsPlaying)		       
-		      {			
-			if(currentTime < loadedSound->sound.sampleCount)
-			  {
-			    r32 loadedSoundSample0 = loadedSound->sound.samples[channelIndex][soundReadIndex];
-			    r32 loadedSoundSample1 = loadedSound->sound.samples[channelIndex][soundReadIndex + 1];
-			    r32 loadedSoundSample = lerp(loadedSoundSample0, loadedSoundSample1, soundReadFrac);
-
-			    mixedVal += 0.5f*loadedSoundSample;
-			  }
-			else
-			  {		      
-			    pluginSetBooleanParameter(&pluginState->soundIsPlaying, false);
-			    loadedSound->samplesPlayed = 0;// + pluginState->start_pos);
-			  }		  
-		      }
-
-		    r32 inputSample = inputFrames[channelIndex][frameIndex]/(r32)S16_MAX;
-		    ASSERT(isInRange(inputSample, -1.f, 1.f));
-
-		    mixedVal += 0.5f*inputSample;
-		    inputMixBuffers[channelIndex][frameIndex] = 32000.f*mixedVal;		   
-		  }
-	      }	  
+	  {	    
+	    	    	  
 	  } break;
 	case AudioFormat_r32:
 	  {
@@ -1031,7 +1054,7 @@ AUDIO_PROCESS(audioProcess)
 	      }
 	  } break;
 	}
-      
+      */
       bool soundIsPlaying = pluginReadBooleanParameter(&pluginState->soundIsPlaying);
       if(soundIsPlaying)
 	{

@@ -161,25 +161,24 @@ void
 maDataCallback(ma_device *pDevice, void *pOutput, const void *pInput, ma_uint32 frameCount)
 {  
   //ma_pcm_rb *buffer = (ma_pcm_rb *)pDevice->pUserData;
-
   MACallbackUserData *buffers = (MACallbackUserData *)pDevice->pUserData;
   if(buffers)
     {
-      ma_pcm_rb *buffer = buffers->outputBuffer;
-      if(buffer)
+      ma_pcm_rb *outputBuffer = buffers->outputBuffer;
+      if(outputBuffer)
 	{
 	  ma_uint32 framesRemaining = frameCount;
 	  while(framesRemaining)
 	    {
 	      void *srcBuffer = 0;
 	      ma_uint32 framesToRead = framesRemaining;
-	      ma_result result = ma_pcm_rb_acquire_read(buffer, &framesToRead, &srcBuffer);
+	      ma_result result = ma_pcm_rb_acquire_read(outputBuffer, &framesToRead, &srcBuffer);
 	      if(result == MA_SUCCESS)
 		{
 		  usz bytesToRead = CHANNELS*framesToRead*sizeof(s16);
 		  memcpy(pOutput, srcBuffer, bytesToRead);
 	      
-		  result = ma_pcm_rb_commit_read(buffer, framesToRead);
+		  result = ma_pcm_rb_commit_read(outputBuffer, framesToRead);
 		  if(result == MA_SUCCESS)
 		    {
 		      framesRemaining -= framesToRead;
@@ -187,15 +186,56 @@ maDataCallback(ma_device *pDevice, void *pOutput, const void *pInput, ma_uint32 
 		    }
 		  else
 		    {
-		      //fprintf(stderr, "ERROR: ma_pcm_rb_commit_read failed: %s\n", ma_result_description(result));
+		      fprintf(stderr, "ERROR: maDataCallback: ma_pcm_rb_commit_read failed: %s\n",
+			      ma_result_description(result));
+		      break;
 		    }
 		}
 	      else
 		{
-		  //fprintf(stderr, "ERROR: ma_pcm_rb_acquire_read failed: %s\n", ma_result_description(result));
+		  fprintf(stderr, "ERROR: maDataCallback ma_pcm_rb_acquire_read failed: %s\n",
+			  ma_result_description(result));
+		  break;
 		}
 	    }     
 	}
+#if 1
+      ma_pcm_rb *inputBuffer = buffers->inputBuffer;
+      if(inputBuffer)
+	{
+	  ma_uint32 framesRemaining = frameCount;
+	  while(framesRemaining)
+	    {
+	      void *destBuffer = 0;
+	      ma_uint32 framesToWrite = framesRemaining;
+	      ma_result result = ma_pcm_rb_acquire_write(inputBuffer, &framesToWrite, &destBuffer);
+	      if(result == MA_SUCCESS)
+		{
+		  usz bytesToWrite = CHANNELS*framesToWrite*sizeof(s16);
+		  memcpy(destBuffer, pInput, bytesToWrite);
+
+		  result = ma_pcm_rb_commit_write(inputBuffer, framesToWrite);
+		  if(result == MA_SUCCESS)
+		    {
+		      framesRemaining -= framesToWrite;
+		      pInput = (u8 *)pInput + bytesToWrite;
+		    }
+		  else
+		    {
+		      fprintf(stderr, "ERROR: maDataCallback: ma_pcm_rb_commit_write failed: %s\n",
+			      ma_result_description(result));
+		      break;
+		    }
+		}
+	      else
+		{
+		  fprintf(stderr, "ERROR: maDataCallback: ma_pcm_rb_acquire_write failed: %s\n",
+			  ma_result_description(result));
+		  break;
+		}
+	    }
+	}
+#endif
     }
 }
 
@@ -301,13 +341,18 @@ main(int argc, char **argv)
 	      // audio setup
 
 	      u32 audioBufferFrameCount = 48000/2;
-	      void *audioBufferData = calloc(audioBufferFrameCount, CHANNELS*sizeof(s16));
+	      void *audioBufferDataOutput = calloc(audioBufferFrameCount, CHANNELS*sizeof(s16));
+	      void *audioBufferDataInput = calloc(audioBufferFrameCount, CHANNELS*sizeof(s16));
 
 	      PluginAudioBuffer audioBuffer = {};
 	      audioBuffer.outputFormat = AudioFormat_s16;
 	      audioBuffer.outputSampleRate = SR;
 	      audioBuffer.outputChannels = CHANNELS;
 	      audioBuffer.outputStride = 2*sizeof(s16);
+	      audioBuffer.inputFormat = AudioFormat_s16;
+	      audioBuffer.inputSampleRate = SR;
+	      audioBuffer.inputChannels = CHANNELS;
+	      audioBuffer.inputStride = 2*sizeof(s16);
 	      audioBuffer.midiMessageCount = 0; // TODO: send midi messages to the plugin
 	      audioBuffer.midiBuffer = (u8 *)calloc(KILOBYTES(1), 1);
 
@@ -357,15 +402,31 @@ main(int argc, char **argv)
 
 			  ++audioBuffer.inputDeviceCount;
 			}
-		      
+
+		      // TODO: this is about the lowest latency I could get on my machine while
+		      //       avoiding buffer underflows. Putting the audioProcess() call on a
+		      //       separate thread that doesn't have to wait for the monitor vblank
+		      //       will almost certainly enable us to get lower latency, but I don't
+		      //       want to introduce that extra complexity just yet. -Ry
+		      r32 targetLatencyMs = 30.f;
+		      u32 targetLatencySamples = (u32)(targetLatencyMs*(r32)SR/1000.f);
+
 		      ma_pcm_rb maOutputRingBuffer, maInputRingBuffer;
-		      if((ma_pcm_rb_init(ma_format_s16, CHANNELS, audioBufferFrameCount, audioBufferData, NULL,
-					 &maOutputRingBuffer) == MA_SUCCESS) &&
-			 (ma_pcm_rb_init(ma_format_s16, CHANNELS, audioBufferFrameCount, audioBufferData, NULL,
-					 &maInputRingBuffer) == MA_SUCCESS))
+		      if((ma_pcm_rb_init(ma_format_s16, CHANNELS, audioBufferFrameCount,
+					 audioBufferDataOutput, NULL, &maOutputRingBuffer) == MA_SUCCESS) &&
+			 (ma_pcm_rb_init(ma_format_s16, CHANNELS, audioBufferFrameCount,
+					 audioBufferDataInput, NULL, &maInputRingBuffer) == MA_SUCCESS))
 			{
-			  ASSERT(ma_pcm_rb_seek_write(&maOutputRingBuffer, audioBufferFrameCount/10) == MA_SUCCESS);
-			  ASSERT(ma_pcm_rb_seek_write(&maInputRingBuffer, audioBufferFrameCount/10) == MA_SUCCESS);
+			  s32 maOutputRBPtrDistance = ma_pcm_rb_pointer_distance(&maOutputRingBuffer);
+			  s32 maInputRBPtrDistance = ma_pcm_rb_pointer_distance(&maInputRingBuffer);
+			  
+			  // ASSERT(ma_pcm_rb_seek_write(&maOutputRingBuffer,
+			  // 			      targetLatencySamples) == MA_SUCCESS);
+			  // maOutputRBPtrDistance = ma_pcm_rb_pointer_distance(&maOutputRingBuffer);
+			  
+			  // ASSERT(ma_pcm_rb_seek_write(&maInputRingBuffer,
+			  // 			      audioBufferFrameCount - targetLatencySamples) == MA_SUCCESS);
+			  // maInputRBPtrDistance = ma_pcm_rb_pointer_distance(&maInputRingBuffer);
 
 			  MACallbackUserData maCallbackUserData = {&maOutputRingBuffer, &maInputRingBuffer};
 
@@ -381,15 +442,7 @@ main(int argc, char **argv)
 			  maConfig.dataCallback = maDataCallback;
 			  //maConfig.pUserData = &maOutputRingBuffer;
 			  maConfig.pUserData = &maCallbackUserData;
-
-			  // TODO: this is about the lowest latency I could get on my machine while
-			  //       avoiding buffer underflows. Putting the audioProcess() call on a
-			  //       separate thread that doesn't have to wait for the monitor vblank
-			  //       will almost certainly enable us to get lower latency, but I don't
-			  //       want to introduce that extra complexity just yet. -Ry
-			  r32 targetLatencyMs = 30.f;
-			  u32 targetLatencySamples = (u32)(targetLatencyMs*(r32)SR/1000.f);
-
+			  
 			  ma_device maDevice;
 			  if(ma_device_init(NULL, &maConfig, &maDevice) == MA_SUCCESS)
 			    {
@@ -486,8 +539,8 @@ main(int argc, char **argv)
 
 				  double mouseX, mouseY;
 				  glfwGetCursorPos(window, &mouseX, &mouseY);
-				  newInput->mouseState.position = V2(mouseX, (r64)framebufferHeight - mouseY) - viewportMin;
-				  //printf("mouseP: (%.2f, %.2f)\n", newInput->mouseState.position.x, newInput->mouseState.position.y);
+				  newInput->mouseState.position = (V2(mouseX, (r64)framebufferHeight - mouseY) -
+								   viewportMin);
 
 				  if(plugin.renderNewFrame)
 				    {
@@ -514,18 +567,25 @@ main(int argc, char **argv)
 
 				  // process audio
 
-				  s32 maOutputRBPtrDistance = ma_pcm_rb_pointer_distance(&maOutputRingBuffer);
-				  //fprintf(stdout, "\nptr distance: %d\n", maRBPtrDistance);
+				  maOutputRBPtrDistance = ma_pcm_rb_pointer_distance(&maOutputRingBuffer);
+				  maInputRBPtrDistance = ma_pcm_rb_pointer_distance(&maInputRingBuffer);
+				  fprintf(stdout, "\n output rb ptr distance: %d\n", maOutputRBPtrDistance);
+				  fprintf(stdout, "input rb ptr distance: %d\n\n", maInputRBPtrDistance);
 
 				  // TODO: this timing code was hastily hacked together and should be thought out
 				  //       more and made better
 				  u32 framesRemaining = (maOutputRBPtrDistance < 2*(s32)targetLatencySamples) ?
-				    targetLatencySamples : 0;		      
+				    targetLatencySamples : 0;
+				  ma_result maResult;
 				  while(framesRemaining)
 				    {
 				      void *writePtr = 0;
+				      void *readPtr = 0;
 				      u32 framesToWrite = framesRemaining;
-				      ma_result maResult = ma_pcm_rb_acquire_write(&maOutputRingBuffer, &framesToWrite, &writePtr);
+				      maResult = ma_pcm_rb_acquire_write(&maOutputRingBuffer,
+									 &framesToWrite, &writePtr);
+				      maResult = ma_pcm_rb_acquire_read(&maInputRingBuffer,
+				      					&framesToWrite, &readPtr);
 				      if(maResult == MA_SUCCESS)
 					{
 					  if(plugin.audioProcess)
@@ -534,9 +594,11 @@ main(int argc, char **argv)
 					      audioBuffer.millisecondsElapsedSinceLastCall =
 						audioProcessCallTime - lastAudioProcessCallTime;
 					      lastAudioProcessCallTime = audioProcessCallTime;
-					      
+
 					      audioBuffer.outputBuffer[0] = writePtr;
 					      audioBuffer.outputBuffer[1] = (u8 *)writePtr + sizeof(s16);
+					      audioBuffer.inputBuffer[0] = readPtr;
+					      audioBuffer.inputBuffer[1] = readPtr;
 					      audioBuffer.framesToWrite = framesToWrite;
 					      plugin.audioProcess(&pluginMemory, &audioBuffer);
 
@@ -561,20 +623,23 @@ main(int argc, char **argv)
 					    }
 
 					  maResult = ma_pcm_rb_commit_write(&maOutputRingBuffer, framesToWrite);
+					  maResult = ma_pcm_rb_commit_read(&maInputRingBuffer, framesToWrite);
 					  if(maResult == MA_SUCCESS)
 					    {
-					      //fprintf(stdout, "wrote %u frames\n", framesToWrite);
+					      fprintf(stdout, "wrote %u frames\n", framesToWrite);
 					      framesRemaining -= framesToWrite;
 					    }
 					  else
 					    {
-					      fprintf(stderr, "ERROR: ma_pcm_rb_commit_write failed: %s\n",
+					      fprintf(stderr,
+						      "ERROR: audioProcess: ma_pcm_rb_commit_write failed: %s\n",
 						      ma_result_description(maResult));
 					    }
 					}
 				      else
 					{
-					  fprintf(stderr, "ERROR: ma_pcm_rb_acquire_write failed: %s\n",
+					  fprintf(stderr,
+						  "ERROR: audioProcess: ma_pcm_rb_acquire_write failed: %s\n",
 						  ma_result_description(maResult));
 					}
 				    }
@@ -587,6 +652,7 @@ main(int argc, char **argv)
 				  frameElapsedTime = frameEndTime - frameStartTime;
 				}
 
+			      ma_device_stop(&maDevice);
 			      ma_device_uninit(&maDevice);
 			    }
 

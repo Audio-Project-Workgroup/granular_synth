@@ -225,7 +225,7 @@ prepareToPlay(double sampleRate, int samplesPerBlock)
   // pluginMemory.platformAPI.wideMulFloats	 = wideMulFloats;
   // pluginMemory.platformAPI.wideMulInts		 = wideMulInts;
 
-  usz loggerMemorySize = KILOBYTES(32);
+  usz loggerMemorySize = KILOBYTES(512);
   loggerMemory = calloc(loggerMemorySize, 1);
   loggerArena = arenaBegin(loggerMemory, loggerMemorySize);
 
