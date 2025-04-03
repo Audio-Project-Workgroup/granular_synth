@@ -134,7 +134,22 @@ stringListPushFormatV(Arena *arena, String8List *list, char *fmt, va_list vaArgs
   stringListPush(arena, list, string);
 }
 
+// string functions
+inline bool
+stringsAreEqual(String8 s0, String8 s1)
+{
+  bool result = s0.size == s1.size;
+  if(result)
+    {
+      u8 *s0At = s0.str;
+      u8 *s1At = s1.str;
+      for(u32 i = 0; result && i < s0.size; ++i, ++s0At, ++s1At)
+	{
+	  result = *s0At == *s1At;
+	}
+    }
 
-
+  return(result);
+}
   
 

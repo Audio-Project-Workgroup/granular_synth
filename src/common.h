@@ -246,6 +246,14 @@ struct PluginAudioBuffer
 {
   u64 millisecondsElapsedSinceLastCall;
 
+  String8 outputDeviceNames[32];
+  u32 outputDeviceCount;
+  u32 selectedOutputDeviceIndex;
+
+  String8 inputDeviceNames[32];
+  u32 inputDeviceCount;
+  u32 selectedInputDeviceIndex;
+
   AudioFormat outputFormat;
   void *outputBuffer[2];
   u32 outputSampleRate;

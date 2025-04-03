@@ -15,9 +15,6 @@ struct SharedRingBuffer
   volatile u32 queuedCount;
 };
 
-// NOTE: we can't use this for ring buffer reading/writing everywhere because juce doesn't give us simd-aligned
-//       input buffers. Maybe it's on them, maybe it's on daw people. But come on. SSE came out over 25 years ago.
-//       What gives? Aligning allocated memory is super easy.
 inline void
 copyFloatArrayWide(r32 *destInit, r32 *srcInit, u32 count)
 {

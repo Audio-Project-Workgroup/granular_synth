@@ -33,6 +33,13 @@
 #include "render.cpp"
 #include "onnx.cpp"
 
+static ma_device_info *maPlaybackInfos;
+static u32 maPlaybackCount;
+static u32 maPlaybackIndex;
+static ma_device_info *maCaptureInfos;
+static u32 maCaptureCount;
+static u32 maCaptureIndex;
+
 static PluginInput *newInput;
 static GLFWcursor *standardCursor;
 static GLFWcursor *hResizeCursor;
@@ -144,39 +151,51 @@ glfwMouseButtonCallback(GLFWwindow *window, int button, int action, int mods)
 #define SR 48000
 #define CHANNELS 2
 
+struct MACallbackUserData
+{
+  ma_pcm_rb *outputBuffer;
+  ma_pcm_rb *inputBuffer;
+};
+
 void
 maDataCallback(ma_device *pDevice, void *pOutput, const void *pInput, ma_uint32 frameCount)
 {  
-  ma_pcm_rb *buffer = (ma_pcm_rb *)pDevice->pUserData;
-  if(buffer)
+  //ma_pcm_rb *buffer = (ma_pcm_rb *)pDevice->pUserData;
+
+  MACallbackUserData *buffers = (MACallbackUserData *)pDevice->pUserData;
+  if(buffers)
     {
-      ma_uint32 framesRemaining = frameCount;
-      while(framesRemaining)
+      ma_pcm_rb *buffer = buffers->outputBuffer;
+      if(buffer)
 	{
-	  void *srcBuffer = 0;
-	  ma_uint32 framesToRead = framesRemaining;
-	  ma_result result = ma_pcm_rb_acquire_read(buffer, &framesToRead, &srcBuffer);
-	  if(result == MA_SUCCESS)
+	  ma_uint32 framesRemaining = frameCount;
+	  while(framesRemaining)
 	    {
-	      usz bytesToRead = CHANNELS*framesToRead*sizeof(s16);
-	      memcpy(pOutput, srcBuffer, bytesToRead);
-	      
-	      result = ma_pcm_rb_commit_read(buffer, framesToRead);
+	      void *srcBuffer = 0;
+	      ma_uint32 framesToRead = framesRemaining;
+	      ma_result result = ma_pcm_rb_acquire_read(buffer, &framesToRead, &srcBuffer);
 	      if(result == MA_SUCCESS)
 		{
-		  framesRemaining -= framesToRead;
-		  pOutput = (u8 *)pOutput + bytesToRead;		 		 
+		  usz bytesToRead = CHANNELS*framesToRead*sizeof(s16);
+		  memcpy(pOutput, srcBuffer, bytesToRead);
+	      
+		  result = ma_pcm_rb_commit_read(buffer, framesToRead);
+		  if(result == MA_SUCCESS)
+		    {
+		      framesRemaining -= framesToRead;
+		      pOutput = (u8 *)pOutput + bytesToRead;		 		 
+		    }
+		  else
+		    {
+		      //fprintf(stderr, "ERROR: ma_pcm_rb_commit_read failed: %s\n", ma_result_description(result));
+		    }
 		}
 	      else
 		{
-		  //fprintf(stderr, "ERROR: ma_pcm_rb_commit_read failed: %s\n", ma_result_description(result));
+		  //fprintf(stderr, "ERROR: ma_pcm_rb_acquire_read failed: %s\n", ma_result_description(result));
 		}
-	    }
-	  else
-	    {
-	      //fprintf(stderr, "ERROR: ma_pcm_rb_acquire_read failed: %s\n", ma_result_description(result));
-	    }
-	}     
+	    }     
+	}
     }
 }
 
@@ -291,215 +310,294 @@ main(int argc, char **argv)
 	      audioBuffer.outputStride = 2*sizeof(s16);
 	      audioBuffer.midiMessageCount = 0; // TODO: send midi messages to the plugin
 	      audioBuffer.midiBuffer = (u8 *)calloc(KILOBYTES(1), 1);
-	  
-	      ma_pcm_rb maRingBuffer;
-	      if(ma_pcm_rb_init(ma_format_s16, CHANNELS, audioBufferFrameCount, audioBufferData, NULL, &maRingBuffer) == MA_SUCCESS)
+
+	      ma_context maContext;
+	      if(ma_context_init(NULL, 0, NULL, &maContext) == MA_SUCCESS)
 		{
-		  ASSERT(ma_pcm_rb_seek_write(&maRingBuffer, audioBufferFrameCount/10) == MA_SUCCESS);	     
-
-		  // TODO: the host application is currently hard-coded to request an output device
-		  //       which is 48kHz, stereo, and 16-bit-per-sample. Miniaudio can iterate over
-		  //       output devices, so we should use that to make a device-selection interface.
-		  ma_device_config maConfig = ma_device_config_init(ma_device_type_playback);
-		  maConfig.playback.format = maRingBuffer.format;
-		  maConfig.playback.channels = maRingBuffer.channels;
-		  maConfig.sampleRate = SR;
-		  maConfig.dataCallback = maDataCallback;
-		  maConfig.pUserData = &maRingBuffer;
-
-		  // TODO: this is about the lowest latency I could get on my machine while
-		  //       avoiding buffer underflows. Putting the audioProcess() call on a
-		  //       separate thread that doesn't have to wait for the monitor vblank
-		  //       will almost certainly enable us to get lower latency, but I don't
-		  //       want to introduce that extra complexity just yet. -Ry
-		  r32 targetLatencyMs = 30.f;
-		  u32 targetLatencySamples = (u32)(targetLatencyMs*(r32)SR/1000.f);
-
-		  ma_device maDevice;
-		  if(ma_device_init(NULL, &maConfig, &maDevice) == MA_SUCCESS)
+		  ma_device_info maDefaultPlaybackDeviceInfo;
+		  ma_device_info maDefaultCaptureDeviceInfo;
+		  
+		  if((ma_context_get_devices(&maContext, &maPlaybackInfos, &maPlaybackCount,
+					    &maCaptureInfos, &maCaptureCount) == MA_SUCCESS) &&
+		     (ma_context_get_device_info(&maContext, ma_device_type_playback, NULL,
+						 &maDefaultPlaybackDeviceInfo) == MA_SUCCESS) &&
+		     (ma_context_get_device_info(&maContext, ma_device_type_capture, NULL,
+						 &maDefaultCaptureDeviceInfo) == MA_SUCCESS))
 		    {
-		      ma_device_start(&maDevice);
-
-		      // main loop
-
-		      u64 frameElapsedTime = 0;
-		      u64 lastAudioProcessCallTime = 0;
-		      while(!glfwWindowShouldClose(window))
+		      // NOTE: enumerate devices, get default device indices
+		      for(u32 iPlayback = 0; iPlayback < maPlaybackCount; ++iPlayback)
 			{
-			  u64 frameStartTime = readOSTimer();
-			  
-			  // reload plugin
+			  //printf("%u: %s", iPlayback, maPlaybackInfos[iPlayback].name);
+			  String8 deviceStr = STR8_CSTR(maPlaybackInfos[iPlayback].name);
+			  ASSERT(audioBuffer.outputDeviceCount < ARRAY_COUNT(audioBuffer.outputDeviceNames));
+			  audioBuffer.outputDeviceNames[audioBuffer.outputDeviceCount] = deviceStr;
+			  if(stringsAreEqual(deviceStr, STR8_CSTR(maDefaultPlaybackDeviceInfo.name)))
+			    {
+			      maPlaybackIndex = iPlayback;
+			      audioBuffer.selectedOutputDeviceIndex = audioBuffer.outputDeviceCount;
+				//printf("(default)");
+			    }
+			    //printf("\n");
+
+			    ++audioBuffer.outputDeviceCount;
+			}
+		      for(u32 iCapture = 0; iCapture < maCaptureCount; ++iCapture)
+			{
+			  //printf("%u: %s", iCapture, maCaptureInfos[iCapture].name);
+			  String8 deviceStr = STR8_CSTR(maCaptureInfos[iCapture].name);
+			  ASSERT(audioBuffer.inputDeviceCount < ARRAY_COUNT(audioBuffer.inputDeviceNames));
+			  audioBuffer.inputDeviceNames[audioBuffer.inputDeviceCount] = deviceStr;
+			  if(stringsAreEqual(deviceStr, STR8_CSTR(maDefaultCaptureDeviceInfo.name)))
+			    {
+			      maCaptureIndex = iCapture;
+			      audioBuffer.selectedInputDeviceIndex = audioBuffer.inputDeviceCount;
+			      //printf("(default)");
+			    }
+			  //printf("\n");
+
+			  ++audioBuffer.inputDeviceCount;
+			}
 		      
-			  u64 newWriteTime = getLastWriteTimeU64(PLUGIN_PATH);
-			  if(newWriteTime != plugin.lastWriteTime)
+		      ma_pcm_rb maOutputRingBuffer, maInputRingBuffer;
+		      if((ma_pcm_rb_init(ma_format_s16, CHANNELS, audioBufferFrameCount, audioBufferData, NULL,
+					 &maOutputRingBuffer) == MA_SUCCESS) &&
+			 (ma_pcm_rb_init(ma_format_s16, CHANNELS, audioBufferFrameCount, audioBufferData, NULL,
+					 &maInputRingBuffer) == MA_SUCCESS))
+			{
+			  ASSERT(ma_pcm_rb_seek_write(&maOutputRingBuffer, audioBufferFrameCount/10) == MA_SUCCESS);
+			  ASSERT(ma_pcm_rb_seek_write(&maInputRingBuffer, audioBufferFrameCount/10) == MA_SUCCESS);
+
+			  MACallbackUserData maCallbackUserData = {&maOutputRingBuffer, &maInputRingBuffer};
+
+			  // TODO: the host application is currently hard-coded to request an output device
+			  //       which is 48kHz, stereo, and 16-bit-per-sample. Miniaudio can iterate over
+			  //       output devices, so we should use that to make a device-selection interface.
+			  ma_device_config maConfig = ma_device_config_init(ma_device_type_duplex);
+			  maConfig.playback.format = maOutputRingBuffer.format;
+			  maConfig.playback.channels = maOutputRingBuffer.channels;
+			  maConfig.capture.format = maInputRingBuffer.format;
+			  maConfig.capture.channels = maInputRingBuffer.channels;
+			  maConfig.sampleRate = SR;
+			  maConfig.dataCallback = maDataCallback;
+			  //maConfig.pUserData = &maOutputRingBuffer;
+			  maConfig.pUserData = &maCallbackUserData;
+
+			  // TODO: this is about the lowest latency I could get on my machine while
+			  //       avoiding buffer underflows. Putting the audioProcess() call on a
+			  //       separate thread that doesn't have to wait for the monitor vblank
+			  //       will almost certainly enable us to get lower latency, but I don't
+			  //       want to introduce that extra complexity just yet. -Ry
+			  r32 targetLatencyMs = 30.f;
+			  u32 targetLatencySamples = (u32)(targetLatencyMs*(r32)SR/1000.f);
+
+			  ma_device maDevice;
+			  if(ma_device_init(NULL, &maConfig, &maDevice) == MA_SUCCESS)
 			    {
-			      unloadPluginCode(&plugin);
-			      for(u32 tryIndex = 0; !plugin.isValid && (tryIndex < 10); ++tryIndex)
+			      ma_device_start(&maDevice);
+
+			      // main loop
+
+			      u64 frameElapsedTime = 0;
+			      u64 lastAudioProcessCallTime = 0;
+			      while(!glfwWindowShouldClose(window))
 				{
-				  plugin = loadPluginCode(PLUGIN_PATH);
-				  msecWait(5);
-				}			  
-			    }		      
-
-			  // handle input
-
-			  int framebufferWidth, framebufferHeight;
-			  glfwGetFramebufferSize(window, &framebufferWidth, &framebufferHeight);
-
-			  for(u32 buttonIndex = 0; buttonIndex < MouseButton_COUNT; ++buttonIndex)
-			    {
-			      newInput->mouseState.buttons[buttonIndex].halfTransitionCount = 0;
-			      newInput->mouseState.buttons[buttonIndex].endedDown =
-				oldInput->mouseState.buttons[buttonIndex].endedDown;
-			    }
-			  for(u32 keyIndex = 0; keyIndex < KeyboardButton_COUNT; ++keyIndex)
-			    {
-			      newInput->keyboardState.keys[keyIndex].halfTransitionCount = 0;
-			      newInput->keyboardState.keys[keyIndex].endedDown =
-				oldInput->keyboardState.keys[keyIndex].endedDown;
-			    }
-			  for(u32 modifierIndex = 0; modifierIndex < KeyboardModifier_COUNT; ++modifierIndex)
-			    {
-			      newInput->keyboardState.modifiers[modifierIndex].halfTransitionCount = 0;
-			      newInput->keyboardState.modifiers[modifierIndex].endedDown =
-				oldInput->keyboardState.modifiers[modifierIndex].endedDown;
-			    }
-
-			  // TODO: what's the difference between window size and framebuffer size? do we need both?
-			  //int windowWidth, windowHeight;
-			  //glfwGetWindowSize(window, &windowWidth, &windowHeight);
+				  u64 frameStartTime = readOSTimer();
 			  
-			  newInput->frameMillisecondsElapsed = frameElapsedTime;			  
-
-			  // render new frame			  
-
-			  glViewport(0, 0, framebufferWidth, framebufferHeight);
-			  glScissor(0, 0, framebufferWidth, framebufferHeight);
-
-			  glClearColor(0.2f, 0.2f, 0.2f, 0.f);
-			  glClear(GL_COLOR_BUFFER_BIT);		      
-
-			  r32 targetAspectRatio = 16.f/9.f;
-			  r32 windowAspectRatio = (r32)framebufferWidth/(r32)framebufferHeight;
-			  v2 viewportMin, viewportDim;
-			  if(windowAspectRatio < targetAspectRatio)
-			    {
-			      // NOTE: width constrained
-			      viewportDim.x = (r32)framebufferWidth;
-			      viewportDim.y = viewportDim.x/targetAspectRatio;
-			      viewportMin = V2(0, ((r32)framebufferHeight - viewportDim.y)*0.5f);
-			    }
-			  else
-			    {
-			      // NOTE: height constrained
-			      viewportDim.y = (r32)framebufferHeight;
-			      viewportDim.x = viewportDim.y*targetAspectRatio;
-			      viewportMin = V2(((r32)framebufferWidth - viewportDim.x)*0.5f, 0);
-			    }
-		      		          
-			  commands.windowResized = (commands.widthInPixels != (u32)viewportDim.x ||
-						    commands.heightInPixels != (u32)viewportDim.y);
-			  commands.widthInPixels = (u32)viewportDim.x;
-			  commands.heightInPixels = (u32)viewportDim.y;
-			  
-			  glViewport((GLint)viewportMin.x, (GLint)viewportMin.y,
-				     (GLsizei)viewportDim.x, (GLsizei)viewportDim.y);
-			  glScissor((GLint)viewportMin.x, (GLint)viewportMin.y,
-				    (GLsizei)viewportDim.x, (GLsizei)viewportDim.y);
-
-			  GL_PRINT_ERROR("GL ERROR: %u at frame start\n");
-
-			  double mouseX, mouseY;
-			  glfwGetCursorPos(window, &mouseX, &mouseY);
-			  newInput->mouseState.position = V2(mouseX, (r64)framebufferHeight - mouseY) - viewportMin;
-			  //printf("mouseP: (%.2f, %.2f)\n", newInput->mouseState.position.x, newInput->mouseState.position.y);
-
-			  if(plugin.renderNewFrame)
-			    {
-			      plugin.renderNewFrame(&pluginMemory, oldInput, &commands);
-			      glfwSetCursorState(window, commands.cursorState);
-			      renderCommands(&commands);
-			      
-			      for(String8Node *node = pluginMemory.logger->log.first; node; node = node->next)
-				{
-				  String8 string = node->string;
-				  if(string.str)
-				    {  
-				      fwrite(string.str, sizeof(*string.str), string.size, stdout);
-				      fprintf(stdout, "\n");
-				    }
-				}
-
-			      pluginMemory.logger->log.first = 0;
-			      arenaEnd(pluginMemory.logger->logArena);
-			    }
-
-			  glfwSwapBuffers(window);
-			  glfwPollEvents();		      	     		      
-
-			  // process audio
-
-			  s32 maRBPtrDistance = ma_pcm_rb_pointer_distance(&maRingBuffer);
-			  //fprintf(stdout, "\nptr distance: %d\n", maRBPtrDistance);
-
-			  // TODO: this timing code was hastily hacked together and should be thought out
-			  //       more and made better
-			  u32 framesRemaining = (maRBPtrDistance < 2*(s32)targetLatencySamples) ?
-			    targetLatencySamples : 0;		      
-			  while(framesRemaining)
-			    {
-			      void *writePtr = 0;
-			      u32 framesToWrite = framesRemaining;
-			      ma_result maResult = ma_pcm_rb_acquire_write(&maRingBuffer, &framesToWrite, &writePtr);
-			      if(maResult == MA_SUCCESS)
-				{
-				  if(plugin.audioProcess)
+				  // reload plugin
+		      
+				  u64 newWriteTime = getLastWriteTimeU64(PLUGIN_PATH);
+				  if(newWriteTime != plugin.lastWriteTime)
 				    {
-				      u64 audioProcessCallTime = readOSTimer();
-				      audioBuffer.millisecondsElapsedSinceLastCall =
-					audioProcessCallTime - lastAudioProcessCallTime;
-				      lastAudioProcessCallTime = audioProcessCallTime;
+				      unloadPluginCode(&plugin);
+				      for(u32 tryIndex = 0; !plugin.isValid && (tryIndex < 10); ++tryIndex)
+					{
+					  plugin = loadPluginCode(PLUGIN_PATH);
+					  msecWait(5);
+					}			  
+				    }		      
 
-				      //audioBuffer.buffer = writePtr;
-				      audioBuffer.outputBuffer[0] = writePtr;
-				      audioBuffer.outputBuffer[1] = (u8 *)writePtr + sizeof(s16);
-				      audioBuffer.framesToWrite = framesToWrite;
-				      plugin.audioProcess(&pluginMemory, &audioBuffer);
+				  // handle input
+
+				  int framebufferWidth, framebufferHeight;
+				  glfwGetFramebufferSize(window, &framebufferWidth, &framebufferHeight);
+
+				  for(u32 buttonIndex = 0; buttonIndex < MouseButton_COUNT; ++buttonIndex)
+				    {
+				      newInput->mouseState.buttons[buttonIndex].halfTransitionCount = 0;
+				      newInput->mouseState.buttons[buttonIndex].endedDown =
+					oldInput->mouseState.buttons[buttonIndex].endedDown;
+				    }
+				  for(u32 keyIndex = 0; keyIndex < KeyboardButton_COUNT; ++keyIndex)
+				    {
+				      newInput->keyboardState.keys[keyIndex].halfTransitionCount = 0;
+				      newInput->keyboardState.keys[keyIndex].endedDown =
+					oldInput->keyboardState.keys[keyIndex].endedDown;
+				    }
+				  for(u32 modifierIndex = 0; modifierIndex < KeyboardModifier_COUNT; ++modifierIndex)
+				    {
+				      newInput->keyboardState.modifiers[modifierIndex].halfTransitionCount = 0;
+				      newInput->keyboardState.modifiers[modifierIndex].endedDown =
+					oldInput->keyboardState.modifiers[modifierIndex].endedDown;
 				    }
 
-				  maResult = ma_pcm_rb_commit_write(&maRingBuffer, framesToWrite);
-				  if(maResult == MA_SUCCESS)
+				  // TODO: what's the difference between window size and framebuffer size? do we need both?
+				  //int windowWidth, windowHeight;
+				  //glfwGetWindowSize(window, &windowWidth, &windowHeight);
+			  
+				  newInput->frameMillisecondsElapsed = frameElapsedTime;			  
+
+				  // render new frame			  
+
+				  glViewport(0, 0, framebufferWidth, framebufferHeight);
+				  glScissor(0, 0, framebufferWidth, framebufferHeight);
+
+				  glClearColor(0.2f, 0.2f, 0.2f, 0.f);
+				  glClear(GL_COLOR_BUFFER_BIT);		      
+
+				  r32 targetAspectRatio = 16.f/9.f;
+				  r32 windowAspectRatio = (r32)framebufferWidth/(r32)framebufferHeight;
+				  v2 viewportMin, viewportDim;
+				  if(windowAspectRatio < targetAspectRatio)
 				    {
-				      //fprintf(stdout, "wrote %u frames\n", framesToWrite);
-				      framesRemaining -= framesToWrite;
+				      // NOTE: width constrained
+				      viewportDim.x = (r32)framebufferWidth;
+				      viewportDim.y = viewportDim.x/targetAspectRatio;
+				      viewportMin = V2(0, ((r32)framebufferHeight - viewportDim.y)*0.5f);
 				    }
 				  else
 				    {
-				      fprintf(stderr, "ERROR: ma_pcm_rb_commit_write failed: %s\n",
-					      ma_result_description(maResult));
+				      // NOTE: height constrained
+				      viewportDim.y = (r32)framebufferHeight;
+				      viewportDim.x = viewportDim.y*targetAspectRatio;
+				      viewportMin = V2(((r32)framebufferWidth - viewportDim.x)*0.5f, 0);
 				    }
+		      		          
+				  commands.windowResized = (commands.widthInPixels != (u32)viewportDim.x ||
+							    commands.heightInPixels != (u32)viewportDim.y);
+				  commands.widthInPixels = (u32)viewportDim.x;
+				  commands.heightInPixels = (u32)viewportDim.y;
+			  
+				  glViewport((GLint)viewportMin.x, (GLint)viewportMin.y,
+					     (GLsizei)viewportDim.x, (GLsizei)viewportDim.y);
+				  glScissor((GLint)viewportMin.x, (GLint)viewportMin.y,
+					    (GLsizei)viewportDim.x, (GLsizei)viewportDim.y);
+
+				  GL_PRINT_ERROR("GL ERROR: %u at frame start\n");
+
+				  double mouseX, mouseY;
+				  glfwGetCursorPos(window, &mouseX, &mouseY);
+				  newInput->mouseState.position = V2(mouseX, (r64)framebufferHeight - mouseY) - viewportMin;
+				  //printf("mouseP: (%.2f, %.2f)\n", newInput->mouseState.position.x, newInput->mouseState.position.y);
+
+				  if(plugin.renderNewFrame)
+				    {
+				      plugin.renderNewFrame(&pluginMemory, oldInput, &commands);
+				      glfwSetCursorState(window, commands.cursorState);
+				      renderCommands(&commands);
+			      
+				      for(String8Node *node = pluginMemory.logger->log.first; node; node = node->next)
+					{
+					  String8 string = node->string;
+					  if(string.str)
+					    {  
+					      fwrite(string.str, sizeof(*string.str), string.size, stdout);
+					      fprintf(stdout, "\n");
+					    }
+					}
+
+				      pluginMemory.logger->log.first = 0;
+				      arenaEnd(pluginMemory.logger->logArena);
+				    }
+
+				  glfwSwapBuffers(window);
+				  glfwPollEvents();		      	     		      
+
+				  // process audio
+
+				  s32 maOutputRBPtrDistance = ma_pcm_rb_pointer_distance(&maOutputRingBuffer);
+				  //fprintf(stdout, "\nptr distance: %d\n", maRBPtrDistance);
+
+				  // TODO: this timing code was hastily hacked together and should be thought out
+				  //       more and made better
+				  u32 framesRemaining = (maOutputRBPtrDistance < 2*(s32)targetLatencySamples) ?
+				    targetLatencySamples : 0;		      
+				  while(framesRemaining)
+				    {
+				      void *writePtr = 0;
+				      u32 framesToWrite = framesRemaining;
+				      ma_result maResult = ma_pcm_rb_acquire_write(&maOutputRingBuffer, &framesToWrite, &writePtr);
+				      if(maResult == MA_SUCCESS)
+					{
+					  if(plugin.audioProcess)
+					    {
+					      u64 audioProcessCallTime = readOSTimer();
+					      audioBuffer.millisecondsElapsedSinceLastCall =
+						audioProcessCallTime - lastAudioProcessCallTime;
+					      lastAudioProcessCallTime = audioProcessCallTime;
+					      
+					      audioBuffer.outputBuffer[0] = writePtr;
+					      audioBuffer.outputBuffer[1] = (u8 *)writePtr + sizeof(s16);
+					      audioBuffer.framesToWrite = framesToWrite;
+					      plugin.audioProcess(&pluginMemory, &audioBuffer);
+
+					      // TODO: test this works
+					      if(audioBuffer.selectedOutputDeviceIndex != maPlaybackIndex)
+						{
+						  ma_device_stop(&maDevice);
+						  ma_device_uninit(&maDevice);
+
+						  maPlaybackIndex = audioBuffer.selectedOutputDeviceIndex;
+						  maConfig.playback.pDeviceID = &maPlaybackInfos[maPlaybackIndex].id;
+						  if(audioBuffer.selectedInputDeviceIndex != maCaptureIndex)
+						    {
+						      maCaptureIndex = audioBuffer.selectedInputDeviceIndex;
+						      maConfig.capture.pDeviceID = &maCaptureInfos[maCaptureIndex].id;
+						    }
+
+						  ASSERT(ma_device_init(&maContext, &maConfig, &maDevice) ==
+							 MA_SUCCESS);
+						  ma_device_start(&maDevice);
+						}
+					    }
+
+					  maResult = ma_pcm_rb_commit_write(&maOutputRingBuffer, framesToWrite);
+					  if(maResult == MA_SUCCESS)
+					    {
+					      //fprintf(stdout, "wrote %u frames\n", framesToWrite);
+					      framesRemaining -= framesToWrite;
+					    }
+					  else
+					    {
+					      fprintf(stderr, "ERROR: ma_pcm_rb_commit_write failed: %s\n",
+						      ma_result_description(maResult));
+					    }
+					}
+				      else
+					{
+					  fprintf(stderr, "ERROR: ma_pcm_rb_acquire_write failed: %s\n",
+						  ma_result_description(maResult));
+					}
+				    }
+
+				  PluginInput *temp = newInput;
+				  newInput = oldInput;
+				  oldInput = temp;
+
+				  u64 frameEndTime = readOSTimer();
+				  frameElapsedTime = frameEndTime - frameStartTime;
 				}
-			      else
-				{
-				  fprintf(stderr, "ERROR: ma_pcm_rb_acquire_write failed: %s\n",
-					  ma_result_description(maResult));
-				}
+
+			      ma_device_uninit(&maDevice);
 			    }
 
-			  PluginInput *temp = newInput;
-			  newInput = oldInput;
-			  oldInput = temp;
-
-			  u64 frameEndTime = readOSTimer();
-			  frameElapsedTime = frameEndTime - frameStartTime;
-			}
-
-		      ma_device_uninit(&maDevice);
+			  ma_pcm_rb_uninit(&maOutputRingBuffer);
+			  ma_pcm_rb_uninit(&maInputRingBuffer);
+			}		      
 		    }
 
-		  ma_pcm_rb_uninit(&maRingBuffer);
+		  ma_context_uninit(&maContext);
 		}
-
+	      
 	      onnxState.api->ReleaseSession(onnxState.session);
 	      onnxState.api->ReleaseEnv(onnxState.env);
 	    }
