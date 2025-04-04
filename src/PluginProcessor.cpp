@@ -197,6 +197,7 @@ prepareToPlay(double sampleRate, int samplesPerBlock)
 
   pluginMemory = {};
   pluginMemory.memory = calloc(MEGABYTES(512), 1);
+  pluginMemory.host = PluginHost_daw;
   pluginMemory.platformAPI.readEntireFile = juceReadEntireFile;
   pluginMemory.platformAPI.writeEntireFile = juceWriteEntireFile;
   pluginMemory.platformAPI.freeFileMemory = juceFreeFileMemory;

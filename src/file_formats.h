@@ -581,12 +581,14 @@ getTextRectangle(LoadedFont *font, char *text, u32 windowWidth, u32 windowHeight
 }
 
 inline v2
-getTextDim(LoadedFont *font, u8 *text)
+getTextDim(LoadedFont *font, String8 text)
 {
   v2 result = {};
 
-  u8 *at = text;
-  while(*at)
+  u8 *at = text.str;
+  u64 textSize = text.size;
+  //while(*at)
+  for(u64 i = 0; i < textSize; ++i)
     {
       u8 c = *at;
       u32 glyphIndex = c - font->characterRange.min;

@@ -90,11 +90,26 @@ struct PluginLogger
 extern PlatformAPI globalPlatform;
 extern PluginLogger *globalLogger;
 
+enum PluginHost
+{
+  PluginHost_executable,
+  PluginHost_daw,
+};
+
 struct PluginMemory
 {
   void *memory;
   
   u64 osTimerFreq;
+  PluginHost host;
+
+  String8 outputDeviceNames[32];
+  u32 outputDeviceCount;
+  u32 selectedOutputDeviceIndex;
+
+  String8 inputDeviceNames[32];
+  u32 inputDeviceCount;
+  u32 selectedInputDeviceIndex;
   
   PlatformAPI platformAPI;
 
@@ -180,6 +195,7 @@ enum KeyboardButton
   KeyboardButton_x,
   KeyboardButton_y,
   KeyboardButton_z,
+  KeyboardButton_esc,
   KeyboardButton_tab,  
   KeyboardButton_backspace,
   KeyboardButton_minus,
@@ -245,15 +261,7 @@ struct MidiHeader
 struct PluginAudioBuffer
 {
   u64 millisecondsElapsedSinceLastCall;
-
-  String8 outputDeviceNames[32];
-  u32 outputDeviceCount;
-  u32 selectedOutputDeviceIndex;
-
-  String8 inputDeviceNames[32];
-  u32 inputDeviceCount;
-  u32 selectedInputDeviceIndex;
-
+  
   AudioFormat outputFormat;
   void *outputBuffer[2];
   u32 outputSampleRate;

@@ -124,6 +124,12 @@ struct PluginParameter
 #include "ring_buffer.h"
 #include "internal_granulator.h"
 
+enum PluginMode
+{
+  PluginMode_editor,
+  PluginMode_menu,
+};
+
 struct PlayingSound
 {  
   LoadedSound sound;
@@ -137,6 +143,17 @@ struct PluginState
   Arena permanentArena;
   Arena frameArena;
   Arena loadArena;
+
+  PluginHost pluginHost;
+  PluginMode pluginMode;
+
+  String8 outputDeviceNames[32];
+  u32 outputDeviceCount;
+  u32 selectedOutputDeviceIndex;
+
+  String8 inputDeviceNames[32];
+  u32 inputDeviceCount;
+  u32 selectedInputDeviceIndex;
 
   LoadedGrainPackfile loadedGrainPackfile;
   FileGrainState silo;
@@ -155,7 +172,8 @@ struct PluginState
 
   //UILayout layout;
   UIContext uiContext;
-  UIPanel *rootPanel;  
+  UIPanel *rootPanel;
+  UIPanel *menuPanel;
 
   GrainManager grainManager;
   //GrainBuffer grainBuffer;

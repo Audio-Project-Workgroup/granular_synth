@@ -40,9 +40,10 @@
      - display the state of grains and the grain buffer
      - make panel resizing not jank
 
-   - Parameters:
+   - Parameters (high priority):
      - more parameters
      - make parameters visible to the daw to enable parameter modification via automation
+     - parameter display number -> processing number transformation for nonlinear parameters
 
    - File Loading: (on hold)
      - more audio file formats (eg flac, ogg, mp3)
@@ -50,10 +51,10 @@
      - better samplerate conversion (ie FFT method (TODO: speed up fft and czt))
      - load in batches to pass to ML model (maybe)     
 
-   - MIDI:
+   - MIDI (high priority):
      - cc channel - parameter remapping at runtime
 
-   - Grains:
+   - Grains (high priority):
      - more grain parameters    
      - add grain post-processing effects like pitch-shifting, time-stretching and stereo-widening
 
@@ -104,6 +105,8 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 	      globalLogger = memoryBlock->logger;
 
 	      pluginState->osTimerFreq = memoryBlock->osTimerFreq;
+	      pluginState->pluginHost = memoryBlock->host;
+	      pluginState->pluginMode = PluginMode_editor;
 
 	      pluginState->permanentArena = arenaBegin((u8 *)memory + sizeof(PluginState), MEGABYTES(512));
 	      pluginState->frameArena = arenaSubArena(&pluginState->permanentArena, MEGABYTES(64));
@@ -227,7 +230,24 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 	      pluginState->parameters[PluginParameter_density].currentValue = 1.f;
 	      pluginState->parameters[PluginParameter_density].targetValue = 1.f;
 	      pluginState->parameters[PluginParameter_density].range = makeRange(0.1f, 20.f);
-	  
+
+	      // NOTE: devices
+	      pluginState->outputDeviceCount = memoryBlock->outputDeviceCount;
+	      pluginState->selectedOutputDeviceIndex = memoryBlock->selectedOutputDeviceIndex;
+	      for(u32 i = 0; i < pluginState->outputDeviceCount; ++i)
+		{
+		  pluginState->outputDeviceNames[i] =
+		    arenaPushString(&pluginState->permanentArena, memoryBlock->outputDeviceNames[i]);
+		}
+	      
+	      pluginState->inputDeviceCount = memoryBlock->inputDeviceCount;
+	      pluginState->selectedInputDeviceIndex = memoryBlock->selectedInputDeviceIndex;
+	      for(u32 i = 0; i < pluginState->inputDeviceCount; ++i)
+		{
+		  pluginState->inputDeviceNames[i] =
+		    arenaPushString(&pluginState->permanentArena, memoryBlock->inputDeviceNames[i]);
+		}
+
 	      // NOTE: grain buffer initialization
 	      u32 grainBufferCount = 48000;
 	      pluginState->grainBuffer = initializeGrainBuffer(pluginState, grainBufferCount);
@@ -290,18 +310,22 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 
 	      UIPanel *currentParentPanel = pluginState->rootPanel;
 	      UIPanel *bottom = makeUIPanel(currentParentPanel, &pluginState->permanentArena,
-					    UIAxis_x, 0.2f, "bottom", V4(0.094f, 0.149f, 0.102f, 1));
+					    UIAxis_x, 0.2f, STR8_LIT("bottom"), V4(0.094f, 0.149f, 0.102f, 1));
 	      UIPanel *top = makeUIPanel(currentParentPanel, &pluginState->permanentArena,
-					 UIAxis_x, 0.8f, "top");
+					 UIAxis_x, 0.8f, STR8_LIT("top"));
 	      UNUSED(bottom);
 	      	      
 	      currentParentPanel = top;
 	      UIPanel *left = makeUIPanel(currentParentPanel, &pluginState->permanentArena,
-					  UIAxis_x, 0.5f, "left", V4(0.094f, 0.102f, 0.149f, 1));
+					  UIAxis_x, 0.5f, STR8_LIT("left"), V4(0.094f, 0.102f, 0.149f, 1));
 	      UIPanel *right = makeUIPanel(currentParentPanel, &pluginState->permanentArena,
-					   UIAxis_x, 0.5f, "right", V4(0.149f, 0.102f, 0.094f, 1));
+					   UIAxis_x, 0.5f, STR8_LIT("right"), V4(0.149f, 0.102f, 0.094f, 1));
 	      UNUSED(left);
-	      UNUSED(right);	      	      
+	      UNUSED(right);
+
+	      pluginState->menuPanel = arenaPushStruct(&pluginState->permanentArena, UIPanel);
+	      pluginState->menuPanel->sizePercentOfParent = 1.f;
+	      pluginState->menuPanel->splitAxis = UIAxis_y;	  
 #if 0
 #if 1
 	      r32 *testModelInput = pluginState->loadedSound.sound.samples[0];
@@ -361,363 +385,402 @@ RENDER_NEW_FRAME(renderNewFrame)
       UIContext *uiContext = &pluginState->uiContext;
       uiContextNewFrame(uiContext, &input->mouseState, &input->keyboardState, renderCommands->windowResized);
       
-      TemporaryMemory scratchMemory = arenaBeginTemporaryMemory(&pluginState->frameArena, KILOBYTES(128));           
-      
-      // NOTE: non-leaf ui
-      for(UIPanel *panel = pluginState->rootPanel; panel; panel = uiPanelIteratorDepthFirstPreorder(panel).next)
+      TemporaryMemory scratchMemory = arenaBeginTemporaryMemory(&pluginState->frameArena, KILOBYTES(128));
+
+      if(pluginState->pluginHost == PluginHost_executable)
 	{
-	  Rect2 panelRect = uiComputeRectFromPanel(panel, screenRect, (Arena *)&scratchMemory);
-	  v2 panelDim = getDim(panelRect);
-
-	  if(panel->first)
+	  if(uiContext->escPressed)
 	    {
-	      UILayout *panelLayout = &panel->layout;
-	      uiBeginLayout(panelLayout, uiContext, panelRect);
-	  
-	      for(UIPanel *child = panel->first; child && child->next; child = child->next)
+	      pluginState->pluginMode = (PluginMode)!pluginState->pluginMode;
+	    }
+	}
+
+      if(pluginState->pluginMode == PluginMode_menu)
+	{
+	  UILayout *menuLayout = &pluginState->menuPanel->layout;
+	  uiBeginLayout(menuLayout, uiContext, screenRect, colorV4FromU32(0x04060EFF));
+	  renderPushQuad(renderCommands, screenRect, 0, 0, RenderLevel_background, menuLayout->root->color);
+
+	  v4 baseTextColor = colorV4FromU32(0xFFDEADFF);
+	  v4 selectedTextColor = colorV4FromU32(0xFFD700FF);
+	  //v4 selectedTextColor = V4(0, 1, 1, 1);
+
+	  r32 textScale = 0.45f;
+	  for(u32 outputDeviceIndex = 0; outputDeviceIndex < pluginState->outputDeviceCount; ++outputDeviceIndex)
+	    {
+	      v4 textColor = (outputDeviceIndex == pluginState->selectedOutputDeviceIndex) ? selectedTextColor : baseTextColor;
+	      String8 outputDeviceName = pluginState->outputDeviceNames[outputDeviceIndex];
+	      UIComm outputDevice = uiMakeSelectableTextElement(menuLayout, outputDeviceName, textScale, textColor);
+	    }
+
+	  for(u32 inputDeviceIndex = 0; inputDeviceIndex < pluginState->inputDeviceCount; ++inputDeviceIndex)
+	    {
+	      v4 textColor = (inputDeviceIndex == pluginState->selectedInputDeviceIndex) ? selectedTextColor : baseTextColor;
+	      String8 inputDeviceName = pluginState->inputDeviceNames[inputDeviceIndex];
+	      UIComm inputDevice = uiMakeSelectableTextElement(menuLayout, inputDeviceName, textScale, textColor);
+	    }
+
+	  renderPushUILayout(renderCommands, menuLayout);
+	  uiEndLayout(menuLayout);
+	}
+      else
+	{
+	  // NOTE: non-leaf ui
+	  for(UIPanel *panel = pluginState->rootPanel; panel; panel = uiPanelIteratorDepthFirstPreorder(panel).next)
+	    {
+	      Rect2 panelRect = uiComputeRectFromPanel(panel, screenRect, (Arena *)&scratchMemory);
+	      v2 panelDim = getDim(panelRect);
+
+	      if(panel->first)
 		{
-		  Rect2 childRect = uiComputeChildPanelRect(child, panelRect);
-		  Rect2 boundaryRect = childRect;
-		  UIAxis splitAxis = panel->splitAxis;
+		  UILayout *panelLayout = &panel->layout;
+		  uiBeginLayout(panelLayout, uiContext, panelRect);
+	  
+		  for(UIPanel *child = panel->first; child && child->next; child = child->next)
+		    {
+		      Rect2 childRect = uiComputeChildPanelRect(child, panelRect);
+		      Rect2 boundaryRect = childRect;
+		      UIAxis splitAxis = panel->splitAxis;
 
-		  if(splitAxis == UIAxis_x)
-		    {
-		      child->fringeFlags |= UIFringeFlag_right;
-		      child->next->fringeFlags |= UIFringeFlag_left;
-		    }
-		  else
-		    {
-		      child->fringeFlags |= UIFringeFlag_top;
-		      child->next->fringeFlags |= UIFringeFlag_bottom;
-		    }
+		      if(splitAxis == UIAxis_x)
+			{
+			  child->fringeFlags |= UIFringeFlag_right;
+			  child->next->fringeFlags |= UIFringeFlag_left;
+			}
+		      else
+			{
+			  child->fringeFlags |= UIFringeFlag_top;
+			  child->next->fringeFlags |= UIFringeFlag_bottom;
+			}
 		    
-		  boundaryRect.min.E[splitAxis] = boundaryRect.max.E[splitAxis];
-		  boundaryRect.min.E[splitAxis] -= 3;
-		  boundaryRect.max.E[splitAxis] += 3;
+		      boundaryRect.min.E[splitAxis] = boundaryRect.max.E[splitAxis];
+		      boundaryRect.min.E[splitAxis] -= 3;
+		      boundaryRect.max.E[splitAxis] += 3;
 	      
-		  UIComm hresize = uiMakeBox(&panel->layout, "hresize", boundaryRect,
-					     UIElementFlag_clickable |
-					     UIElementFlag_drawBackground |
-					     UIElementFlag_drawBorder);
-		  if(isInRectangle(boundaryRect, uiContext->mouseP.xy))
-		    {
-		      renderChangeCursorState(renderCommands,
-					      (splitAxis == UIAxis_x) ? CursorState_hArrow : CursorState_vArrow);
-		    }
-		  UIPanel *minChild = child;
-		  UIPanel *maxChild = child->next;		 
+		      UIComm hresize = uiMakeBox(&panel->layout, STR8_LIT("hresize"), boundaryRect,
+						 UIElementFlag_clickable |
+						 UIElementFlag_drawBackground |
+						 UIElementFlag_drawBorder);
+		      if(isInRectangle(boundaryRect, uiContext->mouseP.xy))
+			{
+			  renderChangeCursorState(renderCommands,
+						  (splitAxis == UIAxis_x) ? CursorState_hArrow : CursorState_vArrow);
+			}
+		      UIPanel *minChild = child;
+		      UIPanel *maxChild = child->next;		 
 
-		  if(hresize.flags & UICommFlag_pressed)
-		    {
-		      uiStoreDragData(hresize.element,
-				      V2(minChild->sizePercentOfParent, maxChild->sizePercentOfParent));
+		      if(hresize.flags & UICommFlag_pressed)
+			{
+			  uiStoreDragData(hresize.element,
+					  V2(minChild->sizePercentOfParent, maxChild->sizePercentOfParent));
+			}
+		      if(hresize.flags & UICommFlag_dragging)
+			{
+			  renderChangeCursorState(renderCommands,
+						  splitAxis == UIAxis_x ? CursorState_hArrow : CursorState_vArrow);
+		  
+			  v2 dragData = uiLoadDragData(hresize.element);
+			  v2 dragDelta = uiGetDragDelta(hresize.element);
+			  //printf("dragData: (%.2f, %.2f)\n", dragData.x, dragData.y);
+			  //printf("dragDelta: (%.2f, %.2f)\n", dragDelta.x, dragDelta.y);
+		  
+			  r32 minChildPercentPreDrag = dragData.x;
+			  r32 maxChildPercentPreDrag = dragData.y;
+			  r32 minChildPixelsPreDrag = minChildPercentPreDrag*panelDim.E[splitAxis];
+			  r32 maxChildPixelsPreDrag = maxChildPercentPreDrag*panelDim.E[splitAxis];
+			  r32 minChildPixelsPostDrag = minChildPixelsPreDrag + dragDelta.E[splitAxis];
+			  r32 maxChildPixelsPostDrag = maxChildPixelsPreDrag - dragDelta.E[splitAxis];
+			  r32 minChildPercentPostDrag = minChildPixelsPostDrag/panelDim.E[splitAxis];
+			  r32 maxChildPercentPostDrag = maxChildPixelsPostDrag/panelDim.E[splitAxis];
+			  minChild->sizePercentOfParent = clampToRange(minChildPercentPostDrag, 0, 1);
+			  maxChild->sizePercentOfParent = clampToRange(maxChildPercentPostDrag, 0, 1);
+			}	
 		    }
-		  if(hresize.flags & UICommFlag_dragging)
-		    {
-		      renderChangeCursorState(renderCommands,
-					      splitAxis == UIAxis_x ? CursorState_hArrow : CursorState_vArrow);
-		  
-		      v2 dragData = uiLoadDragData(hresize.element);
-		      v2 dragDelta = uiGetDragDelta(hresize.element);
-		      //printf("dragData: (%.2f, %.2f)\n", dragData.x, dragData.y);
-		      //printf("dragDelta: (%.2f, %.2f)\n", dragDelta.x, dragDelta.y);
-		  
-		      r32 minChildPercentPreDrag = dragData.x;
-		      r32 maxChildPercentPreDrag = dragData.y;
-		      r32 minChildPixelsPreDrag = minChildPercentPreDrag*panelDim.E[splitAxis];
-		      r32 maxChildPixelsPreDrag = maxChildPercentPreDrag*panelDim.E[splitAxis];
-		      r32 minChildPixelsPostDrag = minChildPixelsPreDrag + dragDelta.E[splitAxis];
-		      r32 maxChildPixelsPostDrag = maxChildPixelsPreDrag - dragDelta.E[splitAxis];
-		      r32 minChildPercentPostDrag = minChildPixelsPostDrag/panelDim.E[splitAxis];
-		      r32 maxChildPercentPostDrag = maxChildPixelsPostDrag/panelDim.E[splitAxis];
-		      minChild->sizePercentOfParent = clampToRange(minChildPercentPostDrag, 0, 1);
-		      maxChild->sizePercentOfParent = clampToRange(maxChildPercentPostDrag, 0, 1);
-		    }	
+
+		  renderPushUILayout(renderCommands, panelLayout);
+		  uiEndLayout(panelLayout);
 		}
+	    }      
+      
+	  // NOTE: leaf ui
+	  for(UIPanel *panel = pluginState->rootPanel; panel; panel = uiPanelIteratorDepthFirstPreorder(panel).next)
+	    {
+	      // NOTE: calculate rectangles
+	      Rect2 panelRect = uiComputeRectFromPanel(panel, screenRect, (Arena *)&scratchMemory);	  
+	  	  
+	      // NOTE: build ui
+	      if(!panel->first)
+		{
+		  //printf("panelRect:\n  min: (%.2f, %.2f)\n  max: (%.2f, %.2f)\n",
+		  //    panelRect.min.x, panelRect.min.y, panelRect.max.x, panelRect.max.y);
+	      
+		  renderPushQuad(renderCommands, panelRect, 0, 0, RenderLevel_background, panel->color);
+	      
+		  UILayout *panelLayout = &panel->layout;
+		  uiBeginLayout(panelLayout, uiContext, panelRect);
 
-	      renderPushUILayout(renderCommands, panelLayout);
-	      uiEndLayout(panelLayout);
+		  //printf("layoutRootRect:\n  min: (%.2f, %.2f)\n  max: (%.2f, %.2f)\n",
+		  //     panelLayout->root->region.min.x, panelLayout->root->region.min.y,
+		  //     panelLayout->root->region.max.x, panelLayout->root->region.max.y);
+
+		  UIComm text = uiMakeTextElement(panelLayout, panel->name, 1.5);
+		  UNUSED(text);
+
+		  // TODO: don't use strings to check which panel we are in
+		  if(stringsAreEqual(panel->name, STR8_LIT("left")))
+		    {
+		      UIComm volume = uiMakeSlider(panelLayout, STR8_LIT("volume"), V2(30.f, 30.f), UIAxis_y, 0.6f,
+						   &pluginState->parameters[PluginParameter_volume], V4(0.8f, 0.8f, 0.8f, 1));
+
+		      renderPushRectOutline(renderCommands, volume.element->parent->region, 2, RenderLevel_front,
+					    V4(1, 1, 0, 1));
+
+		      if(volume.flags & UICommFlag_hovering)
+			{
+			  volume.element->color = hadamard(volume.element->color, V4(1, 1, 0, 1));
+			}
+
+		      //r32 oldVolume = pluginReadFloatParameter(volume.element->fParam);
+		      //r32 newVolume = oldVolume;
+		      if(volume.flags & UICommFlag_dragging)
+			{
+			  if(volume.flags & UICommFlag_leftDragging)
+			    {	
+			      v2 dragDelta = uiGetDragDelta(volume.element);
+			      //printf("dragDelta: (%.2f, %.2f)\n", dragDelta.x, dragDelta.y);
+		      
+			      r32 newVolume = volume.element->fParamValueAtClick + dragDelta.y/getDim(volume.element->region).y;
+			      pluginSetFloatParameter(volume.element->fParam, newVolume);
+			    }
+			  else if(volume.flags & UICommFlag_minusPressed)
+			    {
+			      r32 oldVolume = pluginReadFloatParameter(volume.element->fParam);
+			      r32 newVolume = oldVolume - 0.02f;
+
+			      pluginSetFloatParameter(volume.element->fParam, newVolume);
+			    }
+			  else if(volume.flags & UICommFlag_plusPressed)
+			    {
+			      r32 oldVolume = pluginReadFloatParameter(volume.element->fParam);
+			      r32 newVolume = oldVolume + 0.02f;
+
+			      pluginSetFloatParameter(volume.element->fParam, newVolume);
+			    }
+			}		  		  
+		    }
+		  else if(stringsAreEqual(panel->name, STR8_LIT("right")))
+		    {
+		      //
+		      // play
+		      //
+		      {
+			v2 dim = getDim(panelLayout->regionRemaining);
+			r32 sizePOP = 0.15f;		    
+			r32 offsetPixels = 20.f;		    
+			v2 offset = offsetPixels*V2(1, 1);
+			UIComm play = uiMakeButton(panelLayout, STR8_LIT("play"), offset, -sizePOP,
+						   &pluginState->soundIsPlaying, V4(0, 0, 1, 1));
+		    
+			if(play.flags & UICommFlag_pressed)
+			  {
+			    bool oldPlay = pluginReadBooleanParameter(play.element->bParam);
+			    bool newPlay = !oldPlay;
+			    pluginSetBooleanParameter(play.element->bParam, newPlay);
+			    // TODO: stop doing the queue here: we don't want to have to synchronize grain (de)queueing
+			    //       across the audio and video threads (once we actually have them on their own threads)
+			    //queueAllGrainsFromFile(&pluginState->silo, &pluginState->loadedGrainPackfile);
+			  }		    
+		      }
+		  
+		      //
+		      // density
+		      //
+		      {
+			v2 dim = getDim(panelLayout->regionRemaining);
+			r32 sizePOP = 0.15f;
+			r32 offsetPixels = 20.f;
+			v2 offset = offsetPixels*V2(1, 1);    
+			UIComm density = uiMakeKnob(panelLayout, STR8_LIT("density"), offset, -sizePOP,
+						    &pluginState->parameters[PluginParameter_density], V4(0, 1, 0, 1));
+		  
+			//r32 oldDensity = pluginReadFloatParameter(density.element->fParam);
+			//r32 newDensity = oldDensity;
+			//printf("oldDensity: %.2f\n", oldDensity);		  
+			if(density.flags & UICommFlag_dragging)
+			  {
+			    v2 dragDelta = uiGetDragDelta(density.element);
+			    //printf("dragDelta: (%.2f, %.2f)\n", dragDelta.x, dragDelta.y);
+		      
+			    r32 newDensity = density.element->fParamValueAtClick + 0.1f*dragDelta.y;
+			    pluginSetFloatParameter(density.element->fParam, newDensity);
+			    //printf("newDensity: %.2f\n", newDensity);
+			  }		    
+		      }
+		    }
+		  else if(stringsAreEqual(panel->name, STR8_LIT("bottom")))
+		    {
+		      logString("\ndisplaying grain buffer\n");
+
+		      v2 dim = getDim(panelLayout->regionRemaining);
+		      v2 min = panelLayout->regionRemaining.min;
+
+		      r32 middleBarThickness = 4.f;
+		      Rect2 middleBar = rectMinDim(min + V2(0, 0.5f*dim.y),
+						   V2(dim.x, middleBarThickness));
+		      renderPushQuad(renderCommands, middleBar, 0, 0.f, RenderLevel_front, V4(0, 0, 0, 1));
+
+		      v2 upperRegionMin = min + V2(0, 0.5f*(dim.y + middleBarThickness));
+		      v2 lowerRegionMin = min;
+		      v2 regionDim = V2(dim.x, 0.5f*dim.y - middleBarThickness);
+		      v2 lowerRegionMiddle = lowerRegionMin + V2(0, 0.5f*regionDim.y);
+		      v2 upperRegionMiddle = upperRegionMin + V2(0, 0.5f*regionDim.y);
+
+		      u32 grainBufferCapacity = pluginState->grainBuffer.capacity;
+		      GrainStateView *grainStateView = &pluginState->grainStateView;
+		      AudioRingBuffer *grainViewBuffer = &grainStateView->viewBuffer;
+		  
+		      u32 viewEntryReadIndex = grainStateView->readIndex;
+		      u32 entriesQueued = globalPlatform.atomicLoad(&grainStateView->entriesQueued);
+		      logFormatString("entriesQueued: %u", entriesQueued);
+		  
+		      for(u32 entryIndex = 0; entryIndex < entriesQueued; ++entryIndex)
+			{
+			  u32 bufferReadIndex = grainStateView->viewBuffer.readIndex;
+			  u32 bufferWriteIndex = grainStateView->viewBuffer.writeIndex;
+		  
+			  GrainBufferViewEntry *view = (grainStateView->views +
+							((viewEntryReadIndex + entryIndex) %
+							 ARRAY_COUNT(grainStateView->views)));
+
+			  // NOTE: update view buffer with new view data
+			  writeSamplesToAudioRingBuffer(grainViewBuffer,
+							view->bufferSamples[0], view->bufferSamples[1],
+							view->sampleCount);
+
+			  // NOTE: display view read and write positions
+			  r32 barThickness = 2.f;
+			  u32 readIndex = bufferReadIndex;
+			  r32 readPosition = (r32)readIndex/(r32)grainBufferCapacity;
+			  r32 readBarPosition = readPosition*dim.x;
+			  Rect2 readBar = rectMinDim(min + V2(readBarPosition, 0.f),
+						     V2(barThickness, dim.y));
+			  renderPushQuad(renderCommands, readBar, 0, 0.f, RenderLevel_front, V4(1, 0, 0, 1));
+		      
+			  u32 writeIndex = bufferWriteIndex;
+			  r32 writePosition = (r32)writeIndex/(r32)grainBufferCapacity;
+			  r32 writeBarPosition = writePosition*dim.x;
+			  Rect2 writeBar = rectMinDim(min + V2(writeBarPosition, 0.f),
+						      V2(barThickness, dim.y));
+			  renderPushQuad(renderCommands, writeBar, 0, 0.f, RenderLevel_front, V4(1, 1, 1, 1));
+
+			  // NOTE: display playing grain start and end positions
+#if 1
+			  v4 grainWindowColors[] =
+			    {
+			      //colorV4FromU32(0xFF4000FF),
+			      colorV4FromU32(0xFF8000FF),
+			      colorV4FromU32(0xFFBF00FF),
+			      colorV4FromU32(0xFFFF00FF),
+			  
+			      colorV4FromU32(0xBFFF00FF),
+			      colorV4FromU32(0x80FF00FF),
+			      colorV4FromU32(0x40FF00FF),
+			      colorV4FromU32(0x00FF00FF),
+
+			      colorV4FromU32(0x00FF40FF),
+			      colorV4FromU32(0x00FF80FF),
+			      colorV4FromU32(0x00FFBFFF),
+			      colorV4FromU32(0x00FFFFFF),
+
+			      colorV4FromU32(0x00BFFFFF),
+			      colorV4FromU32(0x0080FFFF),
+			      colorV4FromU32(0x0040FFFF),
+			      colorV4FromU32(0x0000FFFF),
+
+			      colorV4FromU32(0x4000FFFF),
+			      colorV4FromU32(0x8000FFFF),
+			      colorV4FromU32(0xBF00FFFF),
+			      colorV4FromU32(0xFF00FFFF),
+
+			      colorV4FromU32(0xFF00BFFF),
+			      colorV4FromU32(0xFF0080FF),
+			      //colorV4FromU32(0xFF0040FF),
+			    };
+
+			  for(u32 grainViewIndex = 0; grainViewIndex < view->grainCount; ++grainViewIndex)
+			    {
+			      GrainViewEntry *grainView = view->grainViews + grainViewIndex;
+			      //u32 grainReadIndex = grainView->readIndex;
+			      u32 grainStartIndex = grainView->startIndex;
+			      u32 grainEndIndex = grainView->endIndex;			  
+			      r32 grainStartPosition = (r32)grainStartIndex/(r32)grainBufferCapacity;
+			      r32 grainEndPosition = (r32)grainEndIndex/(r32)grainBufferCapacity;
+			      r32 grainStartBarPosition = grainStartPosition*dim.x;
+			      r32 grainEndBarPosition = grainEndPosition*dim.x;
+			      Rect2 grainStartBar = rectMinDim(min + V2(grainStartBarPosition, 0.f),
+							       V2(barThickness, dim.y));
+			      Rect2 grainEndBar = rectMinDim(min + V2(grainEndBarPosition, 0.f),
+							     V2(barThickness, dim.y));
+			      v4 grainWindowColor = grainWindowColors[grainViewIndex];
+			      renderPushQuad(renderCommands, grainStartBar, 0, 0.f, RenderLevel_front, grainWindowColor);
+			      renderPushQuad(renderCommands, grainEndBar, 0, 0.f, RenderLevel_front, grainWindowColor);
+			    }
+#endif
+			}
+
+#if 1		  
+		      r32 samplesPerPixel = (r32)grainBufferCapacity/dim.x;
+		      u32 lastSampleIndex = 0;
+		      u32 widthInPixels = (u32)dim.x;
+		      for(u32 pixel = 0; pixel < widthInPixels; ++pixel)
+			{
+			  r32 samplePosition = samplesPerPixel*pixel;
+			  u32 sampleIndex = (u32)samplePosition;
+			  r32 sampleL = 0.f;
+			  r32 sampleR = 0.f;
+			  for(u32 i = lastSampleIndex; i < sampleIndex; ++i)
+			    {
+			      sampleL += grainViewBuffer->samples[0][i];
+			      sampleR += grainViewBuffer->samples[1][i];
+			    }
+			  sampleL /= samplesPerPixel;
+			  sampleR /= samplesPerPixel;
+		      		      
+			  Rect2 sampleLBar = rectMinDim(lowerRegionMiddle + V2(pixel, 0.f),
+							V2(1.f, 0.5f*sampleL*regionDim.y));
+			  Rect2 sampleRBar = rectMinDim(upperRegionMiddle + V2(pixel, 0.f),
+							V2(1.f, 0.5f*sampleR*regionDim.y));
+			  renderPushQuad(renderCommands, sampleLBar, 0, 0.f, RenderLevel_front, V4(0, 1, 0, 1));
+			  renderPushQuad(renderCommands, sampleRBar, 0, 0.f, RenderLevel_front, V4(0, 1, 0, 1));
+
+			  lastSampleIndex = sampleIndex;
+			}
+#endif
+
+		      grainStateView->readIndex =
+			(viewEntryReadIndex + entriesQueued) % ARRAY_COUNT(grainStateView->views);
+		      u32 oldEntriesQueued = entriesQueued;
+		      while(globalPlatform.atomicCompareAndSwap(&grainStateView->entriesQueued,
+								entriesQueued,
+								entriesQueued - oldEntriesQueued) != entriesQueued)
+			{
+			  entriesQueued = globalPlatform.atomicLoad(&grainStateView->entriesQueued);
+			}
+		      // while(globalPlatform.atomicCompareAndSwap(&grainStateView->entriesQueued, entriesQueued, 0) !=
+		      // 	    entriesQueued)
+		      // 	{
+		      // 	  entriesQueued = globalPlatform.atomicLoad(&grainStateView->entriesQueued);
+		      // 	  grainStateView->readIndex =
+		      // 	    (viewReadIndex + entriesQueued) % ARRAY_COUNT(grainStateView->views);
+		      // 	}
+		    }
+	      
+		  renderPushUILayout(renderCommands, panelLayout);
+		  uiEndLayout(panelLayout);
+		}	  
 	    }
 	}
       
-      // NOTE: leaf ui
-      for(UIPanel *panel = pluginState->rootPanel; panel; panel = uiPanelIteratorDepthFirstPreorder(panel).next)
-	{
-	  // NOTE: calculate rectangles
-	  Rect2 panelRect = uiComputeRectFromPanel(panel, screenRect, (Arena *)&scratchMemory);	  
-	  	  
-	  // NOTE: build ui
-	  if(!panel->first)
-	    {
-	      //printf("panelRect:\n  min: (%.2f, %.2f)\n  max: (%.2f, %.2f)\n",
-	      //    panelRect.min.x, panelRect.min.y, panelRect.max.x, panelRect.max.y);
-	      
-	      renderPushQuad(renderCommands, panelRect, 0, 0, RenderLevel_background, panel->color);
-	      
-	      UILayout *panelLayout = &panel->layout;
-	      uiBeginLayout(panelLayout, uiContext, panelRect);
-
-	      //printf("layoutRootRect:\n  min: (%.2f, %.2f)\n  max: (%.2f, %.2f)\n",
-	      //     panelLayout->root->region.min.x, panelLayout->root->region.min.y,
-	      //     panelLayout->root->region.max.x, panelLayout->root->region.max.y);
-
-	      UIComm text = uiMakeTextElement(panelLayout, (char *)panel->name, 1.5);
-	      UNUSED(text);
-
-	      // TODO: don't use strings to check which panel we are in
-	      if(stringsAreEqual(panel->name, (u8 *)"left"))
-		{
-		  UIComm volume = uiMakeSlider(panelLayout, "volume", V2(30.f, 30.f), UIAxis_y, 0.6f,
-					       &pluginState->parameters[PluginParameter_volume], V4(0.8f, 0.8f, 0.8f, 1));
-
-		  renderPushRectOutline(renderCommands, volume.element->parent->region, 2, RenderLevel_front,
-					V4(1, 1, 0, 1));
-
-		  if(volume.flags & UICommFlag_hovering)
-		    {
-		      volume.element->color = hadamard(volume.element->color, V4(1, 1, 0, 1));
-		    }
-
-		  //r32 oldVolume = pluginReadFloatParameter(volume.element->fParam);
-		  //r32 newVolume = oldVolume;
-		  if(volume.flags & UICommFlag_dragging)
-		    {
-		      if(volume.flags & UICommFlag_leftDragging)
-			{	
-			  v2 dragDelta = uiGetDragDelta(volume.element);
-			  //printf("dragDelta: (%.2f, %.2f)\n", dragDelta.x, dragDelta.y);
-		      
-			  r32 newVolume = volume.element->fParamValueAtClick + dragDelta.y/getDim(volume.element->region).y;
-			  pluginSetFloatParameter(volume.element->fParam, newVolume);
-			}
-		      else if(volume.flags & UICommFlag_minusPressed)
-			{
-			  r32 oldVolume = pluginReadFloatParameter(volume.element->fParam);
-			  r32 newVolume = oldVolume - 0.02f;
-
-			  pluginSetFloatParameter(volume.element->fParam, newVolume);
-			}
-		      else if(volume.flags & UICommFlag_plusPressed)
-			{
-			  r32 oldVolume = pluginReadFloatParameter(volume.element->fParam);
-			  r32 newVolume = oldVolume + 0.02f;
-
-			  pluginSetFloatParameter(volume.element->fParam, newVolume);
-			}
-		    }		  		  
-		}
-	      else if(stringsAreEqual(panel->name, (u8 *)"right"))
-		{
-		  //
-		  // play
-		  //
-		  {
-		    v2 dim = getDim(panelLayout->regionRemaining);
-		    r32 sizePOP = 0.15f;		    
-		    r32 offsetPixels = 20.f;		    
-		    v2 offset = offsetPixels*V2(1, 1);
-		    UIComm play = uiMakeButton(panelLayout, "play", offset, -sizePOP,
-					       &pluginState->soundIsPlaying, V4(0, 0, 1, 1));
-		    
-		    if(play.flags & UICommFlag_pressed)
-		      {
-			bool oldPlay = pluginReadBooleanParameter(play.element->bParam);
-			bool newPlay = !oldPlay;
-			pluginSetBooleanParameter(play.element->bParam, newPlay);
-			// TODO: stop doing the queue here: we don't want to have to synchronize grain (de)queueing
-			//       across the audio and video threads (once we actually have them on their own threads)
-			//queueAllGrainsFromFile(&pluginState->silo, &pluginState->loadedGrainPackfile);
-		      }		    
-		  }
-		  
-		  //
-		  // density
-		  //
-		  {
-		    v2 dim = getDim(panelLayout->regionRemaining);
-		    r32 sizePOP = 0.15f;
-		    r32 offsetPixels = 20.f;
-		    v2 offset = offsetPixels*V2(1, 1);    
-		    UIComm density = uiMakeKnob(panelLayout, "density", offset, -sizePOP,
-						&pluginState->parameters[PluginParameter_density], V4(0, 1, 0, 1));
-		  
-		    //r32 oldDensity = pluginReadFloatParameter(density.element->fParam);
-		    //r32 newDensity = oldDensity;
-		    //printf("oldDensity: %.2f\n", oldDensity);		  
-		    if(density.flags & UICommFlag_dragging)
-		      {
-			v2 dragDelta = uiGetDragDelta(density.element);
-			//printf("dragDelta: (%.2f, %.2f)\n", dragDelta.x, dragDelta.y);
-		      
-			r32 newDensity = density.element->fParamValueAtClick + 0.1f*dragDelta.y;
-			pluginSetFloatParameter(density.element->fParam, newDensity);
-			//printf("newDensity: %.2f\n", newDensity);
-		      }		    
-		  }
-		}
-	      else if(stringsAreEqual(panel->name, (u8 *)"bottom"))
-		{
-		  logString("\ndisplaying grain buffer\n");
-
-		  v2 dim = getDim(panelLayout->regionRemaining);
-		  v2 min = panelLayout->regionRemaining.min;
-
-		  r32 middleBarThickness = 4.f;
-		  Rect2 middleBar = rectMinDim(min + V2(0, 0.5f*dim.y),
-					       V2(dim.x, middleBarThickness));
-		  renderPushQuad(renderCommands, middleBar, 0, 0.f, RenderLevel_front, V4(0, 0, 0, 1));
-
-		  v2 upperRegionMin = min + V2(0, 0.5f*(dim.y + middleBarThickness));
-		  v2 lowerRegionMin = min;
-		  v2 regionDim = V2(dim.x, 0.5f*dim.y - middleBarThickness);
-		  v2 lowerRegionMiddle = lowerRegionMin + V2(0, 0.5f*regionDim.y);
-		  v2 upperRegionMiddle = upperRegionMin + V2(0, 0.5f*regionDim.y);
-
-		  u32 grainBufferCapacity = pluginState->grainBuffer.capacity;
-		  GrainStateView *grainStateView = &pluginState->grainStateView;
-		  AudioRingBuffer *grainViewBuffer = &grainStateView->viewBuffer;
-		  
-		  u32 viewEntryReadIndex = grainStateView->readIndex;
-		  u32 entriesQueued = globalPlatform.atomicLoad(&grainStateView->entriesQueued);
-		  logFormatString("entriesQueued: %u", entriesQueued);
-		  
-		  for(u32 entryIndex = 0; entryIndex < entriesQueued; ++entryIndex)
-		    {
-		      u32 bufferReadIndex = grainStateView->viewBuffer.readIndex;
-		      u32 bufferWriteIndex = grainStateView->viewBuffer.writeIndex;
-		  
-		      GrainBufferViewEntry *view = (grainStateView->views +
-						    ((viewEntryReadIndex + entryIndex) %
-						     ARRAY_COUNT(grainStateView->views)));
-
-		      // NOTE: update view buffer with new view data
-		      writeSamplesToAudioRingBuffer(grainViewBuffer,
-						    view->bufferSamples[0], view->bufferSamples[1],
-						    view->sampleCount);
-
-		      // NOTE: display view read and write positions
-		      r32 barThickness = 2.f;
-		      u32 readIndex = bufferReadIndex;
-		      r32 readPosition = (r32)readIndex/(r32)grainBufferCapacity;
-		      r32 readBarPosition = readPosition*dim.x;
-		      Rect2 readBar = rectMinDim(min + V2(readBarPosition, 0.f),
-						 V2(barThickness, dim.y));
-		      renderPushQuad(renderCommands, readBar, 0, 0.f, RenderLevel_front, V4(1, 0, 0, 1));
-		      
-		      u32 writeIndex = bufferWriteIndex;
-		      r32 writePosition = (r32)writeIndex/(r32)grainBufferCapacity;
-		      r32 writeBarPosition = writePosition*dim.x;
-		      Rect2 writeBar = rectMinDim(min + V2(writeBarPosition, 0.f),
-						  V2(barThickness, dim.y));
-		      renderPushQuad(renderCommands, writeBar, 0, 0.f, RenderLevel_front, V4(1, 1, 1, 1));
-
-		      // NOTE: display playing grain start and end positions
-#if 1
-		      v4 grainWindowColors[] =
-			{
-			  //colorV4FromU32(0xFF4000FF),
-			  colorV4FromU32(0xFF8000FF),
-			  colorV4FromU32(0xFFBF00FF),
-			  colorV4FromU32(0xFFFF00FF),
-			  
-			  colorV4FromU32(0xBFFF00FF),
-			  colorV4FromU32(0x80FF00FF),
-			  colorV4FromU32(0x40FF00FF),
-			  colorV4FromU32(0x00FF00FF),
-
-			  colorV4FromU32(0x00FF40FF),
-			  colorV4FromU32(0x00FF80FF),
-			  colorV4FromU32(0x00FFBFFF),
-			  colorV4FromU32(0x00FFFFFF),
-
-			  colorV4FromU32(0x00BFFFFF),
-			  colorV4FromU32(0x0080FFFF),
-			  colorV4FromU32(0x0040FFFF),
-			  colorV4FromU32(0x0000FFFF),
-
-			  colorV4FromU32(0x4000FFFF),
-			  colorV4FromU32(0x8000FFFF),
-			  colorV4FromU32(0xBF00FFFF),
-			  colorV4FromU32(0xFF00FFFF),
-
-			  colorV4FromU32(0xFF00BFFF),
-			  colorV4FromU32(0xFF0080FF),
-			  //colorV4FromU32(0xFF0040FF),
-			};
-
-		      for(u32 grainViewIndex = 0; grainViewIndex < view->grainCount; ++grainViewIndex)
-			{
-			  GrainViewEntry *grainView = view->grainViews + grainViewIndex;
-			  //u32 grainReadIndex = grainView->readIndex;
-			  u32 grainStartIndex = grainView->startIndex;
-			  u32 grainEndIndex = grainView->endIndex;			  
-			  r32 grainStartPosition = (r32)grainStartIndex/(r32)grainBufferCapacity;
-			  r32 grainEndPosition = (r32)grainEndIndex/(r32)grainBufferCapacity;
-			  r32 grainStartBarPosition = grainStartPosition*dim.x;
-			  r32 grainEndBarPosition = grainEndPosition*dim.x;
-			  Rect2 grainStartBar = rectMinDim(min + V2(grainStartBarPosition, 0.f),
-							   V2(barThickness, dim.y));
-			  Rect2 grainEndBar = rectMinDim(min + V2(grainEndBarPosition, 0.f),
-							 V2(barThickness, dim.y));
-			  v4 grainWindowColor = grainWindowColors[grainViewIndex];
-			  renderPushQuad(renderCommands, grainStartBar, 0, 0.f, RenderLevel_front, grainWindowColor);
-			  renderPushQuad(renderCommands, grainEndBar, 0, 0.f, RenderLevel_front, grainWindowColor);
-			}
-#endif
-		    }
-
-#if 1		  
-		  r32 samplesPerPixel = (r32)grainBufferCapacity/dim.x;
-		  u32 lastSampleIndex = 0;
-		  u32 widthInPixels = (u32)dim.x;
-		  for(u32 pixel = 0; pixel < widthInPixels; ++pixel)
-		    {
-		      r32 samplePosition = samplesPerPixel*pixel;
-		      u32 sampleIndex = (u32)samplePosition;
-		      r32 sampleL = 0.f;
-		      r32 sampleR = 0.f;
-		      for(u32 i = lastSampleIndex; i < sampleIndex; ++i)
-			{
-			  sampleL += grainViewBuffer->samples[0][i];
-			  sampleR += grainViewBuffer->samples[1][i];
-			}
-		      sampleL /= samplesPerPixel;
-		      sampleR /= samplesPerPixel;
-		      		      
-		      Rect2 sampleLBar = rectMinDim(lowerRegionMiddle + V2(pixel, 0.f),
-						    V2(1.f, 0.5f*sampleL*regionDim.y));
-		      Rect2 sampleRBar = rectMinDim(upperRegionMiddle + V2(pixel, 0.f),
-						    V2(1.f, 0.5f*sampleR*regionDim.y));
-		      renderPushQuad(renderCommands, sampleLBar, 0, 0.f, RenderLevel_front, V4(0, 1, 0, 1));
-		      renderPushQuad(renderCommands, sampleRBar, 0, 0.f, RenderLevel_front, V4(0, 1, 0, 1));
-
-		      lastSampleIndex = sampleIndex;
-		    }
-#endif
-
-		  grainStateView->readIndex =
-		    (viewEntryReadIndex + entriesQueued) % ARRAY_COUNT(grainStateView->views);
-		  u32 oldEntriesQueued = entriesQueued;
-		  while(globalPlatform.atomicCompareAndSwap(&grainStateView->entriesQueued,
-							    entriesQueued,
-							    entriesQueued - oldEntriesQueued) != entriesQueued)
-		    {
-		      entriesQueued = globalPlatform.atomicLoad(&grainStateView->entriesQueued);
-		    }
-		  // while(globalPlatform.atomicCompareAndSwap(&grainStateView->entriesQueued, entriesQueued, 0) !=
-		  // 	    entriesQueued)
-		  // 	{
-		  // 	  entriesQueued = globalPlatform.atomicLoad(&grainStateView->entriesQueued);
-		  // 	  grainStateView->readIndex =
-		  // 	    (viewReadIndex + entriesQueued) % ARRAY_COUNT(grainStateView->views);
-		  // 	}
-		}
-	      
-	      renderPushUILayout(renderCommands, panelLayout);
-	      uiEndLayout(panelLayout);
-	    }	  
-	}
-
       arenaEndTemporaryMemory(&scratchMemory);
       uiContextEndFrame(uiContext);
 #else
@@ -971,90 +1034,7 @@ AUDIO_PROCESS(audioProcess)
 	      inputMixBuffers[channelIndex][frameIndex] = mixedVal;		   
 	    }
 	}
-      /*
-      switch(audioBuffer->inputFormat)
-	{
-	  // TODO: pull these cases out into a generic function/macro
-	case AudioFormat_s16:
-	  {	    
-	    	    	  
-	  } break;
-	case AudioFormat_r32:
-	  {
-	    r32 *inputFrames[2] = {};
-	    inputFrames[0] = (r32 *)audioBuffer->inputBuffer[0];
-	    inputFrames[1] = (r32 *)audioBuffer->inputBuffer[1];
-	    
-	    for(u32 frameIndex = 0; frameIndex < framesToRead; ++frameIndex)
-	      {		
-		bool soundIsPlaying = pluginReadBooleanParameter(&pluginState->soundIsPlaying);	
-		r32 currentTime = (r32)loadedSound->samplesPlayed + inputBufferReadSpeed*(r32)frameIndex;
-		u32 soundReadIndex = (u32)currentTime;
-		r32 soundReadFrac = currentTime - (r32)soundReadIndex;
-		
-		for(u32 channelIndex = 0; channelIndex < audioBuffer->inputChannels; ++channelIndex)
-		  {
-		    r32 mixedVal = 0.f;		    		    
-		    if(soundIsPlaying)		       
-		      {			
-			if(currentTime < loadedSound->sound.sampleCount)
-			  {
-			    r32 loadedSoundSample0 = loadedSound->sound.samples[channelIndex][soundReadIndex];
-			    r32 loadedSoundSample1 = loadedSound->sound.samples[channelIndex][soundReadIndex + 1];
-			    r32 loadedSoundSample = lerp(loadedSoundSample0, loadedSoundSample1, soundReadFrac);
-		
-			    mixedVal += 0.5f*loadedSoundSample;			   
-			  }
-			else
-			  {		      
-			    pluginSetBooleanParameter(&pluginState->soundIsPlaying, false);
-			    loadedSound->samplesPlayed = 0;// + pluginState->start_pos);
-			  }		  
-		      }		    
-
-		    r32 inputSample = inputFrames[channelIndex][frameIndex];
-		    ASSERT(isInRange(inputSample, -1.f, 1.f));
-
-		    mixedVal += 0.5f*inputSample;
-		    inputMixBuffers[channelIndex][frameIndex] = mixedVal;		   
-		  }
-	      }
-	  } break;
-	default:
-	  {
-	    for(u32 frameIndex = 0; frameIndex < audioBuffer->framesToWrite; ++frameIndex)
-	      {
-		bool soundIsPlaying = pluginReadBooleanParameter(&pluginState->soundIsPlaying);
-		r32 currentTime = (r32)loadedSound->samplesPlayed + inputBufferReadSpeed*(r32)frameIndex;
-		u32 soundReadIndex = (u32)currentTime;
-		r32 soundReadFrac = currentTime - (r32)soundReadIndex;
-		
-		for(u32 channelIndex = 0; channelIndex < 2; ++channelIndex)
-		  {
-		    r32 mixedVal = 0.f;		    
-		    if(soundIsPlaying)		       
-		      {			
-			if(currentTime < loadedSound->sound.sampleCount)
-			  {
-			    r32 loadedSoundSample0 = loadedSound->sound.samples[channelIndex][soundReadIndex];
-			    r32 loadedSoundSample1 = loadedSound->sound.samples[channelIndex][soundReadIndex + 1];
-			    r32 loadedSoundSample = lerp(loadedSoundSample0, loadedSoundSample1, soundReadFrac);
-
-			    mixedVal += 0.5f*loadedSoundSample;
-			  }
-			else
-			  {		      
-			    pluginSetBooleanParameter(&pluginState->soundIsPlaying, false);
-			    loadedSound->samplesPlayed = 0;// + pluginState->start_pos);
-			  }		  
-		      }
-				  
-		    inputMixBuffers[channelIndex][frameIndex] = mixedVal;
-		  }	
-	      }
-	  } break;
-	}
-      */
+      
       bool soundIsPlaying = pluginReadBooleanParameter(&pluginState->soundIsPlaying);
       if(soundIsPlaying)
 	{

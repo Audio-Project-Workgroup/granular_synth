@@ -71,7 +71,7 @@ renderPushTriangle(RenderCommands *commands, TexturedVertex v1, TexturedVertex v
 }
 
 static inline v2
-renderPushText(RenderCommands *commands, LoadedFont *font, u8 *string,
+renderPushText(RenderCommands *commands, LoadedFont *font, String8 string,//u8 *string,
 	       v2 textMin, v2 textScale,
 	       //Rect2 textRect,
 	       v4 color = V4(1, 1, 1, 1))
@@ -82,8 +82,10 @@ renderPushText(RenderCommands *commands, LoadedFont *font, u8 *string,
 
   //v2 atPos = textRect.min;
   v2 atPos = textMin;
-  u8 *at = string;  
-  while(*at)
+  u8 *at = string.str;
+  u64 stringSize = string.size;
+  //while(*at)
+  for(u32 i = 0; i < stringSize; ++i)
     {
       u8 c = *at;
       LoadedBitmap *glyph = getGlyphFromChar(font, c);
@@ -204,7 +206,8 @@ renderPushUIElement(RenderCommands *commands, UIElement *element)
     {      
       //v2 textDim = getTextDim(layout->font, element->name);
       //v2 textScale = V2(elementRegionDim.x/textDim.x, elementRegionDim.y/textDim.y);
-      renderPushText(commands, layout->context->font, element->name, element->region.min, element->textScale);
+      renderPushText(commands, layout->context->font,
+		     element->name, element->region.min, element->textScale, element->color);
     }
   if(element->flags & UIElementFlag_drawBorder)
     {

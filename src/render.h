@@ -133,7 +133,7 @@ renderBeginCommands(RenderCommands *commands, Arena *perFrameAllocator)
   commands->cursorState = CursorState_default;
 
   commands->texturedQuadCount = 0;
-  commands->texturedQuadCapacity = 512;
+  commands->texturedQuadCapacity = THOUSAND(4);
   commands->texturedQuads = arenaPushArray(commands->allocator, commands->texturedQuadCapacity, TexturedQuad);
 
   commands->quadCount = 0;

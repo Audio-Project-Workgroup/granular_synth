@@ -87,11 +87,11 @@ glfwProcessButtonPress(ButtonState *newState, bool pressed)
 static void
 glfwKeyCallback(GLFWwindow *window, int key, int scancode, int action, int mods)
 {
-  if(key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
-    {
-      glfwSetWindowShouldClose(window, GLFW_TRUE);
-    }
-  else if(key == GLFW_KEY_LEFT_SHIFT || key == GLFW_KEY_RIGHT_SHIFT)
+  // if(key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
+  //   {
+  //     glfwSetWindowShouldClose(window, GLFW_TRUE);
+  //   }
+  if(key == GLFW_KEY_LEFT_SHIFT || key == GLFW_KEY_RIGHT_SHIFT)
     {
       glfwProcessButtonPress(&newInput->keyboardState.modifiers[KeyboardModifier_shift],
 			     action == GLFW_PRESS || action == GLFW_REPEAT);
@@ -104,6 +104,11 @@ glfwKeyCallback(GLFWwindow *window, int key, int scancode, int action, int mods)
   else if(key == GLFW_KEY_LEFT_ALT || key == GLFW_KEY_RIGHT_ALT)
     {
       glfwProcessButtonPress(&newInput->keyboardState.modifiers[KeyboardModifier_alt],
+			     action == GLFW_PRESS || action == GLFW_REPEAT);
+    }
+  else if(key == GLFW_KEY_ESCAPE)
+    {
+      glfwProcessButtonPress(&newInput->keyboardState.keys[KeyboardButton_esc],
 			     action == GLFW_PRESS || action == GLFW_REPEAT);
     }
   else if(key == GLFW_KEY_TAB)
@@ -287,6 +292,7 @@ main(int argc, char **argv)
 	  PluginMemory pluginMemory = {};
 	  pluginMemory.memory = calloc(MEGABYTES(512), 1);
 	  pluginMemory.osTimerFreq = getOSTimerFreq();
+	  pluginMemory.host = PluginHost_executable;
 	  
 	  pluginMemory.platformAPI.readEntireFile  = platformReadEntireFile;
 	  pluginMemory.platformAPI.freeFileMemory  = platformFreeFileMemory;
@@ -374,33 +380,33 @@ main(int argc, char **argv)
 			{
 			  //printf("%u: %s", iPlayback, maPlaybackInfos[iPlayback].name);
 			  String8 deviceStr = STR8_CSTR(maPlaybackInfos[iPlayback].name);
-			  ASSERT(audioBuffer.outputDeviceCount < ARRAY_COUNT(audioBuffer.outputDeviceNames));
-			  audioBuffer.outputDeviceNames[audioBuffer.outputDeviceCount] = deviceStr;
+			  ASSERT(pluginMemory.outputDeviceCount < ARRAY_COUNT(pluginMemory.outputDeviceNames));
+			  pluginMemory.outputDeviceNames[pluginMemory.outputDeviceCount] = deviceStr;
 			  if(stringsAreEqual(deviceStr, STR8_CSTR(maDefaultPlaybackDeviceInfo.name)))
 			    {
 			      maPlaybackIndex = iPlayback;
-			      audioBuffer.selectedOutputDeviceIndex = audioBuffer.outputDeviceCount;
+			      pluginMemory.selectedOutputDeviceIndex = pluginMemory.outputDeviceCount;
 				//printf("(default)");
 			    }
 			    //printf("\n");
 
-			    ++audioBuffer.outputDeviceCount;
+			    ++pluginMemory.outputDeviceCount;
 			}
 		      for(u32 iCapture = 0; iCapture < maCaptureCount; ++iCapture)
 			{
 			  //printf("%u: %s", iCapture, maCaptureInfos[iCapture].name);
 			  String8 deviceStr = STR8_CSTR(maCaptureInfos[iCapture].name);
-			  ASSERT(audioBuffer.inputDeviceCount < ARRAY_COUNT(audioBuffer.inputDeviceNames));
-			  audioBuffer.inputDeviceNames[audioBuffer.inputDeviceCount] = deviceStr;
+			  ASSERT(pluginMemory.inputDeviceCount < ARRAY_COUNT(pluginMemory.inputDeviceNames));
+			  pluginMemory.inputDeviceNames[pluginMemory.inputDeviceCount] = deviceStr;
 			  if(stringsAreEqual(deviceStr, STR8_CSTR(maDefaultCaptureDeviceInfo.name)))
 			    {
 			      maCaptureIndex = iCapture;
-			      audioBuffer.selectedInputDeviceIndex = audioBuffer.inputDeviceCount;
+			      pluginMemory.selectedInputDeviceIndex = pluginMemory.inputDeviceCount;
 			      //printf("(default)");
 			    }
 			  //printf("\n");
 
-			  ++audioBuffer.inputDeviceCount;
+			  ++pluginMemory.inputDeviceCount;
 			}
 
 		      // TODO: this is about the lowest latency I could get on my machine while
@@ -462,10 +468,10 @@ main(int argc, char **argv)
 				  if(newWriteTime != plugin.lastWriteTime)
 				    {
 				      unloadPluginCode(&plugin);
-				      for(u32 tryIndex = 0; !plugin.isValid && (tryIndex < 10); ++tryIndex)
+				      for(u32 tryIndex = 0; !plugin.isValid && (tryIndex < 50); ++tryIndex)
 					{
 					  plugin = loadPluginCode(PLUGIN_PATH);
-					  msecWait(5);
+					  msecWait(10);
 					}			  
 				    }		      
 
@@ -603,6 +609,7 @@ main(int argc, char **argv)
 					      plugin.audioProcess(&pluginMemory, &audioBuffer);
 
 					      // TODO: test this works
+					      #if 0
 					      if(audioBuffer.selectedOutputDeviceIndex != maPlaybackIndex)
 						{
 						  ma_device_stop(&maDevice);
@@ -620,6 +627,7 @@ main(int argc, char **argv)
 							 MA_SUCCESS);
 						  ma_device_start(&maDevice);
 						}
+					      #endif
 					    }
 
 					  maResult = ma_pcm_rb_commit_write(&maOutputRingBuffer, framesToWrite);

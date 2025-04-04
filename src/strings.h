@@ -70,8 +70,9 @@ arenaPushString(Arena *arena, String8 string)
 {
   String8 result = {};
   result.size = string.size;
-  result.str = arenaPushSize(arena, result.size);
+  result.str = arenaPushSize(arena, result.size + 1);
   COPY_SIZE(result.str, string.str, result.size);
+  result.str[result.size] = 0;
 
   return(result);
 }

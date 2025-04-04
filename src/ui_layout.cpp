@@ -15,7 +15,7 @@ uiPopParentElement(UILayout *layout)
 }
 
 inline UIElement *
-uiAllocateElement(UILayout *layout, char *name, u32 flags, v4 color)
+uiAllocateElement(UILayout *layout, String8 name, u32 flags, v4 color)
 {
   UIContext *context = layout->context;
   UIElement *result = arenaPushStruct(context->frameArena, UIElement, arenaFlagsZeroNoAlign());
@@ -29,12 +29,14 @@ uiAllocateElement(UILayout *layout, char *name, u32 flags, v4 color)
 }
 
 inline UIHashKey
-uiHashKeyFromString(u8 *name)
+uiHashKeyFromString(String8 name)
 {
   // TODO: better hash function
   u64 hashKey = 5381;
-  u8 *at = name;
-  while(*at)
+  u8 *at = name.str;
+  u64 count = name.size;
+  //while(*at)
+  for(u64 i = 0; i < count; ++i)
     {
       hashKey = ((hashKey << 5) + hashKey + *at++);
     }
@@ -52,27 +54,28 @@ uiHashKeysAreEqual(UIHashKey key1, UIHashKey key2)
   bool result = (key1.key == key2.key);
   if(result)
     {
-      u8 *at1 = key1.name;
-      u8 *at2 = key2.name;
-      while(*at1 && *at2)
-	{
-	  result = ((*at1++) == (*at2++));
-	  if(!result) break;
-	}
-      if(result)
-	{
-	  if((*at1 != 0) || (*at2 != 0))
-	    {
-	      result = false;
-	    }
-	}
+      result = stringsAreEqual(key1.name, key2.name);
+      // u8 *at1 = key1.name;
+      // u8 *at2 = key2.name;
+      // while(*at1 && *at2)
+      // 	{
+      // 	  result = ((*at1++) == (*at2++));
+      // 	  if(!result) break;
+      // 	}
+      // if(result)
+      // 	{
+      // 	  if((*at1 != 0) || (*at2 != 0))
+      // 	    {
+      // 	      result = false;
+      // 	    }
+      // 	}
     }
 
   return(result);
 }
 
 inline UIElement *
-uiMakeElement(UILayout *layout, char *name, u32 flags, v4 color)	      
+uiMakeElement(UILayout *layout, String8 name, u32 flags, v4 color)	      
 {  
   UIElement *result = uiAllocateElement(layout, name, flags, color);
   result->hashKey = uiHashKeyFromString(result->name);
@@ -244,6 +247,7 @@ uiContextNewFrame(UIContext *context, MouseState *mouse, KeyboardState *keyboard
   context->rightButtonReleased = wasReleased(mouse->buttons[MouseButton_right]);
 
   // NOTE: keyboard input
+  context->escPressed = wasPressed(keyboard->keys[KeyboardButton_esc]);
   context->tabPressed = wasPressed(keyboard->keys[KeyboardButton_tab]);
   if(context->tabPressed) context->selectedElementOrdinal++;
   context->backspacePressed = wasPressed(keyboard->keys[KeyboardButton_backspace]);
@@ -298,7 +302,7 @@ uiBeginLayout(UILayout *layout, UIContext *context, Rect2 parentRect, v4 color =
       layout->selectedElement = {};
     }
   
-  layout->root = uiMakeElement(layout, "root", 0, color);
+  layout->root = uiMakeElement(layout, STR8_LIT("root"), 0, color);
   layout->root->flags |= UIElementFlag_drawBorder;
   layout->root->lastFrameTouched = context->frameIndex;
   //uiSetSemanticSizeAbsolute(layout->root, parentRect.min, getDim(parentRect));
@@ -416,9 +420,9 @@ uiPrintElement(UIElement *element, u32 depth)
 	{
 	  printf("-");
 	}
-      if(element->name)
+      if(element->name.str)
 	{
-	  printf("%s\n", element->name);
+	  printf("%s\n", element->name.str);
 	}
 
       if(element->first)
@@ -560,12 +564,12 @@ uiCommFromElement(UIElement *element)
 //
 
 inline UIComm
-uiMakeTextElement(UILayout *layout, char *message, r32 desiredTextScale, v4 color = V4(1, 1, 1, 1))
+uiMakeTextElement(UILayout *layout, String8 message, r32 desiredTextScale, v4 color = V4(1, 1, 1, 1))
 {
   UIContext *context = layout->context;
   UIElement *text = uiMakeElement(layout, message, UIElementFlag_drawText | UIElementFlag_drawBorder, color);
 
-  v2 messageRectDim = desiredTextScale*getTextDim(context->font, (u8 *)message);
+  v2 messageRectDim = desiredTextScale*getTextDim(context->font, message);
   v2 layoutRegionRemainingDim = getDim(layout->regionRemaining);
 
   r32 textScale = desiredTextScale;
@@ -591,7 +595,29 @@ uiMakeTextElement(UILayout *layout, char *message, r32 desiredTextScale, v4 colo
 }
 
 inline UIComm
-uiMakeBox(UILayout *layout, char *name, Rect2 rect, u32 flags = 0, v4 color = V4(1, 1, 1, 1))
+uiMakeSelectableTextElement(UILayout *layout, String8 message, r32 scale, v4 color = V4(1, 1, 1, 1))
+{
+  UIContext *context = layout->context;
+  u32 flags = UIElementFlag_drawText | UIElementFlag_drawBorder | UIElementFlag_clickable;
+  UIElement *text = uiMakeElement(layout, message, flags, color);
+
+  v2 layoutRegionRemainingDim = getDim(layout->regionRemaining);
+  
+  v2 textRectDim = scale*getTextDim(context->font, message);
+  v2 textRectOffset = (layout->regionRemaining.min +
+		       V2(0.f, layoutRegionRemainingDim.y - scale*context->font->verticalAdvance));  
+
+  text->textScale = V2(scale, scale);
+  text->region = rectMinDim(textRectOffset, textRectDim);
+
+  layout->regionRemaining.max.y = text->region.min.y;
+
+  UIComm textComm = uiCommFromElement(text);
+  return(textComm);
+}
+
+inline UIComm
+uiMakeBox(UILayout *layout, String8 name, Rect2 rect, u32 flags = 0, v4 color = V4(1, 1, 1, 1))
 {
   UIElement *box = uiMakeElement(layout, name, flags, color);
   box->region = rect;
@@ -602,7 +628,7 @@ uiMakeBox(UILayout *layout, char *name, Rect2 rect, u32 flags = 0, v4 color = V4
 }
 
 inline UIComm
-uiMakeButton(UILayout *layout, char *name,
+uiMakeButton(UILayout *layout, String8 name,
 	     v2 offset, r32 sizePercentOfParent,	     
 	     PluginBooleanParameter *param, v4 color = V4(1, 1, 1, 1))
 {
@@ -619,7 +645,7 @@ uiMakeButton(UILayout *layout, char *name,
 }
 
 inline UIComm
-uiMakeSlider(UILayout *layout, char *name,
+uiMakeSlider(UILayout *layout, String8 name,
 	     v2 offset, UIAxis sizeDim, r32 sizePercentOfParent,
 	     //r32 aspectRatio,
 	     PluginFloatParameter *param, v4 color = V4(1, 1, 1, 1))
@@ -637,7 +663,7 @@ uiMakeSlider(UILayout *layout, char *name,
 }
 
 inline UIComm
-uiMakeKnob(UILayout *layout, char *name,
+uiMakeKnob(UILayout *layout, String8 name,
 	   v2 offset, r32 sizePercentOfParent,
 	   PluginFloatParameter *param, v4 color = V4(1, 1, 1, 1))
 {
@@ -655,7 +681,7 @@ uiMakeKnob(UILayout *layout, char *name,
 }
 
 inline UIComm
-uiMakeCollapsibleList(UILayout *layout, char *text, v2 offset, v2 scale, v4 color = V4(1, 1, 1, 1))
+uiMakeCollapsibleList(UILayout *layout, String8 text, v2 offset, v2 scale, v4 color = V4(1, 1, 1, 1))
 {
   //UIContext *context = layout->context;
   u32 flags = UIElementFlag_clickable | UIElementFlag_collapsible | UIElementFlag_drawText | UIElementFlag_drawBorder;

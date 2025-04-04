@@ -66,7 +66,8 @@ enum UIParameter
 struct UIHashKey
 {
   u64 key;
-  u8 *name;
+  //u8 *name;
+  String8 name;
 };
 
 struct UIContext
@@ -89,11 +90,12 @@ struct UIContext
   bool rightButtonReleased;
   bool rightButtonDown;
 
+  bool escPressed;
   bool tabPressed;
   bool backspacePressed;
   bool enterPressed;
   bool minusPressed;
-  bool plusPressed;
+  bool plusPressed;  
 
   bool windowResized;
 
@@ -125,7 +127,8 @@ struct UIElement
   // NOTE: specified at construction
   UILayout *layout;
   u32 flags;
-  u8 *name;
+  //u8 *name;
+  String8 name;
   v2 textScale;
   v4 color;
 
