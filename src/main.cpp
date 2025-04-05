@@ -551,7 +551,7 @@ main(int argc, char **argv)
 				  if(plugin.renderNewFrame)
 				    {
 				      plugin.renderNewFrame(&pluginMemory, oldInput, &commands);
-				      glfwSetCursorState(window, commands.cursorState);
+				      glfwSetCursorState(window, commands.cursorState);				      
 				      renderCommands(&commands);
 			      
 				      for(String8Node *node = pluginMemory.logger->log.first; node; node = node->next)
@@ -566,6 +566,28 @@ main(int argc, char **argv)
 
 				      pluginMemory.logger->log.first = 0;
 				      arenaEnd(pluginMemory.logger->logArena);
+
+				      if(commands.outputAudioDeviceChanged || commands.inputAudioDeviceChanged)
+					{
+					  ma_device_stop(&maDevice);
+					  ma_device_uninit(&maDevice);
+
+					  if(commands.outputAudioDeviceChanged)
+					    {
+					      maPlaybackIndex = commands.selectedOutputAudioDeviceIndex;
+					      maConfig.playback.pDeviceID = &maPlaybackInfos[maPlaybackIndex].id;
+					    }
+
+					  if(commands.inputAudioDeviceChanged)
+					    {
+					      maCaptureIndex = commands.selectedInputAudioDeviceIndex;
+					      maConfig.capture.pDeviceID = &maCaptureInfos[maCaptureIndex].id;
+					    }
+					  
+					  ASSERT(ma_device_init(&maContext, &maConfig, &maDevice) ==
+						 MA_SUCCESS);
+					  ma_device_start(&maDevice);
+					}
 				    }
 
 				  glfwSwapBuffers(window);

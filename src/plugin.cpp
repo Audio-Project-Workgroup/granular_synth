@@ -37,7 +37,7 @@
      - tooltips when hovering (eg show numeric parameter value)
      - interface for selecting files to load at runtime
      - interface for remapping midi cc channels with parameters
-     - display the state of grains and the grain buffer
+     - display the state of grains and the grain buffer (wip)
      - make panel resizing not jank
 
    - Parameters (high priority):
@@ -87,11 +87,12 @@ printButtonState(ButtonState button, char *name)
 	 isDown(button) ? "down" : "up");
 }
 
-//static PluginState *
-//initializePluginState(PluginMemory *memoryBlock)
 extern "C"
 INITIALIZE_PLUGIN_STATE(initializePluginState)
 {
+  globalPlatform = memoryBlock->platformAPI;
+  globalLogger = memoryBlock->logger;
+
   void *memory = memoryBlock->memory;
   PluginState *pluginState = 0;
   if(memory)
@@ -99,11 +100,7 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
       pluginState = (PluginState *)memory;
       if(!pluginState->initialized)
 	{
-	  //if(globalPlatform.syncCompareAndSwap(&pluginState->initializationMutex, 0, 1) == 1)
 	    {
-	      globalPlatform = memoryBlock->platformAPI;
-	      globalLogger = memoryBlock->logger;
-
 	      pluginState->osTimerFreq = memoryBlock->osTimerFreq;
 	      pluginState->pluginHost = memoryBlock->host;
 	      pluginState->pluginMode = PluginMode_editor;
@@ -325,7 +322,17 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 
 	      pluginState->menuPanel = arenaPushStruct(&pluginState->permanentArena, UIPanel);
 	      pluginState->menuPanel->sizePercentOfParent = 1.f;
-	      pluginState->menuPanel->splitAxis = UIAxis_y;	  
+	      pluginState->menuPanel->splitAxis = UIAxis_x;
+
+	      v4 menuBackgroundColor = colorV4FromU32(0x04060EFF);
+	      currentParentPanel = pluginState->menuPanel;
+	      UIPanel *menuLeft = makeUIPanel(currentParentPanel, &pluginState->permanentArena,
+					      UIAxis_x, 0.5f, STR8_LIT("menu left"), menuBackgroundColor);
+	      UIPanel *menuRight = makeUIPanel(currentParentPanel, &pluginState->permanentArena,
+					      UIAxis_x, 0.5f, STR8_LIT("menu right"), menuBackgroundColor);
+	      UNUSED(menuLeft);
+	      UNUSED(menuRight);
+	      
 #if 0
 #if 1
 	      r32 *testModelInput = pluginState->loadedSound.sound.samples[0];
@@ -397,31 +404,122 @@ RENDER_NEW_FRAME(renderNewFrame)
 
       if(pluginState->pluginMode == PluginMode_menu)
 	{
+	  for(UIPanel *panel = pluginState->menuPanel; panel; panel = uiPanelIteratorDepthFirstPreorder(panel).next)
+	    {
+	      Rect2 panelRect = uiComputeRectFromPanel(panel, screenRect, (Arena *)&scratchMemory);	      
+
+	      if(!panel->first)
+		{
+		  renderPushQuad(renderCommands, panelRect, 0, 0, RenderLevel_background, panel->color);
+
+		  UILayout *panelLayout = &panel->layout;
+		  uiBeginLayout(panelLayout, uiContext, panelRect);
+
+		  r32 textScale = 0.7f;
+		  v4 baseTextColor = colorV4FromU32(0xFFDEADFF);
+		  v4 hoveringTextColor = colorV4FromU32(0x98F5FFFF);
+		  v4 selectedTextColor = colorV4FromU32(0xFFD700FF);
+		  //v4 selectedTextColor = V4(1, 0, 0, 1);
+
+		  if(stringsAreEqual(panel->name, STR8_LIT("menu left")))
+		    {
+		      for(u32 outputDeviceIndex = 0;
+			  outputDeviceIndex < pluginState->outputDeviceCount;
+			  ++outputDeviceIndex)
+			{
+			  bool isSelected = (outputDeviceIndex == pluginState->selectedOutputDeviceIndex);
+			  v4 textColor =  isSelected ? selectedTextColor : baseTextColor;
+			  String8 outputDeviceName = pluginState->outputDeviceNames[outputDeviceIndex];
+			  UIComm outputDevice = uiMakeSelectableTextElement(panelLayout, outputDeviceName,
+									    textScale, textColor);
+			  if(outputDevice.flags & UICommFlag_hovering)
+			    {
+			      if(!isSelected) outputDevice.element->color = hoveringTextColor;
+			    }
+			  if(outputDevice.flags & UICommFlag_pressed)
+			    {
+			      pluginState->selectedOutputDeviceIndex = outputDeviceIndex;
+
+			      renderCommands->outputAudioDeviceChanged = true;
+			      renderCommands->selectedOutputAudioDeviceIndex = outputDeviceIndex;
+			    }
+			}
+		    }
+		  else if(stringsAreEqual(panel->name, STR8_LIT("menu right")))
+		    {
+		      for(u32 inputDeviceIndex = 0;
+			  inputDeviceIndex < pluginState->inputDeviceCount;
+			  ++inputDeviceIndex)
+			{
+			  bool isSelected = (inputDeviceIndex == pluginState->selectedInputDeviceIndex);
+			  v4 textColor = isSelected ? selectedTextColor : baseTextColor;
+			  String8 inputDeviceName = pluginState->inputDeviceNames[inputDeviceIndex];
+			  UIComm inputDevice = uiMakeSelectableTextElement(panelLayout, inputDeviceName,
+									   textScale, textColor);
+			  if(inputDevice.flags & UICommFlag_hovering)
+			    {
+			      if(!isSelected) inputDevice.element->color = hoveringTextColor;
+			    }
+			  if(inputDevice.flags & UICommFlag_pressed)
+			    {
+			      pluginState->selectedInputDeviceIndex = inputDeviceIndex;
+
+			      renderCommands->inputAudioDeviceChanged = true;
+			      renderCommands->selectedInputAudioDeviceIndex = inputDeviceIndex;
+			    }
+			}
+		    }
+
+		  renderPushUILayout(renderCommands, panelLayout);
+		  uiEndLayout(panelLayout);
+		}
+	    }
+#if 0
 	  UILayout *menuLayout = &pluginState->menuPanel->layout;
 	  uiBeginLayout(menuLayout, uiContext, screenRect, colorV4FromU32(0x04060EFF));
 	  renderPushQuad(renderCommands, screenRect, 0, 0, RenderLevel_background, menuLayout->root->color);
 
 	  v4 baseTextColor = colorV4FromU32(0xFFDEADFF);
+	  v4 hoveringTextColor = colorV4FromU32(0x98F5FFFF);
 	  v4 selectedTextColor = colorV4FromU32(0xFFD700FF);
 	  //v4 selectedTextColor = V4(0, 1, 1, 1);
 
 	  r32 textScale = 0.45f;
 	  for(u32 outputDeviceIndex = 0; outputDeviceIndex < pluginState->outputDeviceCount; ++outputDeviceIndex)
 	    {
-	      v4 textColor = (outputDeviceIndex == pluginState->selectedOutputDeviceIndex) ? selectedTextColor : baseTextColor;
+	      bool isSelected = (outputDeviceIndex == pluginState->selectedOutputDeviceIndex);
+	      v4 textColor =  isSelected ? selectedTextColor : baseTextColor;
 	      String8 outputDeviceName = pluginState->outputDeviceNames[outputDeviceIndex];
 	      UIComm outputDevice = uiMakeSelectableTextElement(menuLayout, outputDeviceName, textScale, textColor);
+	      if(outputDevice.flags & UICommFlag_hovering)
+		{
+		  if(!isSelected) outputDevice.element->color = hoveringTextColor;
+		}
+	      if(outputDevice.flags & UICommFlag_pressed)
+		{
+		  pluginState->selectedOutputDeviceIndex = outputDeviceIndex;
+		}
 	    }
 
 	  for(u32 inputDeviceIndex = 0; inputDeviceIndex < pluginState->inputDeviceCount; ++inputDeviceIndex)
 	    {
-	      v4 textColor = (inputDeviceIndex == pluginState->selectedInputDeviceIndex) ? selectedTextColor : baseTextColor;
+	      bool isSelected = (inputDeviceIndex == pluginState->selectedInputDeviceIndex);
+	      v4 textColor = isSelected ? selectedTextColor : baseTextColor;
 	      String8 inputDeviceName = pluginState->inputDeviceNames[inputDeviceIndex];
 	      UIComm inputDevice = uiMakeSelectableTextElement(menuLayout, inputDeviceName, textScale, textColor);
+	      if(inputDevice.flags & UICommFlag_hovering)
+		{
+		  if(!isSelected) inputDevice.element->color = hoveringTextColor;
+		}
+	      if(inputDevice.flags & UICommFlag_pressed)
+		{
+		  pluginState->selectedInputDeviceIndex = inputDeviceIndex;
+		}
 	    }
 
 	  renderPushUILayout(renderCommands, menuLayout);
 	  uiEndLayout(menuLayout);
+#endif
 	}
       else
 	{

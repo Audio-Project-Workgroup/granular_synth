@@ -109,6 +109,11 @@ struct RenderCommands
 
   RenderCursorState cursorState;
 
+  bool outputAudioDeviceChanged;
+  u32 selectedOutputAudioDeviceIndex;
+  bool inputAudioDeviceChanged;
+  u32 selectedInputAudioDeviceIndex;
+
   u32 texturedQuadCount;
   u32 texturedQuadCapacity;
   TexturedQuad *texturedQuads;
@@ -131,6 +136,9 @@ renderBeginCommands(RenderCommands *commands, Arena *perFrameAllocator)
   commands->allocator = perFrameAllocator;
 
   commands->cursorState = CursorState_default;
+  
+  commands->outputAudioDeviceChanged = false;
+  commands->inputAudioDeviceChanged = false;  
 
   commands->texturedQuadCount = 0;
   commands->texturedQuadCapacity = THOUSAND(4);

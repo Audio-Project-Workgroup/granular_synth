@@ -598,8 +598,11 @@ getTextDim(LoadedFont *font, String8 text)
 
       ++at;
       //if(*at)
-      result.x += (r32)getHorizontalAdvance(font, c, *at); 
+	{
+	  result.x += (r32)getHorizontalAdvance(font, c, *at); 
+	}      
     }
-
+  
   return(result);
 }
+

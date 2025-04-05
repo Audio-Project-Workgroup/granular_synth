@@ -58,7 +58,8 @@ renderPushRectOutline(RenderCommands *commands, Rect2 rect, r32 thickness, Rende
 }
 
 static inline void
-renderPushTriangle(RenderCommands *commands, TexturedVertex v1, TexturedVertex v2, TexturedVertex v3, LoadedBitmap *texture = 0)
+renderPushTriangle(RenderCommands *commands, TexturedVertex v1, TexturedVertex v2, TexturedVertex v3,
+		   LoadedBitmap *texture = 0)
 {
   ASSERT(commands->triangleCount < commands->triangleCapacity);
   TexturedTriangle *triangle = commands->triangles + commands->triangleCount++;
@@ -71,35 +72,77 @@ renderPushTriangle(RenderCommands *commands, TexturedVertex v1, TexturedVertex v
 }
 
 static inline v2
-renderPushText(RenderCommands *commands, LoadedFont *font, String8 string,//u8 *string,
-	       v2 textMin, v2 textScale,
-	       //Rect2 textRect,
+renderPushText(RenderCommands *commands, LoadedFont *font, String8 string,
+	       v2 textMin, v2 textScale, r32 regionWidth,
 	       v4 color = V4(1, 1, 1, 1))
 {
-  /* v2 textDimBase = getTextDim(font, string); */
-  /* v2 textDim = getDim(textRect); */
-  /* v2 textScale = V2(textDim.x/textDimBase.x, textDim.y/textDimBase.y); */
-
-  //v2 atPos = textRect.min;
   v2 atPos = textMin;
   u8 *at = string.str;
   u64 stringSize = string.size;
-  //while(*at)
+  
+  struct GlyphPushData
+  {
+    u8 c;
+    Rect2 rect;
+    LoadedBitmap *glyph;
+  } pastGlyphs[3] = {};
+
+  bool overflow = false;
   for(u32 i = 0; i < stringSize; ++i)
-    {
+    {      	
       u8 c = *at;
       LoadedBitmap *glyph = getGlyphFromChar(font, c);
 
       v2 glyphDim = V2(glyph->width, glyph->height);
       v2 scaledGlyphDim = hadamard(textScale, glyphDim);
-      Rect2 glyphRect = rectMinDim(atPos, scaledGlyphDim);
-      renderPushQuad(commands, glyphRect, glyph, 0, RenderLevel_front, color);
+      Rect2 glyphRect = rectMinDim(atPos, scaledGlyphDim);      
 
+      if(i >= 2)
+	{
+	  GlyphPushData glyphPushData = pastGlyphs[2];
+	  renderPushQuad(commands, glyphPushData.rect, glyphPushData.glyph, 0, RenderLevel_front, color);
+	}
+
+      //pastGlyphs[3] = pastGlyphs[2];
+      pastGlyphs[2] = pastGlyphs[1];
+      pastGlyphs[1] = pastGlyphs[0];
+      pastGlyphs[0] = {c, glyphRect, glyph};
+      
       ++at;
-      //if(*at)
       atPos.x += textScale.x*getHorizontalAdvance(font, c, *at);
+      if((atPos.x - textMin.x) >= regionWidth)
+	{
+	  if(i != (stringSize - 1))
+	    {
+	      overflow = true;
+	      break;
+	    }
+	}           
     }
 
+  if(!overflow)
+    {
+      GlyphPushData glyphPushData = pastGlyphs[2];
+      renderPushQuad(commands, glyphPushData.rect, glyphPushData.glyph, 0, RenderLevel_front, color);
+      glyphPushData = pastGlyphs[1];
+      renderPushQuad(commands, glyphPushData.rect, glyphPushData.glyph, 0, RenderLevel_front, color);
+      glyphPushData = pastGlyphs[0];
+      renderPushQuad(commands, glyphPushData.rect, glyphPushData.glyph, 0, RenderLevel_front, color);
+    }
+  else
+    {
+      atPos = pastGlyphs[2].rect.min;
+      r32 hAdvance = textScale.x*getHorizontalAdvance(font, '.', '.');	
+      LoadedBitmap *glyph = getGlyphFromChar(font, '.');
+      v2 scaledGlyphDim = hadamard(textScale, V2(glyph->width, glyph->height));      
+      for(u32 i = 0; i < 3; ++i)
+	{
+	  Rect2 glyphRect = rectMinDim(atPos, scaledGlyphDim);
+	  renderPushQuad(commands, glyphRect, glyph, 0, RenderLevel_front, color);
+	  atPos.x += hAdvance;
+	}
+    }
+  
   atPos.y -= textScale.y*font->verticalAdvance;
   return(atPos);
 }
@@ -207,12 +250,13 @@ renderPushUIElement(RenderCommands *commands, UIElement *element)
       //v2 textDim = getTextDim(layout->font, element->name);
       //v2 textScale = V2(elementRegionDim.x/textDim.x, elementRegionDim.y/textDim.y);
       renderPushText(commands, layout->context->font,
-		     element->name, element->region.min, element->textScale, element->color);
+		     element->name, element->region.min, element->textScale, getDim(element->region).x,
+		     element->color);
     }
   if(element->flags & UIElementFlag_drawBorder)
     {
       v4 color = (uiHashKeysAreEqual(element->hashKey, layout->selectedElement)) ? V4(1, 0.5f, 0, 1) : V4(0, 0, 0, 1);
-
+      
       Rect2 border = rectAddRadius(element->region, V2(1, 1));
       renderPushRectOutline(commands, element->region, 2.f, RenderLevel_front, color);
     }
@@ -252,6 +296,7 @@ renderPushUIElement(RenderCommands *commands, UIElement *element)
 	    }
 	}
     }
+  
   r32 labelVSpace = 5.f;
   r32 labelHeight = 15.f;
   v2 textDim = getTextDim(layout->context->font, element->name);
@@ -261,19 +306,21 @@ renderPushUIElement(RenderCommands *commands, UIElement *element)
     {                                   
       v2 labelCenter = V2(elementRegionCenter.x,
 			  elementRegionCenter.y + 0.5f*elementRegionDim.y + labelVSpace + 0.5f*labelHeight);
-      Rect2 labelRegion = rectCenterDim(labelCenter, labelDim);
+      Rect2 labelRegion = rectAddRadius(rectCenterDim(labelCenter, labelDim), V2(2, 1));
       
       renderPushRectOutline(commands, labelRegion, 2.f, RenderLevel_front, V4(0, 0, 0, 1));
-      renderPushText(commands, layout->context->font, element->name, labelRegion.min, V2(textScale, textScale));
+      renderPushText(commands, layout->context->font, element->name,
+		     labelRegion.min, V2(textScale, textScale), labelDim.x);
     }
   if(element->flags & UIElementFlag_drawLabelBelow)
     {           
       v2 labelCenter = V2(elementRegionCenter.x,
 			  elementRegionCenter.y - 0.5f*elementRegionDim.y - labelVSpace - 0.5f*labelHeight);
-      Rect2 labelRegion = rectCenterDim(labelCenter, labelDim);
+      Rect2 labelRegion = rectAddRadius(rectCenterDim(labelCenter, labelDim), V2(2, 1));
       
       renderPushRectOutline(commands, labelRegion, 2.f, RenderLevel_front, V4(0, 0, 0, 1));
-      renderPushText(commands, layout->context->font, element->name, labelRegion.min, V2(textScale, textScale));
+      renderPushText(commands, layout->context->font, element->name,
+		     labelRegion.min, V2(textScale, textScale), labelDim.x);
     }
 
   if(element->next)

@@ -585,7 +585,7 @@ uiMakeTextElement(UILayout *layout, String8 message, r32 desiredTextScale, v4 co
   textOffset.y += layoutRegionRemainingDim.y - textScale*context->font->verticalAdvance;
 
   text->textScale = V2(textScale, textScale);
-  text->region = rectMinDim(textOffset, textScale*messageRectDim);
+  text->region = rectAddRadius(rectMinDim(textOffset, (textScale/desiredTextScale)*messageRectDim), V2(2, 1));
   
   layout->regionRemaining.max.y = text->region.min.y;
 
@@ -607,8 +607,11 @@ uiMakeSelectableTextElement(UILayout *layout, String8 message, r32 scale, v4 col
   v2 textRectOffset = (layout->regionRemaining.min +
 		       V2(0.f, layoutRegionRemainingDim.y - scale*context->font->verticalAdvance));  
 
+  Rect2 textRect = rectAddRadius(rectMinDim(textRectOffset, textRectDim), V2(2, 1));
+  textRect.max.x = MIN(textRect.max.x, layout->regionRemaining.max.x);
+  
   text->textScale = V2(scale, scale);
-  text->region = rectMinDim(textRectOffset, textRectDim);
+  text->region = textRect;
 
   layout->regionRemaining.max.y = text->region.min.y;
 
