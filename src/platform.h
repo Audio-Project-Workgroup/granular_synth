@@ -162,6 +162,7 @@ atomicLoad(volatile u32 *src)
   return(result);
 }
 
+#if 0
 static void *
 atomicLoadPointer(volatile void **src)
 {
@@ -169,6 +170,7 @@ atomicLoadPointer(volatile void **src)
 
   return(result);
 }
+#endif
 
 static u32
 atomicStore(volatile u32 *dest, u32 value)
@@ -490,11 +492,13 @@ atomicLoad(volatile u32 *src)
   return(__atomic_load_n(src, __ATOMIC_ACQUIRE));
 }
 
+#if 0
 static void *
 atomicLoadPointer(volatile void **src)
 {
   return(__atomic_load_n(src, __ATOMIC_ACQUIRE));
 }
+#endif
 
 static u32
 atomicStore(volatile u32 *dest, u32 value)

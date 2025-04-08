@@ -73,7 +73,7 @@ struct PlatformAPI
   PlatformGetCurrentTimestamp *getCurrentTimestamp;
 
   AtomicLoad *atomicLoad;
-  AtomicLoadPointer *atomicLoadPointer;
+  //AtomicLoadPointer *atomicLoadPointer;
   AtomicStore *atomicStore;
   AtomicAdd *atomicAdd;
   AtomicCompareAndSwap *atomicCompareAndSwap;

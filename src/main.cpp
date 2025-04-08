@@ -267,7 +267,8 @@ static BASE_THREAD_PROC(audioThreadProc)
   for(;;)
     {
       s32 outputRBPtrDistance = ma_pcm_rb_pointer_distance(outputRingBuffer);
-      //s32 inputRBPtrDistance = ma_pcm_rb_pointer_distance(inputRingBuffer);
+      s32 inputRBPtrDistance = ma_pcm_rb_pointer_distance(inputRingBuffer);
+      UNUSED(inputRBPtrDistance);
       //fprintf(stdout, "\n output rb ptr distance: %d\n", outputRBPtrDistance);
       //fprintf(stdout, "input rb ptr distance: %d\n\n", inputRBPtrDistance);
 
@@ -383,7 +384,7 @@ main(int argc, char **argv)
 	  pluginMemory.platformAPI.getCurrentTimestamp = platformGetCurrentTimestamp;
 
 	  pluginMemory.platformAPI.atomicLoad			= atomicLoad;
-	  pluginMemory.platformAPI.atomicLoadPointer		= atomicLoadPointer;
+	  //pluginMemory.platformAPI.atomicLoadPointer		= atomicLoadPointer;
 	  pluginMemory.platformAPI.atomicStore			= atomicStore;
 	  pluginMemory.platformAPI.atomicAdd			= atomicAdd;
 	  pluginMemory.platformAPI.atomicCompareAndSwap		= atomicCompareAndSwap;
@@ -503,16 +504,16 @@ main(int argc, char **argv)
 			 (ma_pcm_rb_init(ma_format_s16, CHANNELS, audioBufferFrameCount,
 					 audioBufferDataInput, NULL, &maInputRingBuffer) == MA_SUCCESS))
 			{
-			  //s32 maOutputRBPtrDistance = ma_pcm_rb_pointer_distance(&maOutputRingBuffer);
-			  //s32 maInputRBPtrDistance = ma_pcm_rb_pointer_distance(&maInputRingBuffer);
+			  s32 maOutputRBPtrDistance = ma_pcm_rb_pointer_distance(&maOutputRingBuffer);
+			  s32 maInputRBPtrDistance = ma_pcm_rb_pointer_distance(&maInputRingBuffer);
 			  
-			  // ASSERT(ma_pcm_rb_seek_write(&maOutputRingBuffer,
-			  // 			      targetLatencySamples) == MA_SUCCESS);
-			  // maOutputRBPtrDistance = ma_pcm_rb_pointer_distance(&maOutputRingBuffer);
+			  ASSERT(ma_pcm_rb_seek_write(&maOutputRingBuffer,
+						      targetLatencySamples) == MA_SUCCESS);
+			  maOutputRBPtrDistance = ma_pcm_rb_pointer_distance(&maOutputRingBuffer);
 			  
-			  // ASSERT(ma_pcm_rb_seek_write(&maInputRingBuffer,
-			  // 			      audioBufferFrameCount - targetLatencySamples) == MA_SUCCESS);
-			  // maInputRBPtrDistance = ma_pcm_rb_pointer_distance(&maInputRingBuffer);
+			  ASSERT(ma_pcm_rb_seek_write(&maInputRingBuffer,
+						      audioBufferFrameCount - targetLatencySamples) == MA_SUCCESS);
+			  maInputRBPtrDistance = ma_pcm_rb_pointer_distance(&maInputRingBuffer);
 
 			  MACallbackUserData maCallbackUserData = {&maOutputRingBuffer, &maInputRingBuffer};
 

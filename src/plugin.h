@@ -17,9 +17,14 @@ pluginSetBooleanParameter(PluginBooleanParameter *param, bool value)
   param->value = value;
 }
 
+#define PARAMETER_TRANSFORM(name) r32 (name)(r32 val)
+typedef PARAMETER_TRANSFORM(ParameterTransform);
+
 struct PluginFloatParameter
 {
   RangeR32 range;
+
+  ParameterTransform *processingTransform;
 
   volatile u32 mutex;
   union
@@ -38,6 +43,20 @@ struct PluginFloatParameter
     };
   };   
 };
+
+PARAMETER_TRANSFORM(defaultTransform)
+{
+  return(val);
+}
+
+inline void
+initializeFloatParameter(PluginFloatParameter *param, r32 defaultValue, RangeR32 range,
+			 ParameterTransform *transform = defaultTransform)
+{
+  param->currentValue = param->targetValue = defaultValue;
+  param->range = range;
+  param->processingTransform = transform;
+}
 
 inline r32
 pluginReadFloatParameter(PluginFloatParameter *param)
