@@ -244,9 +244,89 @@ maDataCallback(ma_device *pDevice, void *pOutput, const void *pInput, ma_uint32 
     }
 }
 
+struct AudioThreadData
+{
+  ma_pcm_rb *outputBuffer;
+  ma_pcm_rb *inputBuffer;
+
+  u32 targetLatencySamples;
+  PluginCode *plugin;
+  PluginMemory *pluginMemory;
+  PluginAudioBuffer *audioBuffer;  
+};
+
+static BASE_THREAD_PROC(audioThreadProc)
+{
+  AudioThreadData *audioData = (AudioThreadData *)data;
+  PluginCode *plugin = audioData->plugin;
+  PluginMemory *pluginMemory = audioData->pluginMemory;
+  PluginAudioBuffer *audioBuffer = audioData->audioBuffer;
+  ma_pcm_rb *outputRingBuffer = audioData->outputBuffer;
+  ma_pcm_rb *inputRingBuffer = audioData->inputBuffer;
+
+  for(;;)
+    {
+      s32 outputRBPtrDistance = ma_pcm_rb_pointer_distance(outputRingBuffer);
+      //s32 inputRBPtrDistance = ma_pcm_rb_pointer_distance(inputRingBuffer);
+      //fprintf(stdout, "\n output rb ptr distance: %d\n", outputRBPtrDistance);
+      //fprintf(stdout, "input rb ptr distance: %d\n\n", inputRBPtrDistance);
+
+      // TODO: this timing code was hastily hacked together and should be thought out
+      //       more and made better
+      u32 framesRemaining = (outputRBPtrDistance < 2*(s32)audioData->targetLatencySamples) ?
+	audioData->targetLatencySamples : 0;
+      ma_result maResult;
+      while(framesRemaining)
+	{
+	  void *writePtr = 0;
+	  void *readPtr = 0;
+	  u32 framesToWrite = framesRemaining;
+	  maResult = ma_pcm_rb_acquire_write(outputRingBuffer, &framesToWrite, &writePtr);
+	  maResult = ma_pcm_rb_acquire_read(inputRingBuffer, &framesToWrite, &readPtr);
+	  if(maResult == MA_SUCCESS)
+	    {
+	      if(plugin->audioProcess)
+		{
+		  // u64 audioProcessCallTime = readOSTimer();
+		  // audioBuffer.millisecondsElapsedSinceLastCall =
+		  //   audioProcessCallTime - lastAudioProcessCallTime;
+		  // lastAudioProcessCallTime = audioProcessCallTime;
+
+		  audioBuffer->outputBuffer[0] = writePtr;
+		  audioBuffer->outputBuffer[1] = (u8 *)writePtr + sizeof(s16);
+		  audioBuffer->inputBuffer[0] = readPtr;
+		  audioBuffer->inputBuffer[1] = readPtr;
+		  audioBuffer->framesToWrite = framesToWrite;
+		  plugin->audioProcess(pluginMemory, audioBuffer);
+		}
+
+	      maResult = ma_pcm_rb_commit_write(outputRingBuffer, framesToWrite);
+	      maResult = ma_pcm_rb_commit_read(inputRingBuffer, framesToWrite);
+	      if(maResult == MA_SUCCESS)
+		{
+		  //fprintf(stdout, "wrote %u frames\n", framesToWrite);
+		  framesRemaining -= framesToWrite;
+		}
+	      else
+		{
+		  fprintf(stderr,
+			  "ERROR: audioProcess: ma_pcm_rb_commit_write failed: %s\n",
+			  ma_result_description(maResult));
+		}
+	    }
+	  else
+	    {
+	      fprintf(stderr,
+		      "ERROR: audioProcess: ma_pcm_rb_acquire_write failed: %s\n",
+		      ma_result_description(maResult));
+	    }
+	}
+    }
+}
+
 int
 main(int argc, char **argv)
-{
+{  
   printf("plugin path: %s\n", PLUGIN_PATH);
   int result = 0;
   
@@ -423,8 +503,8 @@ main(int argc, char **argv)
 			 (ma_pcm_rb_init(ma_format_s16, CHANNELS, audioBufferFrameCount,
 					 audioBufferDataInput, NULL, &maInputRingBuffer) == MA_SUCCESS))
 			{
-			  s32 maOutputRBPtrDistance = ma_pcm_rb_pointer_distance(&maOutputRingBuffer);
-			  s32 maInputRBPtrDistance = ma_pcm_rb_pointer_distance(&maInputRingBuffer);
+			  //s32 maOutputRBPtrDistance = ma_pcm_rb_pointer_distance(&maOutputRingBuffer);
+			  //s32 maInputRBPtrDistance = ma_pcm_rb_pointer_distance(&maInputRingBuffer);
 			  
 			  // ASSERT(ma_pcm_rb_seek_write(&maOutputRingBuffer,
 			  // 			      targetLatencySamples) == MA_SUCCESS);
@@ -454,10 +534,22 @@ main(int argc, char **argv)
 			    {
 			      ma_device_start(&maDevice);
 
+			      OSThread audioThread;
+			      AudioThreadData audioThreadData = {};
+			      audioThreadData.outputBuffer = &maOutputRingBuffer;
+			      audioThreadData.inputBuffer = &maInputRingBuffer;
+			      audioThreadData.targetLatencySamples = targetLatencySamples;
+			      audioThreadData.plugin = &plugin;
+			      audioThreadData.pluginMemory = &pluginMemory;
+			      audioThreadData.audioBuffer = &audioBuffer;  
+
+			      threadCreate(&audioThread, audioThreadProc, &audioThreadData);
+			      threadStart(audioThread);
+
 			      // main loop
 
 			      u64 frameElapsedTime = 0;
-			      u64 lastAudioProcessCallTime = 0;
+			      //u64 lastAudioProcessCallTime = 0;
 			      while(!glfwWindowShouldClose(window))
 				{
 				  u64 frameStartTime = readOSTimer();
@@ -594,7 +686,7 @@ main(int argc, char **argv)
 				  glfwPollEvents();		      	     		      
 
 				  // process audio
-
+#if 0
 				  maOutputRBPtrDistance = ma_pcm_rb_pointer_distance(&maOutputRingBuffer);
 				  maInputRBPtrDistance = ma_pcm_rb_pointer_distance(&maInputRingBuffer);
 				  fprintf(stdout, "\n output rb ptr distance: %d\n", maOutputRBPtrDistance);
@@ -673,6 +765,7 @@ main(int argc, char **argv)
 						  ma_result_description(maResult));
 					}
 				    }
+#endif
 
 				  PluginInput *temp = newInput;
 				  newInput = oldInput;

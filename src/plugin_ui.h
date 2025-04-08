@@ -30,7 +30,7 @@ inline UIPanel *
 makeUIPanel(UIPanel *currentParent, Arena *permanentArena, UIAxis splitAxis, r32 sizePercentOfParent, String8 name,
 	    v4 color = V4(0, 0, 0, 1))
 {
-  UIPanel *newPanel = arenaPushStruct(permanentArena, UIPanel);
+  UIPanel *newPanel = arenaPushStruct(permanentArena, UIPanel, arenaFlagsZeroNoAlign());
   newPanel->splitAxis = splitAxis;
   newPanel->sizePercentOfParent = sizePercentOfParent;
   newPanel->parent = currentParent;

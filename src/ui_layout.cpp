@@ -20,7 +20,8 @@ uiAllocateElement(UILayout *layout, String8 name, u32 flags, v4 color)
   UIContext *context = layout->context;
   UIElement *result = arenaPushStruct(context->frameArena, UIElement, arenaFlagsZeroNoAlign());
   result->layout = layout;
-  result->name = arenaPushString(context->frameArena, name);
+  //result->name = arenaPushString(context->frameArena, name);
+  result->name = arenaPushString(context->permanentArena, name);
   result->textScale = V2(1, 1);
   result->flags = flags;
   result->color = color;

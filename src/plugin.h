@@ -142,6 +142,7 @@ struct PluginState
   Arena grainArena;
   Arena permanentArena;
   Arena frameArena;
+  Arena framePermanentArena;
   Arena loadArena;
 
   PluginHost pluginHost;

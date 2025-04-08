@@ -1,6 +1,27 @@
 // operating-system-dependent functions/types
 #pragma once
 
+#define BASE_THREAD_PROC(name) void (name)(void *data)
+typedef BASE_THREAD_PROC(BaseThreadProc);
+
+static void
+baseThreadEntry(BaseThreadProc *func, void *data)
+{  
+  func(data);
+}
+
+struct OSThread
+{
+  void *handle;
+  void *id;
+  
+  BaseThreadProc *func;
+  void *data;
+};
+
+static void threadCreate(OSThread *thread, BaseThreadProc *func, void *data);
+static void threadStart(OSThread thread);
+
 static u32 atomicLoad(volatile u32 *src);
 static u32 atomicStore(volatile u32 *dest, u32 value);
 static u32 atomicAdd(volatile u32 *addend, u32 value);
@@ -81,6 +102,52 @@ inline void
 msecWait(u32 msecsToWait)
 {
   Sleep(msecsToWait);
+}
+
+//
+// thread 
+//
+
+static DWORD WINAPI
+win32ThreadEntry(void *data)
+{
+  OSThread *thread = (OSThread *)data;
+  baseThreadEntry(thread->func, thread->data);
+  
+  return(0);
+}
+
+static void
+threadCreate(OSThread *thread, BaseThreadProc *func, void *threadData)
+{  
+  thread->func = func;
+  thread->data = threadData;
+
+  DWORD id;
+  thread->handle = CreateThread(0, 0, win32ThreadEntry, thread, CREATE_SUSPENDED, &id);
+  if(thread->handle == NULL)
+    {
+      DWORD errorCode = GetLastError();
+      char *errorMessage;
+      FORMAT_ERROR_AS_STRING(errorCode, errorMessage);
+      fprintf(stderr, "failed to get plugin code: %s\n", errorMessage);
+    }
+  else
+    {
+      thread->id = (void *)(uintptr_t)id;
+    } 
+}
+
+static void
+threadStart(OSThread thread)
+{  
+  if(ResumeThread(thread.handle) == (DWORD)-1)
+    {
+      DWORD errorCode = GetLastError();
+      char *errorMessage;
+      FORMAT_ERROR_AS_STRING(errorCode, errorMessage);
+      fprintf(stderr, "failed to get plugin code: %s\n", errorMessage);
+    }
 }
 
 //
@@ -356,6 +423,59 @@ inline void
 msecWait(u32 msecsToWait)
 {
   usleep(1000*msecsToWait);
+}
+
+//
+// thread
+//
+
+#include <pthread.h>
+
+static void
+threadCreate(OSThread *thread, BaseThreadProc *func, void *data)
+{
+  thread->func = func;
+  thread->data = data;
+
+  pthread_attr_t attr;
+  int result = pthread_attr_init(&attr);
+  if(result == 0)
+    {
+      result = pthread_attr_setdetatchstate(&attr, PTHREAD_CREATE_DETACHED);
+      if(result == 0)
+	{
+	  pthread_t handle;
+	  result = pthread_create(&handle, attr, func, data);
+	  if(result == 0)
+	    {
+	      thread->handle = (void *)(uintptr_t)handle;
+	    }
+	  else
+	    {
+	      fprintf(stderr, "ERROR: threadCreate: pthread_create failed\n");
+	    }
+	}
+      else
+	{
+	  fprintf(stderr, "ERROR: threadCreate: pthread_attr_setdetatchstate failed\n");
+	}
+    }
+  else
+    {
+      fprintf(stderr, "ERROR: threadCreate: ptread_attr_init failed\n");
+    }
+}
+
+static void
+threadStart(OSThread thread)
+{
+  pthread_t handle = thread->handle;
+  int result = pthread_detatch(handle);
+  if(result != 0)
+    {
+      fprintf(stderr, "ERROR: threadStart: pthread_detatch failed: %s\n",
+	      (result == EINVAL) ? "thread is not joinable" : ((result == ESRCH) ? "invalid thread id" : ""));
+    }
 }
 
 //

@@ -87,6 +87,19 @@ printButtonState(ButtonState button, char *name)
 	 isDown(button) ? "down" : "up");
 }
 
+static PluginState *
+getPluginState(PluginMemory *memoryBlock)
+{
+  void *memory = memoryBlock->memory;
+  PluginState *pluginState = 0;
+  if(memory)
+    {      
+      pluginState = (PluginState *)memory;
+    }
+
+  return(pluginState);
+}
+
 extern "C"
 INITIALIZE_PLUGIN_STATE(initializePluginState)
 {
@@ -107,6 +120,7 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 
 	      pluginState->permanentArena = arenaBegin((u8 *)memory + sizeof(PluginState), MEGABYTES(512));
 	      pluginState->frameArena = arenaSubArena(&pluginState->permanentArena, MEGABYTES(64));
+	      pluginState->framePermanentArena = arenaSubArena(&pluginState->permanentArena, MEGABYTES(64));
 	      pluginState->loadArena = arenaSubArena(&pluginState->permanentArena, MEGABYTES(128));
 	      pluginState->grainArena = arenaSubArena(&pluginState->permanentArena, KILOBYTES(32));
 	      	      	     
@@ -296,12 +310,14 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 					       &pluginState->permanentArena, characterRange, 32.f);
 
 	      // NOTE: ui initialization
-	      pluginState->uiContext = uiInitializeContext(&pluginState->frameArena, &pluginState->permanentArena,
-							   &pluginState->testFont);
+	      pluginState->uiContext =
+		uiInitializeContext(&pluginState->frameArena, &pluginState->framePermanentArena,
+				    &pluginState->testFont);
 	      //pluginState->layout = uiInitializeLayout(&pluginState->frameArena, &pluginState->permanentArena,
 	      //				       &pluginState->testFont);
 
-	      pluginState->rootPanel = arenaPushStruct(&pluginState->permanentArena, UIPanel);
+	      pluginState->rootPanel = arenaPushStruct(&pluginState->permanentArena, UIPanel,
+						       arenaFlagsZeroNoAlign());
 	      pluginState->rootPanel->sizePercentOfParent = 1.f;
 	      pluginState->rootPanel->splitAxis = UIAxis_y;	  
 
@@ -320,7 +336,8 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 	      UNUSED(left);
 	      UNUSED(right);
 
-	      pluginState->menuPanel = arenaPushStruct(&pluginState->permanentArena, UIPanel);
+	      pluginState->menuPanel = arenaPushStruct(&pluginState->permanentArena, UIPanel,
+						       arenaFlagsZeroNoAlign());
 	      pluginState->menuPanel->sizePercentOfParent = 1.f;
 	      pluginState->menuPanel->splitAxis = UIAxis_x;
 
@@ -1054,7 +1071,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 extern "C"
 AUDIO_PROCESS(audioProcess)
 {  
-  PluginState *pluginState = initializePluginState(memory);  
+  PluginState *pluginState = getPluginState(memory);//initializePluginState(memory);  
   if(pluginState->initialized)
     {
       // NOTE: copy plugin input audio to the grain buffer
