@@ -692,6 +692,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 		      //
 		      {
 			v2 dim = getDim(panelLayout->regionRemaining);
+			UNUSED(dim);
 			r32 sizePOP = 0.15f;		    
 			r32 offsetPixels = 20.f;		    
 			v2 offset = offsetPixels*V2(1, 1);
@@ -714,6 +715,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 		      //
 		      {
 			v2 dim = getDim(panelLayout->regionRemaining);
+			UNUSED(dim);
 			r32 sizePOP = 0.15f;
 			r32 offsetPixels = 20.f;
 			v2 offset = offsetPixels*V2(1, 1);    
@@ -1146,6 +1148,8 @@ AUDIO_PROCESS(audioProcess)
 
 		    genericInputFrames[channelIndex] = (u8 *)inputFrames + audioBuffer->inputStride;
 		  } break;
+
+		default: {ASSERT(!"invalid input format");} break;
 		}
 	      
 	      inputMixBuffers[channelIndex][frameIndex] = mixedVal;		   

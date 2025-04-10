@@ -3,7 +3,7 @@
 SRC_DIR=$PWD
 #-I$SRC_DIR/include
 
-CFLAGS="-g -Wall -Wno-writable-strings -Wno-missing-braces -fno-exceptions -fno-rtti -march=native -std=gnu++11"
+CFLAGS="-g -Wall -Wno-writable-strings -Wno-missing-braces -Wno-unused-function -fno-exceptions -fno-rtti -march=native -std=gnu++11"
 MAC_GL_FLAGS="-framework OpenGL"
 MAC_PLUGIN_FLAGS="-dynamiclib"
 LINUX_GL_FLAGS="-lGL"
@@ -28,8 +28,8 @@ mkdir -p ../build
 pushd ../build > /dev/null
 
 # compile miniaudio to static library
-# clang -c ../src/miniaudio_impl.c -o miniaudio.o
-# ar rcs libminiaudio.a miniaudio.o
+#clang -c ../src/miniaudio_impl.c -o miniaudio.o
+#ar rcs libminiaudio.a miniaudio.o
 
 # compile plugin and host
 clang $CFLAGS ../src/plugin.cpp -o $PLUGIN_NAME $PLUGIN_FLAGS -lm

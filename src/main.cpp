@@ -3,9 +3,9 @@
 // audio and video.
 
 /* TODO:
-   - multithreading
-   - audio output device selection
-   - keyboard input
+   - multithreading (tentatively done)
+   - audio output device selection (tentatively done)
+   - keyboard input (tentatively done)
    - midi device input
 */
 
@@ -510,10 +510,12 @@ main(int argc, char **argv)
 			  ASSERT(ma_pcm_rb_seek_write(&maOutputRingBuffer,
 						      targetLatencySamples) == MA_SUCCESS);
 			  maOutputRBPtrDistance = ma_pcm_rb_pointer_distance(&maOutputRingBuffer);
+			  UNUSED(maOutputRBPtrDistance);
 			  
 			  ASSERT(ma_pcm_rb_seek_write(&maInputRingBuffer,
 						      audioBufferFrameCount - targetLatencySamples) == MA_SUCCESS);
 			  maInputRBPtrDistance = ma_pcm_rb_pointer_distance(&maInputRingBuffer);
+			  UNUSED(maInputRBPtrDistance);
 
 			  MACallbackUserData maCallbackUserData = {&maOutputRingBuffer, &maInputRingBuffer};
 
@@ -545,7 +547,7 @@ main(int argc, char **argv)
 			      audioThreadData.audioBuffer = &audioBuffer;  
 
 			      threadCreate(&audioThread, audioThreadProc, &audioThreadData);
-			      threadStart(audioThread);
+			      //threadStart(audioThread);
 
 			      // main loop
 

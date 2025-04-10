@@ -20,7 +20,7 @@ struct OSThread
 };
 
 static void threadCreate(OSThread *thread, BaseThreadProc *func, void *data);
-static void threadStart(OSThread thread);
+//static void threadStart(OSThread thread);
 
 static u32 atomicLoad(volatile u32 *src);
 static u32 atomicStore(volatile u32 *dest, u32 value);
@@ -124,7 +124,8 @@ threadCreate(OSThread *thread, BaseThreadProc *func, void *threadData)
   thread->data = threadData;
 
   DWORD id;
-  thread->handle = CreateThread(0, 0, win32ThreadEntry, thread, CREATE_SUSPENDED, &id);
+  //thread->handle = CreateThread(0, 0, win32ThreadEntry, thread, CREATE_SUSPENDED, &id);
+  thread->handle = CreateThread(0, 0, win32ThreadEntry, thread, 0, &id);
   if(thread->handle == NULL)
     {
       DWORD errorCode = GetLastError();
@@ -137,7 +138,7 @@ threadCreate(OSThread *thread, BaseThreadProc *func, void *threadData)
       thread->id = (void *)(uintptr_t)id;
     } 
 }
-
+#if 0
 static void
 threadStart(OSThread thread)
 {  
@@ -149,6 +150,7 @@ threadStart(OSThread thread)
       fprintf(stderr, "failed to get plugin code: %s\n", errorMessage);
     }
 }
+#endif
 
 //
 // atomic operations
@@ -433,50 +435,38 @@ msecWait(u32 msecsToWait)
 
 #include <pthread.h>
 
+static void *
+posixThreadEntry(void *data)
+{
+  OSThread *thread = (OSThread *)data;
+  baseThreadEntry(thread->func, thread->data);
+
+  return(NULL);
+}
+
 static void
 threadCreate(OSThread *thread, BaseThreadProc *func, void *data)
 {
   thread->func = func;
   thread->data = data;
 
-  pthread_attr_t attr;
-  int result = pthread_attr_init(&attr);
+  pthread_t handle;
+  //pthread_t *handleOut = (pthread_t *)&thread->handle;
+  int result = pthread_create(&handle, NULL, posixThreadEntry, thread);
   if(result == 0)
     {
-      result = pthread_attr_setdetatchstate(&attr, PTHREAD_CREATE_DETACHED);
-      if(result == 0)
-	{
-	  pthread_t handle;
-	  result = pthread_create(&handle, attr, func, data);
-	  if(result == 0)
-	    {
-	      thread->handle = (void *)(uintptr_t)handle;
-	    }
-	  else
-	    {
-	      fprintf(stderr, "ERROR: threadCreate: pthread_create failed\n");
-	    }
-	}
-      else
-	{
-	  fprintf(stderr, "ERROR: threadCreate: pthread_attr_setdetatchstate failed\n");
-	}
+      thread->handle = (void *)(uintptr_t)handle;
     }
   else
     {
-      fprintf(stderr, "ERROR: threadCreate: ptread_attr_init failed\n");
-    }
-}
-
-static void
-threadStart(OSThread thread)
-{
-  pthread_t handle = thread->handle;
-  int result = pthread_detatch(handle);
-  if(result != 0)
-    {
-      fprintf(stderr, "ERROR: threadStart: pthread_detatch failed: %s\n",
-	      (result == EINVAL) ? "thread is not joinable" : ((result == ESRCH) ? "invalid thread id" : ""));
+      char *errorMessage = 0;
+      switch(result)
+	{	
+	case EAGAIN: {errorMessage = "insufficient resources";} break;
+	case EINVAL: {errorMessage = "invalid settings in attr";} break;
+	case EPERM: {errorMessage = "no permission to set scheduling policy and parameters in attr";} break;
+	}
+      fprintf(stderr, "ERROR: threadCreate: pthread_create failed: %s\n", errorMessage);
     }
 }
 

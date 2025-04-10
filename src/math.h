@@ -1011,8 +1011,9 @@ static REAL_FFT_FUNCTION(fft_real_noPermute)
   r32 *write = destRe;
   for(u32 i = 0; i < length; i += simdWidth)
     {
-      WideFloat in = wideLoadFloats(src);
-      wideStoreFloats(write, in);
+      //WideFloat in = wideLoadFloats(src);
+      WideFloat in = wideLoadFloats(read);
+      wideStoreFloats(write, in);      
 
       read += simdWidth;
       write += simdWidth;

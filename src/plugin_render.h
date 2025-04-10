@@ -258,7 +258,8 @@ renderPushUIElement(RenderCommands *commands, UIElement *element)
       v4 color = (uiHashKeysAreEqual(element->hashKey, layout->selectedElement)) ? V4(1, 0.5f, 0, 1) : V4(0, 0, 0, 1);
       
       Rect2 border = rectAddRadius(element->region, V2(1, 1));
-      renderPushRectOutline(commands, element->region, 2.f, RenderLevel_front, color);
+      //renderPushRectOutline(commands, element->region, 2.f, RenderLevel_front, color);
+      renderPushRectOutline(commands, border, 2.f, RenderLevel_front, color);
     }
   if(element->flags & UIElementFlag_drawBackground)
     {
