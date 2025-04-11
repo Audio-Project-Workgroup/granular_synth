@@ -100,7 +100,20 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
 		   .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
 #endif
 		   )
-{  
+{
+  for(u32 parameterIndex = PluginParameter_none + 1; parameterIndex < PluginParameter_count; ++parameterIndex)
+    {
+      PluginParameterInitData paramInit = pluginParameterInitData[parameterIndex];
+      if(paramInit.min != paramInit.max)
+	{
+	  juce::AudioParameterFloat *vstParameter =
+	    new juce::AudioParameterFloat(juce::String("parameter") + juce::String(parameterIndex),
+					  juce::String(paramInit.name),
+					  paramInit.min, paramInit.max, paramInit.init);
+	  vstParameters.push_back(vstParameter);
+	  addParameter(vstParameter);
+	}
+    }
 }
 
 AudioPluginAudioProcessor::~AudioPluginAudioProcessor()
@@ -274,7 +287,15 @@ prepareToPlay(double sampleRate, int samplesPerBlock)
     }
 
   pluginCode.initializePluginState(&pluginMemory);
-
+  pluginParameters = (PluginFloatParameter *)pluginMemory.memory;    
+  for(u32 parameterIndex = PluginParameter_none + 1; parameterIndex < PluginParameter_count; ++parameterIndex)
+    {
+      PluginFloatParameter *parameter = pluginParameters + parameterIndex;      
+      if(parameter->range.min != parameter->range.max)
+	{	  
+	}
+    }
+  
   audioBuffer = {};
   audioBuffer.inputFormat = audioBuffer.outputFormat = AudioFormat_r32;
   audioBuffer.inputSampleRate = audioBuffer.outputSampleRate = sampleRate;

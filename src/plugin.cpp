@@ -233,16 +233,11 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 
 	      // NOTE: parameter initialization
 	      pluginState->phasor = 0.f;
-	      pluginState->freq = 440.f;	  
-	      // pluginState->parameters[PluginParameter_volume].currentValue = 0.8f;
-	      // pluginState->parameters[PluginParameter_volume].targetValue = 0.8f;
-	      // pluginState->parameters[PluginParameter_volume].range = makeRange(0.f, 1.f);
-	      initializeFloatParameter(&pluginState->parameters[PluginParameter_volume], 0.8f, makeRange(0.f, 1.f));
-
-	      // pluginState->parameters[PluginParameter_density].currentValue = 1.f;
-	      // pluginState->parameters[PluginParameter_density].targetValue = 1.f;
-	      // pluginState->parameters[PluginParameter_density].range = makeRange(0.1f, 20.f);
-	      initializeFloatParameter(&pluginState->parameters[PluginParameter_density], 0.8f, makeRange(0.1f, 20.f));
+	      pluginState->freq = 440.f;	  	     
+	      initializeFloatParameter(&pluginState->parameters[PluginParameter_volume], //0.8f, makeRange(0.f, 1.f)
+				       pluginParameterInitData[PluginParameter_volume]);
+	      initializeFloatParameter(&pluginState->parameters[PluginParameter_density],// 0.8f, makeRange(0.1f, 20.f)
+				       pluginParameterInitData[PluginParameter_density]);
 
 	      // NOTE: devices
 	      pluginState->outputDeviceCount = memoryBlock->outputDeviceCount;

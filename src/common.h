@@ -9,6 +9,7 @@
 #include "profile.h"
 #include "math.h"
 #include "render.h"
+#include "parameters_common.h"
 
 //
 // functionality the host provides to the plugin

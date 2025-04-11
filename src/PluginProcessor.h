@@ -59,6 +59,10 @@ private:
   void *audioBufferMemory;
   bool resourcesReleased;
 
+  std::vector<juce::AudioParameterFloat*> vstParameters;
+  //juce::AudioParameterFloat *vstParameters[PluginParameter_count];
+  PluginFloatParameter *pluginParameters;
+
   //juce::DynamicLibrary onnxDLL;
   
   //==============================================================================

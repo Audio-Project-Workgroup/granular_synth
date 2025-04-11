@@ -459,7 +459,7 @@ threadCreate(OSThread *thread, BaseThreadProc *func, void *data)
     }
   else
     {
-      char *errorMessage = 0;
+      const char *errorMessage = 0;
       switch(result)
 	{	
 	case EAGAIN: {errorMessage = "insufficient resources";} break;
