@@ -43,6 +43,7 @@ private:
   u32 editorWidth, editorHeight;
   v2 displayDim, displayMin;
 
+  volatile u32 inputLock;
   PluginInput pluginInput[2];
   PluginInput *newInput;
   PluginInput *oldInput;

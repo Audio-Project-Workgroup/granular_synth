@@ -60,7 +60,8 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
   setWantsKeyboardFocus(true);
   setMouseClickGrabsKeyboardFocus(true);
   //grabKeyboardFocus();
-  
+
+  inputLock = 0;
   pluginInput[0] = {};
   pluginInput[1] = {};
   newInput = &pluginInput[0];
@@ -119,24 +120,40 @@ AudioPluginAudioProcessorEditor::resized()
 void
 AudioPluginAudioProcessorEditor::mouseMove(const juce::MouseEvent &event)
 {
+  while(atomicCompareAndSwap(&inputLock, 0, 1)) {}
+  
   juce::Point<int> mousePosition = event.getPosition();
   newInput->mouseState.position = V2(mousePosition.getX(), editorHeight - mousePosition.getY()) - displayMin;
-
+  
+  while(atomicCompareAndSwap(&inputLock, 1, 0)) {}
+  
   setMouseCursor(editorMouseCursor);
 }
 
 void
 AudioPluginAudioProcessorEditor::mouseDrag(const juce::MouseEvent &event)
 {
+  while(atomicCompareAndSwap(&inputLock, 0, 1)) {}
+  
   juce::Point<int> mousePosition = event.getPosition();
   newInput->mouseState.position = V2(mousePosition.getX(), editorHeight - mousePosition.getY()) - displayMin;
 
-  setMouseCursor(editorMouseCursor);
+  if(!(isDown(newInput->mouseState.buttons[MouseButton_left]) ||
+       isDown(newInput->mouseState.buttons[MouseButton_right])))
+    {
+      int breakme = 5;
+    }
+  
+  while(atomicCompareAndSwap(&inputLock, 1, 0)) {}
+
+  setMouseCursor(editorMouseCursor);  
 }
 
 void
 AudioPluginAudioProcessorEditor::mouseDown(const juce::MouseEvent &event)
 {
+  while(atomicCompareAndSwap(&inputLock, 0, 1)) {}
+  
   if(event.mods.isLeftButtonDown())
     {
       juceProcessButtonPress(&newInput->mouseState.buttons[MouseButton_left], true);      
@@ -145,12 +162,16 @@ AudioPluginAudioProcessorEditor::mouseDown(const juce::MouseEvent &event)
     {
       juceProcessButtonPress(&newInput->mouseState.buttons[MouseButton_right], true);
     }
+  
+  while(atomicCompareAndSwap(&inputLock, 1, 0)) {}
 }
 
 void
 AudioPluginAudioProcessorEditor::mouseUp(const juce::MouseEvent &event)
 {
   // NOTE: JUCE is a very intuitive and well-designed framework that everyone should use without question
+  while(atomicCompareAndSwap(&inputLock, 0, 1)) {}
+  
   if(event.mods.isLeftButtonDown())
     {
       juceProcessButtonPress(&newInput->mouseState.buttons[MouseButton_left], false);
@@ -159,21 +180,29 @@ AudioPluginAudioProcessorEditor::mouseUp(const juce::MouseEvent &event)
     {
       juceProcessButtonPress(&newInput->mouseState.buttons[MouseButton_right], false);
     }
+
+  while(atomicCompareAndSwap(&inputLock, 1, 0)) {}
 }
 
 void
 AudioPluginAudioProcessorEditor::mouseWheelMove(const juce::MouseEvent &event, const juce::MouseWheelDetails &wheel)
 {
+  while(atomicCompareAndSwap(&inputLock, 0, 1)) {}
+  
   if(wheel.deltaY != 0)
     {
       newInput->mouseState.scrollDelta += wheel.deltaY;
     }
+
+  while(atomicCompareAndSwap(&inputLock, 1, 0)) {}
 }
 
 bool AudioPluginAudioProcessorEditor::
 keyPressed(const juce::KeyPress &key)
 {
   bool result = false;
+  while(atomicCompareAndSwap(&inputLock, 0, 1)) {}
+  
   if(key == juce::KeyPress::tabKey)
     {
       result = true;
@@ -231,6 +260,7 @@ keyPressed(const juce::KeyPress &key)
       juceProcessButtonPress(&newInput->keyboardState.modifiers[KeyboardModifier_alt], result);
     }
 
+  while(atomicCompareAndSwap(&inputLock, 1, 0)) {}
   return(result);
 }
 
@@ -258,12 +288,16 @@ AudioPluginAudioProcessorEditor::renderOpenGL(void)
   glViewport(displayMin.x, displayMin.y, displayDim.x, displayDim.y);
   glScissor(displayMin.x, displayMin.y, displayDim.x, displayDim.y);
 
+  // NOTE: we have to put locks around input usage and input callback code, because juce doesn't give us a way of
+  //       polling input at a particular time.
+  while(atomicCompareAndSwap(&inputLock, 0, 1)) {}
   if(processorRef.pluginCode.renderNewFrame)
-    {
-      //juce::Logger::writeToLog("mouseP: (" + juce::String(newInput->mouseState.position.x) +
-      //		       ", " + juce::String(newInput->mouseState.position.y) + ")");
-      
-      processorRef.pluginCode.renderNewFrame(&processorRef.pluginMemory, newInput, &commands);      
+    {      
+      // juce::Logger::writeToLog("left: down=" +
+      // 			       juce::String((int)isDown(newInput->mouseState.buttons[MouseButton_left])) +
+      // 			       " pressed=" +
+      // 			       juce::String((int)wasPressed(newInput->mouseState.buttons[MouseButton_left])));
+      processorRef.pluginCode.renderNewFrame(&processorRef.pluginMemory, newInput, &commands);
 
       // NOTE: it's so cool that you can't set the mouse cursor here and have to defer setting it in a mouse callback
       switch(commands.cursorState)
@@ -303,7 +337,6 @@ AudioPluginAudioProcessorEditor::renderOpenGL(void)
 		  String8 string = node->string;
 		  if(string.str)
 		    {  
-		      //fwrite(string.str, sizeof(*string.str), string.size, stdout);
 		      juce::Logger::writeToLog(juce::String((const char *)string.str, string.size));
 		    }
 		}
@@ -314,12 +347,12 @@ AudioPluginAudioProcessorEditor::renderOpenGL(void)
 	      atomicStore(&pluginLogger->mutex, 0);
 	      break;
 	    }
-	}      
+	}
+      
     }
-
-  // TODO: it seems that input is still not being handled correctly.
-  //       when resizing panels, the cursor shape sometimes does not update,
-  //       and sometimes press interactions aren't registered
+  
+  juce::Logger::writeToLog(juce::String("inputs swapped"));  
+  
   PluginInput *temp = newInput;
   newInput = oldInput;
   oldInput = temp;
@@ -330,20 +363,24 @@ AudioPluginAudioProcessorEditor::renderOpenGL(void)
       newInput->mouseState.buttons[buttonIndex].halfTransitionCount = 0;
       newInput->mouseState.buttons[buttonIndex].endedDown =
 	oldInput->mouseState.buttons[buttonIndex].endedDown;
+      oldInput->mouseState.buttons[buttonIndex].endedDown = false;
     }
   for(u32 keyIndex = 0; keyIndex < KeyboardButton_COUNT; ++keyIndex)
     {
       newInput->keyboardState.keys[keyIndex].halfTransitionCount = 0;
       newInput->keyboardState.keys[keyIndex].endedDown =
 	oldInput->keyboardState.keys[keyIndex].endedDown;
+      oldInput->keyboardState.keys[keyIndex].endedDown = false;
     }
   for(u32 modifierIndex = 0; modifierIndex < KeyboardModifier_COUNT; ++modifierIndex)
     {
       newInput->keyboardState.modifiers[modifierIndex].halfTransitionCount = 0;
       newInput->keyboardState.modifiers[modifierIndex].endedDown =
 	oldInput->keyboardState.modifiers[modifierIndex].endedDown;
+      oldInput->keyboardState.modifiers[modifierIndex].endedDown = false;
     }
-
+  
+  while(atomicCompareAndSwap(&inputLock, 1, 0)) {}
 }
 
 void
