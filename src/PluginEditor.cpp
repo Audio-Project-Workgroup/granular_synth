@@ -289,7 +289,8 @@ AudioPluginAudioProcessorEditor::renderOpenGL(void)
   glScissor(displayMin.x, displayMin.y, displayDim.x, displayDim.y);
 
   // NOTE: we have to put locks around input usage and input callback code, because juce doesn't give us a way of
-  //       polling input at a particular time.
+  //       polling input at a particular time. We could avoid locks by having input callbacks write to a
+  //       lock-free queue, which the rendering code would read from. But that's probably not necessary
   while(atomicCompareAndSwap(&inputLock, 0, 1)) {}
   if(processorRef.pluginCode.renderNewFrame)
     {      

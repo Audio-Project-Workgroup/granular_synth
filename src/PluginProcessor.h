@@ -55,9 +55,11 @@ private:
   PluginLogger pluginLogger;
   void *loggerMemory;
   Arena loggerArena;
-
+  
   void *audioBufferMemory;
   bool resourcesReleased;
+
+  int pluginMemoryBlockSizeInBytes;
 
   std::vector<juce::AudioParameterFloat*> vstParameters;
   //juce::AudioParameterFloat *vstParameters[PluginParameter_count];

@@ -101,6 +101,21 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
 #endif
 		   )
 {
+  pluginMemoryBlockSizeInBytes = MEGABYTES(512);
+  pluginMemory = {};
+
+  pluginCode = {};
+  
+  audioBuffer = {};
+  
+  pluginLogger = {};
+  loggerMemory = nullptr;
+  loggerArena = {};
+
+  pluginParameters = nullptr;
+
+  resourcesReleased = false;
+
   for(u32 parameterIndex = PluginParameter_none + 1; parameterIndex < PluginParameter_count; ++parameterIndex)
     {
       PluginParameterInitData paramInit = pluginParameterInitData[parameterIndex];
@@ -207,9 +222,8 @@ prepareToPlay(double sampleRate, int samplesPerBlock)
 
   //onnxState = {};
   onnxState = onnxInitializeState(modelPath);
-
-  pluginMemory = {};
-  pluginMemory.memory = calloc(MEGABYTES(512), 1);
+  
+  pluginMemory.memory = calloc(pluginMemoryBlockSizeInBytes, 1);
   pluginMemory.host = PluginHost_daw;
   pluginMemory.platformAPI.readEntireFile = juceReadEntireFile;
   pluginMemory.platformAPI.writeEntireFile = juceWriteEntireFile;
@@ -243,7 +257,6 @@ prepareToPlay(double sampleRate, int samplesPerBlock)
   loggerMemory = calloc(loggerMemorySize, 1);
   loggerArena = arenaBegin(loggerMemory, loggerMemorySize);
 
-  pluginLogger = {};
   pluginLogger.logArena = &loggerArena;  
   pluginMemory.logger = &pluginLogger;
 
@@ -253,7 +266,7 @@ prepareToPlay(double sampleRate, int samplesPerBlock)
   // NOTE: JUCE's platform-independent DynamicLibrary abstraction doesn't provide an interface
   //       for getting error messages. If they haven't implemented that after 20 years, it must
   //       be really hard, right?
-  pluginCode = {};
+
   if(libPlugin.open(pluginPath))
     {
       pluginCode.renderNewFrame = (RenderNewFrame *)libPlugin.getFunction("renderNewFrame");
@@ -278,7 +291,6 @@ prepareToPlay(double sampleRate, int samplesPerBlock)
     {
       juce::Logger::writeToLog("failed to open dynamic library");
     }
-
   if(!pluginCode.renderNewFrame || !pluginCode.audioProcess || !pluginCode.initializePluginState)
     {      
       pluginCode.renderNewFrame = nullptr;
@@ -296,14 +308,11 @@ prepareToPlay(double sampleRate, int samplesPerBlock)
 	}
     }
   
-  audioBuffer = {};
   audioBuffer.inputFormat = audioBuffer.outputFormat = AudioFormat_r32;
   audioBuffer.inputSampleRate = audioBuffer.outputSampleRate = sampleRate;
   //audioBuffer.channels = 1;
   //audioBuffer.buffer = calloc(samplesPerBlock, 2*sizeof(float));
-  audioBuffer.midiBuffer = (u8 *)calloc(KILOBYTES(1), 1);
-  
-  resourcesReleased = false;
+  audioBuffer.midiBuffer = (u8 *)calloc(KILOBYTES(1), 1); 
 }
 
 void AudioPluginAudioProcessor::
@@ -413,7 +422,40 @@ getStateInformation(juce::MemoryBlock& destData)
   // You should use this method to store your parameters in the memory block.
   // You could do that either as raw data, or use the XML or ValueTree classes
   // as intermediaries to make it easy to save and load complex data.
-  juce::ignoreUnused(destData);
+  //juce::ignoreUnused(destData);
+
+  //destData.copyFrom(pluginMemory.memory, 0, pluginMemoryBlockSizeInBytes);
+  
+  // TODO: this is a shit ton of data, and it's really slow to write this out
+  //       (slower than it needs to be. idk wtf juce is doing). So we should be more clever about what
+  //       parts of the state we choose to save and restore
+  juce::String stateStorageFilename(BUILD_DIR"/granular_synth_state.test");
+  juce::MemoryOutputStream os(destData, true);  
+  if(pluginMemory.memory)
+    {
+      os.writeInt(pluginMemoryBlockSizeInBytes);
+      //os.write(pluginMemory.memory, pluginMemoryBlockSizeInBytes);
+      os.writeString(stateStorageFilename);
+      
+      juce::File stateStorageFile(stateStorageFilename);
+      if(!stateStorageFile.existsAsFile())
+	{
+	  stateStorageFile.create();
+	}
+      if(stateStorageFile.existsAsFile())
+	{
+	  juce::FileOutputStream fos(stateStorageFile);
+	  if(fos.openedOk())
+	    {
+	      if(!fos.write(pluginMemory.memory, pluginMemoryBlockSizeInBytes))
+		{
+		  juce::Logger::writeToLog("ERROR: failed to write to file: " +
+					   stateStorageFilename + ": " + 
+					   fos.getStatus().getErrorMessage());
+		}
+	    }
+	}
+    }
 }
 
 void AudioPluginAudioProcessor::
@@ -421,9 +463,55 @@ setStateInformation(const void* data, int sizeInBytes)
 {
   // You should use this method to restore your parameters from this memory block,
   // whose contents will have been created by the getStateInformation() call.
-  juce::ignoreUnused(data, sizeInBytes);
-}
+  //juce::ignoreUnused(data, sizeInBytes);
 
+  //juce::MemoryBlock srcData = juce::MemoryBlock(data, sizeInBytes);
+  //srcData.copyTo(pluginMemory.memory, pluginMemoryBlockSIzeInBytes);
+  
+  // ASSERT(sizeInBytes <= pluginMemoryBlockSizeInBytes);
+  // memcpy(pluginMemory.memory, data, sizeInBytes);
+
+  // TODO: idk if this function ever gets called
+  juce::MemoryInputStream is(data, (usz)sizeInBytes, false);
+  int blockSize = is.readInt();
+  juce::String stateStorageFilename = is.readString();
+  if(blockSize == pluginMemoryBlockSizeInBytes)
+    {
+      if(pluginMemory.memory)
+	{
+	  // if(is.getNumBytesRemaining() == pluginMemoryBlockSizeInBytes)
+	  //   {
+	  //     is.read(pluginMemory.memory, pluginMemoryBlockSizeInBytes);
+	  //   }
+	  // else
+	  //   {
+	  //     juce::Logger::writeToLog("setStateInformation() received inconsistent block size");
+	  //   }
+	  juce::File stateStorageFile(stateStorageFilename);
+	  if(stateStorageFile.existsAsFile())
+	    {
+	      juce::FileInputStream fis(stateStorageFile);
+	      if(fis.openedOk())
+		{
+		  if(!fis.read(pluginMemory.memory, pluginMemoryBlockSizeInBytes))
+		    {
+		      juce::Logger::writeToLog("ERROR: failed to read from file: " +
+					       stateStorageFilename + ": " +
+					       fis.getStatus().getErrorMessage());
+		    }
+		}
+	    }
+	}
+      else if(blockSize == 0)
+	{
+	  juce::Logger::writeToLog("setStateInformation() received empty input block");
+	}
+      else
+	{
+	  juce::Logger::writeToLog("setStateInformation() received invalid block size");
+	}
+    }
+}
 //==============================================================================
 // This creates new instances of the plugin..
 juce::AudioProcessor*

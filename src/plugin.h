@@ -1,5 +1,7 @@
 #define INTERNAL_SAMPLE_RATE (48000)
 
+#include "common.h"
+
 #include "plugin_parameters.h"
 #include "file_granulator.h"
 #include "file_formats.h"
@@ -21,7 +23,7 @@ struct PlayingSound
   r32 samplesPlayed;  
 };
 
-struct PluginState
+struct PluginState INTROSPECT
 {
   PluginFloatParameter parameters[PluginParameter_count];
 

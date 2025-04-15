@@ -31,6 +31,10 @@ pushd ../build > /dev/null
 #clang -c ../src/miniaudio_impl.c -o miniaudio.o
 #ar rcs libminiaudio.a miniaudio.o
 
+# preprocessor
+clang $CFLAGS ../src/preprocessor.cpp -o preprocessor
+#./preprocessor ../src/plugin.h
+
 # compile plugin and host
 clang $CFLAGS ../src/plugin.cpp -o $PLUGIN_NAME $PLUGIN_FLAGS -lm
 

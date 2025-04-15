@@ -1,4 +1,5 @@
 // functionality present in both the plugin and its host
+#define INTROSPECT
 
 #include "context.h"
 #include "types.h"
@@ -83,8 +84,12 @@ struct PlatformAPI
 
 struct PluginLogger
 {
-  Arena *logArena;
+  Arena *logArena;  
   String8List log;
+  /* String8 *logBuffer; */
+  /* usz logBufferCapacity; */
+  /* u32 readIndex; */
+  /* u32 writeIndex; */
   volatile u32 mutex;
 };
 
