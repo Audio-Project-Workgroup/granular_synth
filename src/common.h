@@ -12,6 +12,8 @@
 #include "render.h"
 #include "parameters_common.h"
 
+#include "meta.h"
+
 //
 // functionality the host provides to the plugin
 // 

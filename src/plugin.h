@@ -23,7 +23,8 @@ struct PlayingSound
   r32 samplesPlayed;  
 };
 
-struct PluginState INTROSPECT
+INTROSPECT
+struct PluginState
 {
   PluginFloatParameter parameters[PluginParameter_count];
 
