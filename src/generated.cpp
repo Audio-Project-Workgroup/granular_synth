@@ -183,8 +183,128 @@ static MemberDefinition membersOf_PluginFloatParameter[] =
   {STR8_LIT("u32"), STR8_LIT("dValue_AsInt"), 0, 1, 0},
 };
 
+static MemberDefinition membersOf_PlayingSound[] = 
+{
+  {STR8_LIT("LoadedSound"), STR8_LIT("sound"), 0, 0, 0},
+  {STR8_LIT("r32"), STR8_LIT("samplesPlayed"), 0, 0, 0},
+};
+
+static MemberDefinition membersOf_GrainPackfileTag[] = 
+{
+  {STR8_LIT("usz"), STR8_LIT("startSampleIndex"), 0, 0, 0},
+  {STR8_LIT("r32"), STR8_LIT("vector"), 0, 0, FILE_TAG_LENGTH},
+};
+
+static MemberDefinition membersOf_PlayingGrain[] = 
+{
+  {STR8_LIT("PlayingGrain"), STR8_LIT("nextPlaying"), 1, 0, 0},
+  {STR8_LIT("PlayingGrain"), STR8_LIT("prevPlaying"), 1, 0, 0},
+  {STR8_LIT("PlayingGrain"), STR8_LIT("nextQueued"), 1, 1, 0},
+  {STR8_LIT("PlayingGrain"), STR8_LIT("nextFree"), 1, 1, 0},
+  {STR8_LIT("bool"), STR8_LIT("onFreeList"), 0, 0, 0},
+  {STR8_LIT("u64"), STR8_LIT("startSampleIndex"), 0, 0, 0},
+  {STR8_LIT("u32"), STR8_LIT("samplesRemaining"), 0, 0, 0},
+  {STR8_LIT("r32"), STR8_LIT("samples"), 1, 0, 2},
+};
+
+static MemberDefinition membersOf_UIHashKey[] = 
+{
+  {STR8_LIT("u64"), STR8_LIT("key"), 0, 0, 0},
+  {STR8_LIT("String8"), STR8_LIT("name"), 0, 0, 0},
+};
+
+static MemberDefinition membersOf_UILayout[] = 
+{
+  {STR8_LIT("UIContext"), STR8_LIT("context"), 1, 0, 0},
+  {STR8_LIT("u32"), STR8_LIT("elementCount"), 0, 0, 0},
+  {STR8_LIT("UIElement"), STR8_LIT("root"), 1, 0, 0},
+  {STR8_LIT("UIElement"), STR8_LIT("currentParent"), 1, 0, 0},
+  {STR8_LIT("UIElement"), STR8_LIT("elementCache"), 1, 0, 512},
+  {STR8_LIT("UIElement"), STR8_LIT("elementFreeList"), 1, 0, 0},
+  {STR8_LIT("Rect2"), STR8_LIT("regionRemaining"), 0, 0, 0},
+  {STR8_LIT("u32"), STR8_LIT("index"), 0, 0, 0},
+  {STR8_LIT("UIHashKey"), STR8_LIT("selectedElement"), 0, 0, 0},
+};
+
+static MemberDefinition membersOf_Grain[] = 
+{
+  {STR8_LIT("Grain"), STR8_LIT("next"), 1, 0, 0},
+  {STR8_LIT("Grain"), STR8_LIT("prev"), 1, 0, 0},
+  {STR8_LIT("r32"), STR8_LIT("start"), 1, 0, 2},
+  {STR8_LIT("WindowType"), STR8_LIT("window"), 0, 0, 0},
+  {STR8_LIT("s32"), STR8_LIT("samplesToPlay"), 0, 0, 0},
+  {STR8_LIT("u32"), STR8_LIT("length"), 0, 0, 0},
+  {STR8_LIT("r32"), STR8_LIT("lengthInv"), 0, 0, 0},
+};
+
+static MemberDefinition membersOf_GrainViewNode[] = 
+{
+  {STR8_LIT("GrainViewNode"), STR8_LIT("next"), 1, 0, 0},
+  {STR8_LIT("u32"), STR8_LIT("readIndex"), 0, 0, 0},
+};
+
+static MemberDefinition membersOf_GrainBufferViewNode[] = 
+{
+  {STR8_LIT("GrainBufferViewNode"), STR8_LIT("next"), 1, 0, 0},
+  {STR8_LIT("GrainBufferViewNode"), STR8_LIT("nextFree"), 1, 0, 0},
+  {STR8_LIT("u32"), STR8_LIT("bufferReadIndex"), 0, 0, 0},
+  {STR8_LIT("u32"), STR8_LIT("bufferWriteIndex"), 0, 0, 0},
+  {STR8_LIT("r32"), STR8_LIT("bufferSamples"), 1, 0, 2},
+  {STR8_LIT("u32"), STR8_LIT("grainCount"), 0, 0, 0},
+  {STR8_LIT("GrainViewNode"), STR8_LIT("head"), 1, 0, 0},
+};
+
+static MemberDefinition membersOf_LoadedSound[] = 
+{
+  {STR8_LIT("u32"), STR8_LIT("sampleCount"), 0, 0, 0},
+  {STR8_LIT("u32"), STR8_LIT("channelCount"), 0, 0, 0},
+  {STR8_LIT("r32"), STR8_LIT("samples"), 1, 0, 2},
+};
+
+static MemberDefinition membersOf_UIElement[] = 
+{
+  {STR8_LIT("UIElement"), STR8_LIT("next"), 1, 0, 0},
+  {STR8_LIT("UIElement"), STR8_LIT("prev"), 1, 0, 0},
+  {STR8_LIT("UIElement"), STR8_LIT("first"), 1, 0, 0},
+  {STR8_LIT("UIElement"), STR8_LIT("last"), 1, 0, 0},
+  {STR8_LIT("UIElement"), STR8_LIT("parent"), 1, 0, 0},
+  {STR8_LIT("UIHashKey"), STR8_LIT("hashKey"), 0, 0, 0},
+  {STR8_LIT("u32"), STR8_LIT("lastFrameTouched"), 0, 0, 0},
+  {STR8_LIT("UIElement"), STR8_LIT("nextInHash"), 1, 0, 0},
+  {STR8_LIT("UILayout"), STR8_LIT("layout"), 1, 0, 0},
+  {STR8_LIT("u32"), STR8_LIT("flags"), 0, 0, 0},
+  {STR8_LIT("String8"), STR8_LIT("name"), 0, 0, 0},
+  {STR8_LIT("v2"), STR8_LIT("textScale"), 0, 0, 0},
+  {STR8_LIT("v4"), STR8_LIT("color"), 0, 0, 0},
+  {STR8_LIT("UIParameter"), STR8_LIT("parameterType"), 0, 0, 0},
+  {STR8_LIT("PluginBooleanParameter"), STR8_LIT("bParam"), 1, 1, 0},
+  {STR8_LIT("PluginFloatParameter"), STR8_LIT("fParam"), 1, 1, 0},
+  {STR8_LIT("r32"), STR8_LIT("aspectRatio"), 0, 0, 0},
+  {STR8_LIT("UIAxis"), STR8_LIT("sizingDim"), 0, 0, 0},
+  {STR8_LIT("r32"), STR8_LIT("size"), 0, 1, 0},
+  {STR8_LIT("r32"), STR8_LIT("heightPercentOfLayoutRegionRemaining"), 0, 1, 0},
+  {STR8_LIT("r32"), STR8_LIT("widthPercentOfLayoutRegionRemaining"), 0, 1, 0},
+  {STR8_LIT("v2"), STR8_LIT("offset"), 0, 0, 0},
+  {STR8_LIT("Rect2"), STR8_LIT("region"), 0, 0, 0},
+  {STR8_LIT("u32"), STR8_LIT("commFlags"), 0, 0, 0},
+  {STR8_LIT("v2"), STR8_LIT("mouseClickedP"), 0, 0, 0},
+  {STR8_LIT("r32"), STR8_LIT("fParamValueAtClick"), 0, 0, 0},
+  {STR8_LIT("v2"), STR8_LIT("dragData"), 0, 0, 0},
+  {STR8_LIT("bool"), STR8_LIT("showChildren"), 0, 0, 0},
+};
+
 static MetaStruct metaStructs[] = 
 {
+  {STR8_LIT("UIElement"), membersOf_UIElement},
+  {STR8_LIT("LoadedSound"), membersOf_LoadedSound},
+  {STR8_LIT("GrainBufferViewNode"), membersOf_GrainBufferViewNode},
+  {STR8_LIT("GrainViewNode"), membersOf_GrainViewNode},
+  {STR8_LIT("Grain"), membersOf_Grain},
+  {STR8_LIT("UILayout"), membersOf_UILayout},
+  {STR8_LIT("UIHashKey"), membersOf_UIHashKey},
+  {STR8_LIT("PlayingGrain"), membersOf_PlayingGrain},
+  {STR8_LIT("GrainPackfileTag"), membersOf_GrainPackfileTag},
+  {STR8_LIT("PlayingSound"), membersOf_PlayingSound},
   {STR8_LIT("PluginFloatParameter"), membersOf_PluginFloatParameter},
   {STR8_LIT("PluginBooleanParameter"), membersOf_PluginBooleanParameter},
   {STR8_LIT("String8"), membersOf_String8},

@@ -760,7 +760,7 @@ struct ParseContext
 };
 
 static void parseMember(ParseContext *parseContext);
-static void parseStruct(ParseContext *parseContext);
+static bool parseStruct(ParseContext *parseContext);
 static void parseUnion(ParseContext *parseContext);
 
 static void
@@ -769,10 +769,13 @@ parseUnion(ParseContext *parseContext)
   TokenList *tokens = parseContext->tokens;
   String8List *output = parseContext->output;
   Arena *allocator = parseContext->allocator;
+  UNUSED(output);
+  UNUSED(allocator);
 
   parseContext->inUnion = true;
 
   Token optionalNameToken = peekToken(tokens, Token_identifier);
+  UNUSED(optionalNameToken);
 
   if(peekToken(tokens, Token_lBrace).kind != Token_unknown)
     {
@@ -787,7 +790,7 @@ parseUnion(ParseContext *parseContext)
 
 static void
 parseMember(ParseContext *parseContext)
-{
+{  
   TokenList *tokens = parseContext->tokens;
   String8List *output = parseContext->output;
   Arena *allocator = parseContext->allocator;
@@ -823,11 +826,24 @@ parseMember(ParseContext *parseContext)
 
   if(!typeIsKnown)
     {
-      UnknownStruct *unknownStruct = arenaPushStruct(allocator, UnknownStruct);
-      unknownStruct->name = typeToken.name;
-      QUEUE_PUSH(firstUnknownStruct, lastUnknownStruct, unknownStruct);
+      bool typeIsAlreadyUnknown = false;
+      for(UnknownStruct *unknownStruct = firstUnknownStruct; unknownStruct; unknownStruct = unknownStruct->next)
+	{
+	  if(stringsAreEqual(unknownStruct->name, typeToken.name))
+	    {
+	      typeIsAlreadyUnknown = true;
+	      break;
+	    }
+	}
+
+      if(!typeIsAlreadyUnknown)
+	{
+	  UnknownStruct *unknownStruct = arenaPushStruct(allocator, UnknownStruct);
+	  unknownStruct->name = typeToken.name;      
+	  DLL_PUSH_BACK(firstUnknownStruct, lastUnknownStruct, unknownStruct);
+	}
     }
-    
+  
   if(peekToken(tokens, Token_asterisk).kind != Token_unknown)
     {
       isPointer = true;
@@ -880,9 +896,11 @@ parseMember(ParseContext *parseContext)
     }
 }
 
-static void
+static bool
 parseStruct(ParseContext *parseContext)
 {
+  bool foundMembers = false;
+
   TokenList *tokens = parseContext->tokens;
   String8List *output = parseContext->output;
   Arena *allocator = parseContext->allocator;
@@ -916,6 +934,7 @@ parseStruct(ParseContext *parseContext)
 	  while(peekToken(tokens, Token_rBrace).kind == Token_unknown)
 	    {
 	      parseMember(parseContext);
+	      foundMembers = true;
 	    }
 	  ASSERT(peekToken(tokens, Token_semicolon).kind != Token_unknown);
 
@@ -925,7 +944,7 @@ parseStruct(ParseContext *parseContext)
 	    }
 	}
 
-      if(optionalNameToken.kind != Token_unknown)
+      if((optionalNameToken.kind != Token_unknown) && foundMembers)
 	{      
 	  ParsedStruct *newParsedStruct = arenaPushStruct(allocator, ParsedStruct);
 	  newParsedStruct->name = arenaPushString(allocator, optionalNameToken.name);
@@ -933,6 +952,8 @@ parseStruct(ParseContext *parseContext)
 	  STACK_PUSH(firstParsedStruct, newParsedStruct);
 	}
     }
+
+  return(foundMembers);
 }
 
 static void
@@ -968,12 +989,8 @@ parseFile(Arena *allocator, String8 fileContents)
   String8List outputList = {};
   ParseContext parseContext = {allocator, &outputList, &tokens};
 
-  //for(u64 tokenIndex = 0; tokenIndex < tokens.count; ++tokenIndex)
   while(tokens.first)
     {
-      // TokenNode *node = tokens.first;
-      // Token token = node->token;
-      // QUEUE_POP(tokens.first, tokens.last);
       Token token = getTokenFromList(&tokens);
       //printToken(token);
       switch(token.kind)
@@ -1015,7 +1032,8 @@ parseFile(Arena *allocator, String8 fileContents)
 	      {
 		Token nameToken = getTokenFromList(&tokens);
 		bool structIsUnknown = false;
-		for(UnknownStruct *unknownStruct = firstUnknownStruct;
+		UnknownStruct *unknownStruct = 0;
+		for(unknownStruct = firstUnknownStruct;
 		    unknownStruct && unknownStruct != lastUnknownStruct;
 		    unknownStruct = unknownStruct->next)
 		  {
@@ -1032,7 +1050,11 @@ parseFile(Arena *allocator, String8 fileContents)
 		    nameTokenNode->token = nameToken;
 		    QUEUE_PUSH_FRONT(tokens.first, tokens.last, nameTokenNode);
 		    
-		    parseStruct(&parseContext);
+		    bool foundMembers = parseStruct(&parseContext);
+		    if(foundMembers)
+		      {
+			DLL_REMOVE(firstUnknownStruct, lastUnknownStruct, unknownStruct);
+		      }
 		  }
 	      }
 	  }
@@ -1049,26 +1071,13 @@ parseFile(Arena *allocator, String8 fileContents)
       String8 string = node->string;
       fprintf(stdout, "%.*s", (int)string.size, string.str);
       QUEUE_POP(outputList.first, outputList.last);
-    }
-
-  // for(u64 includeIndex = 0; includeIndex < includedFilenameList.nodeCount; ++includeIndex)
-  //   {
-  //     String8Node *includeNode = includedFilenameList.first;
-  //     String8 includeFilename = includeNode->string;
-  //     String8 includeContents = readFile(allocator, includeFilename);
-  //     //stringListPush(allocator, &loadedFileContents, includeContents);
-  //     String8Node *includeContentsNode = arenaPushStruct(allocator, String8Node);
-  //     includeContentsNode->string = includeContents;
-  //     stringListPushNode(&loadedFileContents, includeContentsNode);
-
-  //     QUEUE_POP(includedFilenameList.first, includedFilenameList.last);
-  //   }
+    } 
 }
 
 int main(int argc, char **argv)
 {
   // NOTE: get filenames to parse
-  usz filenameBufferSize = KILOBYTES(1);
+  usz filenameBufferSize = KILOBYTES(512);
   void *filenameBuffer = calloc(filenameBufferSize, 1);
   Arena filenameArena = arenaBegin(filenameBuffer, filenameBufferSize);
   //String8List filenameList = {};
@@ -1077,21 +1086,25 @@ int main(int argc, char **argv)
       stringListPush(&filenameArena, &cliFilenameList, STR8_CSTR(argv[argi]));
     }
 
-  usz parseBufferSize = MEGABYTES(4);
+  usz parseBufferSize = MEGABYTES(128);
   void *parseBuffer = calloc(parseBufferSize, 1);
   Arena parseArena = arenaBegin(parseBuffer, parseBufferSize);
-  //for(u32 fileIndex = 0; fileIndex < filenameList.nodeCount; ++fileIndex)
+ 
   while(cliFilenameList.first)
     {      
       String8Node *fileNode = cliFilenameList.first;
       String8 filename = fileNode->string;
       String8 fileContents = readFile(&parseArena, filename);
-      fprintf(stderr, "DEBUG: %.*s size=%zu\n", (int)filename.size, filename.str, fileContents.size);
+
+      String8Node *fileContentsNode = arenaPushStruct(&filenameArena, String8Node);
+      fileContentsNode->string = fileContents;
+      stringListPushNode(&loadedFileContents, fileContentsNode);
+
+      //fprintf(stderr, "DEBUG: %.*s size=%zu\n", (int)filename.size, filename.str, fileContents.size);
       parseFile(&parseArena, fileContents);
       stringListPush(&filenameArena, &parsedFilenameList, filename);
       
       QUEUE_POP(cliFilenameList.first, cliFilenameList.last);
-      //arenaEnd(&parseArena);
     }
 
   while(includedFilenameList.first)
@@ -1099,7 +1112,7 @@ int main(int argc, char **argv)
       String8Node *fileNode = includedFilenameList.first;
       String8 filename = fileNode->string;
       String8 fileContents = readFile(&parseArena, filename);
-      fprintf(stderr, "DEBUG: %.*s size=%zu\n", (int)filename.size, filename.str, fileContents.size);
+      //fprintf(stderr, "DEBUG: %.*s size=%zu\n", (int)filename.size, filename.str, fileContents.size);
 
       bool includeFileAlreadyParsed = false;
       for(String8Node *node = parsedFilenameList.first; node; node = node->next)
@@ -1114,11 +1127,40 @@ int main(int argc, char **argv)
 			
       if(!includeFileAlreadyParsed)
 	{
+	  String8Node *fileContentsNode = arenaPushStruct(&filenameArena, String8Node);
+	  fileContentsNode->string = fileContents;
+	  stringListPushNode(&loadedFileContents, fileContentsNode);
+
 	  parseFile(&parseArena, fileContents);
 	  stringListPush(&filenameArena, &parsedFilenameList, filename);
 	}           
       
       QUEUE_POP(includedFilenameList.first, includedFilenameList.last);
+    }
+ 
+  u32 tryCounter = 0;
+  u32 maxTryCount = 5;
+  while(firstUnknownStruct && (tryCounter < maxTryCount))
+    {
+      //fprintf(stderr, "DEBUG: parsing all files\n");
+
+      // UnknownStruct *unknownStruct = firstUnknownStruct;
+      // for(UnknownStruct *unknownStruct = firstUnknownStruct; unknownStruct; unknownStruct = unknownStruct->next)
+      // 	{
+      // 	  fprintf(stderr, "DEBUG: unknown struct: `%.*s`\n",
+      // 		  (int)unknownStruct->name.size, unknownStruct->name.str);
+      // 	}
+      
+
+      String8Node *fileNode = loadedFileContents.first;
+      for(u64 fileIndex = 0; fileIndex < loadedFileContents.nodeCount; ++fileIndex, fileNode = fileNode->next)
+	{
+	  String8 fileContents = fileNode->string;
+	  parseFile(&parseArena, fileContents);
+	}
+
+      //QUEUE_POP(firstUnknownStruct, lastUnknownStruct);
+      ++tryCounter;
     }
 
   if(firstParsedStruct)
@@ -1131,14 +1173,5 @@ int main(int argc, char **argv)
 		  (int)parsedStruct->name.size, parsedStruct->name.str);
 	}
       fprintf(stdout, "};\n\n");
-    }
-
-  while(firstUnknownStruct)
-    {
-      UnknownStruct *unknownStruct = firstUnknownStruct;
-      fprintf(stderr, "DEBUG: unknown struct: `%.*s`\n",
-	      (int)unknownStruct->name.size, unknownStruct->name.str);
-
-      QUEUE_POP(firstUnknownStruct, lastUnknownStruct);
     }
 }

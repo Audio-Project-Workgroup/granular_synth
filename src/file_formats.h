@@ -142,7 +142,7 @@ loadWav(char *filename, Arena *loadAllocator, Arena *permanentAllocator)
       
       u32 sourceSampleCount = sampleDataSize/(channelCount*bytesPerSample);      
       u32 destSampleCount = ROUND_UP_TO_MULTIPLE_OF_2((u32)(sampleRateConversionFactor*sourceSampleCount));
-      u32 paddedDestSampleCount = ROUND_UP_TO_MULTIPLE(destSampleCount, GRAIN_LENGTH);
+      u32 paddedDestSampleCount = ROUND_UP_TO_MULTIPLE(destSampleCount, FILE_GRAIN_LENGTH);
       u32 maxSampleCount = MAX(sourceSampleCount, paddedDestSampleCount);
 
       // NOTE: we allocate more space than we actually need for storing samples, since we use these buffers

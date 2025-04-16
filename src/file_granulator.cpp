@@ -11,8 +11,8 @@ beginGrainPackfile(Arena *allocator)
 static void
 addSoundToGrainPackfile(GrainPackfile *packfile, LoadedSound *sound)
 {
-  u32 soundGrainCount = sound->sampleCount/GRAIN_LENGTH;
-  if(sound->sampleCount % GRAIN_LENGTH) ++soundGrainCount;
+  u32 soundGrainCount = sound->sampleCount/FILE_GRAIN_LENGTH;
+  if(sound->sampleCount % FILE_GRAIN_LENGTH) ++soundGrainCount;
 
   // NOTE: assuming we can read an integer multiple of GRAIN_LENGTH samples from these;
   r32 *srcSamplesL = sound->samples[0];
@@ -20,15 +20,15 @@ addSoundToGrainPackfile(GrainPackfile *packfile, LoadedSound *sound)
   for(u32 grainIndex = 0; grainIndex < soundGrainCount; ++grainIndex)
     {
       GrainPackfileEntry *entry = arenaPushStruct(packfile->allocator, GrainPackfileEntry);
-      COPY_ARRAY(entry->grainSamples[0], srcSamplesL, GRAIN_LENGTH, r32);
-      COPY_ARRAY(entry->grainSamples[1], srcSamplesR, GRAIN_LENGTH, r32);
+      COPY_ARRAY(entry->grainSamples[0], srcSamplesL, FILE_GRAIN_LENGTH, r32);
+      COPY_ARRAY(entry->grainSamples[1], srcSamplesR, FILE_GRAIN_LENGTH, r32);
 
       // TODO: investigate batching inputs to the model
-      void *tagVector = globalPlatform.runModel(entry->grainSamples[0], GRAIN_LENGTH);
-      COPY_ARRAY(entry->grainTagVector, tagVector, TAG_LENGTH, r32);      
+      void *tagVector = globalPlatform.runModel(entry->grainSamples[0], FILE_GRAIN_LENGTH);
+      COPY_ARRAY(entry->grainTagVector, tagVector, FILE_TAG_LENGTH, r32);      
       
-      srcSamplesL += GRAIN_LENGTH;
-      srcSamplesR += GRAIN_LENGTH;
+      srcSamplesL += FILE_GRAIN_LENGTH;
+      srcSamplesR += FILE_GRAIN_LENGTH;
       ++packfile->grainCount;
     }
 }
@@ -44,7 +44,7 @@ writePackfileToDisk(GrainPackfile *packfile, char *filename)
   
   header->fileSize = packfileSize;
   header->grainCount = packfile->grainCount;
-  header->grainLength = GRAIN_LENGTH; 
+  header->grainLength = FILE_GRAIN_LENGTH; 
   header->tagOffset = (u8 *)tags - (u8 *)header;
   header->grainOffset = (u8 *)grains - (u8 *)header;
 
@@ -56,8 +56,8 @@ writePackfileToDisk(GrainPackfile *packfile, char *filename)
       GrainPackfileGrain *grain = grains + grainIndex;
       
       tag->startSampleIndex = grainIndex;//grain - grains;
-      COPY_ARRAY(tag->vector, entry->grainTagVector, TAG_LENGTH, r32);
-      COPY_ARRAY(grain->samples, entry->grainSamples, GRAIN_CHANNEL_LENGTH, r32);
+      COPY_ARRAY(tag->vector, entry->grainTagVector, FILE_TAG_LENGTH, r32);
+      COPY_ARRAY(grain->samples, entry->grainSamples, FILE_GRAIN_CHANNEL_LENGTH, r32);
     }
    
   globalPlatform.writeEntireFile(filename, header, packfileSize);

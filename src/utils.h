@@ -39,6 +39,7 @@
 #define QUEUE_POP(f, l) do {(((f)==(l)) ? ((f)=0, (l)=0) : ((f)=(f)->next));} while(0)
 
 #define DLL_PUSH_BACK(f, l, n) do {((f)==0) ? ((f)=(l)=(n), (n)->next=(n)->prev=0):((n)->prev=(l), (l)->next=(n), (l)=(n), (n)->next=0);} while(0)
+#define DLL_REMOVE(f, l, d) do {((f)==(d) ? ((f)==(l) ? ((f)=(l)=(0)) : ((f)=(f)->next, (f)->prev=0)) : (l)==(d) ? ((l)=(l)->prev, (l)->next=0) : ((d)->next->prev=(d)->prev, (d)->prev->next=(d)->next));} while(0)
 
 #define LINKED_LIST_APPEND(head, new) do {	\
     new->next = head;				\

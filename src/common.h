@@ -1,6 +1,11 @@
 // functionality present in both the plugin and its host
 #define INTROSPECT
 
+#define FILE_GRAIN_CHANNELS (2)
+#define FILE_GRAIN_LENGTH (2400)
+#define FILE_GRAIN_CHANNEL_LENGTH (FILE_GRAIN_LENGTH*FILE_GRAIN_CHANNELS)
+#define FILE_TAG_LENGTH (200)
+
 #include "context.h"
 #include "types.h"
 #include "utils.h"

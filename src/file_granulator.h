@@ -1,8 +1,3 @@
-#define GRAIN_CHANNELS 2
-#define GRAIN_LENGTH 2400
-#define GRAIN_CHANNEL_LENGTH GRAIN_LENGTH*GRAIN_CHANNELS
-#define TAG_LENGTH 200
-
 // for writing to/loading from disk
 
 struct GrainPackfile
@@ -18,19 +13,19 @@ struct GrainPackfile
 struct GrainPackfileTag
 {
   usz startSampleIndex; // NOTE: refers to packfile->samples + startSampleIndex*GRAIN_CHANNEL_LENGTH
-  r32 vector[TAG_LENGTH];  
+  r32 vector[FILE_TAG_LENGTH];  
 };
 
 struct GrainPackfileGrain
 {
-  r32 samples[GRAIN_CHANNEL_LENGTH];
+  r32 samples[FILE_GRAIN_CHANNEL_LENGTH];
 };
 
 struct GrainPackfileEntry
 {
   //GrainPackfileTag tag;
-  r32 grainTagVector[TAG_LENGTH];
-  r32 grainSamples[GRAIN_CHANNELS][GRAIN_LENGTH];
+  r32 grainTagVector[FILE_TAG_LENGTH];
+  r32 grainSamples[FILE_GRAIN_CHANNELS][FILE_GRAIN_LENGTH];
 };
 
 #pragma pack(push, 1)
