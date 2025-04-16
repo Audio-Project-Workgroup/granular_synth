@@ -35,7 +35,7 @@
 #define STACK_POP(head) do {(head) = (head)->next;} while(0)
 
 #define QUEUE_PUSH(f, l, n) do {(f) ? ((l->next=(n),(l)=(n)),(n)->next=0) : (f)=(l)=(n);} while(0)
-#define QUEUE_PUSH_FRONT(f, l, n) do {(f) ? (((n)->next=(f),(f)=(n))) : (f)=(l)=(n),(n)->next=0;} while(0)
+#define QUEUE_PUSH_FRONT(f, l, n) do {(f) ? ((n)->next=(f),(f)=(n)) : ((f)=(l)=(n),(n)->next=0);} while(0)
 #define QUEUE_POP(f, l) do {(((f)==(l)) ? ((f)=0, (l)=0) : ((f)=(f)->next));} while(0)
 
 #define DLL_PUSH_BACK(f, l, n) do {((f)==0) ? ((f)=(l)=(n), (n)->next=(n)->prev=0):((n)->prev=(l), (l)->next=(n), (l)=(n), (n)->next=0);} while(0)

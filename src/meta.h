@@ -3,6 +3,7 @@ struct MemberDefinition
   String8 typeName;
   String8 fieldName;
   bool isPointer;
+  bool isInUnion;
   u64 arrayCount;
 };
 

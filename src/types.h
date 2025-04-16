@@ -153,7 +153,8 @@ union RangeR32
 
 struct Rect2
 {
-  v2 min, max;  
+  v2 min;
+  v2 max;
 };
 
 struct LoadedSound
