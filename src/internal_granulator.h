@@ -27,13 +27,6 @@ grainBufferSetReadPos(u32 write_pos, u32 bufferSize)
   return scratch_rpos;
 }
 
-enum WindowType {
-  HANN = 0,
-  SINE = 1,
-  TRIANGLE = 2,
-  RECTANGULAR = 3
-};
-
 struct Grain
 {
   Grain* next;
