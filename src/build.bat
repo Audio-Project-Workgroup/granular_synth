@@ -11,8 +11,8 @@ del *.pdb > NUL 2> NUL
 del *.rdi > NUL 2> NUL
 
 REM compile miniaudio to static library
-::cl %CFLAGS% -c ..\src\miniaudio_impl.c
-::lib -OUT:miniaudio.lib miniaudio_impl.obj
+cl %CFLAGS% -c ..\src\miniaudio_impl.c
+lib -OUT:miniaudio.lib miniaudio_impl.obj
 
 REM compile plugin and host
 REM /PDB:plugin_%date:~-4,4%%date:~-10,2%%date:~-7,2%_%time:~0,2%%time:~3,2%%time:~6,2%%time:~9,2%.pdb
