@@ -237,6 +237,8 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 				       pluginParameterInitData[PluginParameter_volume]);
 	      initializeFloatParameter(&pluginState->parameters[PluginParameter_density],// 0.8f, makeRange(0.1f, 20.f)
 				       pluginParameterInitData[PluginParameter_density]);
+	      initializeFloatParameter(&pluginState->parameters[PluginParameter_window], //avail range: [0, 3], default value: 0
+				       pluginParameterInitData[PluginParameter_window]);
 
 	      // NOTE: devices
 	      pluginState->outputDeviceCount = memoryBlock->outputDeviceCount;
@@ -728,6 +730,34 @@ RENDER_NEW_FRAME(renderNewFrame)
 			    pluginSetFloatParameter(density.element->fParam, newDensity);
 			    //printf("newDensity: %.2f\n", newDensity);
 			  }		    
+
+// @TODO Refine UI for the window parameter ..
+// .. what needs to be done is position the rotating knob into a more aligned spot in the UI frame .. 
+// .. and implement a knob with distinct states instead of a knob with float states.
+// Otherwise, define a new UI struct for it. hint: It needs a UI that will be used a toggling mechanism across its 4+ disctinct states.
+			// define a new knob for the window parameter
+				// we are on the right sub-UI
+			offset.x = dim.x*0.9; // on the left-most of it
+			// offset.y = 70; // on the top-most of it
+			static int bprint = 100;
+			// @TODO Create a function that is going to be used to create a knob that has discrete states.
+			// Note: Curently it uses the same implementation as uiMakeKnob does. 
+			UIComm window = uiMakeKnob(
+										panelLayout, 
+										STR8_LIT("window"), 
+										offset, 
+										-sizePOP,
+										&pluginState->parameters[PluginParameter_window], 
+										V4(1, 0, 1, 0));
+			if(window.flags & UICommFlag_dragging)
+			{
+				v2 dragDelta = uiGetDragDelta(window.element);
+				r32 newWindow = window.element->fParamValueAtClick + 0.1f*dragDelta.y;
+				newWindow =  abs(u8(newWindow) % (u8)NUM_WINDOWS); // quantize in NUM_WINDOWS range
+				pluginSetFloatParameter(window.element->fParam, newWindow);
+			}		    
+
+
 		      }
 		    }
 		  else if(stringsAreEqual(panel->name, STR8_LIT("bottom")))
@@ -1254,6 +1284,7 @@ AUDIO_PROCESS(audioProcess)
 
 	  pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_volume]);
 	  pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_density]);
+	  pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_window]);
 	}
 
       arenaEndTemporaryMemory(&grainMixerMemory);      

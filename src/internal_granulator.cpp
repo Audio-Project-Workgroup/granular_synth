@@ -183,7 +183,7 @@ synthesize(r32* destBufferLInit, r32* destBufferRInit,
       r32 volume = MAX(1.f/density, 1.f); // TODO: how to adapt volume to prevent clipping?     
       if(grainManager->samplesProcessedSinceLastSeed >= iot)
 	{
-          makeNewGrain(grainManager, grainSize, HANN);         
+          makeNewGrain(grainManager, grainSize, WindowType(pluginReadFloatParameter(&pluginState->parameters[PluginParameter_window])));
 	}      
 
       r32 outSampleL = 0.f;
