@@ -8,7 +8,7 @@
     X(window, 0.f, 0.f, 0.f)			       \
     X(pitch, 0.f, 0.f, 0.f)			       \
     X(streach, 0.f, 0.f, 0.f)			       \
-    X(spread, 0.0f, 100.0f, 50.0f)			       \
+    X(spread, 0.f, 1.0f, 0.5f)			       \
     X(mix, 0.f, 1.f, 0.5f)
 
 // Plugin Parameter enumeration to link with midi CC

@@ -723,7 +723,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 			{
 				v2 dragDelta2 = uiGetDragDelta(spread.element);
 				//printf("dragDelta: (%.2f, %.2f)\n", dragDelta.x, dragDelta.y);
-				r32 spreader = spread.element->fParamValueAtClick + .2f * dragDelta2.y;
+				r32 spreader = spread.element->fParamValueAtClick + .01f * dragDelta2.y;
 				pluginSetFloatParameter(spread.element->fParam, spreader);
 			}
 			
@@ -1256,8 +1256,8 @@ AUDIO_PROCESS(audioProcess)
 			  r32 coef_M = 1.0f * tmp;
 			  r32 coef_S = stereoWidth * tmp;
 
-			  r32 mid = (grainVal[1] + grainVal[2]) * coef_M;
-			  r32 sides = (grainVal[2] - grainVal[1]) * coef_S;
+			  r32 mid = (leftGrainVal + rightGrainVal) * coef_M;
+			  r32 sides = (rightGrainVal - leftGrainVal) * coef_S;
 
 			  // Update grain value based on channel
 			  if (channelIndex == 0) {
