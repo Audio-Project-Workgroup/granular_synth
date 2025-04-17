@@ -214,8 +214,15 @@ logString(char *string)
   for(;;)
     {    
       if(globalPlatform.atomicCompareAndSwap(&globalLogger->mutex, 0, 1) == 0)
-	{   
+	{
 	  stringListPush(globalLogger->logArena, &globalLogger->log, STR8_CSTR(string));
+
+	  if(globalLogger->log.totalSize >= globalLogger->maxCapacity)
+	    {
+	      ZERO_STRUCT(&globalLogger->log);
+	      arenaEnd(globalLogger->logArena);
+	    }
+
 	  globalPlatform.atomicStore(&globalLogger->mutex, 0);
 	  break;
 	}
@@ -233,6 +240,13 @@ logFormatString(char *format, ...)
       if(globalPlatform.atomicCompareAndSwap(&globalLogger->mutex, 0, 1) == 0)
 	{   
 	  stringListPushFormatV(globalLogger->logArena, &globalLogger->log, format, vaArgs);
+
+	  if(globalLogger->log.totalSize >= globalLogger->maxCapacity)
+	    {
+	      ZERO_STRUCT(&globalLogger->log);
+	      arenaEnd(globalLogger->logArena);
+	    }
+
 	  globalPlatform.atomicStore(&globalLogger->mutex, 0);
 	  break;
 	}

@@ -785,6 +785,7 @@ parseUnion(ParseContext *parseContext)
 	}
       ASSERT(peekToken(tokens, Token_semicolon).kind != Token_unknown);
     }
+  
   parseContext->inUnion = false;
 }
 

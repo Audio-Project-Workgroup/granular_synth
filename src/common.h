@@ -93,6 +93,7 @@ struct PluginLogger
 {
   Arena *logArena;  
   String8List log;
+  usz maxCapacity;
   /* String8 *logBuffer; */
   /* usz logBufferCapacity; */
   /* u32 readIndex; */

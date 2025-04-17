@@ -253,11 +253,12 @@ prepareToPlay(double sampleRate, int samplesPerBlock)
   // pluginMemory.platformAPI.wideMulFloats	 = wideMulFloats;
   // pluginMemory.platformAPI.wideMulInts		 = wideMulInts;
 
-  usz loggerMemorySize = KILOBYTES(512);
+  usz loggerMemorySize = KILOBYTES(128);
   loggerMemory = calloc(loggerMemorySize, 1);
   loggerArena = arenaBegin(loggerMemory, loggerMemorySize);
 
-  pluginLogger.logArena = &loggerArena;  
+  pluginLogger.logArena = &loggerArena;
+  pluginLogger.maxCapacity = loggerMemorySize/8;
   pluginMemory.logger = &pluginLogger;
 
   juce::String pluginPath(DYNAMIC_PLUGIN_PATH);
@@ -399,6 +400,12 @@ processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
     {
       audioBuffer.framesToWrite = buffer.getNumSamples();      
       pluginCode.audioProcess(&pluginMemory, &audioBuffer);
+
+      // NOTE: debug
+      juce::Logger::writeToLog(juce::String("logger used: ") +
+			       juce::String(pluginLogger.log.totalSize));
+      juce::Logger::writeToLog(juce::String("logger capacity: ") +
+			       juce::String(pluginLogger.maxCapacity));
     }  
 }
 

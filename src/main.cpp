@@ -409,6 +409,7 @@ main(int argc, char **argv)
 	  
 	  PluginLogger logger = {};
 	  logger.logArena = &loggerArena;
+	  logger.maxCapacity = loggerMemorySize/2;
 
 	  pluginMemory.logger = &logger;
 
@@ -659,7 +660,8 @@ main(int argc, char **argv)
 					    }
 					}
 
-				      pluginMemory.logger->log.first = 0;
+				      //pluginMemory.logger->log.first = 0;
+				      ZERO_STRUCT(&pluginMemory.logger->log);
 				      arenaEnd(pluginMemory.logger->logArena);
 
 				      if(commands.outputAudioDeviceChanged || commands.inputAudioDeviceChanged)

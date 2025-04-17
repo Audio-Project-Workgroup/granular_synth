@@ -34,7 +34,7 @@ pushd ../build > /dev/null
 # preprocessor
 clang $CFLAGS ../src/preprocessor.cpp -o preprocessor
 popd > /dev/null
-../build/preprocessor plugin.h > generated.cpp
+#../build/preprocessor plugin.h > generated.cpp
 pushd ../build > /dev/null
 
 # compile plugin and host

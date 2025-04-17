@@ -342,7 +342,8 @@ AudioPluginAudioProcessorEditor::renderOpenGL(void)
 		    }
 		}
 
-	      pluginLogger->log.first = 0;
+	      //pluginLogger->log.first = 0;
+	      ZERO_STRUCT(&pluginLogger->log);
 	      arenaEnd(pluginLogger->logArena);
 	      
 	      atomicStore(&pluginLogger->mutex, 0);

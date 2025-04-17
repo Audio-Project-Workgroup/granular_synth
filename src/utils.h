@@ -63,11 +63,12 @@
     for(u32 i = 0; i < (size); ++i) *p++ = 0;		\
   } while(0)
 
-#define ZERO_STRUCT(s) do {					\
-    usz size = sizeof(s);					\
-    u8 *data = (u8 *)&(s);					\
-    for(u32 byte = 0; byte < (size); ++byte) data[byte] = 0;	\
-  } while(0)
+/* #define ZERO_STRUCT(s) do {					\ */
+/*     usz size = sizeof(s);					\ */
+/*     u8 *data = (u8 *)&(s);					\ */
+/*     for(u32 byte = 0; byte < (size); ++byte) data[byte] = 0;	\ */
+/*   } while(0) */
+#define ZERO_STRUCT(s) ZERO_SIZE((s), sizeof(*s))
 
 #define ZERO_ARRAY(ptr, count, type) ZERO_SIZE((ptr), (count)*sizeof(type))
 
