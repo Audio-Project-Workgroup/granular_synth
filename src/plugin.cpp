@@ -239,6 +239,8 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 				       pluginParameterInitData[PluginParameter_density]);
 	      initializeFloatParameter(&pluginState->parameters[PluginParameter_window], //avail range: [0, 3], default value: 0
 				       pluginParameterInitData[PluginParameter_window]);
+		  initializeFloatParameter(&pluginState->parameters[PluginParameter_size], //avail range: [0, 16000], default value: 2600
+						pluginParameterInitData[PluginParameter_size]);
 
 	      // NOTE: devices
 	      pluginState->outputDeviceCount = memoryBlock->outputDeviceCount;
@@ -679,7 +681,42 @@ RENDER_NEW_FRAME(renderNewFrame)
 
 			      pluginSetFloatParameter(volume.element->fParam, newVolume);
 			    }
-			}		  		  
+			}
+			
+			// define a new knob for the size parameter
+				// we are on the left sub-UI
+				v2 offset = 20.f*V2(1, 1);
+				r32 sizePOP = 0.15f;
+				UIComm grainSizeKnob = uiMakeKnob(
+											panelLayout, 
+											STR8_LIT("size"), 
+											offset, 
+											-sizePOP,
+											&pluginState->parameters[PluginParameter_size], 
+											V4(0.2f, 0.5f, 0.3f, 1));
+				if(grainSizeKnob.flags & UICommFlag_dragging)
+				{
+					v2 dragDelta = uiGetDragDelta(grainSizeKnob.element);
+					// post processing to set the new grain size using a temporary workaround: 
+					// We scaled dragDelta.x by x20 to cover approximately the full grain-size scale across width resolution of the screen.
+					// i.e. dragging fully to the left reduces grain size and sets it to a value towards zero ..
+					// .. and dragging fully to the right sets the grain-size towards a value near its max value.
+					// @TODO fix temporary workaround
+					r32 newGrainSize = grainSizeKnob.element->fParamValueAtClick + 20.f*dragDelta.x;
+
+					// Ensure in size parameter stays withing its range
+					int sizeMin = pluginState->parameters[PluginParameter_size].range.min;
+					int sizeMax = pluginState->parameters[PluginParameter_size].range.max;
+					newGrainSize = (newGrainSize<sizeMin) ? sizeMin : newGrainSize;
+					newGrainSize = (newGrainSize>sizeMax) ? sizeMax : newGrainSize;
+					
+					pluginSetFloatParameter(grainSizeKnob.element->fParam, newGrainSize);
+				}
+
+
+
+
+
 		    }
 		  else if(stringsAreEqual(panel->name, STR8_LIT("right")))
 		    {
@@ -1195,9 +1232,7 @@ AUDIO_PROCESS(audioProcess)
       //u32 destSampleRate = audioBuffer->outputSampleRate;
       //r32 sampleRateRatio = (r32)INTERNAL_SAMPLE_RATE/(r32)destSampleRate;
       //u32 scaledFramesToWrite = (u32)(sampleRateRatio*framesToWrite);
-      
-      u32 grainSize = 2600; // TODO: make this a parameter
-      
+            
       TemporaryMemory grainMixerMemory = arenaBeginTemporaryMemory(&pluginState->permanentArena, KILOBYTES(128));
       r32 *grainMixBuffers[2] = {};
       grainMixBuffers[0] = arenaPushArray((Arena *)&grainMixerMemory, framesToWrite, r32,
@@ -1206,7 +1241,7 @@ AUDIO_PROCESS(audioProcess)
 					  arenaFlagsZeroNoAlign());
       synthesize(grainMixBuffers[0], grainMixBuffers[1],
 		 gManager, pluginState,
-		 framesToWrite, grainSize);
+		 framesToWrite);
 
       // NOTE: audio output
       r64 nFreq = M_TAU*pluginState->freq/(r64)audioBuffer->outputSampleRate;                 
@@ -1285,6 +1320,7 @@ AUDIO_PROCESS(audioProcess)
 	  pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_volume]);
 	  pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_density]);
 	  pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_window]);
+	  pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_size]);
 	}
 
       arenaEndTemporaryMemory(&grainMixerMemory);      

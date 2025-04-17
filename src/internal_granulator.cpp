@@ -137,7 +137,7 @@ getWindowVal(GrainManager* grainManager, r32 samplesPlayedFrac, WindowType windo
 static void
 synthesize(r32* destBufferLInit, r32* destBufferRInit,
 	   GrainManager* grainManager, PluginState *pluginState,
-	   u32 samplesToWrite, u32 grainSize)
+	   u32 samplesToWrite)
 {
   logString("\nsynthesize called\n");
 
@@ -159,6 +159,8 @@ synthesize(r32* destBufferLInit, r32* destBufferRInit,
   grainStateView->viewBuffer.readIndex = ((grainStateView->viewBuffer.readIndex + newView->sampleCount) %
 					  grainStateView->viewBuffer.capacity);
   
+  r32 grainSize = pluginState->parameters[PluginParameter_size].currentValue;
+
   for(Grain *grain = grainManager->grainPlayList->next;
       grain && grain != grainManager->grainPlayList;
       grain = grain->next)
