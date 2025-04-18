@@ -1,6 +1,6 @@
 #define PLUGIN_PARAMETER_XLIST \
   X(none, 0.f, 0.f, 0.f) \
-    X(volume, 0.f, 1.f, 0.8f)	       \
+    X(volume, -60.f, 0.f, -1.f)	       \
     X(density, 0.1f, 20.f, 1.f)	       \
     X(pan, 0.f, 1.f, 0.5f)		       \
     X(size, 0.f, 16000.f, 2600.f)		       \
@@ -70,4 +70,11 @@ struct PluginFloatParameter
 static PARAMETER_TRANSFORM(defaultTransform)
 {
   return(val);
+}
+
+static PARAMETER_TRANSFORM(decibelsToAmplitude)
+{
+  r32 amplitude = powf(10.f, val/20.f);
+
+  return(amplitude);
 }

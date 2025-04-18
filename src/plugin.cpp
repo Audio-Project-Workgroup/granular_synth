@@ -234,7 +234,7 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 	      pluginState->phasor = 0.f;
 	      pluginState->freq = 440.f;	  	     
 	      initializeFloatParameter(&pluginState->parameters[PluginParameter_volume], //0.8f, makeRange(0.f, 1.f)
-				       pluginParameterInitData[PluginParameter_volume]);
+				       pluginParameterInitData[PluginParameter_volume], decibelsToAmplitude);
 	      initializeFloatParameter(&pluginState->parameters[PluginParameter_density],// 0.8f, makeRange(0.1f, 20.f)
 				       pluginParameterInitData[PluginParameter_density]);
 
@@ -660,7 +660,10 @@ RENDER_NEW_FRAME(renderNewFrame)
 			      v2 dragDelta = uiGetDragDelta(volume.element);
 			      //printf("dragDelta: (%.2f, %.2f)\n", dragDelta.x, dragDelta.y);
 		      
-			      r32 newVolume = volume.element->fParamValueAtClick + dragDelta.y/getDim(volume.element->region).y;
+			      r32 newVolume =
+				(volume.element->fParamValueAtClick +
+				 getLength(volume.element->fParam->range)*dragDelta.y/getDim(volume.element->region).y);
+			      
 			      pluginSetFloatParameter(volume.element->fParam, newVolume);
 			    }
 			  else if(volume.flags & UICommFlag_minusPressed)
@@ -1204,10 +1207,9 @@ AUDIO_PROCESS(audioProcess)
 						audioBuffer->midiMessageCount, frameIndex);
 
 	  PluginFloatParameter *volumeParameter = pluginState->parameters + PluginParameter_volume;
-	  r32 dBVolume = volumeParameter->processingTransform(pluginReadFloatParameter(volumeParameter));
-	  UNUSED(dBVolume);
-	  r32 volume = formatVolumeFactor*pluginReadFloatParameter(&pluginState->parameters[PluginParameter_volume]);
-		
+	  r32 volumeRaw = pluginReadFloatParameter(volumeParameter);
+	  r32 volume =  formatVolumeFactor*volumeParameter->processingTransform(volumeRaw);
+	  	    
 	  pluginState->phasor += nFreq;
 	  if(pluginState->phasor > M_TAU) pluginState->phasor -= M_TAU;
 				  
