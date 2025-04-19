@@ -1,3 +1,11 @@
+enum WindowType {
+  HANN = 0,
+  SINE = 1,
+  TRIANGLE = 2,
+  RECTANGULAR = 3,
+  NUM_WINDOWS
+};
+
 #define PLUGIN_PARAMETER_XLIST \
   X(none, 0.f, 0.f, 0.f) \
     X(volume, -60.f, 0.f, -1.f)	       \
@@ -5,7 +13,7 @@
     X(pan, 0.f, 1.f, 0.5f)		       \
     X(size, 0.f, 16000.f, 2600.f)		       \
     X(offset, 0.f, 0.f, 0.f)			       \
-    X(window, 0.f, 0.f, 0.f)			       \
+    X(window, WindowType(0), WindowType(NUM_WINDOWS), WindowType(HANN))			       \
     X(pitch, 0.f, 0.f, 0.f)			       \
     X(streach, 0.f, 0.f, 0.f)			       \
     X(spread, 0.f, 0.f, 0.f)			       \
