@@ -16,8 +16,8 @@
 #define MILLION(count) (1000LL*THOUSAND(count))
 #define BILLION(count) (1000LL*MILLION(count))
 
-#define MIN(a, b) ((a) > (b)) ? (b) : (a)
-#define MAX(a, b) ((a) > (b)) ? (a) : (b)
+#define MIN(a, b) (((a) > (b)) ? (b) : (a))
+#define MAX(a, b) (((a) > (b)) ? (a) : (b))
 
 #define ARRAY_COUNT(arr) (sizeof(arr)/sizeof(arr[0]))
 #define OFFSET_OF(type, member) ((usz)&(((type *)0)->member))

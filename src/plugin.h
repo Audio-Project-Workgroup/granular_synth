@@ -2,6 +2,51 @@
 
 #include "common.h"
 
+inline void
+logString(char *string)
+{
+  for(;;)
+    {    
+      if(globalPlatform.atomicCompareAndSwap(&globalLogger->mutex, 0, 1) == 0)
+	{
+	  stringListPush(globalLogger->logArena, &globalLogger->log, STR8_CSTR(string));
+
+	  if(globalLogger->log.totalSize >= globalLogger->maxCapacity)
+	    {
+	      ZERO_STRUCT(&globalLogger->log);
+	      arenaEnd(globalLogger->logArena);
+	    }
+
+	  globalPlatform.atomicStore(&globalLogger->mutex, 0);
+	  break;
+	}
+    }
+}
+
+inline void
+logFormatString(char *format, ...)
+{
+  va_list vaArgs;
+  va_start(vaArgs, format);
+
+  for(;;)
+    {    
+      if(globalPlatform.atomicCompareAndSwap(&globalLogger->mutex, 0, 1) == 0)
+	{   
+	  stringListPushFormatV(globalLogger->logArena, &globalLogger->log, format, vaArgs);
+
+	  if(globalLogger->log.totalSize >= globalLogger->maxCapacity)
+	    {
+	      ZERO_STRUCT(&globalLogger->log);
+	      arenaEnd(globalLogger->logArena);
+	    }
+
+	  globalPlatform.atomicStore(&globalLogger->mutex, 0);
+	  break;
+	}
+    }
+}
+
 #include "plugin_parameters.h"
 #include "file_granulator.h"
 #include "file_formats.h"
@@ -207,48 +252,3 @@ static PluginParameterEnum ccParamTable[128] = {
     PluginParameter_none,   // CC 126: Mono Mode On
     PluginParameter_none    // CC 127: Poly Mode On
 };
-
-inline void
-logString(char *string)
-{
-  for(;;)
-    {    
-      if(globalPlatform.atomicCompareAndSwap(&globalLogger->mutex, 0, 1) == 0)
-	{
-	  stringListPush(globalLogger->logArena, &globalLogger->log, STR8_CSTR(string));
-
-	  if(globalLogger->log.totalSize >= globalLogger->maxCapacity)
-	    {
-	      ZERO_STRUCT(&globalLogger->log);
-	      arenaEnd(globalLogger->logArena);
-	    }
-
-	  globalPlatform.atomicStore(&globalLogger->mutex, 0);
-	  break;
-	}
-    }
-}
-
-inline void
-logFormatString(char *format, ...)
-{
-  va_list vaArgs;
-  va_start(vaArgs, format);
-
-  for(;;)
-    {    
-      if(globalPlatform.atomicCompareAndSwap(&globalLogger->mutex, 0, 1) == 0)
-	{   
-	  stringListPushFormatV(globalLogger->logArena, &globalLogger->log, format, vaArgs);
-
-	  if(globalLogger->log.totalSize >= globalLogger->maxCapacity)
-	    {
-	      ZERO_STRUCT(&globalLogger->log);
-	      arenaEnd(globalLogger->logArena);
-	    }
-
-	  globalPlatform.atomicStore(&globalLogger->mutex, 0);
-	  break;
-	}
-    }
-}

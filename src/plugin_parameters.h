@@ -14,7 +14,7 @@ inline void
 initializeFloatParameter(PluginFloatParameter *param, PluginParameterInitData initData,		
 			 ParameterTransform *transform = defaultTransform)
 {
-  param->currentValue = param->targetValue = initData.init;
+  param->currentValue.asFloat = param->targetValue.asFloat = initData.init;
   param->range = makeRange(initData.min, initData.max);
   param->processingTransform = transform;
 }
@@ -22,48 +22,53 @@ initializeFloatParameter(PluginFloatParameter *param, PluginParameterInitData in
 inline r32
 pluginReadFloatParameter(PluginFloatParameter *param)
 {
-  u32 paramCurrentValue_AsInt = globalPlatform.atomicLoad(&param->currentValue_AsInt);
-  r32 paramCurrentValue = *(r32 *)&paramCurrentValue_AsInt;
-  //return(param->currentValue);
-  return(paramCurrentValue);
+  ParameterValue currentValue = {};
+  currentValue.asInt = globalPlatform.atomicLoad(&param->currentValue.asInt);
+
+  return(currentValue.asFloat);
 }
 
 inline void
 pluginSetFloatParameter(PluginFloatParameter *param, r32 value, r32 changeTimeMS = 10)
 {
-  r32 paramTargetValue = clampToRange(value, param->range);
-  u32 paramTargetValue_AsInt = *(u32 *)&paramTargetValue;
-  globalPlatform.atomicStore(&param->targetValue_AsInt, paramTargetValue_AsInt);
+  ParameterValue targetValue = {};
+  targetValue.asFloat = clampToRange(value, param->range);
+  globalPlatform.atomicStore(&param->targetValue.asInt, targetValue.asInt);
 
-  u32 paramCurrentValue_AsInt = globalPlatform.atomicLoad(&param->currentValue_AsInt);
-  r32 paramCurrentValue = *(r32 *)&paramCurrentValue_AsInt;
-  
+  ParameterValue currentValue = {};
+  currentValue.asInt = globalPlatform.atomicLoad(&param->currentValue.asInt);   
+
+  ParameterValue dValue = {};
   r32 changeTimeSamples = 0.001f*changeTimeMS*(r32)INTERNAL_SAMPLE_RATE;
-  r32 dValue = (paramTargetValue - paramCurrentValue)/changeTimeSamples;
-  u32 dValue_AsInt = *(u32 *)&dValue;
-  globalPlatform.atomicStore(&param->dValue_AsInt, dValue_AsInt);
+  dValue.asFloat = (targetValue.asFloat - currentValue.asFloat)/changeTimeSamples;  
+  globalPlatform.atomicStore(&param->dValue.asInt, dValue.asInt);
 }
 
 inline void
 pluginUpdateFloatParameter(PluginFloatParameter *param)
 {
   // NOTE: should be called once per sample, per parameter
+  r32 rangeLen = getLength(param->range);
   r32 err = 0.001f;
 
-  u32 paramTargetValue_AsInt = globalPlatform.atomicLoad(&param->targetValue_AsInt);
-  u32 paramCurrentValue_AsInt = globalPlatform.atomicLoad(&param->currentValue_AsInt);
-  r32 paramTargetValue = *(r32 *)&paramTargetValue_AsInt;
-  r32 paramCurrentValue = *(r32 *)&paramCurrentValue_AsInt;
-  if(Abs(paramTargetValue - paramCurrentValue) > err)
+  ParameterValue targetValue = {};
+  ParameterValue currentValue = {};
+  targetValue.asInt = globalPlatform.atomicLoad(&param->targetValue.asInt);
+  currentValue.asInt = globalPlatform.atomicLoad(&param->currentValue.asInt);
+
+  if(Abs(targetValue.asFloat - currentValue.asFloat)/rangeLen > err)
     {
-      //param->currentValue += param->dValue;
-      u32 dValue_AsInt = globalPlatform.atomicLoad(&param->dValue_AsInt);
-      r32 dValue = *(r32 *)&dValue_AsInt;
+      ParameterValue dValue = {};
+      dValue.asInt = globalPlatform.atomicLoad(&param->dValue.asInt);
+
+      ParameterValue newValue = {};      
+      newValue.asFloat = currentValue.asFloat + dValue.asFloat;
       
-      r32 newValue = paramCurrentValue + dValue;
-      u32 newValue_AsInt = *(u32 *)&newValue;
-      //globalPlatform.atomicStore(&param->currentValue_AsInt, newValue_AsInt);
-      globalPlatform.atomicCompareAndSwap(&param->currentValue_AsInt, paramCurrentValue_AsInt, newValue_AsInt);
+      if(globalPlatform.atomicCompareAndSwap(&param->currentValue.asInt, currentValue.asInt, newValue.asInt) !=
+	 currentValue.asInt)
+	{
+	  logString("WARNING: atomicCAS failed to modify parameter!");
+	}
     }
 }
 

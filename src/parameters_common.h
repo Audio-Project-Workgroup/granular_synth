@@ -1,9 +1,10 @@
-enum WindowType {
-  HANN = 0,
-  SINE = 1,
-  TRIANGLE = 2,
-  RECTANGULAR = 3,
-  NUM_WINDOWS
+enum WindowType
+{
+  WindowShape_hann = 0,
+  WindowShape_sine = 1,
+  WindowShape_triangle = 2,
+  WindowShape_rectangle = 3,
+  WindowShape_count,
 };
 
 #define PLUGIN_PARAMETER_XLIST \
@@ -13,7 +14,7 @@ enum WindowType {
     X(pan, 0.f, 1.f, 0.5f)		       \
     X(size, 0.f, 16000.f, 2600.f)		       \
     X(offset, 0.f, 0.f, 0.f)			       \
-    X(window, WindowType(0), WindowType(NUM_WINDOWS), WindowType(HANN))			       \
+    X(window, 0, WindowShape_count, WindowShape_hann)			       \
     X(pitch, 0.f, 0.f, 0.f)			       \
     X(streach, 0.f, 0.f, 0.f)			       \
     X(spread, 0.f, 0.f, 0.f)			       \
@@ -51,28 +52,37 @@ struct PluginBooleanParameter
 #define PARAMETER_TRANSFORM(name) r32 (name)(r32 val)
 typedef PARAMETER_TRANSFORM(ParameterTransform);
 
+union ParameterValue
+{
+  r32 asFloat;
+  u32 asInt;
+};
+
 struct PluginFloatParameter
 {
   RangeR32 range;
 
   ParameterTransform *processingTransform;
 
-  volatile u32 mutex;
-  union
-  {
-    struct
-    {
-      r32 currentValue;
-      r32 targetValue;
-      r32 dValue;
-    };
-    struct
-    {
-      volatile u32 currentValue_AsInt;
-      volatile u32 targetValue_AsInt;
-      volatile u32 dValue_AsInt;
-    };
-  };   
+  volatile u32 lock;
+  volatile ParameterValue currentValue;
+  volatile ParameterValue targetValue;
+  volatile ParameterValue dValue;
+  /* union */
+  /* { */
+  /*   struct */
+  /*   { */
+  /*     r32 currentValue; */
+  /*     r32 targetValue; */
+  /*     r32 dValue; */
+  /*   }; */
+  /*   struct */
+  /*   { */
+  /*     volatile u32 currentValue_AsInt; */
+  /*     volatile u32 targetValue_AsInt; */
+  /*     volatile u32 dValue_AsInt; */
+  /*   }; */
+  /* };    */
 };
 
 static PARAMETER_TRANSFORM(defaultTransform)

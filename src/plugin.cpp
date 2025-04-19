@@ -233,14 +233,16 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 	      // NOTE: parameter initialization
 	      pluginState->phasor = 0.f;
 	      pluginState->freq = 440.f;	  	     
-	      initializeFloatParameter(&pluginState->parameters[PluginParameter_volume], //0.8f, makeRange(0.f, 1.f)
+	      initializeFloatParameter(&pluginState->parameters[PluginParameter_volume], 
 				       pluginParameterInitData[PluginParameter_volume], decibelsToAmplitude);
-	      initializeFloatParameter(&pluginState->parameters[PluginParameter_density],// 0.8f, makeRange(0.1f, 20.f)
+	      initializeFloatParameter(&pluginState->parameters[PluginParameter_density],
 				       pluginParameterInitData[PluginParameter_density]);
-	      initializeFloatParameter(&pluginState->parameters[PluginParameter_window], //avail range: [0, 3], default value: 0
+	      //avail range: [0, 3], default value: 0
+	      initializeFloatParameter(&pluginState->parameters[PluginParameter_window], 
 				       pluginParameterInitData[PluginParameter_window]);
-		  initializeFloatParameter(&pluginState->parameters[PluginParameter_size], //avail range: [0, 16000], default value: 2600
-						pluginParameterInitData[PluginParameter_size]);
+	      //avail range: [0, 16000], default value: 2600
+	      initializeFloatParameter(&pluginState->parameters[PluginParameter_size], 
+				       pluginParameterInitData[PluginParameter_size]);
 
 	      // NOTE: devices
 	      pluginState->outputDeviceCount = memoryBlock->outputDeviceCount;
@@ -686,40 +688,25 @@ RENDER_NEW_FRAME(renderNewFrame)
 			    }
 			}
 			
-			// define a new knob for the size parameter
-				// we are on the left sub-UI
-				v2 offset = 20.f*V2(1, 1);
-				r32 sizePOP = 0.15f;
-				UIComm grainSizeKnob = uiMakeKnob(
-											panelLayout, 
-											STR8_LIT("size"), 
-											offset, 
-											-sizePOP,
-											&pluginState->parameters[PluginParameter_size], 
-											V4(0.2f, 0.5f, 0.3f, 1));
-				if(grainSizeKnob.flags & UICommFlag_dragging)
-				{
-					v2 dragDelta = uiGetDragDelta(grainSizeKnob.element);
-					// post processing to set the new grain size using a temporary workaround: 
-					// We scaled dragDelta.x by x20 to cover approximately the full grain-size scale across width resolution of the screen.
-					// i.e. dragging fully to the left reduces grain size and sets it to a value towards zero ..
-					// .. and dragging fully to the right sets the grain-size towards a value near its max value.
-					// @TODO fix temporary workaround
-					r32 newGrainSize = grainSizeKnob.element->fParamValueAtClick + 20.f*dragDelta.x;
-
-					// Ensure in size parameter stays withing its range
-					int sizeMin = pluginState->parameters[PluginParameter_size].range.min;
-					int sizeMax = pluginState->parameters[PluginParameter_size].range.max;
-					newGrainSize = (newGrainSize<sizeMin) ? sizeMin : newGrainSize;
-					newGrainSize = (newGrainSize>sizeMax) ? sizeMax : newGrainSize;
+		      // define a new knob for the size parameter
+		      // we are on the left sub-UI
+		      v2 offset = 20.f*V2(1, 1);
+		      r32 sizePOP = 0.15f;
+		      UIComm grainSizeKnob = uiMakeKnob(panelLayout, STR8_LIT("size"), offset, -sizePOP,
+							&pluginState->parameters[PluginParameter_size], 
+							V4(0.2f, 0.5f, 0.3f, 1));
+		      if(grainSizeKnob.flags & UICommFlag_dragging)
+			{
+			  v2 dragDelta = uiGetDragDelta(grainSizeKnob.element);
+			  // post processing to set the new grain size using a temporary workaround: 
+			  // We scaled dragDelta.x by x20 to cover approximately the full grain-size scale across width resolution of the screen.
+			  // i.e. dragging fully to the left reduces grain size and sets it to a value towards zero ..
+			  // .. and dragging fully to the right sets the grain-size towards a value near its max value.
+			  // @TODO fix temporary workaround
+			  r32 newGrainSize = grainSizeKnob.element->fParamValueAtClick + 50.f*dragDelta.y;
 					
-					pluginSetFloatParameter(grainSizeKnob.element->fParam, newGrainSize);
-				}
-
-
-
-
-
+			  pluginSetFloatParameter(grainSizeKnob.element->fParam, newGrainSize);
+			}
 		    }
 		  else if(stringsAreEqual(panel->name, STR8_LIT("right")))
 		    {
@@ -757,10 +744,6 @@ RENDER_NEW_FRAME(renderNewFrame)
 			v2 offset = offsetPixels*V2(1, 1);    
 			UIComm density = uiMakeKnob(panelLayout, STR8_LIT("density"), offset, -sizePOP,
 						    &pluginState->parameters[PluginParameter_density], V4(0, 1, 0, 1));
-		  
-			//r32 oldDensity = pluginReadFloatParameter(density.element->fParam);
-			//r32 newDensity = oldDensity;
-			//printf("oldDensity: %.2f\n", oldDensity);		  
 			if(density.flags & UICommFlag_dragging)
 			  {
 			    v2 dragDelta = uiGetDragDelta(density.element);
@@ -770,28 +753,29 @@ RENDER_NEW_FRAME(renderNewFrame)
 			    pluginSetFloatParameter(density.element->fParam, newDensity);
 			    //printf("newDensity: %.2f\n", newDensity);
 			  }		    
+		      }
+		      // @TODO Refine UI for the window parameter ..
+		      // .. what needs to be done is position the rotating knob into a more aligned spot in the UI frame .. 
+		      // .. and implement a knob with distinct states instead of a knob with float states.
+		      // Otherwise, define a new UI struct for it. hint: It needs a UI that will be used a toggling mechanism across its 4+ disctinct states.
+		      // define a new knob for the window parameter
+		      // we are on the right sub-UI
+		      {
+			v2 dim = getDim(panelLayout->regionRemaining);
+			UNUSED(dim);
+			r32 sizePOP = 0.15f;
+			r32 offsetPixels = 20.f;
+			v2 offset = offsetPixels*V2(1, 1);
+			UIComm window = uiMakeKnob(panelLayout, STR8_LIT("window"), offset, -sizePOP,
+						   &pluginState->parameters[PluginParameter_window], 
+						   V4(1, 0, 1, 1));
+			if(window.flags & UICommFlag_dragging)
+			  {
+			    v2 dragDelta = uiGetDragDelta(window.element);
+			    r32 newWindow = window.element->fParamValueAtClick + 0.01f*dragDelta.y;
 
-			// @TODO Refine UI for the window parameter ..
-			// .. what needs to be done is position the rotating knob into a more aligned spot in the UI frame .. 
-			// .. and implement a knob with distinct states instead of a knob with float states.
-			// Otherwise, define a new UI struct for it. hint: It needs a UI that will be used a toggling mechanism across its 4+ disctinct states.
-			// define a new knob for the window parameter
-				// we are on the right sub-UI
-                offset.x = dim.x*0.9; // on the left-most of it
-                UIComm window = uiMakeKnob(
-                                            panelLayout, 
-                                            STR8_LIT("window"), 
-                                            offset, 
-                                            -sizePOP,
-                                            &pluginState->parameters[PluginParameter_window], 
-                                            V4(1, 0, 1, 0));
-                if(window.flags & UICommFlag_dragging)
-                {
-                    v2 dragDelta = uiGetDragDelta(window.element);
-                    r32 newWindow = window.element->fParamValueAtClick + 0.01f*dragDelta.y;
-                    newWindow =  abs(u8(newWindow) % (u8)NUM_WINDOWS); // quantize in NUM_WINDOWS range
-                    pluginSetFloatParameter(window.element->fParam, newWindow);
-                }		    
+			    pluginSetFloatParameter(window.element->fParam, newWindow);
+			  }		    
 
 
 		      }

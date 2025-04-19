@@ -4,10 +4,10 @@ initializeWindows(GrainManager* grainManager)
   r32 windowLengthF = (r32)WINDOW_LENGTH;
   r32 windowLengthInv = 1.f/windowLengthF;
   
-  r32 *hannBuffer = grainManager->windowBuffer[HANN];
-  r32 *sineBuffer = grainManager->windowBuffer[SINE];
-  r32 *triangleBuffer = grainManager->windowBuffer[TRIANGLE];
-  r32 *rectangularBuffer = grainManager->windowBuffer[RECTANGULAR];
+  r32 *hannBuffer = grainManager->windowBuffer[WindowShape_hann];
+  r32 *sineBuffer = grainManager->windowBuffer[WindowShape_sine];
+  r32 *triangleBuffer = grainManager->windowBuffer[WindowShape_triangle];
+  r32 *rectangularBuffer = grainManager->windowBuffer[WindowShape_rectangle];
   for(u32 sample = 0; sample < WINDOW_LENGTH; ++sample)
     {
       *hannBuffer++ = 0.5f * (1.f - Cos(M_TAU * sample * windowLengthInv));
@@ -79,7 +79,7 @@ makeNewGrain(GrainManager* grainManager, u32 grainSize, WindowType windowParam)
   result->samplesToPlay = grainSize;
   result->length = grainSize;
   result->lengthInv = (r32)1/grainSize;
-  result->window = windowParam;
+  result->window = MIN(windowParam, (WindowType)(WindowShape_count - 1));
 
   DLINKED_LIST_APPEND(grainManager->grainPlayList, result);
 
@@ -96,26 +96,6 @@ destroyGrain(GrainManager* grainManager, Grain* grain)
   STACK_PUSH(grainManager->grainFreeList, grain);
   grain->prev = 0;
 }
-
-#if 0
-// TODO: use lookup tables for windowing, rather than having to branch so much
-inline r32
-applyWindow(r32 sample, u32 index, u32 length, WindowType window)
-{
-  switch (window) {
-  case HANN:
-    return sample * (0.5 * (1 - cos(2 * M_PI * index / length)));
-  case SINE:
-    return sample * sin((M_PI * index) / length);
-  case RECTANGULAR:
-    return sample * 1; 
-  case TRIANGLE:
-    return sample * (1.0 - Abs((index - (length - 1) / 2.0) / ((length - 1) / 2.0)));
-  default:
-    return sample;
-  }
-}
-#endif
 
 inline r32
 getWindowVal(GrainManager* grainManager, r32 samplesPlayedFrac, WindowType window) 
@@ -157,9 +137,7 @@ synthesize(r32* destBufferLInit, r32* destBufferRInit,
 
   readSamplesFromAudioRingBuffer(buffer, newView->bufferSamples[0], newView->bufferSamples[1], samplesToWrite, false);
   grainStateView->viewBuffer.readIndex = ((grainStateView->viewBuffer.readIndex + newView->sampleCount) %
-					  grainStateView->viewBuffer.capacity);
-  
-  r32 grainSize = pluginState->parameters[PluginParameter_size].currentValue;
+					  grainStateView->viewBuffer.capacity);   
 
   for(Grain *grain = grainManager->grainPlayList->next;
       grain && grain != grainManager->grainPlayList;
@@ -179,13 +157,16 @@ synthesize(r32* destBufferLInit, r32* destBufferRInit,
   r32* destBufferR = destBufferRInit;
   for (u32 sampleIndex = 0; sampleIndex < samplesToWrite; ++sampleIndex)
     {
-#if 1
-      r32 density = pluginReadFloatParameter(&pluginState->parameters[PluginParameter_density]);
+#if 1     
+      u32 grainSize = (u32)pluginReadFloatParameter(&pluginState->parameters[PluginParameter_size]);      
+      u32 windowType = (u32)pluginReadFloatParameter(&pluginState->parameters[PluginParameter_window]);
+      r32 density = pluginReadFloatParameter(&pluginState->parameters[PluginParameter_density]);      
+      
       r32 iot = (r32)grainSize/density;
       r32 volume = MAX(1.f/density, 1.f); // TODO: how to adapt volume to prevent clipping?     
       if(grainManager->samplesProcessedSinceLastSeed >= iot)
 	{
-          makeNewGrain(grainManager, grainSize, WindowType(pluginReadFloatParameter(&pluginState->parameters[PluginParameter_window])));
+          makeNewGrain(grainManager, grainSize, (WindowType)windowType);
 	}      
 
       r32 outSampleL = 0.f;

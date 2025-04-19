@@ -1,17 +1,5 @@
 #define WINDOW_LENGTH 1024
 
-/* struct GrainBuffer */
-/* { */
-/*   r32* samples[2]; */
-
-/*   u32 writeIndex; */
-/*   u32 readIndex; */
-/*   /\* r32 writePosition; *\/ */
-/*   /\* r32 readPosition; *\/ */
-
-/*   u32 bufferCount; */
-/* }; */
-
 inline u32
 grainBufferSetReadPos(u32 write_pos, u32 bufferSize)
 {
