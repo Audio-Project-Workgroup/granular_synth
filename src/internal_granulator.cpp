@@ -1,3 +1,17 @@
+static r32
+getRandomStereoPosition(r32 spreadAmount)
+{
+    // Generate a random value between -1 and 1 using a normal distribution
+    // Higher spreadAmount = wider stereo field
+
+    // Simple random number between -1 and 1 (using two calls to rand() for better distribution)
+    r32 randVal = (((r32)rand() / RAND_MAX) * 2.0f - 1.0f) * 0.5f +
+        (((r32)rand() / RAND_MAX) * 2.0f - 1.0f) * 0.5f;
+
+    // Scale by spread parameter (0 = mono, 1 = full stereo)
+    return randVal * spreadAmount;
+}
+
 static void
 initializeWindows(GrainManager* grainManager)
 {
@@ -57,7 +71,7 @@ initializeGrainManager(PluginState *pluginState)
 }
 
 static void
-makeNewGrain(GrainManager* grainManager, u32 grainSize, WindowType windowParam)
+makeNewGrain(GrainManager* grainManager, u32 grainSize, WindowType windowParam, r32 spread)
 {
   Grain* result;
   //TODO: Add some logic that could update based off of position so it doesn't just re-use the same grains over n over
@@ -80,6 +94,8 @@ makeNewGrain(GrainManager* grainManager, u32 grainSize, WindowType windowParam)
   result->length = grainSize;
   result->lengthInv = (r32)1/grainSize;
   result->window = windowParam;
+
+  result->stereoPosition = getRandomStereoPosition(spread);
 
   DLINKED_LIST_APPEND(grainManager->grainPlayList, result);
 
@@ -179,11 +195,12 @@ synthesize(r32* destBufferLInit, r32* destBufferRInit,
     {
 #if 1
       r32 density = pluginReadFloatParameter(&pluginState->parameters[PluginParameter_density]);
+      r32 spread = pluginReadFloatParameter(&pluginState->parameters[PluginParameter_spread]);
       r32 iot = (r32)grainSize/density;
       r32 volume = MAX(1.f/density, 1.f); // TODO: how to adapt volume to prevent clipping?     
       if(grainManager->samplesProcessedSinceLastSeed >= iot)
 	{
-          makeNewGrain(grainManager, grainSize, HANN);         
+          makeNewGrain(grainManager, grainSize, HANN, spread);
 	}      
 
       r32 outSampleL = 0.f;
@@ -209,8 +226,12 @@ synthesize(r32* destBufferLInit, r32* destBufferRInit,
 	      u32 samplesPlayed = c_grain->length - c_grain->samplesToPlay;
 	      r32 samplesPlayedFrac = (r32)samplesPlayed*c_grain->lengthInv;
 	      r32 windowVal = getWindowVal(grainManager, samplesPlayedFrac, c_grain->window);
-	      outSampleL += windowVal*sampleToWriteL;
-	      outSampleR += windowVal*sampleToWriteR;
+	      
+          r32 panLeft = 1.0f - fmaxf(0.0f, c_grain->stereoPosition);
+          r32 panRight = 1.0f + fminf(0.0f, c_grain->stereoPosition);
+          
+          outSampleL += windowVal * sampleToWriteL * panLeft;
+          outSampleR += windowVal * sampleToWriteR * panRight;
 
 	      --c_grain->samplesToPlay;	    
 	      c_grain = c_grain->next;
