@@ -27,6 +27,7 @@ struct Grain
   u32 length;
   r32 lengthInv;
   //bool onFreeList;
+  r32 stereoPosition;
 };
 
 struct GrainManager

@@ -243,6 +243,8 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 	      //avail range: [0, 16000], default value: 2600
 	      initializeFloatParameter(&pluginState->parameters[PluginParameter_size], 
 				       pluginParameterInitData[PluginParameter_size]);
+	      initializeFloatParameter(&pluginState->parameters[PluginParameter_spread],
+						pluginParameterInitData[PluginParameter_spread]);
 
 	      // NOTE: devices
 	      pluginState->outputDeviceCount = memoryBlock->outputDeviceCount;
@@ -734,6 +736,28 @@ RENDER_NEW_FRAME(renderNewFrame)
 		      }
 		  
 		      //
+		      // spread knob
+		      //
+		      {
+			v2 dim = getDim(panelLayout->regionRemaining);
+			UNUSED(dim);
+			r32 sizePOP = 0.15f;
+			r32 offsetPixels = 20.f;
+			v2 offset = offsetPixels*V2(1,1);
+			//spread knob
+			//v2 offsetSpread = offsetPixels * V2(1,2);
+			UIComm spread = uiMakeKnob(panelLayout, STR8_LIT("Spread"), offset, -sizePOP,
+						   &pluginState->parameters[PluginParameter_spread], V4(1, 1, 0, 1));
+			if (spread.flags & UIElementFlag_turnable)
+			  {
+			    v2 dragDelta2 = uiGetDragDelta(spread.element);
+			    //printf("dragDelta: (%.2f, %.2f)\n", dragDelta.x, dragDelta.y);
+			    r32 spreader = spread.element->fParamValueAtClick + .01f * dragDelta2.y;
+			    pluginSetFloatParameter(spread.element->fParam, spreader);
+			  }
+		      }
+			
+		      //
 		      // density
 		      //
 		      {
@@ -741,7 +765,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 			UNUSED(dim);
 			r32 sizePOP = 0.15f;
 			r32 offsetPixels = 20.f;
-			v2 offset = offsetPixels*V2(1, 1);    
+			v2 offset = offsetPixels*V2(1,1);
 			UIComm density = uiMakeKnob(panelLayout, STR8_LIT("density"), offset, -sizePOP,
 						    &pluginState->parameters[PluginParameter_density], V4(0, 1, 0, 1));
 			if(density.flags & UICommFlag_dragging)
@@ -754,6 +778,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 			    //printf("newDensity: %.2f\n", newDensity);
 			  }		    
 		      }
+		      
 		      // @TODO Refine UI for the window parameter ..
 		      // .. what needs to be done is position the rotating knob into a more aligned spot in the UI frame .. 
 		      // .. and implement a knob with distinct states instead of a knob with float states.
@@ -1276,6 +1301,26 @@ AUDIO_PROCESS(audioProcess)
 	      r32 grainVal = lerp(firstGrainVal, nextGrainVal, grainReadFrac);
 #else
 	      r32 grainVal = grainMixBuffers[channelIndex][frameIndex];
+		  r32 leftGrainVal = grainMixBuffers[0][frameIndex];
+		  r32 rightGrainVal = grainMixBuffers[1][frameIndex];
+		  r32 stereoWidth = pluginReadFloatParameter(&pluginState->parameters[PluginParameter_spread]);
+		  if (channelIndex < 2) { // Make sure we only process left and right channels
+			  //r32 widthVal = stereoWidth * 0.5f;
+			  r32 tmp = 1.0f / fmaxf(1.0f + stereoWidth, 2.0f);
+			  r32 coef_M = 1.0f * tmp;
+			  r32 coef_S = stereoWidth * tmp;
+
+			  r32 mid = (leftGrainVal + rightGrainVal) * coef_M;
+			  r32 sides = (rightGrainVal - leftGrainVal) * coef_S;
+
+			  // Update grain value based on channel
+			  if (channelIndex == 0) {
+				  grainVal = mid - sides; // Left channel
+			  }
+			  else {
+				  grainVal = mid + sides; // Right channel
+			  }
+		  }
 #endif
 	      mixedVal += 0.5*grainVal;
 
@@ -1303,6 +1348,7 @@ AUDIO_PROCESS(audioProcess)
 	  pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_density]);
 	  pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_window]);
 	  pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_size]);
+	  pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_spread]);
 	}
 
       arenaEndTemporaryMemory(&grainMixerMemory);      

@@ -116,23 +116,23 @@ target_link_libraries(
 set(VST3_HELPER_DIRECTORY "${CMAKE_BINARY_DIR}/Debug")
 set(VST3_OUTPUT_DIR "${CMAKE_BINARY_DIR}/GranularSynthTest_artefacts/${CMAKE_BUILD_TYPE}/VST3/Granular Synth Test.vst3")
 
-if(WIN32)
-  set(VST3_BIN_DIR "${VST3_OUTPUT_DIR}/Contents/x86_64-win")
-  message("copying ${ONNX_DLL} to ${VST3_BIN_DIR}") 
-  add_custom_command(
-    TARGET ${PROJECT_NAME}
-    POST_BUILD
-    # copy to build output directory
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    "${ONNX_DLL}"
-    "$<TARGET_FILE_DIR:${PROJECT_NAME}>"
-    # copy to VST3 component directory
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    "${ONNX_DLL}"
-    "${VST3_BIN_DIR}"
-    # copy to juce_vst3_helper.exe directory
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    "${ONNX_DLL}"
-    "${VST3_HELPER_DIRECTORY}"
-  )
-endif()
+#if(WIN32)
+#  set(VST3_BIN_DIR "${VST3_OUTPUT_DIR}/Contents/x86_64-win")
+#  message("copying ${ONNX_DLL} to ${VST3_BIN_DIR}") 
+#  add_custom_command(
+#    TARGET ${PROJECT_NAME}
+#    POST_BUILD
+#    # copy to build output directory
+#    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+#    "${ONNX_DLL}"
+#    "$<TARGET_FILE_DIR:${PROJECT_NAME}>"
+#    # copy to VST3 component directory
+#    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+#    "${ONNX_DLL}"
+#    "${VST3_BIN_DIR}"
+#    # copy to juce_vst3_helper.exe directory
+#    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+#    "${ONNX_DLL}"
+#    "${VST3_HELPER_DIRECTORY}"
+#  )
+#endif()
