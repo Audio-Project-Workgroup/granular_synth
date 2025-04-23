@@ -21,7 +21,8 @@ struct Grain
   Grain* prev;
 
   r32* start[2];
-  WindowType window;
+  //WindowType window;
+  r32 windowParam;
   
   s32 samplesToPlay;
   u32 length;

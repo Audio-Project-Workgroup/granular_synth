@@ -72,7 +72,7 @@ initializeGrainManager(PluginState *pluginState)
 }
 
 static void
-makeNewGrain(GrainManager* grainManager, u32 grainSize, WindowType windowParam, r32 spread)
+makeNewGrain(GrainManager* grainManager, u32 grainSize, r32 windowParam, r32 spread)
 {
   Grain* result;
   //TODO: Add some logic that could update based off of position so it doesn't just re-use the same grains over n over
@@ -94,7 +94,7 @@ makeNewGrain(GrainManager* grainManager, u32 grainSize, WindowType windowParam, 
   result->samplesToPlay = grainSize;
   result->length = grainSize;
   result->lengthInv = (r32)1/grainSize;
-  result->window = MIN(windowParam, (WindowType)(WindowShape_count - 1));
+  result->windowParam = MIN(windowParam, (WindowShape_count - 1));
 
   result->stereoPosition = getRandomStereoPosition(spread);
 
@@ -115,22 +115,32 @@ destroyGrain(GrainManager* grainManager, Grain* grain)
 }
 
 inline r32
-getWindowVal(GrainManager* grainManager, r32 samplesPlayedFrac, WindowType window) 
+getWindowVal(GrainManager* grainManager, r32 samplesPlayedFrac, r32 windowParam) 
 {
   r32 tablePosition = samplesPlayedFrac * (r32)(WINDOW_LENGTH - 1);
   u32 tableIndex = (u32)tablePosition;
   r32 indexFrac = tablePosition - tableIndex;
-  
+
+  u32 windowIndex = (u32)windowParam;
+  r32 windowFrac = windowParam - windowIndex;
+
   ASSERT(tableIndex < WINDOW_LENGTH);
   ASSERT(((tableIndex + 1) < WINDOW_LENGTH) || (indexFrac == 0));
-  r32 floor = grainManager->windowBuffer[window][tableIndex];
-  r32 ceil = grainManager->windowBuffer[window][tableIndex + 1];  
-  r32 result = lerp(floor, ceil, indexFrac);
+  ASSERT(windowIndex + 1 < ARRAY_COUNT(grainManager->windowBuffer));
+
+  r32 floor0 = grainManager->windowBuffer[windowIndex][tableIndex];
+  r32 ceil0 = grainManager->windowBuffer[windowIndex][tableIndex + 1];
+  r32 floor1 = grainManager->windowBuffer[windowIndex + 1][tableIndex];
+  r32 ceil1 = grainManager->windowBuffer[windowIndex + 1][tableIndex + 1];
+
+  // NOTE: bilinear blend
+  r32 windowVal0 = lerp(floor0, ceil0, indexFrac);
+  r32 windowVal1 = lerp(floor1, ceil1, indexFrac);
+  r32 result = lerp(windowVal0, windowVal1, windowFrac);
 
   return(result);
 }
 
-// TODO: look up density and size parameters in this function, instead of passing fixed parameters
 static void
 synthesize(r32* destBufferLInit, r32* destBufferRInit,
 	   GrainManager* grainManager, PluginState *pluginState,
@@ -176,7 +186,7 @@ synthesize(r32* destBufferLInit, r32* destBufferRInit,
     {
 #if 1     
       u32 grainSize = (u32)pluginReadFloatParameter(&pluginState->parameters[PluginParameter_size]);      
-      u32 windowType = (u32)pluginReadFloatParameter(&pluginState->parameters[PluginParameter_window]);
+      r32 windowParam = pluginReadFloatParameter(&pluginState->parameters[PluginParameter_window]);
       r32 density = pluginReadFloatParameter(&pluginState->parameters[PluginParameter_density]);
       r32 spread = pluginReadFloatParameter(&pluginState->parameters[PluginParameter_spread]);
       
@@ -184,7 +194,7 @@ synthesize(r32* destBufferLInit, r32* destBufferRInit,
       r32 volume = MAX(1.f/density, 1.f); // TODO: how to adapt volume to prevent clipping?     
       if(grainManager->samplesProcessedSinceLastSeed >= iot)
 	{
-	  makeNewGrain(grainManager, grainSize, (WindowType)windowType, spread);
+	  makeNewGrain(grainManager, grainSize, windowParam, spread);
 	}      
 
       r32 outSampleL = 0.f;
@@ -209,7 +219,7 @@ synthesize(r32* destBufferLInit, r32* destBufferRInit,
 
 	      u32 samplesPlayed = c_grain->length - c_grain->samplesToPlay;
 	      r32 samplesPlayedFrac = (r32)samplesPlayed*c_grain->lengthInv;
-	      r32 windowVal = getWindowVal(grainManager, samplesPlayedFrac, c_grain->window);
+	      r32 windowVal = getWindowVal(grainManager, samplesPlayedFrac, c_grain->windowParam);
 	      
           r32 panLeft = 1.0f - fmaxf(0.0f, c_grain->stereoPosition);
           r32 panRight = 1.0f + fminf(0.0f, c_grain->stereoPosition);
