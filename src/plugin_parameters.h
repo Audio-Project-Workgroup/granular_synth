@@ -45,6 +45,22 @@ pluginSetFloatParameter(PluginFloatParameter *param, r32 value, r32 changeTimeMS
 }
 
 inline void
+pluginOffsetFloatParameter(PluginFloatParameter *param, r32 inc, r32 changeTimeMS = 10)
+{
+  ParameterValue currentValue = {};
+  currentValue.asInt = globalPlatform.atomicLoad(&param->currentValue.asInt);   
+
+  ParameterValue targetValue = {};
+  targetValue.asFloat = clampToRange(currentValue.asFloat + inc, param->range);
+  globalPlatform.atomicStore(&param->targetValue.asInt, targetValue.asInt);
+
+  ParameterValue dValue = {};
+  r32 changeTimeSamples = 0.001f*changeTimeMS*(r32)INTERNAL_SAMPLE_RATE;
+  dValue.asFloat = (targetValue.asFloat - currentValue.asFloat)/changeTimeSamples;  
+  globalPlatform.atomicStore(&param->dValue.asInt, dValue.asInt);
+}
+
+inline void
 pluginUpdateFloatParameter(PluginFloatParameter *param)
 {
   // NOTE: should be called once per sample, per parameter

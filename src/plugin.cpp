@@ -1369,9 +1369,37 @@ RENDER_NEW_FRAME(renderNewFrame)
 extern "C"
 AUDIO_PROCESS(audioProcess)
 {  
-  PluginState *pluginState = getPluginState(memory);//initializePluginState(memory);  
+  PluginState *pluginState = getPluginState(memory);
   if(pluginState->initialized)
     {
+      // NOTE: dequeue host-driven parameter value changes
+      u32 queuedCount = globalPlatform.atomicLoad(&audioBuffer->queuedCount);
+      if(queuedCount)
+	{
+	  u32 parameterValueQueueReadIndex = audioBuffer->parameterValueQueueReadIndex;
+	  for(u32 entryIndex = 0; entryIndex < queuedCount; ++entryIndex)
+	    {
+	      ParameterValueQueueEntry *entry =
+		audioBuffer->parameterValueQueueEntries + parameterValueQueueReadIndex;
+
+	      PluginFloatParameter *parameter = pluginState->parameters + entry->index;
+	      //r32 parameterRangeLen = getLength(parameter->range);
+	      //r32 newVal = entry->value.asFloat*parameterRangeLen + parameter->range.min;
+	      r32 newVal = mapToRange(entry->value.asFloat, parameter->range);
+	      pluginSetFloatParameter(parameter, newVal);
+	    }
+
+	  audioBuffer->parameterValueQueueReadIndex =
+	    (parameterValueQueueReadIndex + queuedCount) % ARRAY_COUNT(audioBuffer->parameterValueQueueEntries);
+
+	  u32 entriesRead = queuedCount;
+	  while(globalPlatform.atomicCompareAndSwap(&audioBuffer->queuedCount,
+						    queuedCount, queuedCount - entriesRead) != queuedCount)
+	    {
+	      queuedCount = globalPlatform.atomicLoad(&audioBuffer->queuedCount);
+	    }
+	}
+      
       // NOTE: copy plugin input audio to the grain buffer
       u32 framesToRead = audioBuffer->framesToWrite;      
       r32 inputBufferReadSpeed = ((audioBuffer->inputSampleRate != 0) ?

@@ -13,12 +13,12 @@ enum WindowType
     X(density, 0.1f, 20.f, 1.f)	       \
     X(pan, 0.f, 1.f, 0.5f)		       \
     X(size, 0.f, 16000.f, 2600.f)		       \
-    X(offset, 0.f, 0.f, 0.f)			       \
     X(window, 0, WindowShape_count - 1, WindowShape_hann)			       \
-    X(pitch, 0.f, 0.f, 0.f)			       \
-    X(streach, 0.f, 0.f, 0.f)			       \
     X(spread, 0.f, 1.0f, 0.5f)			       \
-    X(mix, 0.f, 1.f, 0.5f)
+    X(mix, 0.f, 1.f, 0.5f) \
+    X(offset, 0.f, 0.f, 0.f)			       \
+    X(pitch, 0.f, 0.f, 0.f)			       \
+    X(stretch, 0.f, 0.f, 0.f)			       
 
 // Plugin Parameter enumeration to link with midi CC
 enum PluginParameterEnum
@@ -58,6 +58,12 @@ union ParameterValue
   u32 asInt;
 };
 
+struct ParameterValueQueueEntry
+{
+  u32 index;
+  ParameterValue value;
+};
+
 struct PluginFloatParameter
 {
   RangeR32 range;
@@ -68,21 +74,6 @@ struct PluginFloatParameter
   volatile ParameterValue currentValue;
   volatile ParameterValue targetValue;
   volatile ParameterValue dValue;
-  /* union */
-  /* { */
-  /*   struct */
-  /*   { */
-  /*     r32 currentValue; */
-  /*     r32 targetValue; */
-  /*     r32 dValue; */
-  /*   }; */
-  /*   struct */
-  /*   { */
-  /*     volatile u32 currentValue_AsInt; */
-  /*     volatile u32 targetValue_AsInt; */
-  /*     volatile u32 dValue_AsInt; */
-  /*   }; */
-  /* };    */
 };
 
 static PARAMETER_TRANSFORM(defaultTransform)

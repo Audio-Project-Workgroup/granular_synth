@@ -91,6 +91,46 @@ PLATFORM_FREE_FILE_MEMORY(juceFreeFileMemory)
 }
 
 //==============================================================================
+DetectivePervert::DetectivePervert(AudioPluginAudioProcessor &p)
+  : processorRef(p)
+{
+  juce::Logger::writeToLog("detective pervert reporting for duty");
+}
+
+void DetectivePervert::
+parameterValueChanged(int parameterIndex, float newValue)
+{
+  if(!processorRef.ignoreParameterChange)
+    {
+      juce::Logger::writeToLog("detective pervert heard a parameter value change: " +
+			       juce::String(parameterIndex) + " " +
+			       juce::String(newValue));
+
+      PluginAudioBuffer *audioBuffer = &processorRef.audioBuffer;
+      u32 writeIndex = audioBuffer->parameterValueQueueWriteIndex;
+
+      ParameterValueQueueEntry *entry = audioBuffer->parameterValueQueueEntries + writeIndex;
+      entry->index = processorRef.vstParameterIndexTo_pluginParameterIndex[parameterIndex];
+      entry->value.asFloat = newValue;
+
+      u32 queuedCount = atomicLoad(&audioBuffer->queuedCount);
+      while(atomicCompareAndSwap(&audioBuffer->queuedCount, queuedCount, queuedCount + 1) != queuedCount)
+	{
+	  queuedCount = atomicLoad(&audioBuffer->queuedCount);
+	}
+
+      audioBuffer->parameterValueQueueWriteIndex =
+	(writeIndex + 1) % ARRAY_COUNT(audioBuffer->parameterValueQueueEntries);
+    }
+}
+
+void DetectivePervert::
+parameterGestureChanged(int parameterIndex, bool gestureIsStarting)
+{
+  juce::Logger::writeToLog("detective pervert heard a parameter gesture change");
+}
+
+//==============================================================================
 AudioPluginAudioProcessor::AudioPluginAudioProcessor()
   : AudioProcessor(BusesProperties()
 #if ! JucePlugin_IsMidiEffect
@@ -113,8 +153,11 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
   loggerArena = {};
 
   pluginParameters = nullptr;
+  parameterListener = new DetectivePervert(*this);
 
   resourcesReleased = false;
+
+  ignoreParameterChange = false;
 
   for(u32 parameterIndex = PluginParameter_none + 1; parameterIndex < PluginParameter_count; ++parameterIndex)
     {
@@ -125,8 +168,12 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
 	    new juce::AudioParameterFloat(juce::String("parameter") + juce::String(parameterIndex),
 					  juce::String(paramInit.name),
 					  paramInit.min, paramInit.max, paramInit.init);
+	  
 	  vstParameters.push_back(vstParameter);
 	  addParameter(vstParameter);
+	  vstParameter->addListener(parameterListener);
+
+	  vstParameterIndexTo_pluginParameterIndex.insert({vstParameter->getParameterIndex(), parameterIndex});
 	}
     }
 }
@@ -301,13 +348,6 @@ prepareToPlay(double sampleRate, int samplesPerBlock)
 
   pluginCode.initializePluginState(&pluginMemory);
   pluginParameters = (PluginFloatParameter *)pluginMemory.memory;    
-  for(u32 parameterIndex = PluginParameter_none + 1; parameterIndex < PluginParameter_count; ++parameterIndex)
-    {
-      PluginFloatParameter *parameter = pluginParameters + parameterIndex;      
-      if(parameter->range.min != parameter->range.max)
-	{	  
-	}
-    }
   
   audioBuffer.inputFormat = audioBuffer.outputFormat = AudioFormat_r32;
   audioBuffer.inputSampleRate = audioBuffer.outputSampleRate = sampleRate;
@@ -406,7 +446,26 @@ processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 			       juce::String(pluginLogger.log.totalSize));
       juce::Logger::writeToLog(juce::String("logger capacity: ") +
 			       juce::String(pluginLogger.maxCapacity));
-    }  
+    }
+
+  ignoreParameterChange = true;
+  for(u32 parameterIndex = 0; parameterIndex < vstParameters.size(); ++parameterIndex)
+    {
+      // TODO: make mapping between plugin and vst parameters explicit
+      u32 pluginParameterIndex = vstParameterIndexTo_pluginParameterIndex[parameterIndex];
+      PluginFloatParameter *pluginParameter = pluginParameters + pluginParameterIndex;
+      juce::AudioParameterFloat *vstParameter = vstParameters[parameterIndex];
+
+      ParameterValue pluginParameterValue = {};
+      pluginParameterValue.asInt = atomicLoad(&pluginParameter->currentValue.asInt);
+      *vstParameter = pluginParameterValue.asFloat;
+	
+      juce::Logger::writeToLog("vstParameter " + juce::String(parameterIndex) + ": " +
+			       juce::String(vstParameter->get()));
+      juce::Logger::writeToLog("pluginParameter " + juce::String(pluginParameterIndex) + ": " +
+			       juce::String(pluginParameterValue.asFloat));
+    }
+  ignoreParameterChange = false;  
 }
 
 //==============================================================================

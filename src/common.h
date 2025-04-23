@@ -292,6 +292,11 @@ struct PluginAudioBuffer
 
   u32 midiMessageCount;
   u8 *midiBuffer;
+
+  ParameterValueQueueEntry parameterValueQueueEntries[512];
+  u32 parameterValueQueueReadIndex;
+  u32 parameterValueQueueWriteIndex;
+  volatile u32 queuedCount;
 };
 
 #define AUDIO_PROCESS(name) void (name)(PluginMemory *memory, PluginAudioBuffer *audioBuffer)

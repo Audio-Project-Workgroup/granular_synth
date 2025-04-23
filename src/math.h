@@ -684,6 +684,14 @@ isInRange(r32 val, r32 min, r32 max)
   return(result);
 }
 
+inline r32
+mapToRange(r32 ratio, RangeR32 range)
+{
+  r32 result = ratio*getLength(range) + range.min;
+
+  return(result);
+}
+
 //
 // Rect2
 //

@@ -47,10 +47,16 @@ public:
 
   PluginCode pluginCode;
   PluginMemory pluginMemory;
+  PluginAudioBuffer audioBuffer;
+  
+  class DetectivePervert *parameterListener;
+  std::map<int, int> vstParameterIndexTo_pluginParameterIndex;
+  std::vector<juce::AudioParameterFloat*> vstParameters;
+  PluginFloatParameter *pluginParameters;
+  bool ignoreParameterChange;
 
 private:  
-  juce::DynamicLibrary libPlugin;  
-  PluginAudioBuffer audioBuffer;
+  juce::DynamicLibrary libPlugin;    
   
   PluginLogger pluginLogger;
   void *loggerMemory;
@@ -61,12 +67,19 @@ private:
 
   int pluginMemoryBlockSizeInBytes;
 
-  std::vector<juce::AudioParameterFloat*> vstParameters;
-  //juce::AudioParameterFloat *vstParameters[PluginParameter_count];
-  PluginFloatParameter *pluginParameters;
-
-  //juce::DynamicLibrary onnxDLL;
-  
   //==============================================================================
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioPluginAudioProcessor)
+};
+
+//================================================================================
+class DetectivePervert final : public juce::AudioProcessorParameter::Listener
+{
+public:
+  DetectivePervert(AudioPluginAudioProcessor&);
+  void parameterValueChanged(int parameterIndex, float newValue) override;
+  void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
+  
+private:
+  AudioPluginAudioProcessor &processorRef;
+
 };
