@@ -37,7 +37,8 @@ makeVertex(v2 vPos, v4 color)
 enum RenderLevel
 {
   RenderLevel_background,
-  RenderLevel_boxBackground,
+  //RenderLevel_boxBackground,
+  RenderLevel_control,
   
   RenderLevel_front,
 };

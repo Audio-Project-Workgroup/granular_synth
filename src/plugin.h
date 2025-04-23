@@ -100,7 +100,7 @@ struct PluginState
   //PluginFloatParameter parameters[PluginParameter_count];
 
   PlayingSound loadedSound;
-  LoadedBitmap testBitmap;
+  LoadedBitmap editorSkin;
   LoadedFont testFont;
 
   //UILayout layout;

@@ -106,6 +106,43 @@ renderCommands(RenderCommands *commands)
   glMatrixMode(GL_PROJECTION);
   glLoadMatrixf(projectionMatrix.E);
 
+  renderSortTexturedQuads(commands->texturedQuads, commands->texturedQuadCount);
+  glEnable(GL_TEXTURE_2D);
+  for(u32 quadIndex = 0; quadIndex < commands->texturedQuadCount; ++quadIndex)
+    {
+      TexturedQuad *quad = commands->texturedQuads + quadIndex;
+      renderBindTexture(quad->texture, commands->generateNewTextures);
+
+      if(quad->angle != 0.f)
+	{
+	  v2 vertexCenter = 0.5f*(quad->vertices[3].vPos + quad->vertices[0].vPos);
+	  mat4 rotationMatrix = makeRotationMatrixXY(quad->angle);	  
+	  mat4 translationMatrix = makeTranslationMatrix(vertexCenter);
+	  mat4 invTranslationMatrix = makeTranslationMatrix(-vertexCenter);
+	  
+	  mat4 mvMat = transpose(invTranslationMatrix*rotationMatrix*translationMatrix);
+	  glMatrixMode(GL_MODELVIEW);
+	  glLoadMatrixf(mvMat.E);
+	}
+      else
+	{
+	  glMatrixMode(GL_MODELVIEW);
+	  glLoadIdentity();
+	}      
+      
+      glBegin(GL_TRIANGLES);
+      {
+	renderTexturedVertex(quad->vertices[0]);
+	renderTexturedVertex(quad->vertices[1]);
+	renderTexturedVertex(quad->vertices[3]);
+	
+	renderTexturedVertex(quad->vertices[0]);
+	renderTexturedVertex(quad->vertices[3]);
+	renderTexturedVertex(quad->vertices[2]);
+      }
+      glEnd();     
+    }  
+  
   renderSortQuads(commands->quads, commands->quadCount);
 
   bool drawing = true;  
@@ -153,43 +190,6 @@ renderCommands(RenderCommands *commands)
       renderVertex(quad->vertices[2]);
     }
   glEnd();
-
-  renderSortTexturedQuads(commands->texturedQuads, commands->texturedQuadCount);
-  glEnable(GL_TEXTURE_2D);
-  for(u32 quadIndex = 0; quadIndex < commands->texturedQuadCount; ++quadIndex)
-    {
-      TexturedQuad *quad = commands->texturedQuads + quadIndex;
-      renderBindTexture(quad->texture, commands->generateNewTextures);
-
-      if(quad->angle != 0.f)
-	{
-	  v2 vertexCenter = 0.5f*(quad->vertices[3].vPos + quad->vertices[0].vPos);
-	  mat4 rotationMatrix = makeRotationMatrixXY(quad->angle);	  
-	  mat4 translationMatrix = makeTranslationMatrix(vertexCenter);
-	  mat4 invTranslationMatrix = makeTranslationMatrix(-vertexCenter);
-	  
-	  mat4 mvMat = transpose(invTranslationMatrix*rotationMatrix*translationMatrix);
-	  glMatrixMode(GL_MODELVIEW);
-	  glLoadMatrixf(mvMat.E);
-	}
-      else
-	{
-	  glMatrixMode(GL_MODELVIEW);
-	  glLoadIdentity();
-	}      
-      
-      glBegin(GL_TRIANGLES);
-      {
-	renderTexturedVertex(quad->vertices[0]);
-	renderTexturedVertex(quad->vertices[1]);
-	renderTexturedVertex(quad->vertices[3]);
-	
-	renderTexturedVertex(quad->vertices[0]);
-	renderTexturedVertex(quad->vertices[3]);
-	renderTexturedVertex(quad->vertices[2]);
-      }
-      glEnd();     
-    }  
 
   for(u32 triangleIndex = 0; triangleIndex < commands->triangleCount; ++triangleIndex)
     {

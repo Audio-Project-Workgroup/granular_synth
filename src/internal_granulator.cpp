@@ -5,6 +5,7 @@ getRandomStereoPosition(r32 spreadAmount)
   // Higher spreadAmount = wider stereo field
 
   // Simple random number between -1 and 1 (using two calls to rand() for better distribution)
+  // TODO: replace rand() with custom prng for better performance, uniformity, and consistency across platforms
   r32 randVal = ((((r32)rand() / (r32)RAND_MAX) * 2.0f - 1.0f) * 0.5f +
 		 (((r32)rand() / (r32)RAND_MAX) * 2.0f - 1.0f)) * 0.5f;
 

@@ -15,7 +15,7 @@ uiPopParentElement(UILayout *layout)
 }
 
 inline UIElement *
-uiAllocateElement(UILayout *layout, String8 name, u32 flags, v4 color)
+uiAllocateElement(UILayout *layout, String8 name, u32 flags, v4 color, LoadedBitmap *texture)
 {
   UIContext *context = layout->context;
   UIElement *result = arenaPushStruct(context->frameArena, UIElement, arenaFlagsZeroNoAlign());
@@ -25,6 +25,7 @@ uiAllocateElement(UILayout *layout, String8 name, u32 flags, v4 color)
   result->textScale = V2(1, 1);
   result->flags = flags;
   result->color = color;
+  result->texture = texture;
 
   return(result);
 }
@@ -55,30 +56,16 @@ uiHashKeysAreEqual(UIHashKey key1, UIHashKey key2)
   bool result = (key1.key == key2.key);
   if(result)
     {
-      result = stringsAreEqual(key1.name, key2.name);
-      // u8 *at1 = key1.name;
-      // u8 *at2 = key2.name;
-      // while(*at1 && *at2)
-      // 	{
-      // 	  result = ((*at1++) == (*at2++));
-      // 	  if(!result) break;
-      // 	}
-      // if(result)
-      // 	{
-      // 	  if((*at1 != 0) || (*at2 != 0))
-      // 	    {
-      // 	      result = false;
-      // 	    }
-      // 	}
+      result = stringsAreEqual(key1.name, key2.name);   
     }
 
   return(result);
 }
 
 inline UIElement *
-uiMakeElement(UILayout *layout, String8 name, u32 flags, v4 color)	      
+uiMakeElement(UILayout *layout, String8 name, u32 flags, v4 color, LoadedBitmap *texture)	      
 {  
-  UIElement *result = uiAllocateElement(layout, name, flags, color);
+  UIElement *result = uiAllocateElement(layout, name, flags, color, texture);
   result->hashKey = uiHashKeyFromString(result->name);
 
   // NOTE: if the new element existed previously, get the previously computed information
@@ -271,23 +258,9 @@ uiContextEndFrame(UIContext *context)
   context->selectedElementOrdinal %= context->processedElementCount + 1;
 }
 
-/*
-inline UILayout
-uiInitializeLayout(UIContext *context)
-//(Arena *frameArena, Arena *permanentArena, LoadedFont *font)
-{
-  UILayout layout = {};
-  //layout.frameArena = frameArena;
-  //layout.permanentArena = permanentArena;
-  //layout.font = font;
-  layout.context = context;
-
-  return(layout);
-}
-*/
-
 inline void
-uiBeginLayout(UILayout *layout, UIContext *context, Rect2 parentRect, v4 color = V4(1, 1, 1, 1))
+uiBeginLayout(UILayout *layout, UIContext *context, Rect2 parentRect,
+	      v4 color = V4(1, 1, 1, 1), LoadedBitmap *texture = 0)
 {
   ASSERT(layout->elementCount == 0);
   layout->context = context;
@@ -303,8 +276,8 @@ uiBeginLayout(UILayout *layout, UIContext *context, Rect2 parentRect, v4 color =
       layout->selectedElement = {};
     }
   
-  layout->root = uiMakeElement(layout, STR8_LIT("root"), 0, color);
-  layout->root->flags |= UIElementFlag_drawBorder;
+  layout->root = uiMakeElement(layout, STR8_LIT("root"), 0, color, texture);
+  layout->root->flags = UIElementFlag_drawBorder | UIElementFlag_drawBackground;
   layout->root->lastFrameTouched = context->frameIndex;
   //uiSetSemanticSizeAbsolute(layout->root, parentRect.min, getDim(parentRect));
   layout->root->region = parentRect;
@@ -568,7 +541,7 @@ inline UIComm
 uiMakeTextElement(UILayout *layout, String8 message, r32 desiredTextScale, v4 color = V4(1, 1, 1, 1))
 {
   UIContext *context = layout->context;
-  UIElement *text = uiMakeElement(layout, message, UIElementFlag_drawText | UIElementFlag_drawBorder, color);
+  UIElement *text = uiMakeElement(layout, message, UIElementFlag_drawText | UIElementFlag_drawBorder, color, 0);
 
   v2 messageRectDim = desiredTextScale*getTextDim(context->font, message);
   v2 layoutRegionRemainingDim = getDim(layout->regionRemaining);
@@ -600,7 +573,7 @@ uiMakeSelectableTextElement(UILayout *layout, String8 message, r32 scale, v4 col
 {
   UIContext *context = layout->context;
   u32 flags = UIElementFlag_drawText | UIElementFlag_drawBorder | UIElementFlag_clickable;
-  UIElement *text = uiMakeElement(layout, message, flags, color);
+  UIElement *text = uiMakeElement(layout, message, flags, color, 0);
 
   v2 layoutRegionRemainingDim = getDim(layout->regionRemaining);
   
@@ -621,9 +594,10 @@ uiMakeSelectableTextElement(UILayout *layout, String8 message, r32 scale, v4 col
 }
 
 inline UIComm
-uiMakeBox(UILayout *layout, String8 name, Rect2 rect, u32 flags = 0, v4 color = V4(1, 1, 1, 1))
+uiMakeBox(UILayout *layout, String8 name, Rect2 rect,
+	  u32 flags = 0, v4 color = V4(1, 1, 1, 1), LoadedBitmap *texture = 0)
 {
-  UIElement *box = uiMakeElement(layout, name, flags, color);
+  UIElement *box = uiMakeElement(layout, name, flags, color, texture);
   box->region = rect;
 
   UIComm boxComm = uiCommFromElement(box);
@@ -632,16 +606,15 @@ uiMakeBox(UILayout *layout, String8 name, Rect2 rect, u32 flags = 0, v4 color = 
 }
 
 inline UIComm
-uiMakeButton(UILayout *layout, String8 name,
-	     v2 offset, r32 sizePercentOfParent,	     
-	     PluginBooleanParameter *param, v4 color = V4(1, 1, 1, 1))
+uiMakeButton(UILayout *layout, String8 name, v2 offset, v2 dim, r32 aspectRatio, PluginBooleanParameter *param,
+	     v4 color = V4(1, 1, 1, 1), LoadedBitmap *texture = 0)
 {
   u32 flags = UIElementFlag_clickable | UIElementFlag_drawBackground | UIElementFlag_drawBorder;
-  UIElement *button = uiMakeElement(layout, name, flags, color);
+  UIElement *button = uiMakeElement(layout, name, flags, color, texture);
   uiSetElementDataBoolean(button, param);
 
-  button->region = uiComputeElementRegion(button, offset, UIAxis_y, sizePercentOfParent, 1);
-  layout->regionRemaining.max.y = button->region.min.y;
+  button->region = uiComputeElementRegion(button, offset, dim, aspectRatio);
+  //layout->regionRemaining.max.y = button->region.min.y;
 
   UIComm buttonComm = uiCommFromElement(button);
 
@@ -650,16 +623,15 @@ uiMakeButton(UILayout *layout, String8 name,
 
 inline UIComm
 uiMakeSlider(UILayout *layout, String8 name,
-	     v2 offset, UIAxis sizeDim, r32 sizePercentOfParent,
-	     //r32 aspectRatio,
-	     PluginFloatParameter *param, v4 color = V4(1, 1, 1, 1))
+	     v2 offset, v2 dim, r32 aspectRatio, PluginFloatParameter *param,
+	     v4 color = V4(1, 1, 1, 1), LoadedBitmap *texture = 0)
 {
   u32 flags = (UIElementFlag_clickable | UIElementFlag_draggable | UIElementFlag_drawBorder |
 	       UIElementFlag_drawLabelAbove | UIElementFlag_drawLabelBelow);
-  UIElement *slider = uiMakeElement(layout, name, flags, color);
+  UIElement *slider = uiMakeElement(layout, name, flags, color, texture);
   uiSetElementDataFloat(slider, param);
 
-  slider->region = uiComputeElementRegion(slider, offset, sizeDim, sizePercentOfParent, 0.2f);
+  slider->region = uiComputeElementRegion(slider, offset, dim, aspectRatio);
   
   UIComm sliderComm = uiCommFromElement(slider);
 
@@ -667,31 +639,34 @@ uiMakeSlider(UILayout *layout, String8 name,
 }
 
 inline UIComm
-uiMakeKnob(UILayout *layout, String8 name,
-	   v2 offset, r32 sizePercentOfParent,
-	   PluginFloatParameter *param, v4 color = V4(1, 1, 1, 1))
+uiMakeKnob(UILayout *layout, String8 name, v2 offset, v2 dim, r32 aspectRatio, PluginFloatParameter *param,
+	   v4 color = V4(1, 1, 1, 1), LoadedBitmap *texture = 0)
 {
   u32 flags = (UIElementFlag_clickable | UIElementFlag_turnable | UIElementFlag_drawBorder |
 	       UIElementFlag_drawLabelBelow);
-  UIElement *knob = uiMakeElement(layout, name, flags, color);
+  UIElement *knob = uiMakeElement(layout, name, flags, color, texture);
   uiSetElementDataFloat(knob, param);
 
-  knob->region = uiComputeElementRegion(knob, offset, UIAxis_y, sizePercentOfParent, 1);
-  layout->regionRemaining.max.y = knob->region.min.y;
+  knob->region = uiComputeElementRegion(knob, offset, dim, aspectRatio);
+  //layout->regionRemaining.max.y = knob->region.min.y;
 
   UIComm knobComm = uiCommFromElement(knob);
 
   return(knobComm);
 }
-//doesn't work
+
+// NOTE: incomplete
+#if 0
 inline UIComm
-uiMakeCollapsibleList(UILayout *layout, String8 text, v2 offset, v2 scale, v4 color = V4(1, 1, 1, 1))
+uiMakeCollapsibleList(UILayout *layout, String8 text, v2 offset, v2 scale,
+		      v4 color = V4(1, 1, 1, 1))
 {
   //UIContext *context = layout->context;
   u32 flags = UIElementFlag_clickable | UIElementFlag_collapsible | UIElementFlag_drawText | UIElementFlag_drawBorder;
-  UIElement *list = uiMakeElement(layout, text, flags, color);
+  UIElement *list = uiMakeElement(layout, text, flags, color, 0);
   //uiSetSemanticSizeText(list, context->font, offset, scale);
 
   UIComm listComm = uiCommFromElement(list);
   return(listComm);
 }
+#endif

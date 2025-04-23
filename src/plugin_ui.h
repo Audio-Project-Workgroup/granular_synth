@@ -15,10 +15,11 @@ struct UIPanel
   UIPanel *parent;
 
   UIAxis splitAxis;
-  r32 sizePercentOfParent;  
-  //u8 *name;
+  r32 sizePercentOfParent;
+  
   String8 name;
   v4 color;
+  LoadedBitmap *texture;
 
   u32 fringeFlags;
   Rect2 region;

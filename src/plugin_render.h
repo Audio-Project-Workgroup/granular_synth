@@ -152,118 +152,32 @@ renderChangeCursorState(RenderCommands *commands, RenderCursorState cursorState)
 {
   commands->cursorState = cursorState;
 }
-#if 0
-inline Rect2
-renderComputeUIElementRegion(RenderCommands *commands, UIElement *element)
-{
-  v2 elementDim = V2(0, 0);      
-  switch(element->semanticDim[UIAxis_x].type)
-    {
-    case UISizeType_none:
-      {	
-      } break;
-    case UISizeType_pixels:
-      {
-	elementDim.x = element->semanticDim[UIAxis_x].value;
-      } break;
-    case UISizeType_percentOfParentDim:
-      {
-	elementDim.x = element->semanticDim[UIAxis_x].value*getDim(element->parent->region).x;
-      } break;
-    default: ASSERT(!"unhandled/invalid case");
-    }
-  switch(element->semanticDim[UIAxis_y].type)
-    {
-    case UISizeType_none:
-      {
-      } break;
-    case UISizeType_pixels:
-      {
-	elementDim.y = element->semanticDim[UIAxis_y].value;
-      } break;
-    case UISizeType_percentOfParentDim:
-      {
-	elementDim.y = element->semanticDim[UIAxis_y].value*getDim(element->parent->region).y;
-      } break;
-    default: ASSERT(!"unhandled/invalid case");
-    }
-      
-  v2 elementMin = V2(0, 0);
-  switch(element->semanticOffset[UIAxis_x].type)
-    {
-    case UISizeType_none:
-      {
-      } break;
-    case UISizeType_pixels:
-      {
-	elementMin.x = element->semanticOffset[UIAxis_x].value;
-      } break;
-    case UISizeType_percentOfParentDim:
-      {
-	elementMin.x = element->semanticOffset[UIAxis_x].value*getDim(element->parent->region).x + element->parent->region.min.x;
-      } break;
-    /* case UISizeType_percentOfOwnDim: */
-    /*   { */
-    /* 	elementMin.x = element->semanticOffset[UIAxis_x].value*elementDim.x; */
-    /*   } break; */
-    default: ASSERT(!"unhandled/invalid case");
-    }
-  switch(element->semanticOffset[UIAxis_y].type)
-    {
-    case UISizeType_none:
-      {
-      } break;
-    case UISizeType_pixels:
-      {
-	elementMin.y = element->semanticOffset[UIAxis_y].value;
-      } break;
-    case UISizeType_percentOfParentDim:
-      {
-	elementMin.y = element->semanticOffset[UIAxis_y].value*getDim(element->parent->region).y + element->parent->region.min.y;
-      } break;
-    /* case UISizeType_percentOfOwnDim: */
-    /*   { */
-    /* 	elementMin.y = element->semanticOffset[UIAxis_y].value*elementDim.y; */
-    /*   } break; */
-    default: ASSERT(!"unhandled/invalid case");	  
-    }
-
-  Rect2 elementRect = rectMinDim(elementMin, elementDim);
-  return(elementRect);
-}
-#endif
 
 inline void
 renderPushUIElement(RenderCommands *commands, UIElement *element)
 {
   UILayout *layout = element->layout;
-  //UIContext *context = layout->context;
-  
-  //element->region = renderComputeUIElementRegion(commands, element);
-  //element->hotRegion = element->region;
+  //UIContext *context = layout->context;  
 
   v2 elementRegionCenter = getCenter(element->region);
   v2 elementRegionDim = getDim(element->region);
   // TODO: pull out common formatting computations
   if(element->flags & UIElementFlag_drawText)
     {      
-      //v2 textDim = getTextDim(layout->font, element->name);
-      //v2 textScale = V2(elementRegionDim.x/textDim.x, elementRegionDim.y/textDim.y);
       renderPushText(commands, layout->context->font,
 		     element->name, element->region.min, element->textScale, getDim(element->region).x,
 		     element->color);
     }
   if(element->flags & UIElementFlag_drawBorder)
     {
-      v4 color = (uiHashKeysAreEqual(element->hashKey, layout->selectedElement)) ? V4(1, 0.5f, 0, 1) : V4(0, 0, 0, 1);
-      
+      v4 color = uiHashKeysAreEqual(element->hashKey, layout->selectedElement) ? V4(1, 0.5f, 0, 1) : V4(0, 0, 0, 1);
       Rect2 border = rectAddRadius(element->region, V2(1, 1));
-      //renderPushRectOutline(commands, element->region, 2.f, RenderLevel_front, color);
+      
       renderPushRectOutline(commands, border, 2.f, RenderLevel_front, color);
     }
   if(element->flags & UIElementFlag_drawBackground)
     {
-      renderPushQuad(commands, element->region, 0, 0, RenderLevel_front, element->color);
+      renderPushQuad(commands, element->region, element->texture, 0, RenderLevel_background, element->color);
     }  
   if(element->flags & UIElementFlag_draggable)
     {            

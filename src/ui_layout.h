@@ -1,12 +1,7 @@
-enum UISizeType : u32
+enum UISizeType
 {
-  UISizeType_none,
   UISizeType_pixels,
-  UISizeType_text,
-  UISizeType_glCoords,
-  UISizeType_percentOfParentDim,
-  //UISizeType_percentOfOwnDim,
-  UISizeType_sumOfChildren,
+  UISizeType_percentOfParent,
 };
 
 struct UISize
@@ -127,10 +122,10 @@ struct UIElement
   // NOTE: specified at construction
   UILayout *layout;
   u32 flags;
-  //u8 *name;
   String8 name;
   v2 textScale;
   v4 color;
+  LoadedBitmap *texture;
 
   UIParameter parameterType;
   union // TODO: maybe there could be a use for an element that has both a boolean and a float parameter attached
@@ -141,15 +136,15 @@ struct UIElement
   
   //UISize semanticDim[UIAxis_COUNT];
   //UISize semanticOffset[UIAxis_COUNT];
-  r32 aspectRatio;
-  UIAxis sizingDim;
-  union
-  {
-    r32 size;
-    r32 heightPercentOfLayoutRegionRemaining;
-    r32 widthPercentOfLayoutRegionRemaining;    
-  };
-  v2 offset;
+  //r32 aspectRatio;
+  /* UIAxis sizingDim; */
+  /* union */
+  /* { */
+  /*   r32 size; */
+  /*   r32 heightPercentOfLayoutRegionRemaining; */
+  /*   r32 widthPercentOfLayoutRegionRemaining;     */
+  /* }; */
+  /* v2 offset; */
 
   // NOTE: computed
   Rect2 region;
@@ -187,6 +182,8 @@ struct UILayout
   UIElement *elementFreeList;
   
   Rect2 regionRemaining;
+  UISizeType currentOffsetSizeType;
+  UISizeType currentDimSizeType;
 
   u32 index;
  
@@ -194,12 +191,69 @@ struct UILayout
   UIHashKey selectedElement;  
 };
 
+inline void
+uiPushLayoutOffsetSizeType(UILayout *layout, UISizeType sizeType)
+{
+  layout->currentOffsetSizeType = sizeType;
+}
+
+inline void
+uiPushLayoutDimSizeType(UILayout *layout, UISizeType sizeType)
+{
+  layout->currentDimSizeType = sizeType;
+}
+
 inline v2
 uiGetDragDelta(UIElement *element)
 {
   return(element->layout->context->mouseP.xy - element->mouseClickedP);
 }
 
+#if 1
+inline Rect2
+uiComputeElementRegion(UIElement *element, v2 offset, v2 dim, r32 aspectRatio)
+{
+  UISizeType offsetSizeType = element->layout->currentOffsetSizeType;
+  UISizeType dimSizeType = element->layout->currentDimSizeType;
+
+  Rect2 parentRegion = element->parent->region;
+  v2 parentRegionDim = getDim(parentRegion);
+  
+  v2 elementOffset = {};
+  v2 elementDim = {};
+  switch(offsetSizeType)
+    {
+    case UISizeType_pixels:
+      {
+	elementOffset = offset;
+      } break;
+    case UISizeType_percentOfParent:
+      {
+	elementOffset = hadamard(offset, parentRegionDim);
+      } break;
+    default: {} break;
+    }
+  
+  switch(dimSizeType)
+    {
+    case UISizeType_pixels:
+      {
+	elementDim = dim;
+      } break;
+    case UISizeType_percentOfParent:
+      {
+	elementDim = hadamard(dim, parentRegionDim);
+      } break;
+    default: {} break;
+    }
+
+  elementDim.x = elementDim.y*aspectRatio;
+
+  Rect2 result = rectMinDim(elementOffset, elementDim);
+
+  return(result);
+}
+#else
 inline Rect2
 uiComputeElementRegion(UIElement *element, v2 offset, UIAxis sizeDim, r32 sizePercentOfParent, r32 aspectRatio)
 {
@@ -268,6 +322,7 @@ uiComputeElementRegion(UIElement *element, v2 offset, UIAxis sizeDim, r32 sizePe
 
   return(elementRegion); 
 }
+#endif
 
 enum UICommFlags : u32
 {
