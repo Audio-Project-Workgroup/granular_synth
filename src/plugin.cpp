@@ -245,6 +245,8 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 				       pluginParameterInitData[PluginParameter_size]);
 	      initializeFloatParameter(&pluginState->parameters[PluginParameter_spread],
 						pluginParameterInitData[PluginParameter_spread]);
+	      initializeFloatParameter(&pluginState->parameters[PluginParameter_offset],
+						pluginParameterInitData[PluginParameter_offset]);
 
 	      // NOTE: devices
 	      pluginState->outputDeviceCount = memoryBlock->outputDeviceCount;
@@ -270,7 +272,7 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 
 	      // NOTE: grain view initialization
 	      GrainStateView *grainStateView = &pluginState->grainStateView;
-	      grainStateView->writeIndex = 1;
+	      grainStateView->viewWriteIndex = 1;
 	      grainStateView->viewBuffer.capacity = grainBufferCount;
 	      grainStateView->viewBuffer.samples[0] = arenaPushArray(&pluginState->permanentArena,
 								     grainStateView->viewBuffer.capacity, r32,
@@ -725,12 +727,29 @@ RENDER_NEW_FRAME(renderNewFrame)
 		      }		    
 		  }
 
+		  // NOTE: offset
+		  {
+		    v2 offsetOffsetPOP = V2(0.25f, 0.2f);
+		    v2 offsetSizePOP = knobDimPOP*V2(1, 1);
+
+		    UIComm offset = uiMakeKnob(panelLayout, STR8_LIT("offset"), offsetOffsetPOP, offsetSizePOP, 1.f,
+					       &pluginState->parameters[PluginParameter_offset], 
+					       V4(0.5f, 0, 1, 1));
+		    if(offset.flags & UICommFlag_dragging)
+		      {
+			v2 dragDelta = uiGetDragDelta(offset.element);
+			r32 newOffset = offset.element->fParamValueAtClick + 200.f*dragDelta.y;
+
+			pluginSetFloatParameter(offset.element->fParam, newOffset);
+		      }
+		  }
+
 		  // NOTE: grain view		  
 		  logString("\ndisplaying grain buffer\n");
 
 		  v2 drawRegionDim = getDim(panelLayout->regionRemaining);
 		  v2 dim = hadamard(V2(0.552f, 0.18f), drawRegionDim);
-		  v2 min = hadamard(V2(0.212f, 0.53f), drawRegionDim);//panelLayout->regionRemaining.min;
+		  v2 min = hadamard(V2(0.212f, 0.53f), drawRegionDim);
 		  renderPushRectOutline(renderCommands, rectMinDim(min, dim), 2.f, RenderLevel_front, V4(1, 1, 1, 1));
 
 		  r32 middleBarThickness = 4.f;
@@ -748,15 +767,12 @@ RENDER_NEW_FRAME(renderNewFrame)
 		  GrainStateView *grainStateView = &pluginState->grainStateView;
 		  AudioRingBuffer *grainViewBuffer = &grainStateView->viewBuffer;
 		  
-		  u32 viewEntryReadIndex = grainStateView->readIndex;
+		  u32 viewEntryReadIndex = grainStateView->viewReadIndex;
 		  u32 entriesQueued = globalPlatform.atomicLoad(&grainStateView->entriesQueued);
 		  logFormatString("entriesQueued: %u", entriesQueued);
 		  
 		  for(u32 entryIndex = 0; entryIndex < entriesQueued; ++entryIndex)
-		    {
-		      u32 bufferReadIndex = grainStateView->viewBuffer.readIndex;
-		      u32 bufferWriteIndex = grainStateView->viewBuffer.writeIndex;
-		  
+		    {		     		  
 		      GrainBufferViewEntry *view = (grainStateView->views +
 						    ((viewEntryReadIndex + entryIndex) %
 						     ARRAY_COUNT(grainStateView->views)));
@@ -764,7 +780,11 @@ RENDER_NEW_FRAME(renderNewFrame)
 		      // NOTE: update view buffer with new view data
 		      writeSamplesToAudioRingBuffer(grainViewBuffer,
 						    view->bufferSamples[0], view->bufferSamples[1],
-						    view->sampleCount);
+						    view->sampleCount);		      
+		      // u32 bufferReadIndex = grainStateView->viewBuffer.readIndex;
+		      // u32 bufferWriteIndex = grainStateView->viewBuffer.writeIndex;
+		      u32 bufferReadIndex = view->bufferReadIndex;
+		      u32 bufferWriteIndex = view->bufferWriteIndex;
 
 		      // NOTE: display view read and write positions
 		      r32 barThickness = 2.f;
@@ -862,7 +882,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 		      lastSampleIndex = sampleIndex;
 		    }
 
-		  grainStateView->readIndex =
+		  grainStateView->viewReadIndex =
 		    (viewEntryReadIndex + entriesQueued) % ARRAY_COUNT(grainStateView->views);
 		  u32 oldEntriesQueued = entriesQueued;
 		  while(globalPlatform.atomicCompareAndSwap(&grainStateView->entriesQueued,
@@ -1602,6 +1622,7 @@ AUDIO_PROCESS(audioProcess)
 	  pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_window]);
 	  pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_size]);
 	  pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_spread]);
+	  pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_offset]);
 	}
 
       arenaEndTemporaryMemory(&grainMixerMemory);      

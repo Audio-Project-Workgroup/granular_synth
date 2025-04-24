@@ -36,13 +36,19 @@ static AudioRingBuffer
 initializeGrainBuffer(PluginState *pluginState, u32 bufferCount)
 {
   AudioRingBuffer grainBuffer = {};
+  //GrainBuffer grainBuffer = {};
   grainBuffer.capacity = bufferCount;
   grainBuffer.samples[0] = arenaPushArray(&pluginState->permanentArena, bufferCount, r32,
 					  arenaFlagsNoZeroAlign(4*sizeof(r32)));
   grainBuffer.samples[1] = arenaPushArray(&pluginState->permanentArena, bufferCount, r32,
 					  arenaFlagsNoZeroAlign(4*sizeof(r32)));
-  grainBuffer.writeIndex = 0;
-  grainBuffer.readIndex = grainBufferSetReadPos(60, bufferCount);
+
+  r32 offset = pluginReadFloatParameter(&pluginState->parameters[PluginParameter_offset]);
+  u32 offsetSamples = (u32)offset;
+  grainBuffer.writeIndex = offsetSamples;
+  grainBuffer.readIndex = 0;
+  //grainBuffer.writeSpeed = 1.f;
+  //grainBuffer.readSpeed = 1.f;
 
   return(grainBuffer);
 }
@@ -147,12 +153,20 @@ synthesize(r32* destBufferLInit, r32* destBufferRInit,
 	   u32 samplesToWrite)
 {
   logString("\nsynthesize called\n");
+  logFormatString("samplesToWrite: %lu", samplesToWrite);
 
   AudioRingBuffer *buffer = grainManager->grainBuffer;
   GrainStateView *grainStateView = &pluginState->grainStateView;
 
+  u32 currentOffset = getAudioRingBufferOffset(buffer);
+  u32 targetOffset = (u32)pluginReadFloatParameter(&pluginState->parameters[PluginParameter_offset]);
+  r32 readPositionIncrement = ((r32)currentOffset - (r32)targetOffset)/(r32)samplesToWrite;
+  logFormatString("currentOffset: %.2f", currentOffset);
+  logFormatString("targetOffset: %.2f", targetOffset);
+  logFormatString("readPositionIncrement: %.2f", readPositionIncrement);
+
   // NOTE: queue a new view and fill out its data
-  u32 viewWriteIndex = (grainStateView->writeIndex + 1) % ARRAY_COUNT(grainStateView->views);  
+  u32 viewWriteIndex = (grainStateView->viewWriteIndex + 1) % ARRAY_COUNT(grainStateView->views);  
   u32 entriesQueued = globalPlatform.atomicLoad(&grainStateView->entriesQueued);
   GrainBufferViewEntry *newView = grainStateView->views + viewWriteIndex;  
   newView->grainCount = 0;
@@ -164,7 +178,10 @@ synthesize(r32* destBufferLInit, r32* destBufferRInit,
 
   readSamplesFromAudioRingBuffer(buffer, newView->bufferSamples[0], newView->bufferSamples[1], samplesToWrite, false);
   grainStateView->viewBuffer.readIndex = ((grainStateView->viewBuffer.readIndex + newView->sampleCount) %
-					  grainStateView->viewBuffer.capacity);   
+					  grainStateView->viewBuffer.capacity);
+
+  newView->bufferReadIndex = buffer->readIndex;
+  newView->bufferWriteIndex = buffer->writeIndex;
 
   for(Grain *grain = grainManager->grainPlayList->next;
       grain && grain != grainManager->grainPlayList;
@@ -180,16 +197,18 @@ synthesize(r32* destBufferLInit, r32* destBufferRInit,
     }
 
   // NOTE: process grains
+  u32 startReadIndex = buffer->readIndex;
+    
   r32* destBufferL = destBufferLInit;
-  r32* destBufferR = destBufferRInit;
+  r32* destBufferR = destBufferRInit;  
   for (u32 sampleIndex = 0; sampleIndex < samplesToWrite; ++sampleIndex)
-    {
+    {     
 #if 1     
       u32 grainSize = (u32)pluginReadFloatParameter(&pluginState->parameters[PluginParameter_size]);      
       r32 windowParam = pluginReadFloatParameter(&pluginState->parameters[PluginParameter_window]);
       r32 density = pluginReadFloatParameter(&pluginState->parameters[PluginParameter_density]);
-      r32 spread = pluginReadFloatParameter(&pluginState->parameters[PluginParameter_spread]);
-      
+      r32 spread = pluginReadFloatParameter(&pluginState->parameters[PluginParameter_spread]);      
+
       r32 iot = (r32)grainSize/density;
       r32 volume = MAX(1.f/density, 1.f); // TODO: how to adapt volume to prevent clipping?     
       if(grainManager->samplesProcessedSinceLastSeed >= iot)
@@ -257,14 +276,16 @@ synthesize(r32* destBufferLInit, r32* destBufferRInit,
       
       ++grainManager->samplesProcessedSinceLastSeed;
       
-      ++buffer->readIndex;
+      //++buffer->readIndex;
+      r32 newReadPosition = (r32)startReadIndex + readPositionIncrement*(r32)(sampleIndex + 1);
+      buffer->readIndex = (u32)newReadPosition;
       buffer->readIndex %= buffer->capacity;
     
       *destBufferL++ = clampToRange(volume*outSampleL, -1.f, 1.f);
       *destBufferR++ = clampToRange(volume*outSampleR, -1.f, 1.f);
     }
 
-  grainStateView->writeIndex = viewWriteIndex;
+  grainStateView->viewWriteIndex = viewWriteIndex;
   while(globalPlatform.atomicCompareAndSwap(&grainStateView->entriesQueued, entriesQueued, entriesQueued + 1) !=
 	entriesQueued)
     {

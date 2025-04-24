@@ -2,22 +2,35 @@ struct AudioRingBuffer
 {
   r32 *samples[2];
   u32 capacity;
+
   u32 writeIndex;
-  u32 readIndex;
+  u32 readIndex; 
 };
+
+inline u32
+getAudioRingBufferOffset(AudioRingBuffer *rb)
+{
+  u32 offset = ((rb->writeIndex >= rb->readIndex) ?
+		(rb->writeIndex - rb->readIndex) :
+		(rb->capacity + rb->writeIndex - rb->readIndex));
+
+  return(offset);
+}
 
 struct SharedRingBuffer
 {
   u8 *entries;
   u32 capacity;
-  volatile u32 writeIndex;
-  volatile u32 readIndex;
+  
+  u32 writeIndex;
+  u32 readIndex;
   volatile u32 queuedCount;
 };
 
 inline void
 copyFloatArrayWide(r32 *destInit, r32 *srcInit, u32 count)
 {
+  // TODO: account for misalignment of dest and src
   u32 simdWidth = 4;
   u32 mask = 0xFFFFFFFF;
   u32 maskInv = ~mask;
@@ -58,18 +71,20 @@ writeSamplesToAudioRingBuffer(AudioRingBuffer *rb, r32 *srcL, r32 *srcR, u32 cou
 {
   u32 samplesToBufferEnd = rb->capacity - rb->writeIndex;
   u32 samplesToCopy = MIN(samplesToBufferEnd, count);
-  /* COPY_ARRAY(rb->samples[0] + rb->writeIndex, srcL, samplesToCopy, r32); */
-  /* COPY_ARRAY(rb->samples[1] + rb->writeIndex, srcR, samplesToCopy, r32); */
-  copyFloatArrayWide(rb->samples[0] + rb->writeIndex, srcL, samplesToCopy);
-  copyFloatArrayWide(rb->samples[1] + rb->writeIndex, srcR, samplesToCopy);
+  COPY_ARRAY(rb->samples[0] + rb->writeIndex, srcL, samplesToCopy, r32);
+  COPY_ARRAY(rb->samples[1] + rb->writeIndex, srcR, samplesToCopy, r32);
+  // NOTE: we cannot rely on pointers having the correct alignment 
+  /* copyFloatArrayWide(rb->samples[0] + rb->writeIndex, srcL, samplesToCopy); */
+  /* copyFloatArrayWide(rb->samples[1] + rb->writeIndex, srcR, samplesToCopy); */
 
   if(samplesToCopy < count)
     {
       u32 samplesRemaining = count - samplesToCopy;
-      /* COPY_ARRAY(rb->samples[0], srcL + samplesToCopy, samplesRemaining, r32); */
-      /* COPY_ARRAY(rb->samples[1], srcR + samplesToCopy, samplesRemaining, r32); */
-      copyFloatArrayWide(rb->samples[0], srcL + samplesToCopy, samplesRemaining);
-      copyFloatArrayWide(rb->samples[1], srcR + samplesToCopy, samplesRemaining);
+      COPY_ARRAY(rb->samples[0], srcL + samplesToCopy, samplesRemaining, r32);
+      COPY_ARRAY(rb->samples[1], srcR + samplesToCopy, samplesRemaining, r32);
+      // NOTE: we cannot rely on pointers having the correct alignment 
+      /* copyFloatArrayWide(rb->samples[0], srcL + samplesToCopy, samplesRemaining); */
+      /* copyFloatArrayWide(rb->samples[1], srcR + samplesToCopy, samplesRemaining); */
     }
 
   if(increment)
@@ -83,18 +98,20 @@ readSamplesFromAudioRingBuffer(AudioRingBuffer *rb, r32 *destL, r32 *destR, u32 
 {
   u32 samplesToBufferEnd = rb->capacity - rb->readIndex;
   u32 samplesToCopy = MIN(samplesToBufferEnd, count);
-  /* COPY_ARRAY(destL, rb->samples[0] + rb->readIndex, samplesToCopy, r32); */
-  /* COPY_ARRAY(destR, rb->samples[1] + rb->readIndex, samplesToCopy, r32); */
-  copyFloatArrayWide(destL, rb->samples[0] + rb->readIndex, samplesToCopy);
-  copyFloatArrayWide(destR, rb->samples[1] + rb->readIndex, samplesToCopy);
+  COPY_ARRAY(destL, rb->samples[0] + rb->readIndex, samplesToCopy, r32);
+  COPY_ARRAY(destR, rb->samples[1] + rb->readIndex, samplesToCopy, r32);
+  // NOTE: we cannot rely on pointers having the correct alignment 
+  /* copyFloatArrayWide(destL, rb->samples[0] + rb->readIndex, samplesToCopy); */
+  /* copyFloatArrayWide(destR, rb->samples[1] + rb->readIndex, samplesToCopy); */
 
   if(samplesToCopy < count)
     {
       u32 samplesRemaining = count - samplesToCopy;
-      /* COPY_ARRAY(destL + samplesToCopy, rb->samples[0], samplesRemaining, r32); */
-      /* COPY_ARRAY(destR + samplesToCopy, rb->samples[1], samplesRemaining, r32); */
-      copyFloatArrayWide(destL + samplesToCopy, rb->samples[0], samplesRemaining);
-      copyFloatArrayWide(destR + samplesToCopy, rb->samples[1], samplesRemaining);
+      COPY_ARRAY(destL + samplesToCopy, rb->samples[0], samplesRemaining, r32);
+      COPY_ARRAY(destR + samplesToCopy, rb->samples[1], samplesRemaining, r32);
+      // NOTE: we cannot rely on pointers having the correct alignment 
+      /* copyFloatArrayWide(destL + samplesToCopy, rb->samples[0], samplesRemaining); */
+      /* copyFloatArrayWide(destR + samplesToCopy, rb->samples[1], samplesRemaining); */
     }
 
   if(increment)
