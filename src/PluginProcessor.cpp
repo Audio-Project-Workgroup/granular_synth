@@ -450,8 +450,7 @@ processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 
   ignoreParameterChange = true;
   for(u32 parameterIndex = 0; parameterIndex < vstParameters.size(); ++parameterIndex)
-    {
-      // TODO: make mapping between plugin and vst parameters explicit
+    {      
       u32 pluginParameterIndex = vstParameterIndexTo_pluginParameterIndex[parameterIndex];
       PluginFloatParameter *pluginParameter = pluginParameters + pluginParameterIndex;
       juce::AudioParameterFloat *vstParameter = vstParameters[parameterIndex];

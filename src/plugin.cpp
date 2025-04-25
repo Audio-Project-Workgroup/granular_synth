@@ -232,19 +232,28 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 
 	      // NOTE: parameter initialization
 	      pluginState->phasor = 0.f;
-	      pluginState->freq = 440.f;	  	     
+	      pluginState->freq = 440.f;
+	      
 	      initializeFloatParameter(&pluginState->parameters[PluginParameter_volume], 
 				       pluginParameterInitData[PluginParameter_volume], decibelsToAmplitude);
+	      
 	      initializeFloatParameter(&pluginState->parameters[PluginParameter_density],
 				       pluginParameterInitData[PluginParameter_density]);
+	      
 	      //avail range: [0, 3], default value: 0
 	      initializeFloatParameter(&pluginState->parameters[PluginParameter_window], 
 				       pluginParameterInitData[PluginParameter_window]);
+	      
 	      //avail range: [0, 16000], default value: 2600
 	      initializeFloatParameter(&pluginState->parameters[PluginParameter_size], 
 				       pluginParameterInitData[PluginParameter_size]);
+	      
 	      initializeFloatParameter(&pluginState->parameters[PluginParameter_spread],
 						pluginParameterInitData[PluginParameter_spread]);
+	      
+	      initializeFloatParameter(&pluginState->parameters[PluginParameter_mix],
+						pluginParameterInitData[PluginParameter_mix]);
+	      
 	      initializeFloatParameter(&pluginState->parameters[PluginParameter_offset],
 						pluginParameterInitData[PluginParameter_offset]);
 
@@ -725,6 +734,23 @@ RENDER_NEW_FRAME(renderNewFrame)
 
 			pluginSetFloatParameter(window.element->fParam, newWindow);
 		      }		    
+		  }
+
+		  // NOTE: mix
+		  {
+		    v2 mixOffsetPOP = V2(0.25f, 0.4f);
+		    v2 mixSizePOP = knobDimPOP*V2(1, 1);
+
+		    UIComm mix = uiMakeKnob(panelLayout, STR8_LIT("mix"), mixOffsetPOP, mixSizePOP, 1.f,
+					       &pluginState->parameters[PluginParameter_mix], 
+					       V4(1.f, 0, 0.5f, 1));
+		    if(mix.flags & UICommFlag_dragging)
+		      {
+			v2 dragDelta = uiGetDragDelta(mix.element);
+			r32 newMix = mix.element->fParamValueAtClick + 0.01f*dragDelta.y;
+
+			pluginSetFloatParameter(mix.element->fParam, newMix);
+		      }
 		  }
 
 		  // NOTE: offset
@@ -1505,14 +1531,11 @@ AUDIO_PROCESS(audioProcess)
 	}
 
       writeSamplesToAudioRingBuffer(gbuff, inputMixBuffers[0], inputMixBuffers[1], framesToRead);
-      arenaEndTemporaryMemory(&inputMixerMemory);
+      //arenaEndTemporaryMemory(&inputMixerMemory);
 
       // NOTE: grain playback
       GrainManager* gManager = &pluginState->grainManager;
       u32 framesToWrite = audioBuffer->framesToWrite;
-      //u32 destSampleRate = audioBuffer->outputSampleRate;
-      //r32 sampleRateRatio = (r32)INTERNAL_SAMPLE_RATE/(r32)destSampleRate;
-      //u32 scaledFramesToWrite = (u32)(sampleRateRatio*framesToWrite);
             
       TemporaryMemory grainMixerMemory = arenaBeginTemporaryMemory(&pluginState->permanentArena, KILOBYTES(128));
       r32 *grainMixBuffers[2] = {};
@@ -1540,7 +1563,7 @@ AUDIO_PROCESS(audioProcess)
       
       void *genericOutputFrames[2] = {};
       genericOutputFrames[0] = audioBuffer->outputBuffer[0];
-      genericOutputFrames[1] = audioBuffer->outputBuffer[1];
+      genericOutputFrames[1] = audioBuffer->outputBuffer[1];     
 
       u8 *atMidiBuffer = audioBuffer->midiBuffer;
 
@@ -1552,7 +1575,9 @@ AUDIO_PROCESS(audioProcess)
 	  PluginFloatParameter *volumeParameter = pluginState->parameters + PluginParameter_volume;
 	  r32 volumeRaw = pluginReadFloatParameter(volumeParameter);
 	  r32 volume =  formatVolumeFactor*volumeParameter->processingTransform(volumeRaw);
-	  	    
+
+	  r32 mixParam = pluginReadFloatParameter(&pluginState->parameters[PluginParameter_mix]);
+
 	  pluginState->phasor += nFreq;
 	  if(pluginState->phasor > M_TAU) pluginState->phasor -= M_TAU;
 				  
@@ -1574,30 +1599,32 @@ AUDIO_PROCESS(audioProcess)
 	      r32 grainVal = lerp(firstGrainVal, nextGrainVal, grainReadFrac);
 #else
 	      r32 grainVal = grainMixBuffers[channelIndex][frameIndex];
-		  r32 leftGrainVal = grainMixBuffers[0][frameIndex];
-		  r32 rightGrainVal = grainMixBuffers[1][frameIndex];
-		  r32 stereoWidth = pluginReadFloatParameter(&pluginState->parameters[PluginParameter_spread]);
-		  if (channelIndex < 2) { // Make sure we only process left and right channels
-			  //r32 widthVal = stereoWidth * 0.5f;
-			  r32 tmp = 1.0f / fmaxf(1.0f + stereoWidth, 2.0f);
-			  r32 coef_M = 1.0f * tmp;
-			  r32 coef_S = stereoWidth * tmp;
+	      r32 leftGrainVal = grainMixBuffers[0][frameIndex];
+	      r32 rightGrainVal = grainMixBuffers[1][frameIndex];
+	      r32 stereoWidth = pluginReadFloatParameter(&pluginState->parameters[PluginParameter_spread]);
+	      if (channelIndex < 2) { // Make sure we only process left and right channels
+		//r32 widthVal = stereoWidth * 0.5f;
+		r32 tmp = 1.0f / fmaxf(1.0f + stereoWidth, 2.0f);
+		r32 coef_M = 1.0f * tmp;
+		r32 coef_S = stereoWidth * tmp;
 
-			  r32 mid = (leftGrainVal + rightGrainVal) * coef_M;
-			  r32 sides = (rightGrainVal - leftGrainVal) * coef_S;
+		r32 mid = (leftGrainVal + rightGrainVal) * coef_M;
+		r32 sides = (rightGrainVal - leftGrainVal) * coef_S;
 
-			  // Update grain value based on channel
-			  if (channelIndex == 0) {
-				  grainVal = mid - sides; // Left channel
-			  }
-			  else {
-				  grainVal = mid + sides; // Right channel
-			  }
-		  }
+		// Update grain value based on channel
+		if (channelIndex == 0) {
+		  grainVal = mid - sides; // Left channel
+		}
+		else {
+		  grainVal = mid + sides; // Right channel
+		}
+	      }
 #endif
-	      mixedVal += 0.5*grainVal;
-
-	      // *outptbuffer++ = volume*mixedVal;
+	      
+	      // mixedVal += 0.5f*grainVal;
+	      // mixedVal += 0.5f*inputMixBuffers[channelIndex][frameIndex];
+	      mixedVal += lerp(inputMixBuffers[channelIndex][frameIndex], grainVal, mixParam);
+	     
 	      switch(audioBuffer->outputFormat)
 		{
 		case AudioFormat_r32:
@@ -1613,7 +1640,7 @@ AUDIO_PROCESS(audioProcess)
 		    genericOutputFrames[channelIndex] = (u8 *)audioFrames + audioBuffer->outputStride;
 		  } break;
 
-		default: ASSERT(!"ERROR: invalid audio format");
+		default: ASSERT(!"ERROR: invalid audio output format");
 		}
 	    }
 
@@ -1622,9 +1649,11 @@ AUDIO_PROCESS(audioProcess)
 	  pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_window]);
 	  pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_size]);
 	  pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_spread]);
+	  pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_mix]);
 	  pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_offset]);
 	}
 
+      arenaEndTemporaryMemory(&inputMixerMemory);
       arenaEndTemporaryMemory(&grainMixerMemory);      
     }
 }

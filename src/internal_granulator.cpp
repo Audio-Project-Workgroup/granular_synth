@@ -203,7 +203,8 @@ synthesize(r32* destBufferLInit, r32* destBufferRInit,
   r32* destBufferR = destBufferRInit;  
   for (u32 sampleIndex = 0; sampleIndex < samplesToWrite; ++sampleIndex)
     {     
-#if 1     
+#if 1
+      // TODO: update these parameters in this loop?
       u32 grainSize = (u32)pluginReadFloatParameter(&pluginState->parameters[PluginParameter_size]);      
       r32 windowParam = pluginReadFloatParameter(&pluginState->parameters[PluginParameter_window]);
       r32 density = pluginReadFloatParameter(&pluginState->parameters[PluginParameter_density]);
@@ -280,9 +281,20 @@ synthesize(r32* destBufferLInit, r32* destBufferRInit,
       r32 newReadPosition = (r32)startReadIndex + readPositionIncrement*(r32)(sampleIndex + 1);
       buffer->readIndex = (u32)newReadPosition;
       buffer->readIndex %= buffer->capacity;
-    
+
+      // r32 wetSampleL = volume*outSampleL;
+      // r32 wetSampleR = volume*outSampleR;
+
+      // r32 drySampleL = buffer->samples[0][buffer->readIndex];
+      // r32 drySampleR = buffer->samples[1][buffer->readIndex];
+
+      // r32 mixedSampleL = lerp(drySampleL, wetSampleL, mix);
+      // r32 mixedSampleR = lerp(drySampleR, wetSampleR, mix);
+
       *destBufferL++ = clampToRange(volume*outSampleL, -1.f, 1.f);
       *destBufferR++ = clampToRange(volume*outSampleR, -1.f, 1.f);
+      // *destBufferL++ = clampToRange(mixedSampleL, -1.f, 1.f);
+      // *destBufferR++ = clampToRange(mixedSampleR, -1.f, 1.f);
     }
 
   grainStateView->viewWriteIndex = viewWriteIndex;
