@@ -607,7 +607,7 @@ uiMakeBox(UILayout *layout, String8 name, Rect2 rect,
 
 inline UIComm
 uiMakeButton(UILayout *layout, String8 name, v2 offset, v2 dim, r32 aspectRatio, PluginBooleanParameter *param,
-	     v4 color = V4(1, 1, 1, 1), LoadedBitmap *texture = 0)
+	     LoadedBitmap *texture = 0, v4 color = V4(1, 1, 1, 1))
 {
   u32 flags = UIElementFlag_clickable | UIElementFlag_drawBackground | UIElementFlag_drawBorder;
   UIElement *button = uiMakeElement(layout, name, flags, color, texture);
@@ -624,10 +624,10 @@ uiMakeButton(UILayout *layout, String8 name, v2 offset, v2 dim, r32 aspectRatio,
 inline UIComm
 uiMakeSlider(UILayout *layout, String8 name,
 	     v2 offset, v2 dim, r32 aspectRatio, PluginFloatParameter *param,
-	     v4 color = V4(1, 1, 1, 1), LoadedBitmap *texture = 0)
+	     LoadedBitmap *texture = 0, v4 color = V4(1, 1, 1, 1))
 {
   u32 flags = (UIElementFlag_clickable | UIElementFlag_draggable | UIElementFlag_drawBorder |
-	       UIElementFlag_drawLabelAbove | UIElementFlag_drawLabelBelow);
+	       0);//UIElementFlag_drawLabelBelow);
   UIElement *slider = uiMakeElement(layout, name, flags, color, texture);
   uiSetElementDataFloat(slider, param);
 
@@ -640,10 +640,10 @@ uiMakeSlider(UILayout *layout, String8 name,
 
 inline UIComm
 uiMakeKnob(UILayout *layout, String8 name, v2 offset, v2 dim, r32 aspectRatio, PluginFloatParameter *param,
-	   v4 color = V4(1, 1, 1, 1), LoadedBitmap *texture = 0)
+	   LoadedBitmap *texture = 0, v4 color = V4(1, 1, 1, 1))
 {
   u32 flags = (UIElementFlag_clickable | UIElementFlag_turnable | UIElementFlag_drawBorder |
-	       UIElementFlag_drawLabelBelow);
+	       0);//UIElementFlag_drawLabelBelow);
   UIElement *knob = uiMakeElement(layout, name, flags, color, texture);
   uiSetElementDataFloat(knob, param);
 

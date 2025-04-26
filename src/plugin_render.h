@@ -8,16 +8,18 @@ renderPushQuad(RenderCommands *commands, Rect2 rect, LoadedBitmap *texture, r32 
       TexturedQuad *quad = commands->texturedQuads + commands->texturedQuadCount++;
 
       v2 dim = getDim(rect);
+      v2 center = getCenter(rect);
       v2 bottomLeft = rect.min;
       bottomLeft -= V2(texture->alignPercentage.x*dim.x, texture->alignPercentage.y*dim.y);
   
       quad->vertices[0] = makeTexturedVertex(bottomLeft, V2(0, 0), color);
       quad->vertices[1] = makeTexturedVertex(bottomLeft + V2(dim.x, 0), V2(1, 0), color);
       quad->vertices[2] = makeTexturedVertex(bottomLeft + V2(0, dim.y), V2(0, 1), color);
-      quad->vertices[3] = makeTexturedVertex(bottomLeft + dim, V2(1, 1), color);
-  
+      quad->vertices[3] = makeTexturedVertex(bottomLeft + dim, V2(1, 1), color);      
+
       quad->texture = texture;
       quad->angle = angle;
+      quad->matrix = transpose(makeRotationMatrixXY(center, angle));
       quad->level = level;
     }
   else
@@ -26,6 +28,7 @@ renderPushQuad(RenderCommands *commands, Rect2 rect, LoadedBitmap *texture, r32 
       Quad *quad = commands->quads + commands->quadCount++;
 
       v2 dim = getDim(rect);
+      v2 center = getCenter(rect);
       v2 bottomLeft = rect.min;
   
       quad->vertices[0] = makeVertex(bottomLeft, color);
@@ -34,6 +37,7 @@ renderPushQuad(RenderCommands *commands, Rect2 rect, LoadedBitmap *texture, r32 
       quad->vertices[3] = makeVertex(bottomLeft + dim, color);
   
       quad->angle = angle;
+      quad->matrix = transpose(makeRotationMatrixXY(center, angle));
       quad->level = level;
     }
 }
@@ -194,7 +198,7 @@ renderPushUIElement(RenderCommands *commands, UIElement *element)
 	  v2 faderCenter = V2(elementRegionCenter.x, element->region.min.y + paramPercentage*elementRegionDim.y);
 	  Rect2 faderRect = rectCenterDim(faderCenter, V2(elementRegionDim.x, 0.1f*elementRegionDim.y));
 	  
-	  renderPushQuad(commands, faderRect, 0, 0, RenderLevel_front, element->color);
+	  renderPushQuad(commands, faderRect, element->texture, 0, RenderLevel_front, element->color);
 	}
     }
   if(element->flags & UIElementFlag_turnable)
@@ -205,9 +209,12 @@ renderPushUIElement(RenderCommands *commands, UIElement *element)
 	    {  
 	      r32 paramValue = pluginReadFloatParameter(element->fParam);
 	      r32 paramPercentage = (paramValue - element->fParam->range.min)/(element->fParam->range.max - element->fParam->range.min);
+	      logFormatString("paramPercentage: %.2f", paramPercentage);
+	      //r32 paramAngle = -(paramPercentage - 0.5f)*1.5f*M_PI;
 	      r32 paramAngle = -paramPercentage*M_PI;
 
-	      renderPushQuad(commands, element->region, 0, paramAngle, RenderLevel_front, element->color);
+	      renderPushQuad(commands,
+			     element->region, element->texture, paramAngle, RenderLevel_front, element->color);
 	    }
 	}
     }

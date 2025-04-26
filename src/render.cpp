@@ -115,12 +115,13 @@ renderCommands(RenderCommands *commands)
 
       if(quad->angle != 0.f)
 	{
-	  v2 vertexCenter = 0.5f*(quad->vertices[3].vPos + quad->vertices[0].vPos);
-	  mat4 rotationMatrix = makeRotationMatrixXY(quad->angle);	  
-	  mat4 translationMatrix = makeTranslationMatrix(vertexCenter);
-	  mat4 invTranslationMatrix = makeTranslationMatrix(-vertexCenter);
+	  // v2 vertexCenter = 0.5f*(quad->vertices[3].vPos + quad->vertices[0].vPos);
+	  // mat4 rotationMatrix = makeRotationMatrixXY(quad->angle);	  
+	  // mat4 translationMatrix = makeTranslationMatrix(vertexCenter);
+	  // mat4 invTranslationMatrix = makeTranslationMatrix(-vertexCenter);
 	  
-	  mat4 mvMat = transpose(invTranslationMatrix*rotationMatrix*translationMatrix);
+	  // mat4 mvMat = transpose(invTranslationMatrix*rotationMatrix*translationMatrix);
+	  mat4 mvMat = quad->matrix;
 	  glMatrixMode(GL_MODELVIEW);
 	  glLoadMatrixf(mvMat.E);
 	}
@@ -157,12 +158,13 @@ renderCommands(RenderCommands *commands)
 	  drawing = false;
 	  glEnd();
 	  
-	  v2 vertexCenter = 0.5f*(quad->vertices[3].vPos + quad->vertices[0].vPos);
-	  mat4 rotationMatrix = makeRotationMatrixXY(quad->angle);	  
-	  mat4 translationMatrix = makeTranslationMatrix(vertexCenter);
-	  mat4 invTranslationMatrix = makeTranslationMatrix(-vertexCenter);
+	  // v2 vertexCenter = 0.5f*(quad->vertices[3].vPos + quad->vertices[0].vPos);
+	  // mat4 rotationMatrix = makeRotationMatrixXY(quad->angle);	  
+	  // mat4 translationMatrix = makeTranslationMatrix(vertexCenter);
+	  // mat4 invTranslationMatrix = makeTranslationMatrix(-vertexCenter);
 	  
-	  mat4 mvMat = transpose(invTranslationMatrix*rotationMatrix*translationMatrix);
+	  // mat4 mvMat = transpose(invTranslationMatrix*rotationMatrix*translationMatrix);
+	  mat4 mvMat = quad->matrix;
 	  glMatrixMode(GL_MODELVIEW);
 	  glLoadMatrixf(mvMat.E);
 	}

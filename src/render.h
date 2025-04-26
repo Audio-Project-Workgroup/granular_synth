@@ -47,6 +47,7 @@ struct Quad
 {
   RenderLevel level;
   r32 angle;
+  mat4 matrix;
 
   Vertex vertices[4];  
 };
@@ -55,6 +56,7 @@ struct TexturedQuad
 {
   RenderLevel level;
   r32 angle;
+  mat4 matrix;
   
   TexturedVertex vertices[4];
   LoadedBitmap *texture;

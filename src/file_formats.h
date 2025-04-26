@@ -389,7 +389,7 @@ loadWav(char *filename, Arena *loadAllocator, Arena *permanentAllocator)
 }
 
 static inline LoadedBitmap
-loadBitmap(char *filename, Arena *allocator)
+loadBitmap(char *filename, Arena *allocator, v2 alignment = V2(0, 0))
 {
   LoadedBitmap result = {};
 
@@ -441,6 +441,7 @@ loadBitmap(char *filename, Arena *allocator)
       result.stride = result.width*bytesPerPixel;      
     }
 
+  result.alignPercentage = alignment;
   return(result);
 }
 

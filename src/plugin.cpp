@@ -318,10 +318,38 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 								   &pluginState->permanentArena);
 	      pluginState->silo = initializeFileGrainState(&pluginState->permanentArena);	  	      
 
-	      pluginState->editorSkin = loadBitmap("../data/editor_skin.bmp", &pluginState->permanentArena);
+	      pluginState->editorReferenceLayout =
+		loadBitmap("../data/BMP/GRANADE_UI_POSITIONSREFERENCE.bmp", &pluginState->permanentArena);
+	      pluginState->editorSkin =
+		loadBitmap("../data/BMP/TREE.bmp", &pluginState->permanentArena);
+	      pluginState->pomegranateKnob =
+		loadBitmap("../data/BMP/POMEGRANATE_BUTTON.bmp", &pluginState->permanentArena);
+	      pluginState->pomegranateKnobLabel =
+		loadBitmap("../data/BMP/POMEGRANATE_BUTTON_WHITEMARKERS.bmp", &pluginState->permanentArena);
+	      pluginState->halfPomegranateKnob =
+		loadBitmap("../data/BMP/HALFPOMEGRANATE_BUTTON.bmp", &pluginState->permanentArena);
+	      pluginState->halfPomegranateKnobLabel =
+		loadBitmap("../data/BMP/HALFPOMEGRANATE_BUTTON_WHITEMARKERS.bmp", &pluginState->permanentArena);
+	      pluginState->densityKnob =
+		loadBitmap("../data/BMP/DENSITYPOMEGRANATE_BUTTON.bmp", &pluginState->permanentArena,
+			   V2(0.01, -0.022));
+	      pluginState->densityKnobShadow =
+		loadBitmap("../data/BMP/DENSITYPOMEGRANATE_BUTTON_SHADOW.bmp", &pluginState->permanentArena);
+	      pluginState->densityKnobLabel =
+		loadBitmap("../data/BMP/DENSITYPOMEGRANATE_BUTTON_WHITEMARKERS.bmp", &pluginState->permanentArena);
+	      pluginState->levelBar =
+		loadBitmap("../data/BMP/LEVELBAR.bmp", &pluginState->permanentArena);
+	      pluginState->levelFader =
+		loadBitmap("../data/BMP/LEVELBAR_SLIDINGLEVER.bmp", &pluginState->permanentArena);
+	      pluginState->grainViewBackground =
+		loadBitmap("../data/BMP/GREENFRAME_RECTANGLE.bmp", &pluginState->permanentArena);
+	      pluginState->grainViewOutline =
+		loadBitmap("../data/BMP/GREENFRAME.bmp", &pluginState->permanentArena);
 
 	      RangeU32 characterRange = {32, 127}; // NOTE: from SPACE up to (but not including) DEL
 	      pluginState->testFont = loadFont("../data/arial.ttf", &pluginState->loadArena,
+					       &pluginState->permanentArena, characterRange, 32.f);
+	      pluginState->agencyBold = loadFont("../data/FONT/AGENCYB.ttf", &pluginState->loadArena,
 					       &pluginState->permanentArena, characterRange, 32.f);
 
 	      // NOTE: ui initialization
@@ -335,7 +363,8 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 	      pluginState->rootPanel->splitAxis = UIAxis_y;
 	      pluginState->rootPanel->name = STR8_LIT("editor");
 	      pluginState->rootPanel->color = V4(1, 1, 1, 1);
-	      pluginState->rootPanel->texture = &pluginState->editorSkin;
+	      //pluginState->rootPanel->texture = &pluginState->editorSkin;
+	      pluginState->rootPanel->texture = &pluginState->editorReferenceLayout;
 #if 0 
 	      UIPanel *currentParentPanel = pluginState->rootPanel;
 	      UIPanel *bottom = makeUIPanel(currentParentPanel, &pluginState->permanentArena,
@@ -596,8 +625,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 	      if(!panel->first)
 		{
 		  // NOTE: background skin
-		  //renderPushQuad(renderCommands, panelRect, panel->texture, 0, RenderLevel_background, panel->color);
-	      
+		  //renderPushQuad(renderCommands, panelRect, panel->texture, 0, RenderLevel_background, panel->color);	      
 		  UILayout *panelLayout = &panel->layout;
 		  uiBeginLayout(panelLayout, uiContext, panelRect, panel->color, panel->texture);
 		  uiPushLayoutOffsetSizeType(panelLayout, UISizeType_percentOfParent);
@@ -612,7 +640,8 @@ RENDER_NEW_FRAME(renderNewFrame)
 		  v2 volumeDimPOP = V2(0.1f, 0.6f);
 		  UIComm volume = uiMakeSlider(panelLayout, STR8_LIT("volume"), volumeOffsetPOP, volumeDimPOP, 0.2f,
 					       &pluginState->parameters[PluginParameter_volume],
-					       V4(0.8f, 0.8f, 0.8f, 1));		  
+					       &pluginState->levelFader);
+					       //V4(0.8f, 0.8f, 0.8f, 1));		  
 
 		  if(volume.flags & UICommFlag_hovering)
 		    {
@@ -647,14 +676,15 @@ RENDER_NEW_FRAME(renderNewFrame)
 			}
 		    }			
 
-		  r32 knobDimPOP = 0.1f;
+		  r32 knobDimPOP = 0.2f;
 
 		  // NOTE: size
 		  v2 sizeOffsetPOP = V2(0.69f, 0.28f);
 		  v2 sizeDimPOP = knobDimPOP*V2(1, 1);
 		  UIComm grainSizeKnob = uiMakeKnob(panelLayout, STR8_LIT("size"), sizeOffsetPOP, sizeDimPOP, 1.f,
-						    &pluginState->parameters[PluginParameter_size], 
-						    V4(0.2f, 0.5f, 0.3f, 1));
+						    &pluginState->parameters[PluginParameter_size],
+						    &pluginState->pomegranateKnob);
+						    //V4(0.2f, 0.5f, 0.3f, 1));
 		  if(grainSizeKnob.flags & UICommFlag_dragging)
 		    {
 		      v2 dragDelta = uiGetDragDelta(grainSizeKnob.element);
@@ -673,7 +703,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 		    v2 playOffsetPOP = V2(0.8f, 0.65f);
 		    v2 playSizePOP = knobDimPOP*V2(1, 1);
 		    UIComm play = uiMakeButton(panelLayout, STR8_LIT("play"), playOffsetPOP, playSizePOP, 1.f,
-					       &pluginState->soundIsPlaying, V4(0, 0, 1, 1));
+					       &pluginState->soundIsPlaying, 0, V4(0, 0, 1, 1));
 		    
 		    if(play.flags & UICommFlag_pressed)
 		      {
@@ -692,7 +722,9 @@ RENDER_NEW_FRAME(renderNewFrame)
 		    v2 spreadSizePOP = knobDimPOP*V2(1, 1);
 		    
 		    UIComm spread = uiMakeKnob(panelLayout, STR8_LIT("Spread"), spreadOffsetPOP, spreadSizePOP, 1.f,
-					       &pluginState->parameters[PluginParameter_spread], V4(1, 1, 0, 1));
+					       &pluginState->parameters[PluginParameter_spread],
+					       &pluginState->pomegranateKnob);
+					       //V4(1, 1, 0, 1));
 		    if (spread.flags & UIElementFlag_turnable)
 		      {
 			v2 dragDelta2 = uiGetDragDelta(spread.element);
@@ -704,12 +736,18 @@ RENDER_NEW_FRAME(renderNewFrame)
 
 		  // NOTE: density
 		  {
-		    v2 densityOffsetPOP = V2(0.48f, 0.22f);
-		    v2 densitySizePOP = knobDimPOP*V2(1, 1);
+		    r32 densityDimPOP = 0.235f;
+		    v2 densityOffsetPOP = V2(0.45f, 0.06f);
+		    v2 densitySizePOP = densityDimPOP*V2(1, 1);
 
 		    UIComm density = uiMakeKnob(panelLayout, STR8_LIT("density"),
 						densityOffsetPOP, densitySizePOP, 1.f,
-						&pluginState->parameters[PluginParameter_density], V4(0, 1, 0, 1));
+						&pluginState->parameters[PluginParameter_density],
+						&pluginState->densityKnob,
+						V4(1, 1, 1, 1));
+		    Rect2 densityRect = density.element->region;
+		    v2 densityRectCenter = getCenter(densityRect);
+		    renderPushQuad(renderCommands, rectCenterDim(densityRectCenter, V2(4, 4)), 0, 0, RenderLevel_front);
 		    if(density.flags & UICommFlag_dragging)
 		      {
 			v2 dragDelta = uiGetDragDelta(density.element);
@@ -725,8 +763,9 @@ RENDER_NEW_FRAME(renderNewFrame)
 		    v2 windowSizePOP = knobDimPOP*V2(1, 1);
 
 		    UIComm window = uiMakeKnob(panelLayout, STR8_LIT("window"), windowOffsetPOP, windowSizePOP, 1.f,
-					       &pluginState->parameters[PluginParameter_window], 
-					       V4(1, 0, 1, 1));
+					       &pluginState->parameters[PluginParameter_window],
+					       &pluginState->pomegranateKnob);
+					       //V4(1, 0, 1, 1));
 		    if(window.flags & UICommFlag_dragging)
 		      {
 			v2 dragDelta = uiGetDragDelta(window.element);
@@ -742,8 +781,9 @@ RENDER_NEW_FRAME(renderNewFrame)
 		    v2 mixSizePOP = knobDimPOP*V2(1, 1);
 
 		    UIComm mix = uiMakeKnob(panelLayout, STR8_LIT("mix"), mixOffsetPOP, mixSizePOP, 1.f,
-					       &pluginState->parameters[PluginParameter_mix], 
-					       V4(1.f, 0, 0.5f, 1));
+					    &pluginState->parameters[PluginParameter_mix],
+					    &pluginState->pomegranateKnob);
+					    //V4(1.f, 0, 0.5f, 1));
 		    if(mix.flags & UICommFlag_dragging)
 		      {
 			v2 dragDelta = uiGetDragDelta(mix.element);
@@ -759,8 +799,9 @@ RENDER_NEW_FRAME(renderNewFrame)
 		    v2 offsetSizePOP = knobDimPOP*V2(1, 1);
 
 		    UIComm offset = uiMakeKnob(panelLayout, STR8_LIT("offset"), offsetOffsetPOP, offsetSizePOP, 1.f,
-					       &pluginState->parameters[PluginParameter_offset], 
-					       V4(0.5f, 0, 1, 1));
+					       &pluginState->parameters[PluginParameter_offset],
+					       &pluginState->pomegranateKnob);
+					       //V4(0.5f, 0, 1, 1));
 		    if(offset.flags & UICommFlag_dragging)
 		      {
 			v2 dragDelta = uiGetDragDelta(offset.element);

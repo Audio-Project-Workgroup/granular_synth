@@ -100,8 +100,23 @@ struct PluginState
   //PluginFloatParameter parameters[PluginParameter_count];
 
   PlayingSound loadedSound;
+
+  LoadedBitmap editorReferenceLayout;
   LoadedBitmap editorSkin;
+  LoadedBitmap pomegranateKnob;
+  LoadedBitmap pomegranateKnobLabel;
+  LoadedBitmap halfPomegranateKnob;
+  LoadedBitmap halfPomegranateKnobLabel;
+  LoadedBitmap densityKnob;
+  LoadedBitmap densityKnobShadow;
+  LoadedBitmap densityKnobLabel;
+  LoadedBitmap levelBar;
+  LoadedBitmap levelFader;
+  LoadedBitmap grainViewBackground;
+  LoadedBitmap grainViewOutline;
+
   LoadedFont testFont;
+  LoadedFont agencyBold;
 
   //UILayout layout;
   UIContext uiContext;

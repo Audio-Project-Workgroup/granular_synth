@@ -542,6 +542,20 @@ makeRotationMatrixXY(r32 angle)
 }
 
 inline mat4
+makeRotationMatrixXY(v2 c, r32 a)
+{
+  mat4 result = {};
+  r32 ca = Cos(a);
+  r32 sa = Sin(a);  
+  result.r1 = V4(ca, -sa, 0,  c.x*(1.f - ca) + c.y*sa);
+  result.r2 = V4(sa,  ca, 0, -c.x*sa + c.y*(1.f - ca));
+  result.r3 = V4(0, 0, 1, 0);
+  result.r4 = V4(0, 0, 0, 1);
+
+  return(result);
+}
+
+inline mat4
 makeProjectionMatrix(u32 widthInPixels, u32 heightInPixels)
 {
   mat4 result = {};
