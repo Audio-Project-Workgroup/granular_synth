@@ -185,20 +185,24 @@ renderPushUIElement(RenderCommands *commands, UIElement *element)
     }  
   if(element->flags & UIElementFlag_draggable)
     {            
-      v2 travelDim = V2(0.2f*elementRegionDim.x, elementRegionDim.y);
+      v2 travelDim = V2(elementRegionDim.x, elementRegionDim.y);
       Rect2 travelRect = rectCenterDim(elementRegionCenter, travelDim);
       
-      renderPushQuad(commands, travelRect, 0, 0, RenderLevel_front, V4(0, 0, 0, 1));
+      renderPushQuad(commands, travelRect, element->texture, 0, RenderLevel_front, element->color);
 
       if(element->parameterType == UIParameter_float)
 	{
 	  r32 paramValue = pluginReadFloatParameter(element->fParam);
 	  r32 paramPercentage = (paramValue - element->fParam->range.min)/(element->fParam->range.max - element->fParam->range.min);
-	  
-	  v2 faderCenter = V2(elementRegionCenter.x, element->region.min.y + paramPercentage*elementRegionDim.y);
-	  Rect2 faderRect = rectCenterDim(faderCenter, V2(elementRegionDim.x, 0.1f*elementRegionDim.y));
-	  
-	  renderPushQuad(commands, faderRect, element->texture, 0, RenderLevel_front, element->color);
+
+	  r32 offsetFactor = 0.05f;
+	  v2 faderCenter = V2(elementRegionCenter.x,
+			      (element->region.min.y +
+			       (paramPercentage*(1.f - 2.f*offsetFactor) + offsetFactor)*elementRegionDim.y));
+	  Rect2 faderRect = rectCenterDim(faderCenter, V2(elementRegionDim.x, elementRegionDim.y));
+
+	  //renderPushRectOutline(commands, faderRect, 2.f, RenderLevel_front, V4(0, 0, 0, 1));
+	  renderPushQuad(commands, faderRect, element->secondaryTexture, 0, RenderLevel_front, element->color);
 	}
     }
   if(element->flags & UIElementFlag_turnable)

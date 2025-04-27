@@ -624,11 +624,12 @@ uiMakeButton(UILayout *layout, String8 name, v2 offset, v2 dim, r32 aspectRatio,
 inline UIComm
 uiMakeSlider(UILayout *layout, String8 name,
 	     v2 offset, v2 dim, r32 aspectRatio, PluginFloatParameter *param,
-	     LoadedBitmap *texture = 0, v4 color = V4(1, 1, 1, 1))
+	     LoadedBitmap *backgroundTexture = 0, LoadedBitmap *clickableTexture = 0, v4 color = V4(1, 1, 1, 1))
 {
   u32 flags = (UIElementFlag_clickable | UIElementFlag_draggable | UIElementFlag_drawBorder |
 	       0);//UIElementFlag_drawLabelBelow);
-  UIElement *slider = uiMakeElement(layout, name, flags, color, texture);
+  UIElement *slider = uiMakeElement(layout, name, flags, color, backgroundTexture);
+  slider->secondaryTexture = clickableTexture;
   uiSetElementDataFloat(slider, param);
 
   slider->region = uiComputeElementRegion(slider, offset, dim, aspectRatio);

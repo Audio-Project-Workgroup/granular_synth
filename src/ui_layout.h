@@ -126,6 +126,7 @@ struct UIElement
   v2 textScale;
   v4 color;
   LoadedBitmap *texture;
+  LoadedBitmap *secondaryTexture;
 
   UIParameter parameterType;
   union // TODO: maybe there could be a use for an element that has both a boolean and a float parameter attached

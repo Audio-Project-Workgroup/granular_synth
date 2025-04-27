@@ -323,16 +323,18 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 	      pluginState->editorSkin =
 		loadBitmap("../data/BMP/TREE.bmp", &pluginState->permanentArena);
 	      pluginState->pomegranateKnob =
-		loadBitmap("../data/BMP/POMEGRANATE_BUTTON.bmp", &pluginState->permanentArena);
+		loadBitmap("../data/BMP/POMEGRANATE_BUTTON.bmp", &pluginState->permanentArena,
+			   V2(0, -0.03f));
 	      pluginState->pomegranateKnobLabel =
 		loadBitmap("../data/BMP/POMEGRANATE_BUTTON_WHITEMARKERS.bmp", &pluginState->permanentArena);
 	      pluginState->halfPomegranateKnob =
-		loadBitmap("../data/BMP/HALFPOMEGRANATE_BUTTON.bmp", &pluginState->permanentArena);
+		loadBitmap("../data/BMP/HALFPOMEGRANATE_BUTTON.bmp", &pluginState->permanentArena,
+			   V2(-0.005f, -0.035f));
 	      pluginState->halfPomegranateKnobLabel =
 		loadBitmap("../data/BMP/HALFPOMEGRANATE_BUTTON_WHITEMARKERS.bmp", &pluginState->permanentArena);
 	      pluginState->densityKnob =
 		loadBitmap("../data/BMP/DENSITYPOMEGRANATE_BUTTON.bmp", &pluginState->permanentArena,
-			   V2(0.01, -0.022));
+			   V2(0.01f, -0.022f));
 	      pluginState->densityKnobShadow =
 		loadBitmap("../data/BMP/DENSITYPOMEGRANATE_BUTTON_SHADOW.bmp", &pluginState->permanentArena);
 	      pluginState->densityKnobLabel =
@@ -340,7 +342,8 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 	      pluginState->levelBar =
 		loadBitmap("../data/BMP/LEVELBAR.bmp", &pluginState->permanentArena);
 	      pluginState->levelFader =
-		loadBitmap("../data/BMP/LEVELBAR_SLIDINGLEVER.bmp", &pluginState->permanentArena);
+		loadBitmap("../data/BMP/LEVELBAR_SLIDINGLEVER.bmp", &pluginState->permanentArena,
+			   V2(0, -0.416f));
 	      pluginState->grainViewBackground =
 		loadBitmap("../data/BMP/GREENFRAME_RECTANGLE.bmp", &pluginState->permanentArena);
 	      pluginState->grainViewOutline =
@@ -636,12 +639,13 @@ RENDER_NEW_FRAME(renderNewFrame)
 
 #if 1
 		  // NOTE: volume
-		  v2 volumeOffsetPOP = V2(0.1f, 0.1f);
-		  v2 volumeDimPOP = V2(0.1f, 0.6f);
-		  UIComm volume = uiMakeSlider(panelLayout, STR8_LIT("volume"), volumeOffsetPOP, volumeDimPOP, 0.2f,
+		  //v2 volumeOffsetPOP = V2(0.909f, 0.19f);
+		  v2 volumeOffsetPOP = V2(0.87f, 0.17f);
+		  v2 volumeDimPOP = V2(0.2f, 0.45f);
+		  UIComm volume = uiMakeSlider(panelLayout, STR8_LIT("volume"), volumeOffsetPOP, volumeDimPOP, 0.5f,
 					       &pluginState->parameters[PluginParameter_volume],
-					       &pluginState->levelFader);
-					       //V4(0.8f, 0.8f, 0.8f, 1));		  
+					       &pluginState->levelBar, &pluginState->levelFader,
+					       V4(1, 1, 1, 0.5f));		  
 
 		  if(volume.flags & UICommFlag_hovering)
 		    {
@@ -676,15 +680,15 @@ RENDER_NEW_FRAME(renderNewFrame)
 			}
 		    }			
 
-		  r32 knobDimPOP = 0.2f;
+		  r32 knobDimPOP = 0.235f;
 
 		  // NOTE: size
-		  v2 sizeOffsetPOP = V2(0.69f, 0.28f);
+		  v2 sizeOffsetPOP = V2(0.239f, 0.109f);
 		  v2 sizeDimPOP = knobDimPOP*V2(1, 1);
 		  UIComm grainSizeKnob = uiMakeKnob(panelLayout, STR8_LIT("size"), sizeOffsetPOP, sizeDimPOP, 1.f,
 						    &pluginState->parameters[PluginParameter_size],
-						    &pluginState->pomegranateKnob);
-						    //V4(0.2f, 0.5f, 0.3f, 1));
+						    &pluginState->pomegranateKnob,
+						    V4(1, 1, 1, 1));
 		  if(grainSizeKnob.flags & UICommFlag_dragging)
 		    {
 		      v2 dragDelta = uiGetDragDelta(grainSizeKnob.element);
@@ -718,13 +722,13 @@ RENDER_NEW_FRAME(renderNewFrame)
 
 		  // NOTE: spread
 		  {
-		    v2 spreadOffsetPOP = V2(0.87f, 0.2f);
+		    v2 spreadOffsetPOP = V2(-0.001f, 0.067f);
 		    v2 spreadSizePOP = knobDimPOP*V2(1, 1);
 		    
 		    UIComm spread = uiMakeKnob(panelLayout, STR8_LIT("Spread"), spreadOffsetPOP, spreadSizePOP, 1.f,
 					       &pluginState->parameters[PluginParameter_spread],
-					       &pluginState->pomegranateKnob);
-					       //V4(1, 1, 0, 1));
+					       &pluginState->pomegranateKnob,
+					       V4(1, 1, 1, 1));
 		    if (spread.flags & UIElementFlag_turnable)
 		      {
 			v2 dragDelta2 = uiGetDragDelta(spread.element);
@@ -759,7 +763,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 		  		  
 		  // NOTE: window
 		  {
-		    v2 windowOffsetPOP = V2(0.79f, 0.1f);
+		    v2 windowOffsetPOP = V2(0.1f, 0.5f);
 		    v2 windowSizePOP = knobDimPOP*V2(1, 1);
 
 		    UIComm window = uiMakeKnob(panelLayout, STR8_LIT("window"), windowOffsetPOP, windowSizePOP, 1.f,
@@ -777,13 +781,17 @@ RENDER_NEW_FRAME(renderNewFrame)
 
 		  // NOTE: mix
 		  {
-		    v2 mixOffsetPOP = V2(0.25f, 0.4f);
-		    v2 mixSizePOP = knobDimPOP*V2(1, 1);
+		    r32 mixDimPOP = 0.235f;
+		    v2 mixOffsetPOP = V2(0.6399f, 0.1121f);
+		    v2 mixSizePOP = mixDimPOP*V2(1, 1);
 
 		    UIComm mix = uiMakeKnob(panelLayout, STR8_LIT("mix"), mixOffsetPOP, mixSizePOP, 1.f,
 					    &pluginState->parameters[PluginParameter_mix],
-					    &pluginState->pomegranateKnob);
-					    //V4(1.f, 0, 0.5f, 1));
+					    &pluginState->halfPomegranateKnob,
+					    V4(1, 1, 1, 1));
+		    Rect2 mixRect = mix.element->region;
+		    v2 mixRectCenter = getCenter(mixRect);
+		    renderPushQuad(renderCommands, rectCenterDim(mixRectCenter, V2(4, 4)), 0, 0, RenderLevel_front, V4(0, 0, 0, 1));
 		    if(mix.flags & UICommFlag_dragging)
 		      {
 			v2 dragDelta = uiGetDragDelta(mix.element);
@@ -795,13 +803,16 @@ RENDER_NEW_FRAME(renderNewFrame)
 
 		  // NOTE: offset
 		  {
-		    v2 offsetOffsetPOP = V2(0.25f, 0.2f);
+		    v2 offsetOffsetPOP = V2(0.1285f, 0.004f);
 		    v2 offsetSizePOP = knobDimPOP*V2(1, 1);
 
 		    UIComm offset = uiMakeKnob(panelLayout, STR8_LIT("offset"), offsetOffsetPOP, offsetSizePOP, 1.f,
 					       &pluginState->parameters[PluginParameter_offset],
-					       &pluginState->pomegranateKnob);
-					       //V4(0.5f, 0, 1, 1));
+					       &pluginState->pomegranateKnob,
+					       V4(1, 1, 1, 1));
+		    Rect2 offsetRect = offset.element->region;
+		    v2 offsetRectCenter = getCenter(offsetRect);
+		    renderPushQuad(renderCommands, rectCenterDim(offsetRectCenter, V2(4, 4)), 0, 0, RenderLevel_front, V4(0, 0, 0, 1));
 		    if(offset.flags & UICommFlag_dragging)
 		      {
 			v2 dragDelta = uiGetDragDelta(offset.element);
