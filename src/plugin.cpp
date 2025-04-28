@@ -318,6 +318,7 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 								   &pluginState->permanentArena);
 	      pluginState->silo = initializeFileGrainState(&pluginState->permanentArena);	  	      
 
+	      pluginState->nullTexture = makeBitmap(&pluginState->permanentArena, 1920, 1080, 0xFFFFFFFF);
 	      pluginState->editorReferenceLayout =
 		loadBitmap("../data/BMP/GRANADE_UI_POSITIONSREFERENCE.bmp", &pluginState->permanentArena);
 	      pluginState->editorSkin =
@@ -392,12 +393,14 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 	      pluginState->menuPanel->sizePercentOfParent = 1.f;
 	      pluginState->menuPanel->splitAxis = UIAxis_x;
 
-	      v4 menuBackgroundColor = colorV4FromU32(0x04060EFF);
+	      v4 menuBackgroundColor = colorV4FromU32(0x080C1CFF);
 	      UIPanel *currentParentPanel = pluginState->menuPanel;
 	      UIPanel *menuLeft = makeUIPanel(currentParentPanel, &pluginState->permanentArena,
-					      UIAxis_x, 0.5f, STR8_LIT("menu left"), menuBackgroundColor);
+					      UIAxis_x, 0.5f, STR8_LIT("menu left"),
+					      &pluginState->nullTexture, menuBackgroundColor);
 	      UIPanel *menuRight = makeUIPanel(currentParentPanel, &pluginState->permanentArena,
-					      UIAxis_x, 0.5f, STR8_LIT("menu right"), menuBackgroundColor);
+					       UIAxis_x, 0.5f, STR8_LIT("menu right"),
+					       &pluginState->nullTexture, menuBackgroundColor);
 	      UNUSED(menuLeft);
 	      UNUSED(menuRight);
 	      
@@ -431,8 +434,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 { 
   PluginState *pluginState = initializePluginState(memory);
   if(pluginState)
-    {
-      //renderCommands->arena = &pluginState->frameArena;
+    {      
       renderBeginCommands(renderCommands, &pluginState->frameArena);
      
       logFormatString("mouseP: (%.2f, %.2f)", input->mouseState.position.x, input->mouseState.position.y);
@@ -468,7 +470,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 	    }
 	}
 
-      // NOTE: standalone i/o device selection
+      // NOTE: standalone i/o device selection      
       if(pluginState->pluginMode == PluginMode_menu)
 	{
 	  for(UIPanel *panel = pluginState->menuPanel; panel; panel = uiPanelIteratorDepthFirstPreorder(panel).next)
@@ -477,16 +479,13 @@ RENDER_NEW_FRAME(renderNewFrame)
 
 	      if(!panel->first)
 		{
-		  renderPushQuad(renderCommands, panelRect, 0, 0, RenderLevel_background, panel->color);
-
 		  UILayout *panelLayout = &panel->layout;
-		  uiBeginLayout(panelLayout, uiContext, panelRect);
+		  uiBeginLayout(panelLayout, uiContext, panelRect, panel->color, panel->texture);		 
 
 		  r32 textScale = 0.7f;
 		  v4 baseTextColor = colorV4FromU32(0xFFDEADFF);
 		  v4 hoveringTextColor = colorV4FromU32(0x98F5FFFF);
 		  v4 selectedTextColor = colorV4FromU32(0xFFD700FF);
-		  //v4 selectedTextColor = V4(1, 0, 0, 1);
 
 		  if(stringsAreEqual(panel->name, STR8_LIT("menu left")))
 		    {
@@ -497,6 +496,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 			  bool isSelected = (outputDeviceIndex == pluginState->selectedOutputDeviceIndex);
 			  v4 textColor =  isSelected ? selectedTextColor : baseTextColor;
 			  String8 outputDeviceName = pluginState->outputDeviceNames[outputDeviceIndex];
+#if 1
 			  UIComm outputDevice = uiMakeSelectableTextElement(panelLayout, outputDeviceName,
 									    textScale, textColor);
 			  if(outputDevice.flags & UICommFlag_hovering)
@@ -510,6 +510,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 			      renderCommands->outputAudioDeviceChanged = true;
 			      renderCommands->selectedOutputAudioDeviceIndex = outputDeviceIndex;
 			    }
+#endif
 			}
 		    }
 		  else if(stringsAreEqual(panel->name, STR8_LIT("menu right")))
@@ -521,6 +522,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 			  bool isSelected = (inputDeviceIndex == pluginState->selectedInputDeviceIndex);
 			  v4 textColor = isSelected ? selectedTextColor : baseTextColor;
 			  String8 inputDeviceName = pluginState->inputDeviceNames[inputDeviceIndex];
+#if 1
 			  UIComm inputDevice = uiMakeSelectableTextElement(panelLayout, inputDeviceName,
 									   textScale, textColor);
 			  if(inputDevice.flags & UICommFlag_hovering)
@@ -534,6 +536,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 			      renderCommands->inputAudioDeviceChanged = true;
 			      renderCommands->selectedInputAudioDeviceIndex = inputDeviceIndex;
 			    }
+#endif
 			}
 		    }
 

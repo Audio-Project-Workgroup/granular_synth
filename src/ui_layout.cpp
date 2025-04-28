@@ -586,6 +586,7 @@ uiMakeSelectableTextElement(UILayout *layout, String8 message, r32 scale, v4 col
   
   text->textScale = V2(scale, scale);
   text->region = textRect;
+  text->clickableRegion = text->region;
 
   layout->regionRemaining.max.y = text->region.min.y;
 

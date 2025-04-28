@@ -445,6 +445,27 @@ loadBitmap(char *filename, Arena *allocator, v2 alignment = V2(0, 0))
   return(result);
 }
 
+static inline LoadedBitmap
+makeBitmap(Arena *allocator, s32 width, s32 height, u32 color)
+{
+  LoadedBitmap result = {};
+  result.width = width;
+  result.height = height;
+  result.stride = width*sizeof(u32);
+  result.pixels = arenaPushArray(allocator, width*height, u32);
+
+  u32 *dest = result.pixels;
+  for(s32 y = 0; y < height; ++y)
+    {      
+      for(s32 x = 0; x < width; ++x)
+	{
+	  *dest++ = color;
+	}
+    }
+
+  return(result);
+}
+
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
 

@@ -101,6 +101,7 @@ struct PluginState
 
   PlayingSound loadedSound;
 
+  LoadedBitmap nullTexture;
   LoadedBitmap editorReferenceLayout;
   LoadedBitmap editorSkin;
   LoadedBitmap pomegranateKnob;
