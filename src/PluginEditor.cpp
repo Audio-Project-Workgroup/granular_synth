@@ -76,8 +76,8 @@ AudioPluginAudioProcessorEditor::~AudioPluginAudioProcessorEditor()
 }
 
 //==============================================================================
-void
-AudioPluginAudioProcessorEditor::paint(juce::Graphics& g)
+void AudioPluginAudioProcessorEditor::
+paint(juce::Graphics& g)
 {
   // (Our component is opaque, so we must completely fill the background with a solid colour)
   //g.fillAll(getLookAndFeel().findColour(juce::ResizableWindow::backgroundColourId));
@@ -89,8 +89,8 @@ AudioPluginAudioProcessorEditor::paint(juce::Graphics& g)
   //g.drawFittedText("Hello World!", getLocalBounds(), juce::Justification::centred, 1);
 }
 
-void
-AudioPluginAudioProcessorEditor::resized()
+void AudioPluginAudioProcessorEditor::
+resized()
 {
   editorWidth = getWidth();
   editorHeight = getHeight();
@@ -117,8 +117,8 @@ AudioPluginAudioProcessorEditor::resized()
   commands.heightInPixels = (u32)displayDim.y;
 }
 
-void
-AudioPluginAudioProcessorEditor::mouseMove(const juce::MouseEvent &event)
+void AudioPluginAudioProcessorEditor::
+mouseMove(const juce::MouseEvent &event)
 {
   while(atomicCompareAndSwap(&inputLock, 0, 1)) {}
   
@@ -130,8 +130,8 @@ AudioPluginAudioProcessorEditor::mouseMove(const juce::MouseEvent &event)
   setMouseCursor(editorMouseCursor);
 }
 
-void
-AudioPluginAudioProcessorEditor::mouseDrag(const juce::MouseEvent &event)
+void AudioPluginAudioProcessorEditor::
+mouseDrag(const juce::MouseEvent &event)
 {
   while(atomicCompareAndSwap(&inputLock, 0, 1)) {}
   
@@ -149,8 +149,8 @@ AudioPluginAudioProcessorEditor::mouseDrag(const juce::MouseEvent &event)
   setMouseCursor(editorMouseCursor);  
 }
 
-void
-AudioPluginAudioProcessorEditor::mouseDown(const juce::MouseEvent &event)
+void AudioPluginAudioProcessorEditor::
+mouseDown(const juce::MouseEvent &event)
 {
   while(atomicCompareAndSwap(&inputLock, 0, 1)) {}
   
@@ -166,8 +166,8 @@ AudioPluginAudioProcessorEditor::mouseDown(const juce::MouseEvent &event)
   while(atomicCompareAndSwap(&inputLock, 1, 0)) {}
 }
 
-void
-AudioPluginAudioProcessorEditor::mouseUp(const juce::MouseEvent &event)
+void AudioPluginAudioProcessorEditor::
+mouseUp(const juce::MouseEvent &event)
 {
   // NOTE: JUCE is a very intuitive and well-designed framework that everyone should use without question
   while(atomicCompareAndSwap(&inputLock, 0, 1)) {}
@@ -184,8 +184,8 @@ AudioPluginAudioProcessorEditor::mouseUp(const juce::MouseEvent &event)
   while(atomicCompareAndSwap(&inputLock, 1, 0)) {}
 }
 
-void
-AudioPluginAudioProcessorEditor::mouseWheelMove(const juce::MouseEvent &event, const juce::MouseWheelDetails &wheel)
+void AudioPluginAudioProcessorEditor::
+mouseWheelMove(const juce::MouseEvent &event, const juce::MouseWheelDetails &wheel)
 {
   while(atomicCompareAndSwap(&inputLock, 0, 1)) {}
   
@@ -264,19 +264,22 @@ keyPressed(const juce::KeyPress &key)
   return(result);
 }
 
-void
-AudioPluginAudioProcessorEditor::newOpenGLContextCreated(void)
+void AudioPluginAudioProcessorEditor::
+newOpenGLContextCreated(void)
 {
-  juce::gl::glDebugMessageControl(juce::gl::GL_DEBUG_SOURCE_API,
-				  juce::gl::GL_DEBUG_TYPE_OTHER,
-				  juce::gl::GL_DEBUG_SEVERITY_NOTIFICATION,
-				  0,
-				  0,
-				  juce::gl::GL_FALSE );
+  glDebugMessageControl(GL_DEBUG_SOURCE_API,
+			GL_DEBUG_TYPE_OTHER,
+			GL_DEBUG_SEVERITY_NOTIFICATION,
+			0,
+			0,
+			GL_FALSE);
+  
+  glEnable(GL_TEXTURE_2D);  
+  glEnable(GL_SCISSOR_TEST);
 }
 
-void
-AudioPluginAudioProcessorEditor::renderOpenGL(void)
+void AudioPluginAudioProcessorEditor::
+renderOpenGL(void)
 {
   
   glViewport(0, 0, editorWidth, editorHeight);
@@ -287,6 +290,11 @@ AudioPluginAudioProcessorEditor::renderOpenGL(void)
 
   glViewport(displayMin.x, displayMin.y, displayDim.x, displayDim.y);
   glScissor(displayMin.x, displayMin.y, displayDim.x, displayDim.y);
+
+  // NOTE: juce needs this blending stuff to be in the render function, aparently.
+  //       no idea why, or if it's just a linux thing
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
   // NOTE: we have to put locks around input usage and input callback code, because juce doesn't give us a way of
   //       polling input at a particular time. We could avoid locks by having input callbacks write to a
@@ -385,7 +393,7 @@ AudioPluginAudioProcessorEditor::renderOpenGL(void)
   while(atomicCompareAndSwap(&inputLock, 1, 0)) {}
 }
 
-void
-AudioPluginAudioProcessorEditor::openGLContextClosing(void)
+void AudioPluginAudioProcessorEditor::
+openGLContextClosing(void)
 {
 }
