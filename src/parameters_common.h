@@ -12,7 +12,7 @@ enum WindowType
     X(volume, -60.f, 0.f, -1.f)	       \
     X(density, 0.1f, 20.f, 1.f)	       \
     X(pan, 0.f, 1.f, 0.5f)		       \
-    X(size, 0.f, 16000.f, 2600.f)		       \
+    X(size, 1024.f, 16000.f, 2600.f)		       \
     X(window, 0, WindowShape_count - 1, WindowShape_hann)			       \
     X(spread, 0.f, 1.0f, 0.5f)			       \
     X(mix, 0.f, 1.f, 0.5f) \

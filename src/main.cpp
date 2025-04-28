@@ -264,6 +264,9 @@ static BASE_THREAD_PROC(audioThreadProc)
   ma_pcm_rb *outputRingBuffer = audioData->outputBuffer;
   ma_pcm_rb *inputRingBuffer = audioData->inputBuffer;
 
+  u32 baseWaitTimeMS = 1;
+  u32 waitTimeMS = baseWaitTimeMS;
+
   for(;;)
     {
       s32 outputRBPtrDistance = ma_pcm_rb_pointer_distance(outputRingBuffer);
@@ -276,51 +279,61 @@ static BASE_THREAD_PROC(audioThreadProc)
       //       more and made better
       u32 framesRemaining = (outputRBPtrDistance < 2*(s32)audioData->targetLatencySamples) ?
 	audioData->targetLatencySamples : 0;
-      ma_result maResult;
-      while(framesRemaining)
+      if(framesRemaining)
 	{
-	  void *writePtr = 0;
-	  void *readPtr = 0;
-	  u32 framesToWrite = framesRemaining;
-	  maResult = ma_pcm_rb_acquire_write(outputRingBuffer, &framesToWrite, &writePtr);
-	  maResult = ma_pcm_rb_acquire_read(inputRingBuffer, &framesToWrite, &readPtr);
-	  if(maResult == MA_SUCCESS)
+	  waitTimeMS = baseWaitTimeMS;
+	  
+	  ma_result maResult;
+	  while(framesRemaining)
 	    {
-	      if(plugin->audioProcess)
-		{
-		  // u64 audioProcessCallTime = readOSTimer();
-		  // audioBuffer.millisecondsElapsedSinceLastCall =
-		  //   audioProcessCallTime - lastAudioProcessCallTime;
-		  // lastAudioProcessCallTime = audioProcessCallTime;
-
-		  audioBuffer->outputBuffer[0] = writePtr;
-		  audioBuffer->outputBuffer[1] = (u8 *)writePtr + sizeof(s16);
-		  audioBuffer->inputBuffer[0] = readPtr;
-		  audioBuffer->inputBuffer[1] = readPtr;
-		  audioBuffer->framesToWrite = framesToWrite;
-		  plugin->audioProcess(pluginMemory, audioBuffer);
-		}
-
-	      maResult = ma_pcm_rb_commit_write(outputRingBuffer, framesToWrite);
-	      maResult = ma_pcm_rb_commit_read(inputRingBuffer, framesToWrite);
+	      void *writePtr = 0;
+	      void *readPtr = 0;
+	      u32 framesToWrite = framesRemaining;
+	      maResult = ma_pcm_rb_acquire_write(outputRingBuffer, &framesToWrite, &writePtr);
+	      maResult = ma_pcm_rb_acquire_read(inputRingBuffer, &framesToWrite, &readPtr);
 	      if(maResult == MA_SUCCESS)
 		{
-		  //fprintf(stdout, "wrote %u frames\n", framesToWrite);
-		  framesRemaining -= framesToWrite;
+		  if(plugin->audioProcess)
+		    {
+		      // u64 audioProcessCallTime = readOSTimer();
+		      // audioBuffer.millisecondsElapsedSinceLastCall =
+		      //   audioProcessCallTime - lastAudioProcessCallTime;
+		      // lastAudioProcessCallTime = audioProcessCallTime;
+
+		      audioBuffer->outputBuffer[0] = writePtr;
+		      audioBuffer->outputBuffer[1] = (u8 *)writePtr + sizeof(s16);
+		      audioBuffer->inputBuffer[0] = readPtr;
+		      audioBuffer->inputBuffer[1] = readPtr;
+		      audioBuffer->framesToWrite = framesToWrite;
+		      plugin->audioProcess(pluginMemory, audioBuffer);
+		    }
+
+		  maResult = ma_pcm_rb_commit_write(outputRingBuffer, framesToWrite);
+		  maResult = ma_pcm_rb_commit_read(inputRingBuffer, framesToWrite);
+		  if(maResult == MA_SUCCESS)
+		    {
+		      //fprintf(stdout, "wrote %u frames\n", framesToWrite);
+		      framesRemaining -= framesToWrite;
+		    }
+		  else
+		    {
+		      fprintf(stderr,
+			      "ERROR: audioProcess: ma_pcm_rb_commit_write failed: %s\n",
+			      ma_result_description(maResult));
+		    }
 		}
 	      else
 		{
 		  fprintf(stderr,
-			  "ERROR: audioProcess: ma_pcm_rb_commit_write failed: %s\n",
+			  "ERROR: audioProcess: ma_pcm_rb_acquire_write failed: %s\n",
 			  ma_result_description(maResult));
 		}
 	    }
-	  else
-	    {
-	      fprintf(stderr,
-		      "ERROR: audioProcess: ma_pcm_rb_acquire_write failed: %s\n",
-		      ma_result_description(maResult));
-	    }
+	}
+      else
+	{
+	  msecWait(waitTimeMS);
+	  waitTimeMS *= 2;
 	}
     }
 }
