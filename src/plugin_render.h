@@ -240,7 +240,7 @@ renderPushUIElement(RenderCommands *commands, UIElement *element)
   /*   } */
   if(element->flags & UIElementFlag_drawLabelBelow)
     {
-      logFormatString("textOffset: (%.2f, %.2f)", element->textOffset);
+      //logFormatString("textOffset: (%.2f, %.2f)", element->textOffset);
       v2 textCenter = element->textOffset + V2(elementRegionCenter.x,
 					       elementRegionCenter.y - 0.5f*elementRegionDim.y);      
       Rect2 textRegion = rectAddRadius(rectCenterDim(textCenter, textDim), V2(2, 1));

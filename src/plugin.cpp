@@ -238,7 +238,7 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 				       pluginParameterInitData[PluginParameter_volume], decibelsToAmplitude);
 	      
 	      initializeFloatParameter(&pluginState->parameters[PluginParameter_density],
-				       pluginParameterInitData[PluginParameter_density]);
+				       pluginParameterInitData[PluginParameter_density], densityTransform);
 	      
 	      //avail range: [0, 3], default value: 0
 	      initializeFloatParameter(&pluginState->parameters[PluginParameter_window], 

@@ -183,6 +183,8 @@ synthesize(r32* destBufferLInit, r32* destBufferRInit,
   newView->bufferReadIndex = buffer->readIndex;
   newView->bufferWriteIndex = buffer->writeIndex;
 
+  PluginFloatParameter *densityParam = pluginState->parameters + PluginParameter_density;
+
   for(Grain *grain = grainManager->grainPlayList->next;
       grain && grain != grainManager->grainPlayList;
       grain = grain->next)
@@ -207,7 +209,8 @@ synthesize(r32* destBufferLInit, r32* destBufferRInit,
       // TODO: update these parameters in this loop?
       u32 grainSize = (u32)pluginReadFloatParameter(&pluginState->parameters[PluginParameter_size]);      
       r32 windowParam = pluginReadFloatParameter(&pluginState->parameters[PluginParameter_window]);
-      r32 density = pluginReadFloatParameter(&pluginState->parameters[PluginParameter_density]);
+      r32 densityRaw = pluginReadFloatParameter(densityParam);
+      r32 density = densityParam->processingTransform(densityRaw);
       r32 spread = pluginReadFloatParameter(&pluginState->parameters[PluginParameter_spread]);      
 
       r32 iot = (r32)grainSize/density;
