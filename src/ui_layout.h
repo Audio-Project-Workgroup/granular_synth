@@ -127,6 +127,10 @@ struct UIElement
   v4 color;
   LoadedBitmap *texture;
   LoadedBitmap *secondaryTexture;
+  LoadedBitmap *labelTexture;
+  v2 labelOffset;
+  v2 labelDim;
+  v2 textOffset;
 
   UIParameter parameterType;
   union // TODO: maybe there could be a use for an element that has both a boolean and a float parameter attached
@@ -149,6 +153,7 @@ struct UIElement
 
   // NOTE: computed
   Rect2 region;
+  Rect2 clickableRegion;
   u32 commFlags;
   v2 mouseClickedP;
   r32 fParamValueAtClick;

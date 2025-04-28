@@ -213,41 +213,52 @@ renderPushUIElement(RenderCommands *commands, UIElement *element)
 	    {  
 	      r32 paramValue = pluginReadFloatParameter(element->fParam);
 	      r32 paramPercentage = (paramValue - element->fParam->range.min)/(element->fParam->range.max - element->fParam->range.min);
-	      logFormatString("paramPercentage: %.2f", paramPercentage);
-	      //r32 paramAngle = -(paramPercentage - 0.5f)*1.5f*M_PI;
-	      r32 paramAngle = -paramPercentage*M_PI;
+	      //logFormatString("paramPercentage: %.2f", paramPercentage);
+	      r32 paramAngle = -(paramPercentage - 0.5f)*1.5f*M_PI;
+	      //r32 paramAngle = -paramPercentage*M_PI;
 
 	      renderPushQuad(commands,
 			     element->region, element->texture, paramAngle, RenderLevel_front, element->color);
 	    }
 	}
     }
-  
-  r32 labelVSpace = 5.f;
-  r32 labelHeight = 15.f;
+
   v2 textDim = getTextDim(layout->context->font, element->name);
-  r32 textScale = labelHeight/textDim.y;
-  v2 labelDim = textScale*textDim;      
-  if(element->flags & UIElementFlag_drawLabelAbove)
-    {                                   
-      v2 labelCenter = V2(elementRegionCenter.x,
-			  elementRegionCenter.y + 0.5f*elementRegionDim.y + labelVSpace + 0.5f*labelHeight);
-      Rect2 labelRegion = rectAddRadius(rectCenterDim(labelCenter, labelDim), V2(2, 1));
+  v2 textScale = element->textScale;
+  //logFormatString("textScale: (%.2f, %.2f)", textScale.x, textScale.y);
+  textDim = hadamard(textScale, textDim);
+  
+  /* if(element->flags & UIElementFlag_drawLabelAbove) */
+  /*   {                                    */
+  /*     v2 labelCenter = V2(elementRegionCenter.x, */
+  /* 			  elementRegionCenter.y + 0.5f*elementRegionDim.y + labelVSpace + 0.5f*labelHeight); */
+  /*     Rect2 labelRegion = rectAddRadius(rectCenterDim(labelCenter, labelDim), V2(2, 1)); */
       
-      renderPushRectOutline(commands, labelRegion, 2.f, RenderLevel_front, V4(0, 0, 0, 1));
-      renderPushText(commands, layout->context->font, element->name,
-		     labelRegion.min, V2(textScale, textScale), labelDim.x);
-    }
+  /*     renderPushRectOutline(commands, labelRegion, 2.f, RenderLevel_front, V4(0, 0, 0, 1)); */
+  /*     renderPushText(commands, layout->context->font, element->name, */
+  /* 		     labelRegion.min, V2(textScale, textScale), labelDim.x); */
+  /*   } */
   if(element->flags & UIElementFlag_drawLabelBelow)
-    {           
-      v2 labelCenter = V2(elementRegionCenter.x,
-			  elementRegionCenter.y - 0.5f*elementRegionDim.y - labelVSpace - 0.5f*labelHeight);
-      Rect2 labelRegion = rectAddRadius(rectCenterDim(labelCenter, labelDim), V2(2, 1));
+    {
+      logFormatString("textOffset: (%.2f, %.2f)", element->textOffset);
+      v2 textCenter = element->textOffset + V2(elementRegionCenter.x,
+					       elementRegionCenter.y - 0.5f*elementRegionDim.y);      
+      Rect2 textRegion = rectAddRadius(rectCenterDim(textCenter, textDim), V2(2, 1));
       
-      renderPushRectOutline(commands, labelRegion, 2.f, RenderLevel_front, V4(0, 0, 0, 1));
+      if(element->labelTexture)
+	{	  
+	  v2 labelOffset = hadamard(element->labelOffset, elementRegionDim);
+	  v2 labelDim = hadamard(element->labelDim, elementRegionDim);
+	  Rect2 labelRegion = rectMinDim(labelOffset + element->region.min, labelDim);
+	  //renderPushRectOutline(commands, labelRegion, 2.f, RenderLevel_front, V4(0, 0, 0, 1));
+	  renderPushQuad(commands, labelRegion, element->labelTexture, 0, RenderLevel_front, V4(1, 1, 0, 1));
+	}
+      renderPushRectOutline(commands, textRegion, 2.f, RenderLevel_front, V4(0, 0, 0, 1));
       renderPushText(commands, layout->context->font, element->name,
-		     labelRegion.min, V2(textScale, textScale), labelDim.x);
+		     textRegion.min, textScale, textDim.x);
     }
+
+  renderPushRectOutline(commands, element->clickableRegion, 2.f, RenderLevel_front, V4(1, 0, 1, 1));
 
   if(element->next)
     {

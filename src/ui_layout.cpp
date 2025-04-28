@@ -465,12 +465,12 @@ uiCommFromElement(UIElement *element)
   UILayout *layout = element->layout;
   UIContext *context = layout->context;
   
-  Rect2 elementRect = element->region;  
+  Rect2 clickableRect = element->clickableRegion;  
   v2 mouseP = context->mouseP.xy;
 
   UIComm result = {};
   result.element = element;
-  if(isInRectangle(elementRect, mouseP))
+  if(isInRectangle(clickableRect, mouseP))
     {
       // TODO: maybe check clickable field here?
       if(context->leftButtonPressed)
@@ -614,6 +614,7 @@ uiMakeButton(UILayout *layout, String8 name, v2 offset, v2 dim, r32 aspectRatio,
   uiSetElementDataBoolean(button, param);
 
   button->region = uiComputeElementRegion(button, offset, dim, aspectRatio);
+  button->clickableRegion = button->region;
   //layout->regionRemaining.max.y = button->region.min.y;
 
   UIComm buttonComm = uiCommFromElement(button);
@@ -624,15 +625,20 @@ uiMakeButton(UILayout *layout, String8 name, v2 offset, v2 dim, r32 aspectRatio,
 inline UIComm
 uiMakeSlider(UILayout *layout, String8 name,
 	     v2 offset, v2 dim, r32 aspectRatio, PluginFloatParameter *param,
-	     LoadedBitmap *backgroundTexture = 0, LoadedBitmap *clickableTexture = 0, v4 color = V4(1, 1, 1, 1))
+	     v2 textOffset, v2 textScale,
+	     LoadedBitmap *backgroundTexture = 0, LoadedBitmap *clickableTexture = 0, LoadedBitmap *labelTexture = 0,
+	     v4 color = V4(1, 1, 1, 1))
 {
-  u32 flags = (UIElementFlag_clickable | UIElementFlag_draggable | UIElementFlag_drawBorder |
-	       0);//UIElementFlag_drawLabelBelow);
+  u32 flags =
+    (UIElementFlag_clickable | UIElementFlag_draggable | UIElementFlag_drawBorder | UIElementFlag_drawLabelBelow);
   UIElement *slider = uiMakeElement(layout, name, flags, color, backgroundTexture);
-  slider->secondaryTexture = clickableTexture;
   uiSetElementDataFloat(slider, param);
-
+  slider->secondaryTexture = clickableTexture;
+  slider->labelTexture = labelTexture;   
   slider->region = uiComputeElementRegion(slider, offset, dim, aspectRatio);
+  slider->clickableRegion = slider->region;
+  slider->textOffset = textOffset;
+  slider->textScale = textScale;
   
   UIComm sliderComm = uiCommFromElement(slider);
 
@@ -640,15 +646,26 @@ uiMakeSlider(UILayout *layout, String8 name,
 }
 
 inline UIComm
-uiMakeKnob(UILayout *layout, String8 name, v2 offset, v2 dim, r32 aspectRatio, PluginFloatParameter *param,
-	   LoadedBitmap *texture = 0, v4 color = V4(1, 1, 1, 1))
+uiMakeKnob(UILayout *layout, String8 name, v2 offset, v2 dim, r32 aspectRatio, PluginFloatParameter *param,	   
+	   v2 labelOffset, v2 labelDim,
+	   v2 clickableOffset, v2 clickableDim,
+	   v2 textOffset, v2 textScale,
+	   LoadedBitmap *texture = 0, LoadedBitmap *labelTexture = 0, v4 color = V4(1, 1, 1, 1))
 {
-  u32 flags = (UIElementFlag_clickable | UIElementFlag_turnable | UIElementFlag_drawBorder |
-	       0);//UIElementFlag_drawLabelBelow);
+  u32 flags =
+    (UIElementFlag_clickable | UIElementFlag_turnable | UIElementFlag_drawBorder | UIElementFlag_drawLabelBelow);
   UIElement *knob = uiMakeElement(layout, name, flags, color, texture);
   uiSetElementDataFloat(knob, param);
+  knob->labelOffset = labelOffset;
+  knob->labelDim = labelDim;
+  knob->labelTexture = labelTexture;
+  knob->region = uiComputeElementRegion(knob, offset, dim, aspectRatio);    
+  knob->textOffset = textOffset;
+  knob->textScale = textScale;
 
-  knob->region = uiComputeElementRegion(knob, offset, dim, aspectRatio);
+  v2 regionDim = getDim(knob->region);
+  knob->clickableRegion = rectMinDim(knob->region.min + hadamard(clickableOffset, regionDim),
+				     hadamard(clickableDim, regionDim));
   //layout->regionRemaining.max.y = knob->region.min.y;
 
   UIComm knobComm = uiCommFromElement(knob);

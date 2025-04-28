@@ -326,19 +326,22 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 		loadBitmap("../data/BMP/POMEGRANATE_BUTTON.bmp", &pluginState->permanentArena,
 			   V2(0, -0.03f));
 	      pluginState->pomegranateKnobLabel =
-		loadBitmap("../data/BMP/POMEGRANATE_BUTTON_WHITEMARKERS.bmp", &pluginState->permanentArena);
+		loadBitmap("../data/BMP/POMEGRANATE_BUTTON_WHITEMARKERS.bmp", &pluginState->permanentArena,
+			   V2(0, 0));
 	      pluginState->halfPomegranateKnob =
 		loadBitmap("../data/BMP/HALFPOMEGRANATE_BUTTON.bmp", &pluginState->permanentArena,
 			   V2(-0.005f, -0.035f));
 	      pluginState->halfPomegranateKnobLabel =
-		loadBitmap("../data/BMP/HALFPOMEGRANATE_BUTTON_WHITEMARKERS.bmp", &pluginState->permanentArena);
+		loadBitmap("../data/BMP/HALFPOMEGRANATE_BUTTON_WHITEMARKERS.bmp", &pluginState->permanentArena,
+			   V2(0, 0));
 	      pluginState->densityKnob =
 		loadBitmap("../data/BMP/DENSITYPOMEGRANATE_BUTTON.bmp", &pluginState->permanentArena,
 			   V2(0.01f, -0.022f));
 	      pluginState->densityKnobShadow =
 		loadBitmap("../data/BMP/DENSITYPOMEGRANATE_BUTTON_SHADOW.bmp", &pluginState->permanentArena);
 	      pluginState->densityKnobLabel =
-		loadBitmap("../data/BMP/DENSITYPOMEGRANATE_BUTTON_WHITEMARKERS.bmp", &pluginState->permanentArena);
+		loadBitmap("../data/BMP/DENSITYPOMEGRANATE_BUTTON_WHITEMARKERS.bmp", &pluginState->permanentArena,
+			   V2(0, 0));
 	      pluginState->levelBar =
 		loadBitmap("../data/BMP/LEVELBAR.bmp", &pluginState->permanentArena);
 	      pluginState->levelFader =
@@ -358,7 +361,7 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 	      // NOTE: ui initialization
 	      pluginState->uiContext =
 		uiInitializeContext(&pluginState->frameArena, &pluginState->framePermanentArena,
-				    &pluginState->testFont);
+				    &pluginState->agencyBold);
 
 	      pluginState->rootPanel = arenaPushStruct(&pluginState->permanentArena, UIPanel,
 						       arenaFlagsZeroNoAlign());
@@ -638,14 +641,18 @@ RENDER_NEW_FRAME(renderNewFrame)
 		  // UNUSED(text);
 
 #if 1
+		  v2 panelDim = getDim(panelRect);
+		  v2 elementTextScale = 0.0005f*panelDim.x*V2(1.f, 1.f);
+
 		  // NOTE: volume
-		  //v2 volumeOffsetPOP = V2(0.909f, 0.19f);
 		  v2 volumeOffsetPOP = V2(0.87f, 0.17f);
 		  v2 volumeDimPOP = V2(0.2f, 0.45f);
-		  UIComm volume = uiMakeSlider(panelLayout, STR8_LIT("volume"), volumeOffsetPOP, volumeDimPOP, 0.5f,
+		  v2 volumeTextOffset = hadamard(V2(0.001f, -0.022f), panelDim);
+		  UIComm volume = uiMakeSlider(panelLayout, STR8_LIT("LEVEL"), volumeOffsetPOP, volumeDimPOP, 0.5f,
 					       &pluginState->parameters[PluginParameter_volume],
-					       &pluginState->levelBar, &pluginState->levelFader,
-					       V4(1, 1, 1, 0.5f));		  
+					       volumeTextOffset, elementTextScale,
+					       &pluginState->levelBar, &pluginState->levelFader, 0,
+					       V4(1, 1, 1, 1));
 
 		  if(volume.flags & UICommFlag_hovering)
 		    {
@@ -681,14 +688,23 @@ RENDER_NEW_FRAME(renderNewFrame)
 		    }			
 
 		  r32 knobDimPOP = 0.235f;
+		  v2 knobLabelOffset = V2(0.02f, 0.06f);
+		  v2 knobLabelDim = V2(0.96f, 1);
+		  v2 knobClickableOffset = V2(0.1f, 0.2f);
+		  v2 knobClickableDim = V2(0.8f, 0.7f);
+		  v2 knobTextOffset = hadamard(V2(0, 0.04f), panelDim);
 
 		  // NOTE: size
 		  v2 sizeOffsetPOP = V2(0.239f, 0.109f);
-		  v2 sizeDimPOP = knobDimPOP*V2(1, 1);
-		  UIComm grainSizeKnob = uiMakeKnob(panelLayout, STR8_LIT("size"), sizeOffsetPOP, sizeDimPOP, 1.f,
-						    &pluginState->parameters[PluginParameter_size],
-						    &pluginState->pomegranateKnob,
-						    V4(1, 1, 1, 1));
+		  v2 sizeDimPOP = knobDimPOP*V2(1, 1);		  
+		  UIComm grainSizeKnob =
+		    uiMakeKnob(panelLayout, STR8_LIT("SIZE"), sizeOffsetPOP, sizeDimPOP, 1.f,
+			       &pluginState->parameters[PluginParameter_size],
+			       knobLabelOffset, knobLabelDim,
+			       knobClickableOffset, knobClickableDim,
+			       knobTextOffset, elementTextScale,
+			       &pluginState->pomegranateKnob, &pluginState->pomegranateKnobLabel,
+			       V4(1, 1, 1, 1));
 		  if(grainSizeKnob.flags & UICommFlag_dragging)
 		    {
 		      v2 dragDelta = uiGetDragDelta(grainSizeKnob.element);
@@ -724,10 +740,12 @@ RENDER_NEW_FRAME(renderNewFrame)
 		  {
 		    v2 spreadOffsetPOP = V2(-0.001f, 0.067f);
 		    v2 spreadSizePOP = knobDimPOP*V2(1, 1);
-		    
-		    UIComm spread = uiMakeKnob(panelLayout, STR8_LIT("Spread"), spreadOffsetPOP, spreadSizePOP, 1.f,
+		    UIComm spread = uiMakeKnob(panelLayout, STR8_LIT("SPREAD"), spreadOffsetPOP, spreadSizePOP, 1.f,
 					       &pluginState->parameters[PluginParameter_spread],
-					       &pluginState->pomegranateKnob,
+					       knobLabelOffset, knobLabelDim,
+					       knobClickableOffset, knobClickableDim,
+					       knobTextOffset, elementTextScale,
+					       &pluginState->pomegranateKnob, &pluginState->pomegranateKnobLabel,
 					       V4(1, 1, 1, 1));
 		    if (spread.flags & UIElementFlag_turnable)
 		      {
@@ -743,11 +761,17 @@ RENDER_NEW_FRAME(renderNewFrame)
 		    r32 densityDimPOP = 0.235f;
 		    v2 densityOffsetPOP = V2(0.45f, 0.06f);
 		    v2 densitySizePOP = densityDimPOP*V2(1, 1);
+		    v2 densityClickableOffset = V2(0.f, 0.1f);
+		    v2 densityClickableDim = V2(1.f, 0.9f);
+		    v2 densityTextOffset = hadamard(V2(0, -0.015f), panelDim);
 
-		    UIComm density = uiMakeKnob(panelLayout, STR8_LIT("density"),
+		    UIComm density = uiMakeKnob(panelLayout, STR8_LIT("DENSITY"),
 						densityOffsetPOP, densitySizePOP, 1.f,
 						&pluginState->parameters[PluginParameter_density],
-						&pluginState->densityKnob,
+						V2(-0.02f, 0.02f), V2(1.02f, 1),
+						densityClickableOffset, densityClickableDim,
+						densityTextOffset, elementTextScale,
+						&pluginState->densityKnob, &pluginState->densityKnobLabel,
 						V4(1, 1, 1, 1));
 		    Rect2 densityRect = density.element->region;
 		    v2 densityRectCenter = getCenter(densityRect);
@@ -765,11 +789,13 @@ RENDER_NEW_FRAME(renderNewFrame)
 		  {
 		    v2 windowOffsetPOP = V2(0.1f, 0.5f);
 		    v2 windowSizePOP = knobDimPOP*V2(1, 1);
-
-		    UIComm window = uiMakeKnob(panelLayout, STR8_LIT("window"), windowOffsetPOP, windowSizePOP, 1.f,
+		    UIComm window = uiMakeKnob(panelLayout, STR8_LIT("WINDOW"), windowOffsetPOP, windowSizePOP, 1.f,
 					       &pluginState->parameters[PluginParameter_window],
-					       &pluginState->pomegranateKnob);
-					       //V4(1, 0, 1, 1));
+					       knobLabelOffset, knobLabelDim,
+					       knobClickableOffset, knobClickableDim,
+					       knobTextOffset, elementTextScale,
+					       &pluginState->pomegranateKnob, &pluginState->pomegranateKnobLabel,
+					       V4(1, 1, 1, 1));
 		    if(window.flags & UICommFlag_dragging)
 		      {
 			v2 dragDelta = uiGetDragDelta(window.element);
@@ -784,11 +810,14 @@ RENDER_NEW_FRAME(renderNewFrame)
 		    r32 mixDimPOP = 0.235f;
 		    v2 mixOffsetPOP = V2(0.6399f, 0.1121f);
 		    v2 mixSizePOP = mixDimPOP*V2(1, 1);
-
-		    UIComm mix = uiMakeKnob(panelLayout, STR8_LIT("mix"), mixOffsetPOP, mixSizePOP, 1.f,
-					    &pluginState->parameters[PluginParameter_mix],
-					    &pluginState->halfPomegranateKnob,
-					    V4(1, 1, 1, 1));
+		    UIComm mix =
+		      uiMakeKnob(panelLayout, STR8_LIT("MIX"), mixOffsetPOP, mixSizePOP, 1.f,
+				 &pluginState->parameters[PluginParameter_mix],
+				 knobLabelOffset, knobLabelDim,
+				 knobClickableOffset, knobClickableDim,
+				 knobTextOffset, elementTextScale,
+				 &pluginState->halfPomegranateKnob, &pluginState->halfPomegranateKnobLabel,
+				 V4(1, 1, 1, 1));
 		    Rect2 mixRect = mix.element->region;
 		    v2 mixRectCenter = getCenter(mixRect);
 		    renderPushQuad(renderCommands, rectCenterDim(mixRectCenter, V2(4, 4)), 0, 0, RenderLevel_front, V4(0, 0, 0, 1));
@@ -805,10 +834,12 @@ RENDER_NEW_FRAME(renderNewFrame)
 		  {
 		    v2 offsetOffsetPOP = V2(0.1285f, 0.004f);
 		    v2 offsetSizePOP = knobDimPOP*V2(1, 1);
-
-		    UIComm offset = uiMakeKnob(panelLayout, STR8_LIT("offset"), offsetOffsetPOP, offsetSizePOP, 1.f,
+		    UIComm offset = uiMakeKnob(panelLayout, STR8_LIT("OFFSET"), offsetOffsetPOP, offsetSizePOP, 1.f,
 					       &pluginState->parameters[PluginParameter_offset],
-					       &pluginState->pomegranateKnob,
+					       knobLabelOffset, knobLabelDim,
+					       knobClickableOffset, knobClickableDim,
+					       knobTextOffset, elementTextScale,
+					       &pluginState->pomegranateKnob, &pluginState->pomegranateKnobLabel,
 					       V4(1, 1, 1, 1));
 		    Rect2 offsetRect = offset.element->region;
 		    v2 offsetRectCenter = getCenter(offsetRect);
@@ -826,9 +857,19 @@ RENDER_NEW_FRAME(renderNewFrame)
 		  logString("\ndisplaying grain buffer\n");
 
 		  v2 drawRegionDim = getDim(panelLayout->regionRemaining);
-		  v2 dim = hadamard(V2(0.552f, 0.18f), drawRegionDim);
-		  v2 min = hadamard(V2(0.212f, 0.53f), drawRegionDim);
-		  renderPushRectOutline(renderCommands, rectMinDim(min, dim), 2.f, RenderLevel_front, V4(1, 1, 1, 1));
+		  v2 viewDim = hadamard(V2(0.53f, 0.25f), drawRegionDim);
+		  v2 viewMin = hadamard(V2(0.24f, 0.55f), drawRegionDim);
+		  Rect2 viewRect = rectMinDim(viewMin, viewDim);
+		  
+		  renderPushRectOutline(renderCommands, viewRect, 2.f, RenderLevel_front, V4(1, 1, 1, 1));
+		  renderPushQuad(renderCommands, viewRect, &pluginState->grainViewBackground, 0, RenderLevel_front);
+		  renderPushQuad(renderCommands, viewRect, &pluginState->grainViewOutline, 0, RenderLevel_front);
+
+		  v2 dim = hadamard(V2(0.843f, 0.62f), viewDim);
+		  v2 min = viewMin + hadamard(V2(0.075f, 0.2f), viewDim);
+		  Rect2 rect = rectMinDim(min, dim);
+		  renderPushRectOutline(renderCommands, rect, 2.f, RenderLevel_front, V4(1, 1, 1, 1));
+		  
 
 		  r32 middleBarThickness = 4.f;
 		  Rect2 middleBar = rectMinDim(min + V2(0, 0.5f*dim.y),
