@@ -696,6 +696,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 		  v2 knobClickableOffset = V2(0.1f, 0.2f);
 		  v2 knobClickableDim = V2(0.8f, 0.7f);
 		  v2 knobTextOffset = hadamard(V2(0, 0.04f), panelDim);
+		  r32 knobDragLength = 0.35f*panelDim.y;
 
 		  // NOTE: size
 		  v2 sizeOffsetPOP = V2(0.239f, 0.109f);
@@ -717,8 +718,9 @@ RENDER_NEW_FRAME(renderNewFrame)
 			  // We scaled dragDelta.x by x20 to cover approximately the full grain-size scale across width resolution of the screen.
 			  // i.e. dragging fully to the left reduces grain size and sets it to a value towards zero ..
 			  // .. and dragging fully to the right sets the grain-size towards a value near its max value.
-			  // @TODO fix temporary workaround
-			  r32 newGrainSize = size.element->fParamValueAtClick + 50.f*dragDelta.y;
+			  // @TODO fix temporary workaround		
+			  r32 newGrainSize = (size.element->fParamValueAtClick +
+					      dragDelta.y/knobDragLength*getLength(size.element->fParam->range));
 					
 			  pluginSetFloatParameter(size.element->fParam, newGrainSize);
 			}
@@ -771,10 +773,11 @@ RENDER_NEW_FRAME(renderNewFrame)
 		      {
 			if(spread.flags & UICommFlag_leftDragging)
 			  {
-			    v2 dragDelta2 = uiGetDragDelta(spread.element);
+			    v2 dragDelta = uiGetDragDelta(spread.element);
 			    //printf("dragDelta: (%.2f, %.2f)\n", dragDelta.x, dragDelta.y);
-			    r32 spreader = spread.element->fParamValueAtClick + .01f * dragDelta2.y;
-			    pluginSetFloatParameter(spread.element->fParam, spreader);
+			    r32 newSpread = (spread.element->fParamValueAtClick +
+					     dragDelta.y/knobDragLength*getLength(spread.element->fParam->range));
+			    pluginSetFloatParameter(spread.element->fParam, newSpread);
 			  }
 			else if(spread.flags & UICommFlag_minusPressed)
 			  {
@@ -817,9 +820,10 @@ RENDER_NEW_FRAME(renderNewFrame)
 		      {
 			if(density.flags & UICommFlag_leftDragging)
 			  {
-			    v2 dragDelta = uiGetDragDelta(density.element);
-		      
-			    r32 newDensity = density.element->fParamValueAtClick + 0.1f*dragDelta.y;
+			    v2 dragDelta = uiGetDragDelta(density.element);		      			    
+			    r32 newDensity = (density.element->fParamValueAtClick +
+					     dragDelta.y/knobDragLength*getLength(density.element->fParam->range));
+			    
 			    pluginSetFloatParameter(density.element->fParam, newDensity);			
 			  }
 			else if(density.flags & UICommFlag_minusPressed)
@@ -854,8 +858,9 @@ RENDER_NEW_FRAME(renderNewFrame)
 		      {
 			if(window.flags & UICommFlag_leftDragging)
 			  {
-			    v2 dragDelta = uiGetDragDelta(window.element);
-			    r32 newWindow = window.element->fParamValueAtClick + 0.01f*dragDelta.y;
+			    v2 dragDelta = uiGetDragDelta(window.element);		
+			    r32 newWindow = (window.element->fParamValueAtClick +
+					     dragDelta.y/knobDragLength*getLength(window.element->fParam->range));
 
 			    pluginSetFloatParameter(window.element->fParam, newWindow);
 			  }
@@ -897,7 +902,8 @@ RENDER_NEW_FRAME(renderNewFrame)
 			if(mix.flags & UICommFlag_leftDragging)
 			  {
 			    v2 dragDelta = uiGetDragDelta(mix.element);
-			    r32 newMix = mix.element->fParamValueAtClick + 0.01f*dragDelta.y;
+			    r32 newMix = (mix.element->fParamValueAtClick +
+					     dragDelta.y/knobDragLength*getLength(mix.element->fParam->range));
 
 			    pluginSetFloatParameter(mix.element->fParam, newMix);
 			  }
@@ -937,7 +943,8 @@ RENDER_NEW_FRAME(renderNewFrame)
 			if(offset.flags & UICommFlag_leftDragging)
 			  {
 			    v2 dragDelta = uiGetDragDelta(offset.element);
-			    r32 newOffset = offset.element->fParamValueAtClick + 200.f*dragDelta.y;
+			    r32 newOffset = (offset.element->fParamValueAtClick +
+					     dragDelta.y/knobDragLength*getLength(offset.element->fParam->range));
 
 			    pluginSetFloatParameter(offset.element->fParam, newOffset);
 			  }
