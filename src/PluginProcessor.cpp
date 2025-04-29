@@ -442,10 +442,10 @@ processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
       pluginCode.audioProcess(&pluginMemory, &audioBuffer);
 
       // NOTE: debug
-      juce::Logger::writeToLog(juce::String("logger used: ") +
-			       juce::String(pluginLogger.log.totalSize));
-      juce::Logger::writeToLog(juce::String("logger capacity: ") +
-			       juce::String(pluginLogger.maxCapacity));
+      // juce::Logger::writeToLog(juce::String("logger used: ") +
+      // 			       juce::String(pluginLogger.log.totalSize));
+      // juce::Logger::writeToLog(juce::String("logger capacity: ") +
+      // 			       juce::String(pluginLogger.maxCapacity));
     }
 
   ignoreParameterChange = true;
@@ -489,11 +489,8 @@ getStateInformation(juce::MemoryBlock& destData)
   // as intermediaries to make it easy to save and load complex data.
   //juce::ignoreUnused(destData);
 
-  //destData.copyFrom(pluginMemory.memory, 0, pluginMemoryBlockSizeInBytes);
   
-  // TODO: this is a shit ton of data, and it's really slow to write this out
-  //       (slower than it needs to be. idk wtf juce is doing). So we should be more clever about what
-  //       parts of the state we choose to save and restore
+#if 0  
   juce::String stateStorageFilename(BUILD_DIR"/granular_synth_state.test");
   juce::MemoryOutputStream os(destData, true);  
   if(pluginMemory.memory)
@@ -521,6 +518,17 @@ getStateInformation(juce::MemoryBlock& destData)
 	    }
 	}
     }
+#else
+  juce::MemoryOutputStream os(destData, true);
+  if(pluginParameters)
+    {  
+      for(auto parameter : vstParameters)
+	{
+	  float parameterVal = parameter->get();
+	  os.writeFloat(parameterVal);
+	}
+    }
+#endif
 }
 
 void AudioPluginAudioProcessor::
@@ -530,12 +538,7 @@ setStateInformation(const void* data, int sizeInBytes)
   // whose contents will have been created by the getStateInformation() call.
   //juce::ignoreUnused(data, sizeInBytes);
 
-  //juce::MemoryBlock srcData = juce::MemoryBlock(data, sizeInBytes);
-  //srcData.copyTo(pluginMemory.memory, pluginMemoryBlockSIzeInBytes);
-  
-  // ASSERT(sizeInBytes <= pluginMemoryBlockSizeInBytes);
-  // memcpy(pluginMemory.memory, data, sizeInBytes);
-
+#if 0
   // TODO: idk if this function ever gets called
   juce::MemoryInputStream is(data, (usz)sizeInBytes, false);
   int blockSize = is.readInt();
@@ -576,6 +579,21 @@ setStateInformation(const void* data, int sizeInBytes)
 	  juce::Logger::writeToLog("setStateInformation() received invalid block size");
 	}
     }
+#else
+  int index = 0;
+  juce::MemoryInputStream is(data, (usz)sizeInBytes, false);
+  for(auto parameter : vstParameters)
+    {
+      float newValue = is.readFloat();
+      ignoreParameterChange = true;
+      *parameter = newValue;
+      ignoreParameterChange = false;
+
+      PluginFloatParameter *pluginParameter = pluginParameters + vstParameterIndexTo_pluginParameterIndex[index];
+      float newValuePercentage = percentageFromRange(newValue, pluginParameter->range);
+      parameterListener->parameterValueChanged(index++, newValuePercentage);
+    }
+#endif
 }
 //==============================================================================
 // This creates new instances of the plugin..

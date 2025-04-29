@@ -706,6 +706,14 @@ mapToRange(r32 ratio, RangeR32 range)
   return(result);
 }
 
+inline r32
+percentageFromRange(r32 val, RangeR32 range)
+{
+  r32 percentage = (val - range.min)/getLength(range);
+
+  return(percentage);
+}
+
 //
 // Rect2
 //
