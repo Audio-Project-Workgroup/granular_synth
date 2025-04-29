@@ -650,9 +650,12 @@ RENDER_NEW_FRAME(renderNewFrame)
 		  // NOTE: volume
 		  v2 volumeOffsetPOP = V2(0.87f, 0.17f);
 		  v2 volumeDimPOP = V2(0.2f, 0.45f);
+		  v2 volumeClickableOffset = V2(0.3f, 0);
+		  v2 volumeClickableDim = V2(0.4f, 1.f);
 		  v2 volumeTextOffset = hadamard(V2(0.001f, -0.022f), panelDim);
 		  UIComm volume = uiMakeSlider(panelLayout, STR8_LIT("LEVEL"), volumeOffsetPOP, volumeDimPOP, 0.5f,
 					       &pluginState->parameters[PluginParameter_volume],
+					       volumeClickableOffset, volumeClickableDim,
 					       volumeTextOffset, elementTextScale,
 					       &pluginState->levelBar, &pluginState->levelFader, 0,
 					       V4(1, 1, 1, 1));

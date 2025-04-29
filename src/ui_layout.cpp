@@ -626,6 +626,7 @@ uiMakeButton(UILayout *layout, String8 name, v2 offset, v2 dim, r32 aspectRatio,
 inline UIComm
 uiMakeSlider(UILayout *layout, String8 name,
 	     v2 offset, v2 dim, r32 aspectRatio, PluginFloatParameter *param,
+	     v2 clickableOffset, v2 clickableDim,
 	     v2 textOffset, v2 textScale,
 	     LoadedBitmap *backgroundTexture = 0, LoadedBitmap *clickableTexture = 0, LoadedBitmap *labelTexture = 0,
 	     v4 color = V4(1, 1, 1, 1))
@@ -636,10 +637,13 @@ uiMakeSlider(UILayout *layout, String8 name,
   uiSetElementDataFloat(slider, param);
   slider->secondaryTexture = clickableTexture;
   slider->labelTexture = labelTexture;   
-  slider->region = uiComputeElementRegion(slider, offset, dim, aspectRatio);
-  slider->clickableRegion = slider->region;
+  slider->region = uiComputeElementRegion(slider, offset, dim, aspectRatio);  
   slider->textOffset = textOffset;
   slider->textScale = textScale;
+
+  v2 regionDim = getDim(slider->region);
+  slider->clickableRegion = rectMinDim(slider->region.min + hadamard(clickableOffset, regionDim),
+				       hadamard(clickableDim, regionDim));
   
   UIComm sliderComm = uiCommFromElement(slider);
 
