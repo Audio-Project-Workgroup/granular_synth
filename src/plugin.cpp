@@ -677,14 +677,14 @@ RENDER_NEW_FRAME(renderNewFrame)
 		      else if(volume.flags & UICommFlag_minusPressed)
 			{
 			  r32 oldVolume = pluginReadFloatParameter(volume.element->fParam);
-			  r32 newVolume = oldVolume - 0.02f;
+			  r32 newVolume = oldVolume - 0.02f*getLength(volume.element->fParam->range);
 
 			  pluginSetFloatParameter(volume.element->fParam, newVolume);
 			}
 		      else if(volume.flags & UICommFlag_plusPressed)
 			{
 			  r32 oldVolume = pluginReadFloatParameter(volume.element->fParam);
-			  r32 newVolume = oldVolume + 0.02f;
+			  r32 newVolume = oldVolume + 0.02f*getLength(volume.element->fParam->range);
 
 			  pluginSetFloatParameter(volume.element->fParam, newVolume);
 			}
@@ -700,7 +700,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 		  // NOTE: size
 		  v2 sizeOffsetPOP = V2(0.239f, 0.109f);
 		  v2 sizeDimPOP = knobDimPOP*V2(1, 1);		  
-		  UIComm grainSizeKnob =
+		  UIComm size =
 		    uiMakeKnob(panelLayout, STR8_LIT("SIZE"), sizeOffsetPOP, sizeDimPOP, 1.f,
 			       &pluginState->parameters[PluginParameter_size],
 			       knobLabelOffset, knobLabelDim,
@@ -708,18 +708,35 @@ RENDER_NEW_FRAME(renderNewFrame)
 			       knobTextOffset, elementTextScale,
 			       &pluginState->pomegranateKnob, &pluginState->pomegranateKnobLabel,
 			       V4(1, 1, 1, 1));
-		  if(grainSizeKnob.flags & UICommFlag_dragging)
+		  if(size.flags & UICommFlag_dragging)
 		    {
-		      v2 dragDelta = uiGetDragDelta(grainSizeKnob.element);
-		      // post processing to set the new grain size using a temporary workaround: 
-		      // We scaled dragDelta.x by x20 to cover approximately the full grain-size scale across width resolution of the screen.
-		      // i.e. dragging fully to the left reduces grain size and sets it to a value towards zero ..
-		      // .. and dragging fully to the right sets the grain-size towards a value near its max value.
-		      // @TODO fix temporary workaround
-		      r32 newGrainSize = grainSizeKnob.element->fParamValueAtClick + 50.f*dragDelta.y;
+		      if(size.flags & UICommFlag_leftDragging)
+			{			
+			  v2 dragDelta = uiGetDragDelta(size.element);
+			  // post processing to set the new grain size using a temporary workaround: 
+			  // We scaled dragDelta.x by x20 to cover approximately the full grain-size scale across width resolution of the screen.
+			  // i.e. dragging fully to the left reduces grain size and sets it to a value towards zero ..
+			  // .. and dragging fully to the right sets the grain-size towards a value near its max value.
+			  // @TODO fix temporary workaround
+			  r32 newGrainSize = size.element->fParamValueAtClick + 50.f*dragDelta.y;
 					
-		      pluginSetFloatParameter(grainSizeKnob.element->fParam, newGrainSize);
-		    }
+			  pluginSetFloatParameter(size.element->fParam, newGrainSize);
+			}
+		      else if(size.flags & UICommFlag_minusPressed)
+			{
+			  r32 oldSize = pluginReadFloatParameter(size.element->fParam);
+			  r32 newSize = oldSize - 0.02f*getLength(size.element->fParam->range);
+
+			  pluginSetFloatParameter(size.element->fParam, newSize);
+			}
+		      else if(size.flags & UICommFlag_plusPressed)
+			{
+			  r32 oldSize = pluginReadFloatParameter(size.element->fParam);
+			  r32 newSize = oldSize + 0.02f*getLength(size.element->fParam->range);
+
+			  pluginSetFloatParameter(size.element->fParam, newSize);
+			}
+		    }		  
 
 		  // NOTE: play (for now)
 		  {
@@ -750,12 +767,29 @@ RENDER_NEW_FRAME(renderNewFrame)
 					       knobTextOffset, elementTextScale,
 					       &pluginState->pomegranateKnob, &pluginState->pomegranateKnobLabel,
 					       V4(1, 1, 1, 1));
-		    if (spread.flags & UIElementFlag_turnable)
+		    if(spread.flags & UICommFlag_dragging)
 		      {
-			v2 dragDelta2 = uiGetDragDelta(spread.element);
-			//printf("dragDelta: (%.2f, %.2f)\n", dragDelta.x, dragDelta.y);
-			r32 spreader = spread.element->fParamValueAtClick + .01f * dragDelta2.y;
-			pluginSetFloatParameter(spread.element->fParam, spreader);
+			if(spread.flags & UICommFlag_leftDragging)
+			  {
+			    v2 dragDelta2 = uiGetDragDelta(spread.element);
+			    //printf("dragDelta: (%.2f, %.2f)\n", dragDelta.x, dragDelta.y);
+			    r32 spreader = spread.element->fParamValueAtClick + .01f * dragDelta2.y;
+			    pluginSetFloatParameter(spread.element->fParam, spreader);
+			  }
+			else if(spread.flags & UICommFlag_minusPressed)
+			  {
+			    r32 oldSpread = pluginReadFloatParameter(spread.element->fParam);
+			    r32 newSpread = oldSpread - 0.02f*getLength(spread.element->fParam->range);
+
+			    pluginSetFloatParameter(spread.element->fParam, newSpread);
+			  }
+			else if(spread.flags & UICommFlag_plusPressed)
+			  {
+			    r32 oldSpread = pluginReadFloatParameter(spread.element->fParam);
+			    r32 newSpread = oldSpread + 0.02f*getLength(spread.element->fParam->range);
+
+			    pluginSetFloatParameter(spread.element->fParam, newSpread);
+			  }
 		      }
 		  }
 
@@ -781,13 +815,30 @@ RENDER_NEW_FRAME(renderNewFrame)
 		    renderPushQuad(renderCommands, rectCenterDim(densityRectCenter, V2(4, 4)), 0, 0, RenderLevel_front);
 		    if(density.flags & UICommFlag_dragging)
 		      {
-			v2 dragDelta = uiGetDragDelta(density.element);
+			if(density.flags & UICommFlag_leftDragging)
+			  {
+			    v2 dragDelta = uiGetDragDelta(density.element);
 		      
-			r32 newDensity = density.element->fParamValueAtClick + 0.1f*dragDelta.y;
-			pluginSetFloatParameter(density.element->fParam, newDensity);
-		      }		    
+			    r32 newDensity = density.element->fParamValueAtClick + 0.1f*dragDelta.y;
+			    pluginSetFloatParameter(density.element->fParam, newDensity);			
+			  }
+			else if(density.flags & UICommFlag_minusPressed)
+			  {
+			    r32 oldDensity = pluginReadFloatParameter(density.element->fParam);
+			    r32 newDensity = oldDensity - 0.02f*getLength(density.element->fParam->range);
+
+			    pluginSetFloatParameter(density.element->fParam, newDensity);
+			  }
+			else if(density.flags & UICommFlag_plusPressed)
+			  {
+			    r32 oldDensity = pluginReadFloatParameter(density.element->fParam);
+			    r32 newDensity = oldDensity + 0.02f*getLength(density.element->fParam->range);
+
+			    pluginSetFloatParameter(density.element->fParam, newDensity);
+			  }
+		      }
 		  }
-		  		  
+		  
 		  // NOTE: window
 		  {
 		    v2 windowOffsetPOP = V2(0.1f, 0.5f);
@@ -801,13 +852,30 @@ RENDER_NEW_FRAME(renderNewFrame)
 					       V4(1, 1, 1, 1));
 		    if(window.flags & UICommFlag_dragging)
 		      {
-			v2 dragDelta = uiGetDragDelta(window.element);
-			r32 newWindow = window.element->fParamValueAtClick + 0.01f*dragDelta.y;
+			if(window.flags & UICommFlag_leftDragging)
+			  {
+			    v2 dragDelta = uiGetDragDelta(window.element);
+			    r32 newWindow = window.element->fParamValueAtClick + 0.01f*dragDelta.y;
 
-			pluginSetFloatParameter(window.element->fParam, newWindow);
-		      }		    
+			    pluginSetFloatParameter(window.element->fParam, newWindow);
+			  }
+			else if(window.flags & UICommFlag_minusPressed)
+			  {
+			    r32 oldWindow = pluginReadFloatParameter(window.element->fParam);
+			    r32 newWindow = oldWindow - 0.02f*getLength(window.element->fParam->range);
+
+			    pluginSetFloatParameter(window.element->fParam, newWindow);
+			  }
+			else if(window.flags & UICommFlag_plusPressed)
+			  {
+			    r32 oldWindow = pluginReadFloatParameter(window.element->fParam);
+			    r32 newWindow = oldWindow + 0.02f*getLength(window.element->fParam->range);
+
+			    pluginSetFloatParameter(window.element->fParam, newWindow);
+			  }
+		      }
 		  }
-
+		  
 		  // NOTE: mix
 		  {
 		    r32 mixDimPOP = 0.235f;
@@ -826,13 +894,30 @@ RENDER_NEW_FRAME(renderNewFrame)
 		    renderPushQuad(renderCommands, rectCenterDim(mixRectCenter, V2(4, 4)), 0, 0, RenderLevel_front, V4(0, 0, 0, 1));
 		    if(mix.flags & UICommFlag_dragging)
 		      {
-			v2 dragDelta = uiGetDragDelta(mix.element);
-			r32 newMix = mix.element->fParamValueAtClick + 0.01f*dragDelta.y;
+			if(mix.flags & UICommFlag_leftDragging)
+			  {
+			    v2 dragDelta = uiGetDragDelta(mix.element);
+			    r32 newMix = mix.element->fParamValueAtClick + 0.01f*dragDelta.y;
 
-			pluginSetFloatParameter(mix.element->fParam, newMix);
+			    pluginSetFloatParameter(mix.element->fParam, newMix);
+			  }
+			else if(mix.flags & UICommFlag_minusPressed)
+			  {
+			    r32 oldMix = pluginReadFloatParameter(mix.element->fParam);
+			    r32 newMix = oldMix - 0.02f*getLength(mix.element->fParam->range);
+
+			    pluginSetFloatParameter(mix.element->fParam, newMix);
+			  }
+			else if(mix.flags & UICommFlag_plusPressed)
+			  {
+			    r32 oldMix = pluginReadFloatParameter(mix.element->fParam);
+			    r32 newMix = oldMix + 0.02f*getLength(mix.element->fParam->range);
+
+			    pluginSetFloatParameter(mix.element->fParam, newMix);
+			  }
 		      }
 		  }
-
+		  
 		  // NOTE: offset
 		  {
 		    v2 offsetOffsetPOP = V2(0.1285f, 0.004f);
@@ -849,13 +934,30 @@ RENDER_NEW_FRAME(renderNewFrame)
 		    renderPushQuad(renderCommands, rectCenterDim(offsetRectCenter, V2(4, 4)), 0, 0, RenderLevel_front, V4(0, 0, 0, 1));
 		    if(offset.flags & UICommFlag_dragging)
 		      {
-			v2 dragDelta = uiGetDragDelta(offset.element);
-			r32 newOffset = offset.element->fParamValueAtClick + 200.f*dragDelta.y;
+			if(offset.flags & UICommFlag_leftDragging)
+			  {
+			    v2 dragDelta = uiGetDragDelta(offset.element);
+			    r32 newOffset = offset.element->fParamValueAtClick + 200.f*dragDelta.y;
 
-			pluginSetFloatParameter(offset.element->fParam, newOffset);
+			    pluginSetFloatParameter(offset.element->fParam, newOffset);
+			  }
+			else if(offset.flags & UICommFlag_minusPressed)
+			  {
+			    r32 oldOffset = pluginReadFloatParameter(offset.element->fParam);
+			    r32 newOffset = oldOffset - 0.02f*getLength(offset.element->fParam->range);
+
+			    pluginSetFloatParameter(offset.element->fParam, newOffset);
+			  }
+			else if(offset.flags & UICommFlag_plusPressed)
+			  {
+			    r32 oldOffset = pluginReadFloatParameter(offset.element->fParam);
+			    r32 newOffset = oldOffset + 0.02f*getLength(offset.element->fParam->range);
+
+			    pluginSetFloatParameter(offset.element->fParam, newOffset);
+			  }
 		      }
 		  }
-
+		  
 		  // NOTE: grain view		  
 		  logString("\ndisplaying grain buffer\n");
 
