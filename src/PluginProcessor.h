@@ -5,6 +5,14 @@
 #include "common.h"
 #include "platform.h"
 
+struct VstParameter
+{
+  juce::AudioParameterFloat *parameter;
+  juce::String name;
+  juce::String id;
+  bool openChangeGesture;
+};
+
 //==============================================================================
 class AudioPluginAudioProcessor final : public juce::AudioProcessor
 {
@@ -44,14 +52,15 @@ public:
   //==============================================================================
   void getStateInformation(juce::MemoryBlock& destData) override;
   void setStateInformation(const void* data, int sizeInBytes) override;
-
+  
+  //==============================================================================
   PluginCode pluginCode;
   PluginMemory pluginMemory;
   PluginAudioBuffer audioBuffer;
   
   class DetectivePervert *parameterListener;
   std::map<int, int> vstParameterIndexTo_pluginParameterIndex;
-  std::vector<juce::AudioParameterFloat*> vstParameters;
+  std::vector<VstParameter*> vstParameters;
   PluginFloatParameter *pluginParameters;
   bool ignoreParameterChange;
 

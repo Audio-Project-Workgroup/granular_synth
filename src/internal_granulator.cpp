@@ -244,11 +244,11 @@ synthesize(r32* destBufferLInit, r32* destBufferRInit,
 	      r32 samplesPlayedFrac = (r32)samplesPlayed*c_grain->lengthInv;
 	      r32 windowVal = getWindowVal(grainManager, samplesPlayedFrac, c_grain->windowParam);
 	      
-          r32 panLeft = 1.0f - fmaxf(0.0f, c_grain->stereoPosition);
-          r32 panRight = 1.0f + fminf(0.0f, c_grain->stereoPosition);
+	      r32 panLeft = 1.0f - fmaxf(0.0f, c_grain->stereoPosition);
+	      r32 panRight = 1.0f + fminf(0.0f, c_grain->stereoPosition);
           
-          outSampleL += windowVal * sampleToWriteL * panLeft;
-          outSampleR += windowVal * sampleToWriteR * panRight;
+	      outSampleL += windowVal * sampleToWriteL * panLeft;
+	      outSampleR += windowVal * sampleToWriteR * panRight;
 
 	      --c_grain->samplesToPlay;	    
 	      c_grain = c_grain->next;

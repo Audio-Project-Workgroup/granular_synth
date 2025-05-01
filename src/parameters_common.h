@@ -66,11 +66,11 @@ struct ParameterValueQueueEntry
 
 struct PluginFloatParameter
 {
-  RangeR32 range;
+  RangeR32 range;  
 
   ParameterTransform *processingTransform;
 
-  volatile u32 lock;
+  volatile u32 interacting;
   volatile ParameterValue currentValue;
   volatile ParameterValue targetValue;
   volatile ParameterValue dValue;

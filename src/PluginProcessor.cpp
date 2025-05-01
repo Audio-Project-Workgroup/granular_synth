@@ -164,16 +164,20 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
       PluginParameterInitData paramInit = pluginParameterInitData[parameterIndex];
       if(paramInit.min != paramInit.max)
 	{
-	  juce::AudioParameterFloat *vstParameter =
-	    new juce::AudioParameterFloat(juce::String("parameter") + juce::String(parameterIndex),
-					  juce::String(paramInit.name),
+	  VstParameter *vstParameter = new VstParameter();
+	  vstParameter->id = juce::String("parameter") + juce::String(parameterIndex);
+	  vstParameter->name = juce::String(paramInit.name);
+	  vstParameter->parameter = 
+	    new juce::AudioParameterFloat(vstParameter->id, vstParameter->name,		  
 					  paramInit.min, paramInit.max, paramInit.init);
 	  
 	  vstParameters.push_back(vstParameter);
-	  addParameter(vstParameter);
-	  vstParameter->addListener(parameterListener);
+	  addParameter(vstParameter->parameter);
+	  vstParameter->parameter->addListener(parameterListener);
 
-	  vstParameterIndexTo_pluginParameterIndex.insert({vstParameter->getParameterIndex(), parameterIndex});
+	  vstParameterIndexTo_pluginParameterIndex.insert(
+							  {vstParameter->parameter->getParameterIndex(),
+							   parameterIndex});
 	}
     }
 }
@@ -453,14 +457,29 @@ processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
     {      
       u32 pluginParameterIndex = vstParameterIndexTo_pluginParameterIndex[parameterIndex];
       PluginFloatParameter *pluginParameter = pluginParameters + pluginParameterIndex;
-      juce::AudioParameterFloat *vstParameter = vstParameters[parameterIndex];
+      VstParameter *vstParameter = vstParameters[parameterIndex];
 
       ParameterValue pluginParameterValue = {};
       pluginParameterValue.asInt = atomicLoad(&pluginParameter->currentValue.asInt);
-      *vstParameter = pluginParameterValue.asFloat;
-	
+      *vstParameter->parameter = pluginParameterValue.asFloat;
+
+      int interacting = atomicLoad(&pluginParameter->interacting);
+      if(interacting)
+	{
+	  if(!vstParameter->openChangeGesture)
+	    {
+	      vstParameter->parameter->beginChangeGesture();
+	      vstParameter->openChangeGesture = true;
+	    }	  
+	}
+      else if(vstParameter->openChangeGesture)
+	{
+	  vstParameter->openChangeGesture = false;
+	  vstParameter->parameter->endChangeGesture();
+	}
+      
       juce::Logger::writeToLog("vstParameter " + juce::String(parameterIndex) + ": " +
-			       juce::String(vstParameter->get()));
+			       juce::String(vstParameter->parameter->get()));
       juce::Logger::writeToLog("pluginParameter " + juce::String(pluginParameterIndex) + ": " +
 			       juce::String(pluginParameterValue.asFloat));
     }
@@ -524,7 +543,7 @@ getStateInformation(juce::MemoryBlock& destData)
     {  
       for(auto parameter : vstParameters)
 	{
-	  float parameterVal = parameter->get();
+	  float parameterVal = parameter->parameter->get();
 	  os.writeFloat(parameterVal);
 	}
     }
@@ -586,7 +605,7 @@ setStateInformation(const void* data, int sizeInBytes)
     {
       float newValue = is.readFloat();
       ignoreParameterChange = true;
-      *parameter = newValue;
+      *parameter->parameter = newValue;
       ignoreParameterChange = false;
 
       PluginFloatParameter *pluginParameter = pluginParameters + vstParameterIndexTo_pluginParameterIndex[index];
@@ -595,6 +614,7 @@ setStateInformation(const void* data, int sizeInBytes)
     }
 #endif
 }
+
 //==============================================================================
 // This creates new instances of the plugin..
 juce::AudioProcessor*

@@ -20,30 +20,17 @@
 */
 
 /* TODO:
-   - The interface code is ad-hoc, ugly, does not support binding to a keyboard, midi controller,
-     or screen reader, and assumes renderNewFrame() and audioProcess() are called sequentially
-     on the same thread (which they are in the simple host, but not in the release build).
-     We need a system for creating a hierarchy of UI elements, which can be navigated with the keyboard
-     and can pass information to a screen reader, and having elements bound to state parameters and
-     midi channels/keyboard keys. This system then needs to interface with a system for updating and reading
-     state parameters in a thread-safe way. (WIP)
-
    - UI:
      - screen reader support
-     - bitmap assets for ui elements
      - allow specification of horizontal vs. vertical slider, or knob for draggable elements
-     - render element name, with control over position (ie above, below, left, right)
      - collapsable element groups, sized relative to children
      - tooltips when hovering (eg show numeric parameter value)
      - interface for selecting files to load at runtime
      - interface for remapping midi cc channels with parameters
      - display the state of grains and the grain buffer (wip)
-     - make panel resizing not jank
 
-   - Parameters (high priority):
-     - more parameters
-     - make parameters visible to the daw to enable parameter modification via automation
-     - parameter display number -> processing number transformation for nonlinear parameters
+   - Parameters:
+     - make parameters visible to fl studio last tweaked automation menu
 
    - File Loading: (on hold)
      - more audio file formats (eg flac, ogg, mp3)
@@ -51,16 +38,16 @@
      - better samplerate conversion (ie FFT method (TODO: speed up fft and czt))
      - load in batches to pass to ML model (maybe)     
 
-   - MIDI (high priority):
+   - MIDI:
      - cc channel - parameter remapping at runtime
 
-   - Grains (high priority):
-     - more grain parameters    
-     - add grain post-processing effects like pitch-shifting, time-stretching and stereo-widening
+   - Grains:
+     - pitch-shift and time-stretch grains
 
    - Misc:
+     - profile the code
      - speed up fft (aligned loads/stores, different radix?)
-     - pull native executable audio loop into its own thread
+     - general optimization (simd everywhere)
      - work queues?
      - allocate hardware ring buffer?
 */  
@@ -75,6 +62,9 @@
 //#include "file_granulator.cpp"
 #include "internal_granulator.cpp"
 
+// TODO: interfacing with host layer functions through a global variable like this introduces an unpleasant asymmetry,
+//       preventing code that uses these functions from being shared between the plugin and host. These functions
+//       should either be similarly encapsulated in the host layer, or unencapsulated here.
 PlatformAPI globalPlatform;
 PluginLogger *globalLogger;
 
@@ -320,6 +310,7 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 #endif
 
 	      pluginState->nullTexture = makeBitmap(&pluginState->permanentArena, 1920, 1080, 0xFFFFFFFF);
+	      // TODO: maybe have some kind of x macro list for the bitmap loading
 	      pluginState->editorReferenceLayout =
 		loadBitmap("../data/BMP/NEWGRANADE_UI_POSITIONSREFERENCE.bmp", &pluginState->permanentArena);
 	      pluginState->editorSkin =
@@ -365,6 +356,8 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 		uiInitializeContext(&pluginState->frameArena, &pluginState->framePermanentArena,
 				    &pluginState->agencyBold);
 
+	      // TODO: our editor interface doesn't use resizable panels,
+	      //       so it doesn't make sense to still be using them
 	      pluginState->rootPanel = arenaPushStruct(&pluginState->permanentArena, UIPanel,
 						       arenaFlagsZeroNoAlign());
 	      pluginState->rootPanel->sizePercentOfParent = 1.f;
@@ -548,6 +541,9 @@ RENDER_NEW_FRAME(renderNewFrame)
 	}
       else
 	{
+	  // TODO: our editor interface doesn't use resizable panels,
+	  //       so it doesn't make sense to still be using them
+
 	  // NOTE: non-leaf ui
 	  for(UIPanel *panel = pluginState->rootPanel; panel; panel = uiPanelIteratorDepthFirstPreorder(panel).next)
 	    {
@@ -634,15 +630,10 @@ RENDER_NEW_FRAME(renderNewFrame)
 	      // NOTE: build ui
 	      if(!panel->first)
 		{
-		  // NOTE: background skin
-		  //renderPushQuad(renderCommands, panelRect, panel->texture, 0, RenderLevel_background, panel->color);	      
 		  UILayout *panelLayout = &panel->layout;
 		  uiBeginLayout(panelLayout, uiContext, panelRect, panel->color, panel->texture);
 		  uiPushLayoutOffsetSizeType(panelLayout, UISizeType_percentOfParent);
-		  uiPushLayoutDimSizeType(panelLayout, UISizeType_percentOfParent);
-
-		  // UIComm text = uiMakeTextElement(panelLayout, panel->name, 1.5);
-		  // UNUSED(text);
+		  uiPushLayoutDimSizeType(panelLayout, UISizeType_percentOfParent);		  
 
 #if 1
 		  v2 panelDim = getDim(panelRect);
@@ -668,6 +659,8 @@ RENDER_NEW_FRAME(renderNewFrame)
 		      
 		  if(volume.flags & UICommFlag_dragging)
 		    {
+		      globalPlatform.atomicStore(&volume.element->fParam->interacting, 1);
+		      
 		      if(volume.flags & UICommFlag_leftDragging)
 			{	
 			  v2 dragDelta = uiGetDragDelta(volume.element);			  
@@ -692,7 +685,11 @@ RENDER_NEW_FRAME(renderNewFrame)
 
 			  pluginSetFloatParameter(volume.element->fParam, newVolume);
 			}
-		    }			
+		    }
+		  else
+		    {
+		      globalPlatform.atomicStore(&volume.element->fParam->interacting, 0);
+		    }
 
 		  r32 knobDimPOP = 0.235f;
 		  v2 knobLabelOffset = V2(0.02f, 0.06f);
@@ -716,6 +713,8 @@ RENDER_NEW_FRAME(renderNewFrame)
 			       V4(1, 1, 1, 1));
 		  if(size.flags & UICommFlag_dragging)
 		    {
+		      globalPlatform.atomicStore(&size.element->fParam->interacting, 1);
+		      
 		      if(size.flags & UICommFlag_leftDragging)
 			{			
 			  v2 dragDelta = uiGetDragDelta(size.element);
@@ -743,7 +742,11 @@ RENDER_NEW_FRAME(renderNewFrame)
 
 			  pluginSetFloatParameter(size.element->fParam, newSize);
 			}
-		    }		  
+		    }
+		  else
+		    {
+		      globalPlatform.atomicStore(&size.element->fParam->interacting, 0);
+		    }
 
 		  // NOTE: play (for now)
 		  {
@@ -777,6 +780,8 @@ RENDER_NEW_FRAME(renderNewFrame)
 					       V4(1, 1, 1, 1));
 		    if(spread.flags & UICommFlag_dragging)
 		      {
+			globalPlatform.atomicStore(&spread.element->fParam->interacting, 1);
+
 			if(spread.flags & UICommFlag_leftDragging)
 			  {
 			    v2 dragDelta = uiGetDragDelta(spread.element);
@@ -799,6 +804,10 @@ RENDER_NEW_FRAME(renderNewFrame)
 
 			    pluginSetFloatParameter(spread.element->fParam, newSpread);
 			  }
+		      }
+		    else
+		      {
+			globalPlatform.atomicStore(&spread.element->fParam->interacting, 0);
 		      }
 		  }
 
@@ -824,6 +833,8 @@ RENDER_NEW_FRAME(renderNewFrame)
 		    renderPushQuad(renderCommands, rectCenterDim(densityRectCenter, V2(4, 4)), 0, 0, RenderLevel_front);
 		    if(density.flags & UICommFlag_dragging)
 		      {
+			globalPlatform.atomicStore(&density.element->fParam->interacting, 1);
+
 			if(density.flags & UICommFlag_leftDragging)
 			  {
 			    v2 dragDelta = uiGetDragDelta(density.element);		      			    
@@ -847,6 +858,10 @@ RENDER_NEW_FRAME(renderNewFrame)
 			    pluginSetFloatParameter(density.element->fParam, newDensity);
 			  }
 		      }
+		    else
+		      {
+			globalPlatform.atomicStore(&density.element->fParam->interacting, 0);
+		      }
 		  }
 		  
 		  // NOTE: window
@@ -866,6 +881,8 @@ RENDER_NEW_FRAME(renderNewFrame)
 				 V4(1, 1, 1, 1));
 		    if(window.flags & UICommFlag_dragging)
 		      {
+			globalPlatform.atomicStore(&window.element->fParam->interacting, 1);
+
 			if(window.flags & UICommFlag_leftDragging)
 			  {
 			    v2 dragDelta = uiGetDragDelta(window.element);		
@@ -889,6 +906,10 @@ RENDER_NEW_FRAME(renderNewFrame)
 			    pluginSetFloatParameter(window.element->fParam, newWindow);
 			  }
 		      }
+		    else
+		      {
+			globalPlatform.atomicStore(&window.element->fParam->interacting, 0);
+		      }
 		  }
 		  
 		  // NOTE: mix
@@ -905,12 +926,14 @@ RENDER_NEW_FRAME(renderNewFrame)
 				 knobClickableOffset, knobClickableDim,
 				 mixTextOffset, elementTextScale,
 				 &pluginState->halfPomegranateKnob, &pluginState->halfPomegranateKnobLabel,
-				 V4(1, 1, 1, 0.5f));
+				 V4(1, 1, 1, 1));
 		    Rect2 mixRect = mix.element->region;
 		    v2 mixRectCenter = getCenter(mixRect);
 		    renderPushQuad(renderCommands, rectCenterDim(mixRectCenter, V2(4, 4)), 0, 0, RenderLevel_front, V4(0, 0, 0, 1));
 		    if(mix.flags & UICommFlag_dragging)
 		      {
+			globalPlatform.atomicStore(&mix.element->fParam->interacting, 1);
+
 			if(mix.flags & UICommFlag_leftDragging)
 			  {
 			    v2 dragDelta = uiGetDragDelta(mix.element);
@@ -934,6 +957,10 @@ RENDER_NEW_FRAME(renderNewFrame)
 			    pluginSetFloatParameter(mix.element->fParam, newMix);
 			  }
 		      }
+		    else
+		      {
+			globalPlatform.atomicStore(&mix.element->fParam->interacting, 0);
+		      }
 		  }
 		  
 		  // NOTE: offset
@@ -953,6 +980,8 @@ RENDER_NEW_FRAME(renderNewFrame)
 		    renderPushQuad(renderCommands, rectCenterDim(offsetRectCenter, V2(4, 4)), 0, 0, RenderLevel_front, V4(0, 0, 0, 1));
 		    if(offset.flags & UICommFlag_dragging)
 		      {
+			globalPlatform.atomicStore(&offset.element->fParam->interacting, 1);
+
 			if(offset.flags & UICommFlag_leftDragging)
 			  {
 			    v2 dragDelta = uiGetDragDelta(offset.element);
@@ -975,6 +1004,10 @@ RENDER_NEW_FRAME(renderNewFrame)
 
 			    pluginSetFloatParameter(offset.element->fParam, newOffset);
 			  }
+		      }
+		    else
+		      {
+			globalPlatform.atomicStore(&offset.element->fParam->interacting, 0);
 		      }
 		  }
 		  
@@ -1024,9 +1057,8 @@ RENDER_NEW_FRAME(renderNewFrame)
 		      // NOTE: update view buffer with new view data
 		      writeSamplesToAudioRingBuffer(grainViewBuffer,
 						    view->bufferSamples[0], view->bufferSamples[1],
-						    view->sampleCount);		      
-		      // u32 bufferReadIndex = grainStateView->viewBuffer.readIndex;
-		      // u32 bufferWriteIndex = grainStateView->viewBuffer.writeIndex;
+						    view->sampleCount);
+		      
 		      u32 bufferReadIndex = view->bufferReadIndex;
 		      u32 bufferWriteIndex = view->bufferWriteIndex;
 
@@ -1081,19 +1113,20 @@ RENDER_NEW_FRAME(renderNewFrame)
 
 		      for(u32 grainViewIndex = 0; grainViewIndex < view->grainCount; ++grainViewIndex)
 			{
-			  GrainViewEntry *grainView = view->grainViews + grainViewIndex;
-			  //u32 grainReadIndex = grainView->readIndex;
+			  GrainViewEntry *grainView = view->grainViews + grainViewIndex;			  
 			  u32 grainStartIndex = grainView->startIndex;
 			  u32 grainEndIndex = grainView->endIndex;			  
 			  r32 grainStartPosition = (r32)grainStartIndex/(r32)grainBufferCapacity;
 			  r32 grainEndPosition = (r32)grainEndIndex/(r32)grainBufferCapacity;
 			  r32 grainStartBarPosition = grainStartPosition*dim.x;
 			  r32 grainEndBarPosition = grainEndPosition*dim.x;
+			  
 			  Rect2 grainStartBar = rectMinDim(min + V2(grainStartBarPosition, 0.f),
 							   V2(barThickness, dim.y));
 			  Rect2 grainEndBar = rectMinDim(min + V2(grainEndBarPosition, 0.f),
 							 V2(barThickness, dim.y));
-			  v4 grainWindowColor = grainWindowColors[grainViewIndex];
+			  
+			  v4 grainWindowColor = grainWindowColors[grainViewIndex];			  
 			  renderPushQuad(renderCommands, grainStartBar, 0, 0.f, RenderLevel_front, grainWindowColor);
 			  renderPushQuad(renderCommands, grainEndBar, 0, 0.f, RenderLevel_front, grainWindowColor);
 			}
@@ -1838,9 +1871,7 @@ AUDIO_PROCESS(audioProcess)
 		}
 	      }
 #endif
-	      
-	      // mixedVal += 0.5f*grainVal;
-	      // mixedVal += 0.5f*inputMixBuffers[channelIndex][frameIndex];
+	      	      
 	      mixedVal += lerp(inputMixBuffers[channelIndex][frameIndex], grainVal, mixParam);
 	     
 	      switch(audioBuffer->outputFormat)
