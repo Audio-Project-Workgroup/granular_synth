@@ -914,47 +914,54 @@ RENDER_NEW_FRAME(renderNewFrame)
 			globalPlatform.atomicStore(&window.element->fParam->interacting, 0);
 		      }
 		  }
+		  
 		  // NOTE: pan
 		  {
-			  v2 panOffsetPOP = V2(0.727f, 0.0008f);
-			  v2 panSizePOP = knobDimPOP * V2(1, 1);
-			  v2 panLabelOffset = V2(0.03f, 0.065f);
-			  v2 panTextOffset = hadamard(V2(0.003f, 0.043f), panelDim);
-			  v2 panTextScale = 0.0005f * panelDim.x * V2(1.f, 1.f);
-			  UIComm pan =
-				  uiMakeKnob(panelLayout, STR8_LIT("PAN"), panOffsetPOP, panSizePOP, 1.f,
-					  &pluginState->parameters[PluginParameter_pan],
-					  panLabelOffset, knobLabelDim,
-					  knobClickableOffset, knobClickableDim,
-					  panTextOffset, panTextScale,
-					  &pluginState->halfPomegranateKnob, &pluginState->halfPomegranateKnobLabel,
-					  V4(1, 1, 1, 1));
-			  
-			  if (pan.flags & UICommFlag_dragging)
+		    v2 panOffsetPOP = V2(0.727f, 0.0008f);
+		    v2 panSizePOP = knobDimPOP * V2(1, 1);
+		    v2 panLabelOffset = V2(0.03f, 0.065f);
+		    v2 panTextOffset = hadamard(V2(0.003f, 0.043f), panelDim);
+		    v2 panTextScale = 0.0005f * panelDim.x * V2(1.f, 1.f);
+		    UIComm pan =
+		      uiMakeKnob(panelLayout, STR8_LIT("PAN"), panOffsetPOP, panSizePOP, 1.f,
+				 &pluginState->parameters[PluginParameter_pan],
+				 panLabelOffset, knobLabelDim,
+				 knobClickableOffset, knobClickableDim,
+				 panTextOffset, panTextScale,
+				 &pluginState->halfPomegranateKnob, &pluginState->halfPomegranateKnobLabel,
+				 V4(1, 1, 1, 1));
+
+		    if(pan.flags & UICommFlag_dragging)
+		      {
+			globalPlatform.atomicStore(&pan.element->fParam->interacting, 1);
+
+			if(pan.flags & UICommFlag_leftDragging)
 			  {
-				  if (pan.flags & UICommFlag_leftDragging)
-				  {
-					  v2 dragDelta = uiGetDragDelta(pan.element);
-					  r32 newpan = (pan.element->fParamValueAtClick +
-						  dragDelta.y / knobDragLength * getLength(pan.element->fParam->range));
+			    v2 dragDelta = uiGetDragDelta(pan.element);
+			    r32 newpan = (pan.element->fParamValueAtClick +
+					  dragDelta.y / knobDragLength * getLength(pan.element->fParam->range));
 
-					  pluginSetFloatParameter(pan.element->fParam, newpan);
-				  }
-				  else if (pan.flags & UICommFlag_minusPressed)
-				  {
-					  r32 oldpan = pluginReadFloatParameter(pan.element->fParam);
-					  r32 newpan = oldpan - 0.02f * getLength(pan.element->fParam->range);
-
-					  pluginSetFloatParameter(pan.element->fParam, newpan);
-				  }
-				  else if (pan.flags & UICommFlag_plusPressed)
-				  {
-					  r32 oldpan = pluginReadFloatParameter(pan.element->fParam);
-					  r32 newpan = oldpan + 0.02f * getLength(pan.element->fParam->range);
-
-					  pluginSetFloatParameter(pan.element->fParam, newpan);
-				  }
+			    pluginSetFloatParameter(pan.element->fParam, newpan);
 			  }
+			else if(pan.flags & UICommFlag_minusPressed)
+			  {
+			    r32 oldpan = pluginReadFloatParameter(pan.element->fParam);
+			    r32 newpan = oldpan - 0.02f * getLength(pan.element->fParam->range);
+
+			    pluginSetFloatParameter(pan.element->fParam, newpan);
+			  }
+			else if(pan.flags & UICommFlag_plusPressed)
+			  {
+			    r32 oldpan = pluginReadFloatParameter(pan.element->fParam);
+			    r32 newpan = oldpan + 0.02f * getLength(pan.element->fParam->range);
+
+			    pluginSetFloatParameter(pan.element->fParam, newpan);
+			  }
+		      }
+		    else
+		      {
+			globalPlatform.atomicStore(&pan.element->fParam->interacting, 0);
+		      }
 		  }
 		  
 		  // NOTE: mix
