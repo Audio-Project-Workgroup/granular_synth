@@ -20,7 +20,7 @@ readFile(Arena *allocator, String8 filename)
 {
   String8 result = {};
   
-  HANDLE fileHandle = CreateFileA(filename, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, 0, 0);
+  HANDLE fileHandle = CreateFileA((LPCSTR)filename.str, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, 0, 0);
   if(fileHandle != INVALID_HANDLE_VALUE)
     {
       LARGE_INTEGER fileSize;
@@ -67,7 +67,7 @@ readFile(Arena *allocator, String8 filename)
 static void
 writeFile(String8 filename, String8 srcData)
 {
-  HANDLE fileHandle = CreateFileA(filename, GENERIC_WRITE, FILE_SHARE_WRITE, 0, CREATE_ALWAYS, 0, 0);
+  HANDLE fileHandle = CreateFileA((LPCSTR)filename.str, GENERIC_WRITE, FILE_SHARE_WRITE, 0, CREATE_ALWAYS, 0, 0);
 
   if(fileHandle != INVALID_HANDLE_VALUE)
     {
@@ -1066,6 +1066,7 @@ parseFile(Arena *allocator, String8 fileContents)
 	}      
     }
 
+  fprintf(stderr, "DEBUG: dumping %llu nodes\n", outputList.nodeCount);
   for(u64 stringIndex = 0; stringIndex < outputList.nodeCount; ++stringIndex)
     {
       String8Node *node = outputList.first;
@@ -1101,19 +1102,20 @@ int main(int argc, char **argv)
       fileContentsNode->string = fileContents;
       stringListPushNode(&loadedFileContents, fileContentsNode);
 
-      //fprintf(stderr, "DEBUG: %.*s size=%zu\n", (int)filename.size, filename.str, fileContents.size);
+      fprintf(stderr, "DEBUG: %.*s size=%zu\n", (int)filename.size, filename.str, fileContents.size);
       parseFile(&parseArena, fileContents);
       stringListPush(&filenameArena, &parsedFilenameList, filename);
       
       QUEUE_POP(cliFilenameList.first, cliFilenameList.last);
     }
 
+  int it = 0;
   while(includedFilenameList.first)
     {
       String8Node *fileNode = includedFilenameList.first;
       String8 filename = fileNode->string;
       String8 fileContents = readFile(&parseArena, filename);
-      //fprintf(stderr, "DEBUG: %.*s size=%zu\n", (int)filename.size, filename.str, fileContents.size);
+      fprintf(stderr, "DEBUG: %.*s size=%zu\n", (int)filename.size, filename.str, fileContents.size);
 
       bool includeFileAlreadyParsed = false;
       for(String8Node *node = parsedFilenameList.first; node; node = node->next)
@@ -1137,13 +1139,14 @@ int main(int argc, char **argv)
 	}           
       
       QUEUE_POP(includedFilenameList.first, includedFilenameList.last);
+      fprintf(stderr, "it=%d\n", it++);
     }
  
   u32 tryCounter = 0;
   u32 maxTryCount = 5;
   while(firstUnknownStruct && (tryCounter < maxTryCount))
     {
-      //fprintf(stderr, "DEBUG: parsing all files\n");
+      fprintf(stderr, "DEBUG: parsing all files\n");
 
       // UnknownStruct *unknownStruct = firstUnknownStruct;
       // for(UnknownStruct *unknownStruct = firstUnknownStruct; unknownStruct; unknownStruct = unknownStruct->next)

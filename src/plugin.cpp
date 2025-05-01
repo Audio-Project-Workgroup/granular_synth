@@ -72,7 +72,7 @@
 #include "fft_test.cpp"
 #include "midi.cpp"
 #include "ui_layout.cpp"
-#include "file_granulator.cpp"
+//#include "file_granulator.cpp"
 #include "internal_granulator.cpp"
 
 PlatformAPI globalPlatform;
@@ -306,7 +306,7 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 	      pluginState->loadedSound.sound = loadWav("../data/fingertips_44100_PCM_16.wav",
 						       &pluginState->loadArena, &pluginState->permanentArena);	      
 	      pluginState->loadedSound.samplesPlayed = 0;// + pluginState->start_pos);
-
+#if 0
 	      char *fingertipsPackfilename = "../data/fingertips.grains";
 	      TemporaryMemory packfileMemory = arenaBeginTemporaryMemory(&pluginState->loadArena, MEGABYTES(64));
 	      GrainPackfile fingertipsGrains = beginGrainPackfile((Arena *)&packfileMemory);
@@ -316,7 +316,8 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 
 	      pluginState->loadedGrainPackfile = loadGrainPackfile(fingertipsPackfilename,
 								   &pluginState->permanentArena);
-	      pluginState->silo = initializeFileGrainState(&pluginState->permanentArena);	  	      
+	      pluginState->silo = initializeFileGrainState(&pluginState->permanentArena);
+#endif
 
 	      pluginState->nullTexture = makeBitmap(&pluginState->permanentArena, 1920, 1080, 0xFFFFFFFF);
 	      pluginState->editorReferenceLayout =

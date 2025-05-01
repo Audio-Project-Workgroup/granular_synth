@@ -77,7 +77,7 @@ struct PlatformAPI
   PlatformFreeFileMemory *freeFileMemory;
   PlatformWriteEntireFile *writeEntireFile;
 
-  PlatformRunModel *runModel;
+  //PlatformRunModel *runModel;
 
   PlatformGetCurrentTimestamp *getCurrentTimestamp;
 

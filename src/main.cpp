@@ -31,7 +31,7 @@
 #include "miniaudio.h"
 
 #include "render.cpp"
-#include "onnx.cpp"
+//#include "onnx.cpp"
 
 static ma_device_info *maPlaybackInfos;
 static u32 maPlaybackCount;
@@ -392,7 +392,7 @@ main(int argc, char **argv)
 	  pluginMemory.platformAPI.freeFileMemory  = platformFreeFileMemory;
 	  pluginMemory.platformAPI.writeEntireFile = platformWriteEntireFile;
 	  
-	  pluginMemory.platformAPI.runModel = platformRunModel;
+	  //pluginMemory.platformAPI.runModel = platformRunModel;
 	  
 	  pluginMemory.platformAPI.getCurrentTimestamp = platformGetCurrentTimestamp;
 
@@ -434,10 +434,10 @@ main(int argc, char **argv)
 
 	  // model setup
 
-	  const ORTCHAR_T *modelPath = ORT_TSTR("../data/test_model.onnx");
-	  onnxState = onnxInitializeState(modelPath);
+	  // const ORTCHAR_T *modelPath = ORT_TSTR("../data/test_model.onnx");
+	  // onnxState = onnxInitializeState(modelPath);
 	  
-	  if(onnxState.session && onnxState.env)
+	  // if(onnxState.session && onnxState.env)
 	    {	      	      
 	      // audio setup
 
@@ -805,8 +805,8 @@ main(int argc, char **argv)
 		  ma_context_uninit(&maContext);
 		}
 	      
-	      onnxState.api->ReleaseSession(onnxState.session);
-	      onnxState.api->ReleaseEnv(onnxState.env);
+	      // onnxState.api->ReleaseSession(onnxState.session);
+	      // onnxState.api->ReleaseEnv(onnxState.env);
 	    }
 
 	  glfwDestroyCursor(standardCursor);

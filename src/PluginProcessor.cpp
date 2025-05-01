@@ -2,7 +2,7 @@
 #include "PluginEditor.h"
 
 #include "platform.h"
-#include "onnx.cpp"
+//#include "onnx.cpp"
 
 PLATFORM_READ_ENTIRE_FILE(juceReadEntireFile)
 {
@@ -264,11 +264,11 @@ prepareToPlay(double sampleRate, int samplesPerBlock)
 {
   juce::Logger::writeToLog("prepareToPlay called");
   
-  const ORTCHAR_T *modelPath = ORT_TSTR_ON_MACRO(ONNX_MODEL_PATH);
-  juce::Logger::writeToLog(modelPath);
+  // const ORTCHAR_T *modelPath = ORT_TSTR_ON_MACRO(ONNX_MODEL_PATH);
+  // juce::Logger::writeToLog(modelPath);
 
   //onnxState = {};
-  onnxState = onnxInitializeState(modelPath);
+  //onnxState = onnxInitializeState(modelPath);
   
   pluginMemory.memory = calloc(pluginMemoryBlockSizeInBytes, 1);
   pluginMemory.host = PluginHost_daw;
@@ -278,7 +278,7 @@ prepareToPlay(double sampleRate, int samplesPerBlock)
   //pluginMemory.platformAPI.readEntireFile = platformReadEntireFile;
   //pluginMemory.platformAPI.writeEntireFile = platformWriteEntireFile;
   //pluginMemory.platformAPI.freeFileMemory = platformFreeFileMemory;
-  pluginMemory.platformAPI.runModel = platformRunModel;
+  //pluginMemory.platformAPI.runModel = platformRunModel;
 
   pluginMemory.platformAPI.atomicLoad = atomicLoad;
   //pluginMemory.platformAPI.atomicLoadPointer = atomicLoadPointer;

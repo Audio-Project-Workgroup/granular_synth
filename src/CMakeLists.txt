@@ -25,17 +25,17 @@ get_filename_component(BASE_DIR ${CMAKE_SOURCE_DIR} DIRECTORY)
 set(BUILD_DIR "${BASE_DIR}/build")
 set(DATA_DIR "${BASE_DIR}/data")
 
-set(ONNX_MODEL_PATH ${BASE_DIR}/data/test_model.onnx)
+# set(ONNX_MODEL_PATH ${BASE_DIR}/data/test_model.onnx)
 
 if(WIN32)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc")
 
   set(DYNAMIC_PLUGIN_PATH "${BUILD_DIR}/plugin.dll")
 
-  set(ONNX_LIBRARY_DIR "${BASE_DIR}/src/libs")
-  set(ONNX_INCLUDE_DIR "${BASE_DIR}/src/include")
-  set(ONNX_LIBRARY "${ONNX_LIBRARY_DIR}/onnxruntime.lib")
-  set(ONNX_DLL "${BUILD_DIR}/onnxruntime.dll")
+  # set(ONNX_LIBRARY_DIR "${BASE_DIR}/src/libs")
+  # set(ONNX_INCLUDE_DIR "${BASE_DIR}/src/include")
+  # set(ONNX_LIBRARY "${ONNX_LIBRARY_DIR}/onnxruntime.lib")
+  # set(ONNX_DLL "${BUILD_DIR}/onnxruntime.dll")
   
   message("juce fucks up automatically installing plugins on windows. you have to do it yourself :(")
   #set(JUCE_VST3_COPY_DIR ${USER_ROOT}AppData/Local/Programs/Common/VST3)
@@ -46,13 +46,13 @@ elseif(APPLE)
   set(DYNAMIC_PLUGIN_PATH "${BUILD_DIR}/plugin.dylib")
   #set(ONNX_LIBRARY "${ONNX_LIBRARY_DIR}/libonnxruntime.dylib")
 
-  find_package(onnxruntime REQUIRED)
-  if(TARGET onnxruntime::onnxruntime)
-    set(ONNX_LIBRARY "onnxruntime::onnxruntime")
-    set(ONNX_INCLUDE_DIR ${onnxruntime_INCLUDE_DIRS})
-  else()
-    message("onnxruntime not found")	
-  endif()
+  # find_package(onnxruntime REQUIRED)
+  # if(TARGET onnxruntime::onnxruntime)
+  #   set(ONNX_LIBRARY "onnxruntime::onnxruntime")
+  #   set(ONNX_INCLUDE_DIR ${onnxruntime_INCLUDE_DIRS})
+  # else()
+  #   message("onnxruntime not found")	
+  # endif()
 
   set(JUCE_VST3_COPY_DIR "$ENV{HOME}/Library/Audio/Plug-Ins/VST")
   message("${JUCE_VST3_COPY_DIR}")
@@ -63,24 +63,24 @@ elseif(UNIX)
   set(DYNAMIC_PLUGIN_PATH "${BUILD_DIR}/plugin.so")
   #set(ONNX_LIBRARY "${ONNX_LIBRARY_DIR}/libonnxruntime.so")
 
-  find_package(onnxruntime REQUIRED)
-  if(TARGET onnxruntime::onnxruntime)
-    set(ONNX_LIBRARY "onnxruntime::onnxruntime")
-    set(ONNX_INCLUDE_DIR ${onnxruntime_INCLUDE_DIRS})
-  else()
-    message("onnxruntime not found")	
-  endif()
+  # find_package(onnxruntime REQUIRED)
+  # if(TARGET onnxruntime::onnxruntime)
+  #   set(ONNX_LIBRARY "onnxruntime::onnxruntime")
+  #   set(ONNX_INCLUDE_DIR ${onnxruntime_INCLUDE_DIRS})
+  # else()
+  #   message("onnxruntime not found")	
+  # endif()
 
   set(JUCE_COPY_PLUGIN_AFTER_BUILD ON)	
 endif()
 
-message("${BUILD_DIR}")
-message("${DATA_DIR}")
-message("${DYNAMIC_PLUGIN_PATH}")
-message("${ONNX_LIBRARY_DIR}")
-message("${ONNX_INCLUDE_DIR}")
-message("${ONNX_LIBRARY}")
-message("${ONNX_MODEL_PATH}")
+# message("${BUILD_DIR}")
+# message("${DATA_DIR}")
+# message("${DYNAMIC_PLUGIN_PATH}")
+# message("${ONNX_LIBRARY_DIR}")
+# message("${ONNX_INCLUDE_DIR}")
+# message("${ONNX_LIBRARY}")
+# message("${ONNX_MODEL_PATH}")
 
 target_compile_definitions(
   ${PROJECT_NAME}
@@ -88,13 +88,13 @@ target_compile_definitions(
   "BUILD_DIR=\"${BUILD_DIR}\""
   "DATA_DIR=\"${DATA_DIR}\""
   "DYNAMIC_PLUGIN_PATH=\"${DYNAMIC_PLUGIN_PATH}\""
-  "ONNX_MODEL_PATH=\"${ONNX_MODEL_PATH}\""
+  # "ONNX_MODEL_PATH=\"${ONNX_MODEL_PATH}\""
 )
 
 target_include_directories(
   ${PROJECT_NAME}
   PRIVATE
-  ${ONNX_INCLUDE_DIR}
+  # ${ONNX_INCLUDE_DIR}
 )
 
 target_sources(
@@ -110,7 +110,7 @@ target_link_libraries(
   PRIVATE
   juce_audio_utils
   juce_opengl
-  ${ONNX_LIBRARY}
+  # ${ONNX_LIBRARY}
 )
 
 set(VST3_HELPER_DIRECTORY "${CMAKE_BINARY_DIR}/Debug")
