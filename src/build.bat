@@ -11,8 +11,8 @@ del *.pdb > NUL 2> NUL
 del *.rdi > NUL 2> NUL
 
 REM compile miniaudio to static library
-rem cl %CFLAGS% -c ..\src\miniaudio_impl.c
-rem lib -OUT:miniaudio.lib miniaudio_impl.obj
+cl %CFLAGS% -c ..\src\miniaudio_impl.c
+lib -OUT:miniaudio.lib miniaudio_impl.obj
 
 REM preprocessor
 cl %CFLAGS% ..\src\preprocessor.cpp /link %LFLAGS%
