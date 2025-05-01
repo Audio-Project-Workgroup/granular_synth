@@ -253,7 +253,10 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 	      
 	      initializeFloatParameter(&pluginState->parameters[PluginParameter_mix],
 						pluginParameterInitData[PluginParameter_mix]);
-	      
+
+		  initializeFloatParameter(&pluginState->parameters[PluginParameter_pan],
+						pluginParameterInitData[PluginParameter_pan]);
+
 	      initializeFloatParameter(&pluginState->parameters[PluginParameter_offset],
 						pluginParameterInitData[PluginParameter_offset]);
 
@@ -889,6 +892,48 @@ RENDER_NEW_FRAME(renderNewFrame)
 			    pluginSetFloatParameter(window.element->fParam, newWindow);
 			  }
 		      }
+		  }
+		  // NOTE: pan
+		  {
+			  v2 panOffsetPOP = V2(0.727f, 0.0008f);
+			  v2 panSizePOP = knobDimPOP * V2(1, 1);
+			  v2 panLabelOffset = V2(0.03f, 0.065f);
+			  v2 panTextOffset = hadamard(V2(0.003f, 0.043f), panelDim);
+			  v2 panTextScale = 0.0005f * panelDim.x * V2(1.f, 1.f);
+			  UIComm pan =
+				  uiMakeKnob(panelLayout, STR8_LIT("PAN"), panOffsetPOP, panSizePOP, 1.f,
+					  &pluginState->parameters[PluginParameter_pan],
+					  panLabelOffset, knobLabelDim,
+					  knobClickableOffset, knobClickableDim,
+					  panTextOffset, panTextScale,
+					  &pluginState->halfPomegranateKnob, &pluginState->halfPomegranateKnobLabel,
+					  V4(1, 1, 1, 1));
+			  
+			  if (pan.flags & UICommFlag_dragging)
+			  {
+				  if (pan.flags & UICommFlag_leftDragging)
+				  {
+					  v2 dragDelta = uiGetDragDelta(pan.element);
+					  r32 newpan = (pan.element->fParamValueAtClick +
+						  dragDelta.y / knobDragLength * getLength(pan.element->fParam->range));
+
+					  pluginSetFloatParameter(pan.element->fParam, newpan);
+				  }
+				  else if (pan.flags & UICommFlag_minusPressed)
+				  {
+					  r32 oldpan = pluginReadFloatParameter(pan.element->fParam);
+					  r32 newpan = oldpan - 0.02f * getLength(pan.element->fParam->range);
+
+					  pluginSetFloatParameter(pan.element->fParam, newpan);
+				  }
+				  else if (pan.flags & UICommFlag_plusPressed)
+				  {
+					  r32 oldpan = pluginReadFloatParameter(pan.element->fParam);
+					  r32 newpan = oldpan + 0.02f * getLength(pan.element->fParam->range);
+
+					  pluginSetFloatParameter(pan.element->fParam, newpan);
+				  }
+			  }
 		  }
 		  
 		  // NOTE: mix
@@ -1820,23 +1865,28 @@ AUDIO_PROCESS(audioProcess)
 	      r32 leftGrainVal = grainMixBuffers[0][frameIndex];
 	      r32 rightGrainVal = grainMixBuffers[1][frameIndex];
 	      r32 stereoWidth = pluginReadFloatParameter(&pluginState->parameters[PluginParameter_spread]);
+		  r32 panner = pluginReadFloatParameter(&pluginState->parameters[PluginParameter_pan]);
 	      if (channelIndex < 2) { // Make sure we only process left and right channels
 		//r32 widthVal = stereoWidth * 0.5f;
-		r32 tmp = 1.0f / fmaxf(1.0f + stereoWidth, 2.0f);
-		r32 coef_M = 1.0f * tmp;
-		r32 coef_S = stereoWidth * tmp;
+			r32 tmp = 1.0f / fmaxf(1.0f + stereoWidth, 2.0f);
+			r32 coef_M = 1.0f * tmp;
+			r32 coef_S = stereoWidth * tmp;
 
-		r32 mid = (leftGrainVal + rightGrainVal) * coef_M;
-		r32 sides = (rightGrainVal - leftGrainVal) * coef_S;
+			r32 mid = (leftGrainVal + rightGrainVal) * coef_M;
+			r32 sides = (rightGrainVal - leftGrainVal) * coef_S;
 
-		// Update grain value based on channel
-		if (channelIndex == 0) {
-		  grainVal = mid - sides; // Left channel
-		}
-		else {
-		  grainVal = mid + sides; // Right channel
-		}
+			// Update grain value based on channel
+			if (channelIndex == 0) {
+			  grainVal = mid - sides; // Left channel
+			  grainVal = grainVal * (1 - panner);
+			}
+			else {
+			  grainVal = mid + sides; // Right channel
+			  grainVal = grainVal * (1 + panner);
+			}
 	      }
+
+
 #endif
 	      
 	      // mixedVal += 0.5f*grainVal;
@@ -1868,6 +1918,7 @@ AUDIO_PROCESS(audioProcess)
 	  pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_size]);
 	  pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_spread]);
 	  pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_mix]);
+	  pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_pan]);
 	  pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_offset]);
 	}
 
