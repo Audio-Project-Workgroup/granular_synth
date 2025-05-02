@@ -1,9 +1,15 @@
 // common utilities and miscellaneous functions
 
-#ifdef __clang__
-#define ASSERT(cond) if(!(cond)) __builtin_trap();
+#if BUILD_DEBUG
+#  if COMPILER_MSVC
+#    define ASSERT(cond) if(!(cond)) __debugbreak();
+#  elif COMPILER_CLANG || COMPILER_GCC
+#    define ASSERT(cond) if(!(cond)) __builtin_trap();
+#  else
+#    define ASSERT(cond) if(!(cond)) *(int *)0 = 0;
+#  endif
 #else
-#define ASSERT(cond) if(!(cond)) *(int *)0 = 0;
+#  define ASSERT(cond)
 #endif
 
 #define UNUSED(var) (void)var

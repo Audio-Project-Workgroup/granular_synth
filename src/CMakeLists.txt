@@ -85,6 +85,7 @@ endif()
 target_compile_definitions(
   ${PROJECT_NAME}
   PRIVATE
+  BUILD_DEBUG=1
   "BUILD_DIR=\"${BUILD_DIR}\""
   "DATA_DIR=\"${DATA_DIR}\""
   "DYNAMIC_PLUGIN_PATH=\"${DYNAMIC_PLUGIN_PATH}\""

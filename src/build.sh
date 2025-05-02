@@ -3,12 +3,11 @@
 SRC_DIR=$PWD
 #-I$SRC_DIR/include
 
-CFLAGS="-g -Wall -Wno-writable-strings -Wno-missing-braces -Wno-unused-function -fno-exceptions -fno-rtti -march=native -std=gnu++11"
+CFLAGS="-g -Wall -Wno-writable-strings -Wno-missing-braces -Wno-unused-function -fno-exceptions -fno-rtti -march=native -std=gnu++11 -DBUILD_DEBUG=1"
 MAC_GL_FLAGS="-framework OpenGL"
 MAC_PLUGIN_FLAGS="-dynamiclib"
 LINUX_GL_FLAGS="-lGL"
 LINUX_PLUGIN_FLAGS="-shared -fPIC"
-
 
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
     GL_FLAGS=$LINUX_GL_FLAGS
@@ -32,7 +31,7 @@ pushd ../build > /dev/null
 #ar rcs libminiaudio.a miniaudio.o
 
 # preprocessor
-clang $CFLAGS ../src/preprocessor.cpp -o preprocessor
+#clang $CFLAGS ../src/preprocessor.cpp -o preprocessor
 popd > /dev/null
 #../build/preprocessor plugin.h > generated.cpp
 pushd ../build > /dev/null
@@ -46,7 +45,8 @@ BUILD_PATH="$PWD"
 PLUGIN_PATH="$BUILD_PATH/$PLUGIN_NAME"
 echo $BUILD_PATH
 
-clang $CFLAGS -D"PLUGIN_PATH=\"$PWD/$PLUGIN_NAME\"" ../src/main.cpp -o test -L. $GL_FLAGS -lglfw -lminiaudio -ldl -lpthread -lm $(pkg-config --libs --cflags libonnxruntime)
+clang $CFLAGS -D"PLUGIN_PATH=\"$PWD/$PLUGIN_NAME\"" ../src/main.cpp -o test -L. $GL_FLAGS -lglfw -lminiaudio -ldl -lpthread -lm
+#$(pkg-config --libs --cflags libonnxruntime)
 #-L$SRC_DIR/libs -lonnxruntime
 
 popd > /dev/null

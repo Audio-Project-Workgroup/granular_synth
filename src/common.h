@@ -82,27 +82,25 @@ struct PlatformAPI
   PlatformGetCurrentTimestamp *getCurrentTimestamp;
 
   AtomicLoad *atomicLoad;
-  //AtomicLoadPointer *atomicLoadPointer;
   AtomicStore *atomicStore;
   AtomicAdd *atomicAdd;
   AtomicCompareAndSwap *atomicCompareAndSwap;
   AtomicCompareAndSwapPointers *atomicCompareAndSwapPointers;
 };
 
+#if BUILD_DEBUG
 struct PluginLogger
 {
   Arena *logArena;  
   String8List log;
   usz maxCapacity;
-  /* String8 *logBuffer; */
-  /* usz logBufferCapacity; */
-  /* u32 readIndex; */
-  /* u32 writeIndex; */
+
   volatile u32 mutex;
 };
 
-extern PlatformAPI globalPlatform;
 extern PluginLogger *globalLogger;
+#endif
+extern PlatformAPI globalPlatform;
 
 enum PluginHost
 {

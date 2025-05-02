@@ -338,9 +338,104 @@ static BASE_THREAD_PROC(audioThreadProc)
     }
 }
 
+#pragma pack(push, 1)
+struct BitmapHeader
+{
+  u16 signature;
+  u32 fileSize;
+  u32 reserved;
+  u32 dataOffset;
+
+  u32 headerSize;
+  u32 width;
+  u32 height;
+  u16 planes;
+  u16 bitsPerPixel;
+  u32 compression;
+  u32 imageSize;
+  u32 xPixelsPerM;
+  u32 yPixelsPerM;
+  u32 colorsUsed;
+  u32 colorsImportant;
+
+  u32 redMask;
+  u32 greenMask;
+  u32 blueMask;
+};
+#pragma pack(pop)
+
+#define FOURCC(str) (((u32)((str)[0]) << 0) | ((u32)((str)[1]) << 8) | ((u32)((str)[2]) << 16) | ((u32)((str)[3]) << 24))
+
+static LoadedBitmap
+loadBitmap(Arena *destAllocator, Arena *loadAllocator, String8 filename)
+{
+  LoadedBitmap result = {};
+  LoadedBitmap temp = {};
+
+  ReadFileResult readResult = platformReadEntireFile((char *)filename.str, loadAllocator);
+  if(readResult.contents)
+    {
+      BitmapHeader *header = (BitmapHeader *)readResult.contents;      
+      ASSERT(header->signature == (u16)FOURCC("BM  "));
+      ASSERT(header->fileSize == readResult.contentsSize - 1);
+            
+      result.width = temp.width = header->width;
+      result.height = temp.height = header->height;
+      temp.pixels = (u32 *)(readResult.contents + header->dataOffset);
+      result.pixels = arenaPushArray(destAllocator, result.width*result.height, u32);
+      
+      u16 bytesPerPixel = header->bitsPerPixel / 8;
+      ASSERT(bytesPerPixel == 4);
+      u32 compression = header->compression;
+      (void)compression;
+      ASSERT(header->imageSize == bytesPerPixel*result.width*result.height);
+
+      u32 redMask = header->redMask;
+      u32 greenMask = header->greenMask;
+      u32 blueMask = header->blueMask;
+      u32 alphaMask = ~(redMask | greenMask | blueMask);
+
+      u32 alphaShiftDown = alphaMask ? lowestOrderBit(alphaMask) : 24;
+      u32 redShiftDown = redMask ? lowestOrderBit(redMask) : 16;
+      u32 greenShiftDown = greenMask ? lowestOrderBit(greenMask) : 8;
+      u32 blueShiftDown = blueMask ? lowestOrderBit(blueMask) : 0;
+
+      temp.stride = result.stride = result.width*bytesPerPixel;
+
+      u8 *srcRow = (u8 *)temp.pixels + temp.stride*(temp.height - 1);
+      u8 *destRow = (u8 *)result.pixels;
+      for(u32 y = 0; y < result.height; ++y)
+	{
+	  u32 *srcPixel = (u32 *)srcRow;
+	  u32 *destPixel = (u32 *)destRow;
+
+	  for(u32 x = 0; x < result.width; ++x)
+	    {
+	      u32 c = *srcPixel++;
+	      
+	      u32 red = (c & redMask) >> redShiftDown;
+	      u32 green = (c & greenMask) >> greenShiftDown;
+	      u32 blue = (c & blueMask) >> blueShiftDown;
+	      u32 alpha = (c & alphaMask) >> alphaShiftDown;
+
+	      // NOTE: format is rgba
+	      *destPixel++ = ((alpha << 24) |
+			      (blue << 16) |
+			      (green << 8) |
+			      (red << 0));
+	    }
+
+	  srcRow -= result.stride;
+	  destRow += result.stride;
+	}      
+    }
+
+  return(result);
+}
+
 int
 main(int argc, char **argv)
-{  
+{
   printf("plugin path: %s\n", PLUGIN_PATH);
   int result = 0;
   
@@ -351,9 +446,24 @@ main(int argc, char **argv)
       //glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
       //glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-      GLFWwindow *window = glfwCreateWindow(640, 480, "glfw_miniaudio", NULL, NULL);
+      GLFWwindow *window = glfwCreateWindow(640, 480, "granade", NULL, NULL);
       if(window)	
 	{
+	  // TODO: stop using crt allocation functions - use os allocation functions (VirtualAlloc(), mmap())
+	  // NOTE: set applcation icon
+	  usz loadMemorySize = MEGABYTES(64);
+	  void *loadMemory = calloc(loadMemorySize, 1);
+	  Arena loadArena = arenaBegin(loadMemory, loadMemorySize);
+	  Arena destArena = arenaSubArena(&loadArena, loadMemorySize/2);
+	  LoadedBitmap iconBitmap = loadBitmap(&destArena, &loadArena,
+					       STR8_LIT("../data/BMP/DENSITYPOMEGRANATE_BUTTON.bmp"));
+	  
+	  GLFWimage appIcon[1];
+	  appIcon[0].width = iconBitmap.width;
+	  appIcon[0].height = iconBitmap.height;
+	  appIcon[0].pixels = (u8 *)iconBitmap.pixels;
+	  glfwSetWindowIcon(window, 1, appIcon);
+
 	  standardCursor = glfwCreateStandardCursor(GLFW_ARROW_CURSOR);
 	  hResizeCursor = glfwCreateStandardCursor(GLFW_HRESIZE_CURSOR);
 	  vResizeCursor = glfwCreateStandardCursor(GLFW_VRESIZE_CURSOR);
@@ -397,24 +507,10 @@ main(int argc, char **argv)
 	  pluginMemory.platformAPI.getCurrentTimestamp = platformGetCurrentTimestamp;
 
 	  pluginMemory.platformAPI.atomicLoad			= atomicLoad;
-	  //pluginMemory.platformAPI.atomicLoadPointer		= atomicLoadPointer;
 	  pluginMemory.platformAPI.atomicStore			= atomicStore;
 	  pluginMemory.platformAPI.atomicAdd			= atomicAdd;
 	  pluginMemory.platformAPI.atomicCompareAndSwap		= atomicCompareAndSwap;
 	  pluginMemory.platformAPI.atomicCompareAndSwapPointers = atomicCompareAndSwapPointers;
-
-	  // pluginMemory.platformAPI.wideLoadFloats	 = wideLoadFloats;
-	  // pluginMemory.platformAPI.wideLoadInts		 = wideLoadInts;
-	  // pluginMemory.platformAPI.wideSetConstantFloats = wideSetConstantFloats;
-	  // pluginMemory.platformAPI.wideSetConstantInts	 = wideSetConstantInts;
-	  // pluginMemory.platformAPI.wideStoreFloats	 = wideStoreFloats;
-	  // pluginMemory.platformAPI.wideStoreInts	 = wideStoreInts;
-	  // pluginMemory.platformAPI.wideAddFloats	 = wideAddFloats;
-	  // pluginMemory.platformAPI.wideAddInts		 = wideAddInts;
-	  // pluginMemory.platformAPI.wideSubFloats	 = wideSubFloats;
-	  // pluginMemory.platformAPI.wideSubInts		 = wideSubInts;
-	  // pluginMemory.platformAPI.wideMulFloats	 = wideMulFloats;
-	  // pluginMemory.platformAPI.wideMulInts		 = wideMulInts;
 
 	  usz loggerMemorySize = KILOBYTES(512);
 	  void *loggerMemory = calloc(loggerMemorySize, 1);
@@ -472,8 +568,7 @@ main(int argc, char **argv)
 		    {
 		      // NOTE: enumerate devices, get default device indices
 		      for(u32 iPlayback = 0; iPlayback < maPlaybackCount; ++iPlayback)
-			{
-			  //printf("%u: %s", iPlayback, maPlaybackInfos[iPlayback].name);
+			{			  
 			  String8 deviceStr = STR8_CSTR(maPlaybackInfos[iPlayback].name);
 			  ASSERT(pluginMemory.outputDeviceCount < ARRAY_COUNT(pluginMemory.outputDeviceNames));
 			  pluginMemory.outputDeviceNames[pluginMemory.outputDeviceCount] = deviceStr;
@@ -481,15 +576,12 @@ main(int argc, char **argv)
 			    {
 			      maPlaybackIndex = iPlayback;
 			      pluginMemory.selectedOutputDeviceIndex = pluginMemory.outputDeviceCount;
-				//printf("(default)");
 			    }
-			    //printf("\n");
 
 			    ++pluginMemory.outputDeviceCount;
 			}
 		      for(u32 iCapture = 0; iCapture < maCaptureCount; ++iCapture)
 			{
-			  //printf("%u: %s", iCapture, maCaptureInfos[iCapture].name);
 			  String8 deviceStr = STR8_CSTR(maCaptureInfos[iCapture].name);
 			  ASSERT(pluginMemory.inputDeviceCount < ARRAY_COUNT(pluginMemory.inputDeviceNames));
 			  pluginMemory.inputDeviceNames[pluginMemory.inputDeviceCount] = deviceStr;
@@ -497,9 +589,7 @@ main(int argc, char **argv)
 			    {
 			      maCaptureIndex = iCapture;
 			      pluginMemory.selectedInputDeviceIndex = pluginMemory.inputDeviceCount;
-			      //printf("(default)");
 			    }
-			  //printf("\n");
 
 			  ++pluginMemory.inputDeviceCount;
 			}
@@ -533,9 +623,6 @@ main(int argc, char **argv)
 
 			  MACallbackUserData maCallbackUserData = {&maOutputRingBuffer, &maInputRingBuffer};
 
-			  // TODO: the host application is currently hard-coded to request an output device
-			  //       which is 48kHz, stereo, and 16-bit-per-sample. Miniaudio can iterate over
-			  //       output devices, so we should use that to make a device-selection interface.
 			  ma_device_config maConfig = ma_device_config_init(ma_device_type_duplex);
 			  maConfig.playback.format = maOutputRingBuffer.format;
 			  maConfig.playback.channels = maOutputRingBuffer.channels;
@@ -543,7 +630,6 @@ main(int argc, char **argv)
 			  maConfig.capture.channels = maInputRingBuffer.channels;
 			  maConfig.sampleRate = SR;
 			  maConfig.dataCallback = maDataCallback;
-			  //maConfig.pUserData = &maOutputRingBuffer;
 			  maConfig.pUserData = &maCallbackUserData;
 			  
 			  ma_device maDevice;
@@ -606,11 +692,7 @@ main(int argc, char **argv)
 				      newInput->keyboardState.modifiers[modifierIndex].halfTransitionCount = 0;
 				      newInput->keyboardState.modifiers[modifierIndex].endedDown =
 					oldInput->keyboardState.modifiers[modifierIndex].endedDown;
-				    }
-
-				  // TODO: what's the difference between window size and framebuffer size? do we need both?
-				  //int windowWidth, windowHeight;
-				  //glfwGetWindowSize(window, &windowWidth, &windowHeight);
+				    }				  
 			  
 				  newInput->frameMillisecondsElapsed = frameElapsedTime;			  
 
@@ -672,8 +754,7 @@ main(int argc, char **argv)
 					      fprintf(stdout, "\n");
 					    }
 					}
-
-				      //pluginMemory.logger->log.first = 0;
+				     
 				      ZERO_STRUCT(&pluginMemory.logger->log);
 				      arenaEnd(pluginMemory.logger->logArena);
 
@@ -702,88 +783,6 @@ main(int argc, char **argv)
 
 				  glfwSwapBuffers(window);
 				  glfwPollEvents();		      	     		      
-
-				  // process audio
-#if 0
-				  maOutputRBPtrDistance = ma_pcm_rb_pointer_distance(&maOutputRingBuffer);
-				  maInputRBPtrDistance = ma_pcm_rb_pointer_distance(&maInputRingBuffer);
-				  fprintf(stdout, "\n output rb ptr distance: %d\n", maOutputRBPtrDistance);
-				  fprintf(stdout, "input rb ptr distance: %d\n\n", maInputRBPtrDistance);
-
-				  // TODO: this timing code was hastily hacked together and should be thought out
-				  //       more and made better
-				  u32 framesRemaining = (maOutputRBPtrDistance < 2*(s32)targetLatencySamples) ?
-				    targetLatencySamples : 0;
-				  ma_result maResult;
-				  while(framesRemaining)
-				    {
-				      void *writePtr = 0;
-				      void *readPtr = 0;
-				      u32 framesToWrite = framesRemaining;
-				      maResult = ma_pcm_rb_acquire_write(&maOutputRingBuffer,
-									 &framesToWrite, &writePtr);
-				      maResult = ma_pcm_rb_acquire_read(&maInputRingBuffer,
-				      					&framesToWrite, &readPtr);
-				      if(maResult == MA_SUCCESS)
-					{
-					  if(plugin.audioProcess)
-					    {
-					      u64 audioProcessCallTime = readOSTimer();
-					      audioBuffer.millisecondsElapsedSinceLastCall =
-						audioProcessCallTime - lastAudioProcessCallTime;
-					      lastAudioProcessCallTime = audioProcessCallTime;
-
-					      audioBuffer.outputBuffer[0] = writePtr;
-					      audioBuffer.outputBuffer[1] = (u8 *)writePtr + sizeof(s16);
-					      audioBuffer.inputBuffer[0] = readPtr;
-					      audioBuffer.inputBuffer[1] = readPtr;
-					      audioBuffer.framesToWrite = framesToWrite;
-					      plugin.audioProcess(&pluginMemory, &audioBuffer);
-
-					      // TODO: test this works
-					      #if 0
-					      if(audioBuffer.selectedOutputDeviceIndex != maPlaybackIndex)
-						{
-						  ma_device_stop(&maDevice);
-						  ma_device_uninit(&maDevice);
-
-						  maPlaybackIndex = audioBuffer.selectedOutputDeviceIndex;
-						  maConfig.playback.pDeviceID = &maPlaybackInfos[maPlaybackIndex].id;
-						  if(audioBuffer.selectedInputDeviceIndex != maCaptureIndex)
-						    {
-						      maCaptureIndex = audioBuffer.selectedInputDeviceIndex;
-						      maConfig.capture.pDeviceID = &maCaptureInfos[maCaptureIndex].id;
-						    }
-
-						  ASSERT(ma_device_init(&maContext, &maConfig, &maDevice) ==
-							 MA_SUCCESS);
-						  ma_device_start(&maDevice);
-						}
-					      #endif
-					    }
-
-					  maResult = ma_pcm_rb_commit_write(&maOutputRingBuffer, framesToWrite);
-					  maResult = ma_pcm_rb_commit_read(&maInputRingBuffer, framesToWrite);
-					  if(maResult == MA_SUCCESS)
-					    {
-					      fprintf(stdout, "wrote %u frames\n", framesToWrite);
-					      framesRemaining -= framesToWrite;
-					    }
-					  else
-					    {
-					      fprintf(stderr,
-						      "ERROR: audioProcess: ma_pcm_rb_commit_write failed: %s\n",
-						      ma_result_description(maResult));
-					    }
-					}
-				      else
-					{
-					  fprintf(stderr,
-						  "ERROR: audioProcess: ma_pcm_rb_acquire_write failed: %s\n",
-						  ma_result_description(maResult));
-					}
-				    }
-#endif
 
 				  PluginInput *temp = newInput;
 				  newInput = oldInput;
