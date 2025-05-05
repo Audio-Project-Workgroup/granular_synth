@@ -21,6 +21,7 @@
 
 /* TODO:
    - UI:
+     - improve font rendering
      - screen reader support
      - allow specification of horizontal vs. vertical slider, or knob for draggable elements
      - collapsable element groups, sized relative to children
@@ -31,12 +32,17 @@
 
    - Parameters:
      - make parameters visible to fl studio last tweaked automation menu
+     - per-grain level
+     - modulation
+
+   - State:
+     - full state (de)serialization (not just parameters, also grain buffer)
 
    - File Loading: (on hold)
      - more audio file formats (eg flac, ogg, mp3)
      - speed up reads (ie SIMD)
      - better samplerate conversion (ie FFT method (TODO: speed up fft and czt))
-     - load in batches to pass to ML model (maybe)     
+     - load in batches to pass to ML model
 
    - MIDI:
      - cc channel - parameter remapping at runtime
@@ -46,13 +52,12 @@
 
    - Misc:
      - profile the code
+     - static analysis
      - speed up fft (aligned loads/stores, different radix?)
      - general optimization (simd everywhere)
      - work queues?
      - allocate hardware ring buffer?
-*/  
-
-//#include <stdio.h>
+*/
 
 #include "plugin.h"
 
@@ -63,8 +68,9 @@
 #include "internal_granulator.cpp"
 
 // TODO: interfacing with host layer functions through a global variable like this introduces an unpleasant asymmetry,
-//       preventing code that uses these functions from being shared between the plugin and host. These functions
-//       should either be similarly encapsulated in the host layer, or unencapsulated here.
+//       preventing code that uses these functions (particular parameter reads/writes) from being shared
+//       between the plugin and host. These functions should either be similarly encapsulated in the host layer,
+//       or unencapsulated here.
 PlatformAPI globalPlatform;
 PluginLogger *globalLogger;
 
@@ -112,116 +118,9 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 	      pluginState->framePermanentArena = arenaSubArena(&pluginState->permanentArena, MEGABYTES(64));
 	      pluginState->loadArena = arenaSubArena(&pluginState->permanentArena, MEGABYTES(128));
 	      pluginState->grainArena = arenaSubArena(&pluginState->permanentArena, KILOBYTES(32));
-	      	      	     
-	      TemporaryMemory fftTestMemory = arenaBeginTemporaryMemory(&pluginState->loadArena, KILOBYTES(1));
-	      bool fftTestResult = fftTest((Arena *)&fftTestMemory);
-	      UNUSED(fftTestResult);
-	      arenaEndTemporaryMemory(&fftTestMemory);
-
-#if 0 // NOTE: fft sample rate conversion workbench
-	      r32 sourceSignalFreq = 4.f;
-	      u32 sourceSignalLength = 4410;
-	      u32 destSignalLength = 4800;
-	      u32 maxSignalLength = MAX(sourceSignalLength, destSignalLength);
-	      r32 conversionFactor = (r32)destSignalLength/(r32)sourceSignalLength;	  
-	  
-	      r32 *sourceSignal = arenaPushArray(&pluginState->permanentArena, sourceSignalLength, r32);   
-	      for(u32 i = 0; i < sourceSignalLength; ++i)
-		{
-		  r32 angle = M_TAU*sourceSignalFreq*i/(r32)sourceSignalLength;
-		  sourceSignal[i] = Sin(angle);
-		}
-	  
-	      r32 *compSignal = arenaPushArray(&pluginState->permanentArena, destSignalLength, r32);
-	      r32 *destSignal = arenaPushArray(&pluginState->permanentArena, destSignalLength, r32);
-	      for(u32 i = 0; i < destSignalLength; ++i)
-		{
-		  r32 angle = M_TAU*sourceSignalFreq*i/(r32)destSignalLength;
-		  compSignal[i] = Sin(angle);
-		}	  
-
-	      u32 destBatchSize = 1024;
-	      u32 sourceBatchSize = (u32)((r32)destBatchSize/conversionFactor);
-	      u32 maxBatchSize = MAX(sourceBatchSize, destBatchSize);
-	      u32 numBatches = ((destSignalLength + destBatchSize - 1) & ~(destBatchSize - 1))/destBatchSize;
-
-	      TemporaryMemory cztScratch = arenaBeginTemporaryMemory(&pluginState->loadArena,
-								     16*maxSignalLength*sizeof(c64));
-
-	      r32 *source = sourceSignal;
-	      r32 *dest = destSignal;
-	      c64 *cztDest = arenaPushArray(&pluginState->permanentArena, maxSignalLength, c64);
-	      r32 *imagScratch = arenaPushArray(&pluginState->permanentArena, destSignalLength, r32);
-	      for(u32 batch = 0; batch < numBatches; ++batch)
-		{	      	      
-		  //czt(cztDest, sourceSignal, sourceSignalLength, (Arena *)&cztScratch);
-		  czt(cztDest, source, sourceBatchSize, (Arena *)&cztScratch);
-		  arenaEnd((Arena *)&cztScratch, true);
-
-		  if(sourceSignalLength < destSignalLength)
-		    {
-		      for(u32 i = sourceBatchSize/2 + 1; i < destBatchSize; ++i)
-			{
-			  cztDest[i] = C64(0, 0);
-			}
-
-		      c64 *midpoint = cztDest + sourceBatchSize/2;
-		      c64 *write = cztDest + destBatchSize - sourceBatchSize/2;
-		      for(u32 i = 0; i < sourceBatchSize/2; ++i)
-			{
-			  c64 sourceVal = *(midpoint - i);
-			  if(i == 0) sourceVal *= 0.5f;
-
-			  *(midpoint - i) = conversionFactor*sourceVal;
-			  *write++ = conversionFactor*conjugateC64(sourceVal);
-			}
-		    }
-		  else if(sourceSignalLength > destSignalLength)
-		    {
-		      for(u32 i = destBatchSize; i < sourceBatchSize; ++i)
-			{
-			  cztDest[i] = C64(0, 0);
-			}
-	      
-		      c64 *read = cztDest + destBatchSize/2;
-		      c64 *write = read;
-		      *write++ = C64(0, 0);
-		      --read;
-		      for(u32 i = 1; i < destBatchSize/2; ++i)
-			{
-			  c64 readVal = *read;
-			  readVal *= conversionFactor;
-		  
-			  *write++ = conjugateC64(readVal);
-			  *read-- = readVal;
-			}
-		    }
-	  	      
-		  //iczt(destSignal, imagScratch, cztDest, destSignalLength, (Arena *)&cztScratch);
-		  iczt(dest, imagScratch, cztDest, destBatchSize, (Arena *)&cztScratch);
-
-		  source += sourceBatchSize;
-		  dest += destBatchSize;
-
-		  cztDest += maxBatchSize;
-		  imagScratch += destBatchSize;
-		}
-	  
-	      arenaEndTemporaryMemory(&cztScratch);
-	      //(void *)&sourceSignalFreq;
-
-	      for(u32 i = 0; i < destSignalLength; ++i)
-		{
-		  r32 compVal = compSignal[i];
-		  r32 destVal = destSignal[i];
-		  r32 diff = Abs(compVal - destVal);
-		  r32 err = diff/(compVal + 0.0001f);
-		  printf("err[%u]: %.6f\n", i, err);
-		}
-#endif
 
 	      // NOTE: parameter initialization
-	      pluginState->phasor = 0.f;
+	      // pluginState->phasor = 0.f;
 	      pluginState->freq = 440.f;
 	      
 	      initializeFloatParameter(&pluginState->parameters[PluginParameter_volume], 
@@ -367,24 +266,9 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 	      pluginState->rootPanel->splitAxis = UIAxis_y;
 	      pluginState->rootPanel->name = STR8_LIT("editor");
 	      pluginState->rootPanel->color = V4(1, 1, 1, 1);
-	      //pluginState->rootPanel->texture = &pluginState->editorSkin;
-	      pluginState->rootPanel->texture = &pluginState->editorReferenceLayout;
-#if 0 
-	      UIPanel *currentParentPanel = pluginState->rootPanel;
-	      UIPanel *bottom = makeUIPanel(currentParentPanel, &pluginState->permanentArena,
-					    UIAxis_x, 0.2f, STR8_LIT("bottom"), V4(0.094f, 0.149f, 0.102f, 1));
-	      UIPanel *top = makeUIPanel(currentParentPanel, &pluginState->permanentArena,
-					 UIAxis_x, 0.8f, STR8_LIT("top"));
-	      UNUSED(bottom);
-	      	      
-	      currentParentPanel = top;
-	      UIPanel *left = makeUIPanel(currentParentPanel, &pluginState->permanentArena,
-					  UIAxis_x, 0.5f, STR8_LIT("left"), V4(0.094f, 0.102f, 0.149f, 1));
-	      UIPanel *right = makeUIPanel(currentParentPanel, &pluginState->permanentArena,
-					   UIAxis_x, 0.5f, STR8_LIT("right"), V4(0.149f, 0.102f, 0.094f, 1));
-	      UNUSED(left);
-	      UNUSED(right);
-#endif
+	      pluginState->rootPanel->texture = &pluginState->editorSkin;
+	      //pluginState->rootPanel->texture = &pluginState->editorReferenceLayout;
+
 	      pluginState->menuPanel = arenaPushStruct(&pluginState->permanentArena, UIPanel,
 						       arenaFlagsZeroNoAlign());
 	      pluginState->menuPanel->sizePercentOfParent = 1.f;
@@ -453,7 +337,6 @@ RENDER_NEW_FRAME(renderNewFrame)
       Rect2 screenRect = rectMinDim(V2(0, 0), windowDim);
 
       // NOTE: UI layout
-#if 1
       UIContext *uiContext = &pluginState->uiContext;
       uiContextNewFrame(uiContext, &input->mouseState, &input->keyboardState, renderCommands->windowResized);
       
@@ -493,7 +376,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 			  bool isSelected = (outputDeviceIndex == pluginState->selectedOutputDeviceIndex);
 			  v4 textColor =  isSelected ? selectedTextColor : baseTextColor;
 			  String8 outputDeviceName = pluginState->outputDeviceNames[outputDeviceIndex];
-#if 1
+			  
 			  UIComm outputDevice = uiMakeSelectableTextElement(panelLayout, outputDeviceName,
 									    textScale, textColor);
 			  if(outputDevice.flags & UICommFlag_hovering)
@@ -507,7 +390,6 @@ RENDER_NEW_FRAME(renderNewFrame)
 			      renderCommands->outputAudioDeviceChanged = true;
 			      renderCommands->selectedOutputAudioDeviceIndex = outputDeviceIndex;
 			    }
-#endif
 			}
 		    }
 		  else if(stringsAreEqual(panel->name, STR8_LIT("menu right")))
@@ -519,7 +401,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 			  bool isSelected = (inputDeviceIndex == pluginState->selectedInputDeviceIndex);
 			  v4 textColor = isSelected ? selectedTextColor : baseTextColor;
 			  String8 inputDeviceName = pluginState->inputDeviceNames[inputDeviceIndex];
-#if 1
+
 			  UIComm inputDevice = uiMakeSelectableTextElement(panelLayout, inputDeviceName,
 									   textScale, textColor);
 			  if(inputDevice.flags & UICommFlag_hovering)
@@ -533,7 +415,6 @@ RENDER_NEW_FRAME(renderNewFrame)
 			      renderCommands->inputAudioDeviceChanged = true;
 			      renderCommands->selectedInputAudioDeviceIndex = inputDeviceIndex;
 			    }
-#endif
 			}
 		    }
 
@@ -638,9 +519,36 @@ RENDER_NEW_FRAME(renderNewFrame)
 		  uiPushLayoutOffsetSizeType(panelLayout, UISizeType_percentOfParent);
 		  uiPushLayoutDimSizeType(panelLayout, UISizeType_percentOfParent);		  
 
-#if 1
 		  v2 panelDim = getDim(panelRect);
 		  v2 elementTextScale = 0.0005f*panelDim.x*V2(1.f, 1.f);
+
+		  r32 knobDimPOP = 0.235f;
+		  v2 knobLabelOffset = V2(0.02f, 0.06f);
+		  v2 knobLabelDim = V2(0.96f, 1);
+		  v2 knobClickableOffset = V2(0.1f, 0.2f);
+		  v2 knobClickableDim = V2(0.8f, 0.7f);
+		  //v2 knobTextOffset = hadamard(V2(0, 0.04f), panelDim);
+		  r32 knobDragLength = 0.35f*panelDim.y;
+
+#if BUILD_DEBUG
+		  // NOTE: play (for now)
+		  {
+		    v2 playOffsetPOP = V2(0.05f, 0.6f);
+		    v2 playSizePOP = knobDimPOP*V2(1, 1);
+		    UIComm play = uiMakeButton(panelLayout, STR8_LIT("play"), playOffsetPOP, playSizePOP, 1.f,
+					       &pluginState->soundIsPlaying, 0, V4(0, 0, 1, 1));
+		    
+		    if(play.flags & UICommFlag_pressed)
+		      {
+			bool oldPlay = pluginReadBooleanParameter(play.element->bParam);
+			bool newPlay = !oldPlay;
+			pluginSetBooleanParameter(play.element->bParam, newPlay);
+			// TODO: stop doing the queue here: we don't want to have to synchronize grain (de)queueing
+			//       across the audio and video threads (once we actually have them on their own threads)
+			//queueAllGrainsFromFile(&pluginState->silo, &pluginState->loadedGrainPackfile);
+		      }		    
+		  }
+#endif
 
 		  // NOTE: volume
 		  v2 volumeOffsetPOP = V2(0.857f, 0.43f);
@@ -692,15 +600,149 @@ RENDER_NEW_FRAME(renderNewFrame)
 		  else
 		    {
 		      globalPlatform.atomicStore(&volume.element->fParam->interacting, 0);
-		    }
+		    }		  
 
-		  r32 knobDimPOP = 0.235f;
-		  v2 knobLabelOffset = V2(0.02f, 0.06f);
-		  v2 knobLabelDim = V2(0.96f, 1);
-		  v2 knobClickableOffset = V2(0.1f, 0.2f);
-		  v2 knobClickableDim = V2(0.8f, 0.7f);
-		  //v2 knobTextOffset = hadamard(V2(0, 0.04f), panelDim);
-		  r32 knobDragLength = 0.35f*panelDim.y;
+		  // NOTE: density
+		  {
+		    r32 densityDimPOP = 0.235f;
+		    v2 densityOffsetPOP = V2(0.45f, 0.06f);
+		    v2 densitySizePOP = densityDimPOP*V2(1, 1);
+		    v2 densityClickableOffset = V2(0.f, 0.1f);
+		    v2 densityClickableDim = V2(1.f, 0.9f);
+		    v2 densityTextOffset = hadamard(V2(0, -0.015f), panelDim);
+
+		    UIComm density = uiMakeKnob(panelLayout, STR8_LIT("DENSITY"),
+						densityOffsetPOP, densitySizePOP, 1.f,
+						&pluginState->parameters[PluginParameter_density],
+						V2(-0.02f, 0.02f), V2(1.02f, 1),
+						densityClickableOffset, densityClickableDim,
+						densityTextOffset, elementTextScale,
+						&pluginState->densityKnob, &pluginState->densityKnobLabel,
+						V4(1, 1, 1, 1));
+
+		    if(density.flags & UICommFlag_dragging)
+		      {
+			globalPlatform.atomicStore(&density.element->fParam->interacting, 1);
+
+			if(density.flags & UICommFlag_leftDragging)
+			  {
+			    v2 dragDelta = uiGetDragDelta(density.element);		      			    
+			    r32 newDensity = (density.element->fParamValueAtClick +
+					     dragDelta.y/knobDragLength*getLength(density.element->fParam->range));
+			    
+			    pluginSetFloatParameter(density.element->fParam, newDensity);			
+			  }
+			else if(density.flags & UICommFlag_minusPressed)
+			  {
+			    r32 oldDensity = pluginReadFloatParameter(density.element->fParam);
+			    r32 newDensity = oldDensity - 0.02f*getLength(density.element->fParam->range);
+
+			    pluginSetFloatParameter(density.element->fParam, newDensity);
+			  }
+			else if(density.flags & UICommFlag_plusPressed)
+			  {
+			    r32 oldDensity = pluginReadFloatParameter(density.element->fParam);
+			    r32 newDensity = oldDensity + 0.02f*getLength(density.element->fParam->range);
+
+			    pluginSetFloatParameter(density.element->fParam, newDensity);
+			  }
+		      }
+		    else
+		      {
+			globalPlatform.atomicStore(&density.element->fParam->interacting, 0);
+		      }
+		  }
+
+		  // NOTE: spread
+		  {
+		    v2 spreadOffsetPOP = V2(-0.001f, 0.067f);
+		    v2 spreadSizePOP = knobDimPOP*V2(1, 1);
+		    v2 spreadTextOffset = hadamard(V2(0, 0.038f), panelDim);
+		    UIComm spread = uiMakeKnob(panelLayout, STR8_LIT("SPREAD"), spreadOffsetPOP, spreadSizePOP, 1.f,
+					       &pluginState->parameters[PluginParameter_spread],
+					       knobLabelOffset, knobLabelDim,
+					       knobClickableOffset, knobClickableDim,
+					       spreadTextOffset, elementTextScale,
+					       &pluginState->pomegranateKnob, &pluginState->pomegranateKnobLabel,
+					       V4(1, 1, 1, 1));
+		    if(spread.flags & UICommFlag_dragging)
+		      {
+			globalPlatform.atomicStore(&spread.element->fParam->interacting, 1);
+
+			if(spread.flags & UICommFlag_leftDragging)
+			  {
+			    v2 dragDelta = uiGetDragDelta(spread.element);
+			    //printf("dragDelta: (%.2f, %.2f)\n", dragDelta.x, dragDelta.y);
+			    r32 newSpread = (spread.element->fParamValueAtClick +
+					     dragDelta.y/knobDragLength*getLength(spread.element->fParam->range));
+			    pluginSetFloatParameter(spread.element->fParam, newSpread);
+			  }
+			else if(spread.flags & UICommFlag_minusPressed)
+			  {
+			    r32 oldSpread = pluginReadFloatParameter(spread.element->fParam);
+			    r32 newSpread = oldSpread - 0.02f*getLength(spread.element->fParam->range);
+
+			    pluginSetFloatParameter(spread.element->fParam, newSpread);
+			  }
+			else if(spread.flags & UICommFlag_plusPressed)
+			  {
+			    r32 oldSpread = pluginReadFloatParameter(spread.element->fParam);
+			    r32 newSpread = oldSpread + 0.02f*getLength(spread.element->fParam->range);
+
+			    pluginSetFloatParameter(spread.element->fParam, newSpread);
+			  }
+		      }
+		    else
+		      {
+			globalPlatform.atomicStore(&spread.element->fParam->interacting, 0);
+		      }
+		  }
+
+		  // NOTE: offset
+		  {
+		    v2 offsetOffsetPOP = V2(0.1285f, 0.004f);
+		    v2 offsetSizePOP = knobDimPOP*V2(1, 1);
+		    v2 offsetTextOffset = hadamard(V2(0.002f, 0.038f), panelDim);
+		    UIComm offset = uiMakeKnob(panelLayout, STR8_LIT("OFFSET"), offsetOffsetPOP, offsetSizePOP, 1.f,
+					       &pluginState->parameters[PluginParameter_offset],
+					       knobLabelOffset, knobLabelDim,
+					       knobClickableOffset, knobClickableDim,
+					       offsetTextOffset, elementTextScale,
+					       &pluginState->pomegranateKnob, &pluginState->pomegranateKnobLabel,
+					       V4(1, 1, 1, 1));
+
+		    if(offset.flags & UICommFlag_dragging)
+		      {
+			globalPlatform.atomicStore(&offset.element->fParam->interacting, 1);
+
+			if(offset.flags & UICommFlag_leftDragging)
+			  {
+			    v2 dragDelta = uiGetDragDelta(offset.element);
+			    r32 newOffset = (offset.element->fParamValueAtClick +
+					     dragDelta.y/knobDragLength*getLength(offset.element->fParam->range));
+
+			    pluginSetFloatParameter(offset.element->fParam, newOffset);
+			  }
+			else if(offset.flags & UICommFlag_minusPressed)
+			  {
+			    r32 oldOffset = pluginReadFloatParameter(offset.element->fParam);
+			    r32 newOffset = oldOffset - 0.02f*getLength(offset.element->fParam->range);
+
+			    pluginSetFloatParameter(offset.element->fParam, newOffset);
+			  }
+			else if(offset.flags & UICommFlag_plusPressed)
+			  {
+			    r32 oldOffset = pluginReadFloatParameter(offset.element->fParam);
+			    r32 newOffset = oldOffset + 0.02f*getLength(offset.element->fParam->range);
+
+			    pluginSetFloatParameter(offset.element->fParam, newOffset);
+			  }
+		      }
+		    else
+		      {
+			globalPlatform.atomicStore(&offset.element->fParam->interacting, 0);
+		      }
+		  }
 
 		  // NOTE: size
 		  v2 sizeOffsetPOP = V2(0.239f, 0.109f);
@@ -751,167 +793,52 @@ RENDER_NEW_FRAME(renderNewFrame)
 		      globalPlatform.atomicStore(&size.element->fParam->interacting, 0);
 		    }
 
-		  // NOTE: play (for now)
+		  // NOTE: mix
 		  {
-		    v2 playOffsetPOP = V2(0.05f, 0.6f);
-		    v2 playSizePOP = knobDimPOP*V2(1, 1);
-		    UIComm play = uiMakeButton(panelLayout, STR8_LIT("play"), playOffsetPOP, playSizePOP, 1.f,
-					       &pluginState->soundIsPlaying, 0, V4(0, 0, 1, 1));
-		    
-		    if(play.flags & UICommFlag_pressed)
-		      {
-			bool oldPlay = pluginReadBooleanParameter(play.element->bParam);
-			bool newPlay = !oldPlay;
-			pluginSetBooleanParameter(play.element->bParam, newPlay);
-			// TODO: stop doing the queue here: we don't want to have to synchronize grain (de)queueing
-			//       across the audio and video threads (once we actually have them on their own threads)
-			//queueAllGrainsFromFile(&pluginState->silo, &pluginState->loadedGrainPackfile);
-		      }		    
-		  }
-
-		  // NOTE: spread
-		  {
-		    v2 spreadOffsetPOP = V2(-0.001f, 0.067f);
-		    v2 spreadSizePOP = knobDimPOP*V2(1, 1);
-		    v2 spreadTextOffset = hadamard(V2(0, 0.038f), panelDim);
-		    UIComm spread = uiMakeKnob(panelLayout, STR8_LIT("SPREAD"), spreadOffsetPOP, spreadSizePOP, 1.f,
-					       &pluginState->parameters[PluginParameter_spread],
-					       knobLabelOffset, knobLabelDim,
-					       knobClickableOffset, knobClickableDim,
-					       spreadTextOffset, elementTextScale,
-					       &pluginState->pomegranateKnob, &pluginState->pomegranateKnobLabel,
-					       V4(1, 1, 1, 1));
-		    if(spread.flags & UICommFlag_dragging)
-		      {
-			globalPlatform.atomicStore(&spread.element->fParam->interacting, 1);
-
-			if(spread.flags & UICommFlag_leftDragging)
-			  {
-			    v2 dragDelta = uiGetDragDelta(spread.element);
-			    //printf("dragDelta: (%.2f, %.2f)\n", dragDelta.x, dragDelta.y);
-			    r32 newSpread = (spread.element->fParamValueAtClick +
-					     dragDelta.y/knobDragLength*getLength(spread.element->fParam->range));
-			    pluginSetFloatParameter(spread.element->fParam, newSpread);
-			  }
-			else if(spread.flags & UICommFlag_minusPressed)
-			  {
-			    r32 oldSpread = pluginReadFloatParameter(spread.element->fParam);
-			    r32 newSpread = oldSpread - 0.02f*getLength(spread.element->fParam->range);
-
-			    pluginSetFloatParameter(spread.element->fParam, newSpread);
-			  }
-			else if(spread.flags & UICommFlag_plusPressed)
-			  {
-			    r32 oldSpread = pluginReadFloatParameter(spread.element->fParam);
-			    r32 newSpread = oldSpread + 0.02f*getLength(spread.element->fParam->range);
-
-			    pluginSetFloatParameter(spread.element->fParam, newSpread);
-			  }
-		      }
-		    else
-		      {
-			globalPlatform.atomicStore(&spread.element->fParam->interacting, 0);
-		      }
-		  }
-
-		  // NOTE: density
-		  {
-		    r32 densityDimPOP = 0.235f;
-		    v2 densityOffsetPOP = V2(0.45f, 0.06f);
-		    v2 densitySizePOP = densityDimPOP*V2(1, 1);
-		    v2 densityClickableOffset = V2(0.f, 0.1f);
-		    v2 densityClickableDim = V2(1.f, 0.9f);
-		    v2 densityTextOffset = hadamard(V2(0, -0.015f), panelDim);
-
-		    UIComm density = uiMakeKnob(panelLayout, STR8_LIT("DENSITY"),
-						densityOffsetPOP, densitySizePOP, 1.f,
-						&pluginState->parameters[PluginParameter_density],
-						V2(-0.02f, 0.02f), V2(1.02f, 1),
-						densityClickableOffset, densityClickableDim,
-						densityTextOffset, elementTextScale,
-						&pluginState->densityKnob, &pluginState->densityKnobLabel,
-						V4(1, 1, 1, 1));
-		    Rect2 densityRect = density.element->region;
-		    v2 densityRectCenter = getCenter(densityRect);
-		    renderPushQuad(renderCommands, rectCenterDim(densityRectCenter, V2(4, 4)), 0, 0, RenderLevel_front);
-		    if(density.flags & UICommFlag_dragging)
-		      {
-			globalPlatform.atomicStore(&density.element->fParam->interacting, 1);
-
-			if(density.flags & UICommFlag_leftDragging)
-			  {
-			    v2 dragDelta = uiGetDragDelta(density.element);		      			    
-			    r32 newDensity = (density.element->fParamValueAtClick +
-					     dragDelta.y/knobDragLength*getLength(density.element->fParam->range));
-			    
-			    pluginSetFloatParameter(density.element->fParam, newDensity);			
-			  }
-			else if(density.flags & UICommFlag_minusPressed)
-			  {
-			    r32 oldDensity = pluginReadFloatParameter(density.element->fParam);
-			    r32 newDensity = oldDensity - 0.02f*getLength(density.element->fParam->range);
-
-			    pluginSetFloatParameter(density.element->fParam, newDensity);
-			  }
-			else if(density.flags & UICommFlag_plusPressed)
-			  {
-			    r32 oldDensity = pluginReadFloatParameter(density.element->fParam);
-			    r32 newDensity = oldDensity + 0.02f*getLength(density.element->fParam->range);
-
-			    pluginSetFloatParameter(density.element->fParam, newDensity);
-			  }
-		      }
-		    else
-		      {
-			globalPlatform.atomicStore(&density.element->fParam->interacting, 0);
-		      }
-		  }
-		  
-		  // NOTE: window
-		  {
-		    v2 windowOffsetPOP = V2(0.854f, 0.063f);
-		    v2 windowSizePOP = knobDimPOP*V2(1, 1);
-		    v2 windowLabelOffset = V2(0.03f, 0.065f);
-		    v2 windowTextOffset = hadamard(V2(0.003f, 0.043f), panelDim);
-		    v2 windowTextScale = 0.0005f*panelDim.x*V2(1.f, 1.f);
-		    UIComm window =
-		      uiMakeKnob(panelLayout, STR8_LIT("WINDOW"), windowOffsetPOP, windowSizePOP, 1.f,
-				 &pluginState->parameters[PluginParameter_window],
-				 windowLabelOffset, knobLabelDim,
+		    r32 mixDimPOP = 0.235f;
+		    v2 mixOffsetPOP = V2(0.613f, 0.131f);
+		    v2 mixSizePOP = mixDimPOP*V2(1, 1);
+		    v2 mixLabelOffset = V2(0.02f, 0.068f);
+		    v2 mixTextOffset = hadamard(V2(0.003f, 0.042f), panelDim);
+		    UIComm mix =
+		      uiMakeKnob(panelLayout, STR8_LIT("MIX"), mixOffsetPOP, mixSizePOP, 1.f,
+				 &pluginState->parameters[PluginParameter_mix],
+				 mixLabelOffset, knobLabelDim,
 				 knobClickableOffset, knobClickableDim,
-				 windowTextOffset, windowTextScale,
+				 mixTextOffset, elementTextScale,
 				 &pluginState->halfPomegranateKnob, &pluginState->halfPomegranateKnobLabel,
 				 V4(1, 1, 1, 1));
-		    if(window.flags & UICommFlag_dragging)
+
+		    if(mix.flags & UICommFlag_dragging)
 		      {
-			globalPlatform.atomicStore(&window.element->fParam->interacting, 1);
+			globalPlatform.atomicStore(&mix.element->fParam->interacting, 1);
 
-			if(window.flags & UICommFlag_leftDragging)
+			if(mix.flags & UICommFlag_leftDragging)
 			  {
-			    v2 dragDelta = uiGetDragDelta(window.element);		
-			    r32 newWindow = (window.element->fParamValueAtClick +
-					     dragDelta.y/knobDragLength*getLength(window.element->fParam->range));
+			    v2 dragDelta = uiGetDragDelta(mix.element);
+			    r32 newMix = (mix.element->fParamValueAtClick +
+					     dragDelta.y/knobDragLength*getLength(mix.element->fParam->range));
 
-			    pluginSetFloatParameter(window.element->fParam, newWindow);
+			    pluginSetFloatParameter(mix.element->fParam, newMix);
 			  }
-			else if(window.flags & UICommFlag_minusPressed)
+			else if(mix.flags & UICommFlag_minusPressed)
 			  {
-			    r32 oldWindow = pluginReadFloatParameter(window.element->fParam);
-			    r32 newWindow = oldWindow - 0.02f*getLength(window.element->fParam->range);
+			    r32 oldMix = pluginReadFloatParameter(mix.element->fParam);
+			    r32 newMix = oldMix - 0.02f*getLength(mix.element->fParam->range);
 
-			    pluginSetFloatParameter(window.element->fParam, newWindow);
+			    pluginSetFloatParameter(mix.element->fParam, newMix);
 			  }
-			else if(window.flags & UICommFlag_plusPressed)
+			else if(mix.flags & UICommFlag_plusPressed)
 			  {
-			    r32 oldWindow = pluginReadFloatParameter(window.element->fParam);
-			    r32 newWindow = oldWindow + 0.02f*getLength(window.element->fParam->range);
+			    r32 oldMix = pluginReadFloatParameter(mix.element->fParam);
+			    r32 newMix = oldMix + 0.02f*getLength(mix.element->fParam->range);
 
-			    pluginSetFloatParameter(window.element->fParam, newWindow);
+			    pluginSetFloatParameter(mix.element->fParam, newMix);
 			  }
 		      }
 		    else
 		      {
-			globalPlatform.atomicStore(&window.element->fParam->interacting, 0);
+			globalPlatform.atomicStore(&mix.element->fParam->interacting, 0);
 		      }
 		  }
 		  
@@ -964,105 +891,55 @@ RENDER_NEW_FRAME(renderNewFrame)
 		      }
 		  }
 		  
-		  // NOTE: mix
+		  // NOTE: window
 		  {
-		    r32 mixDimPOP = 0.235f;
-		    v2 mixOffsetPOP = V2(0.613f, 0.131f);
-		    v2 mixSizePOP = mixDimPOP*V2(1, 1);
-		    v2 mixLabelOffset = V2(0.02f, 0.068f);
-		    v2 mixTextOffset = hadamard(V2(0.003f, 0.042f), panelDim);
-		    UIComm mix =
-		      uiMakeKnob(panelLayout, STR8_LIT("MIX"), mixOffsetPOP, mixSizePOP, 1.f,
-				 &pluginState->parameters[PluginParameter_mix],
-				 mixLabelOffset, knobLabelDim,
+		    v2 windowOffsetPOP = V2(0.854f, 0.063f);
+		    v2 windowSizePOP = knobDimPOP*V2(1, 1);
+		    v2 windowLabelOffset = V2(0.03f, 0.065f);
+		    v2 windowTextOffset = hadamard(V2(0.003f, 0.043f), panelDim);
+		    v2 windowTextScale = 0.0005f*panelDim.x*V2(1.f, 1.f);
+		    UIComm window =
+		      uiMakeKnob(panelLayout, STR8_LIT("WINDOW"), windowOffsetPOP, windowSizePOP, 1.f,
+				 &pluginState->parameters[PluginParameter_window],
+				 windowLabelOffset, knobLabelDim,
 				 knobClickableOffset, knobClickableDim,
-				 mixTextOffset, elementTextScale,
+				 windowTextOffset, windowTextScale,
 				 &pluginState->halfPomegranateKnob, &pluginState->halfPomegranateKnobLabel,
 				 V4(1, 1, 1, 1));
-		    Rect2 mixRect = mix.element->region;
-		    v2 mixRectCenter = getCenter(mixRect);
-		    renderPushQuad(renderCommands, rectCenterDim(mixRectCenter, V2(4, 4)), 0, 0, RenderLevel_front, V4(0, 0, 0, 1));
-		    if(mix.flags & UICommFlag_dragging)
+		    
+		    if(window.flags & UICommFlag_dragging)
 		      {
-			globalPlatform.atomicStore(&mix.element->fParam->interacting, 1);
+			globalPlatform.atomicStore(&window.element->fParam->interacting, 1);
 
-			if(mix.flags & UICommFlag_leftDragging)
+			if(window.flags & UICommFlag_leftDragging)
 			  {
-			    v2 dragDelta = uiGetDragDelta(mix.element);
-			    r32 newMix = (mix.element->fParamValueAtClick +
-					     dragDelta.y/knobDragLength*getLength(mix.element->fParam->range));
+			    v2 dragDelta = uiGetDragDelta(window.element);		
+			    r32 newWindow = (window.element->fParamValueAtClick +
+					     dragDelta.y/knobDragLength*getLength(window.element->fParam->range));
 
-			    pluginSetFloatParameter(mix.element->fParam, newMix);
+			    pluginSetFloatParameter(window.element->fParam, newWindow);
 			  }
-			else if(mix.flags & UICommFlag_minusPressed)
+			else if(window.flags & UICommFlag_minusPressed)
 			  {
-			    r32 oldMix = pluginReadFloatParameter(mix.element->fParam);
-			    r32 newMix = oldMix - 0.02f*getLength(mix.element->fParam->range);
+			    r32 oldWindow = pluginReadFloatParameter(window.element->fParam);
+			    r32 newWindow = oldWindow - 0.02f*getLength(window.element->fParam->range);
 
-			    pluginSetFloatParameter(mix.element->fParam, newMix);
+			    pluginSetFloatParameter(window.element->fParam, newWindow);
 			  }
-			else if(mix.flags & UICommFlag_plusPressed)
+			else if(window.flags & UICommFlag_plusPressed)
 			  {
-			    r32 oldMix = pluginReadFloatParameter(mix.element->fParam);
-			    r32 newMix = oldMix + 0.02f*getLength(mix.element->fParam->range);
+			    r32 oldWindow = pluginReadFloatParameter(window.element->fParam);
+			    r32 newWindow = oldWindow + 0.02f*getLength(window.element->fParam->range);
 
-			    pluginSetFloatParameter(mix.element->fParam, newMix);
+			    pluginSetFloatParameter(window.element->fParam, newWindow);
 			  }
 		      }
 		    else
 		      {
-			globalPlatform.atomicStore(&mix.element->fParam->interacting, 0);
+			globalPlatform.atomicStore(&window.element->fParam->interacting, 0);
 		      }
 		  }
-		  
-		  // NOTE: offset
-		  {
-		    v2 offsetOffsetPOP = V2(0.1285f, 0.004f);
-		    v2 offsetSizePOP = knobDimPOP*V2(1, 1);
-		    v2 offsetTextOffset = hadamard(V2(0.002f, 0.038f), panelDim);
-		    UIComm offset = uiMakeKnob(panelLayout, STR8_LIT("OFFSET"), offsetOffsetPOP, offsetSizePOP, 1.f,
-					       &pluginState->parameters[PluginParameter_offset],
-					       knobLabelOffset, knobLabelDim,
-					       knobClickableOffset, knobClickableDim,
-					       offsetTextOffset, elementTextScale,
-					       &pluginState->pomegranateKnob, &pluginState->pomegranateKnobLabel,
-					       V4(1, 1, 1, 1));
-		    Rect2 offsetRect = offset.element->region;
-		    v2 offsetRectCenter = getCenter(offsetRect);
-		    renderPushQuad(renderCommands, rectCenterDim(offsetRectCenter, V2(4, 4)), 0, 0, RenderLevel_front, V4(0, 0, 0, 1));
-		    if(offset.flags & UICommFlag_dragging)
-		      {
-			globalPlatform.atomicStore(&offset.element->fParam->interacting, 1);
-
-			if(offset.flags & UICommFlag_leftDragging)
-			  {
-			    v2 dragDelta = uiGetDragDelta(offset.element);
-			    r32 newOffset = (offset.element->fParamValueAtClick +
-					     dragDelta.y/knobDragLength*getLength(offset.element->fParam->range));
-
-			    pluginSetFloatParameter(offset.element->fParam, newOffset);
-			  }
-			else if(offset.flags & UICommFlag_minusPressed)
-			  {
-			    r32 oldOffset = pluginReadFloatParameter(offset.element->fParam);
-			    r32 newOffset = oldOffset - 0.02f*getLength(offset.element->fParam->range);
-
-			    pluginSetFloatParameter(offset.element->fParam, newOffset);
-			  }
-			else if(offset.flags & UICommFlag_plusPressed)
-			  {
-			    r32 oldOffset = pluginReadFloatParameter(offset.element->fParam);
-			    r32 newOffset = oldOffset + 0.02f*getLength(offset.element->fParam->range);
-
-			    pluginSetFloatParameter(offset.element->fParam, newOffset);
-			  }
-		      }
-		    else
-		      {
-			globalPlatform.atomicStore(&offset.element->fParam->interacting, 0);
-		      }
-		  }
-		  
+		  		  		  
 		  // NOTE: grain view		  
 		  logString("\ndisplaying grain buffer\n");
 
@@ -1220,322 +1097,6 @@ RENDER_NEW_FRAME(renderNewFrame)
 		    {
 		      entriesQueued = globalPlatform.atomicLoad(&grainStateView->entriesQueued);
 		    }		    
-#else
-
-		  // TODO: don't use strings to check which panel we are in
-		  if(stringsAreEqual(panel->name, STR8_LIT("left")))
-		    {
-		      UIComm volume = uiMakeSlider(panelLayout, STR8_LIT("volume"), V2(30.f, 30.f), UIAxis_y, 0.6f,
-						   &pluginState->parameters[PluginParameter_volume], V4(0.8f, 0.8f, 0.8f, 1));
-
-		      renderPushRectOutline(renderCommands, volume.element->parent->region, 2, RenderLevel_front,
-					    V4(1, 1, 0, 1));
-
-		      if(volume.flags & UICommFlag_hovering)
-			{
-			  volume.element->color = hadamard(volume.element->color, V4(1, 1, 0, 1));
-			}
-		      
-		      if(volume.flags & UICommFlag_dragging)
-			{
-			  if(volume.flags & UICommFlag_leftDragging)
-			    {	
-			      v2 dragDelta = uiGetDragDelta(volume.element);
-			      //printf("dragDelta: (%.2f, %.2f)\n", dragDelta.x, dragDelta.y);
-		      
-			      r32 newVolume =
-				(volume.element->fParamValueAtClick +
-				 getLength(volume.element->fParam->range)*dragDelta.y/getDim(volume.element->region).y);
-			      
-			      pluginSetFloatParameter(volume.element->fParam, newVolume);
-			    }
-			  else if(volume.flags & UICommFlag_minusPressed)
-			    {
-			      r32 oldVolume = pluginReadFloatParameter(volume.element->fParam);
-			      r32 newVolume = oldVolume - 0.02f;
-
-			      pluginSetFloatParameter(volume.element->fParam, newVolume);
-			    }
-			  else if(volume.flags & UICommFlag_plusPressed)
-			    {
-			      r32 oldVolume = pluginReadFloatParameter(volume.element->fParam);
-			      r32 newVolume = oldVolume + 0.02f;
-
-			      pluginSetFloatParameter(volume.element->fParam, newVolume);
-			    }
-			}
-			
-		      // define a new knob for the size parameter
-		      // we are on the left sub-UI
-		      v2 offset = 20.f*V2(1, 1);
-		      r32 sizePOP = 0.15f;
-		      UIComm grainSizeKnob = uiMakeKnob(panelLayout, STR8_LIT("size"), offset, -sizePOP,
-							&pluginState->parameters[PluginParameter_size], 
-							V4(0.2f, 0.5f, 0.3f, 1));
-		      if(grainSizeKnob.flags & UICommFlag_dragging)
-			{
-			  v2 dragDelta = uiGetDragDelta(grainSizeKnob.element);
-			  // post processing to set the new grain size using a temporary workaround: 
-			  // We scaled dragDelta.x by x20 to cover approximately the full grain-size scale across width resolution of the screen.
-			  // i.e. dragging fully to the left reduces grain size and sets it to a value towards zero ..
-			  // .. and dragging fully to the right sets the grain-size towards a value near its max value.
-			  // @TODO fix temporary workaround
-			  r32 newGrainSize = grainSizeKnob.element->fParamValueAtClick + 50.f*dragDelta.y;
-					
-			  pluginSetFloatParameter(grainSizeKnob.element->fParam, newGrainSize);
-			}
-		    }
-		  else if(stringsAreEqual(panel->name, STR8_LIT("right")))
-		    {
-		      //
-		      // play
-		      //
-		      {
-			v2 dim = getDim(panelLayout->regionRemaining);
-			UNUSED(dim);
-			r32 sizePOP = 0.15f;		    
-			r32 offsetPixels = 20.f;		    
-			v2 offset = offsetPixels*V2(1, 1);
-			UIComm play = uiMakeButton(panelLayout, STR8_LIT("play"), offset, -sizePOP,
-						   &pluginState->soundIsPlaying, V4(0, 0, 1, 1));
-		    
-			if(play.flags & UICommFlag_pressed)
-			  {
-			    bool oldPlay = pluginReadBooleanParameter(play.element->bParam);
-			    bool newPlay = !oldPlay;
-			    pluginSetBooleanParameter(play.element->bParam, newPlay);
-			    // TODO: stop doing the queue here: we don't want to have to synchronize grain (de)queueing
-			    //       across the audio and video threads (once we actually have them on their own threads)
-			    //queueAllGrainsFromFile(&pluginState->silo, &pluginState->loadedGrainPackfile);
-			  }		    
-		      }
-		  
-		      //
-		      // spread knob
-		      //
-		      {
-			v2 dim = getDim(panelLayout->regionRemaining);
-			UNUSED(dim);
-			r32 sizePOP = 0.15f;
-			r32 offsetPixels = 20.f;
-			v2 offset = offsetPixels*V2(1,1);
-			//spread knob
-			//v2 offsetSpread = offsetPixels * V2(1,2);
-			UIComm spread = uiMakeKnob(panelLayout, STR8_LIT("Spread"), offset, -sizePOP,
-						   &pluginState->parameters[PluginParameter_spread], V4(1, 1, 0, 1));
-			if (spread.flags & UIElementFlag_turnable)
-			  {
-			    v2 dragDelta2 = uiGetDragDelta(spread.element);
-			    //printf("dragDelta: (%.2f, %.2f)\n", dragDelta.x, dragDelta.y);
-			    r32 spreader = spread.element->fParamValueAtClick + .01f * dragDelta2.y;
-			    pluginSetFloatParameter(spread.element->fParam, spreader);
-			  }
-		      }
-			
-		      //
-		      // density
-		      //
-		      {
-			v2 dim = getDim(panelLayout->regionRemaining);
-			UNUSED(dim);
-			r32 sizePOP = 0.15f;
-			r32 offsetPixels = 20.f;
-			v2 offset = offsetPixels*V2(1,1);
-			UIComm density = uiMakeKnob(panelLayout, STR8_LIT("density"), offset, -sizePOP,
-						    &pluginState->parameters[PluginParameter_density], V4(0, 1, 0, 1));
-			if(density.flags & UICommFlag_dragging)
-			  {
-			    v2 dragDelta = uiGetDragDelta(density.element);
-			    //printf("dragDelta: (%.2f, %.2f)\n", dragDelta.x, dragDelta.y);
-		      
-			    r32 newDensity = density.element->fParamValueAtClick + 0.1f*dragDelta.y;
-			    pluginSetFloatParameter(density.element->fParam, newDensity);
-			    //printf("newDensity: %.2f\n", newDensity);
-			  }		    
-		      }
-		      
-		      // @TODO Refine UI for the window parameter ..
-		      // .. what needs to be done is position the rotating knob into a more aligned spot in the UI frame .. 
-		      // .. and implement a knob with distinct states instead of a knob with float states.
-		      // Otherwise, define a new UI struct for it. hint: It needs a UI that will be used a toggling mechanism across its 4+ disctinct states.
-		      // define a new knob for the window parameter
-		      // we are on the right sub-UI
-		      {
-			v2 dim = getDim(panelLayout->regionRemaining);
-			UNUSED(dim);
-			r32 sizePOP = 0.15f;
-			r32 offsetPixels = 20.f;
-			v2 offset = offsetPixels*V2(1, 1);
-			UIComm window = uiMakeKnob(panelLayout, STR8_LIT("window"), offset, -sizePOP,
-						   &pluginState->parameters[PluginParameter_window], 
-						   V4(1, 0, 1, 1));
-			if(window.flags & UICommFlag_dragging)
-			  {
-			    v2 dragDelta = uiGetDragDelta(window.element);
-			    r32 newWindow = window.element->fParamValueAtClick + 0.01f*dragDelta.y;
-
-			    pluginSetFloatParameter(window.element->fParam, newWindow);
-			  }		    
-		      }
-		    }
-		  else if(stringsAreEqual(panel->name, STR8_LIT("bottom")))
-		    {
-		      logString("\ndisplaying grain buffer\n");
-
-		      v2 dim = getDim(panelLayout->regionRemaining);
-		      v2 min = panelLayout->regionRemaining.min;
-
-		      r32 middleBarThickness = 4.f;
-		      Rect2 middleBar = rectMinDim(min + V2(0, 0.5f*dim.y),
-						   V2(dim.x, middleBarThickness));
-		      renderPushQuad(renderCommands, middleBar, 0, 0.f, RenderLevel_front, V4(0, 0, 0, 1));
-
-		      v2 upperRegionMin = min + V2(0, 0.5f*(dim.y + middleBarThickness));
-		      v2 lowerRegionMin = min;
-		      v2 regionDim = V2(dim.x, 0.5f*dim.y - middleBarThickness);
-		      v2 lowerRegionMiddle = lowerRegionMin + V2(0, 0.5f*regionDim.y);
-		      v2 upperRegionMiddle = upperRegionMin + V2(0, 0.5f*regionDim.y);
-
-		      u32 grainBufferCapacity = pluginState->grainBuffer.capacity;
-		      GrainStateView *grainStateView = &pluginState->grainStateView;
-		      AudioRingBuffer *grainViewBuffer = &grainStateView->viewBuffer;
-		  
-		      u32 viewEntryReadIndex = grainStateView->readIndex;
-		      u32 entriesQueued = globalPlatform.atomicLoad(&grainStateView->entriesQueued);
-		      logFormatString("entriesQueued: %u", entriesQueued);
-		  
-		      for(u32 entryIndex = 0; entryIndex < entriesQueued; ++entryIndex)
-			{
-			  u32 bufferReadIndex = grainStateView->viewBuffer.readIndex;
-			  u32 bufferWriteIndex = grainStateView->viewBuffer.writeIndex;
-		  
-			  GrainBufferViewEntry *view = (grainStateView->views +
-							((viewEntryReadIndex + entryIndex) %
-							 ARRAY_COUNT(grainStateView->views)));
-
-			  // NOTE: update view buffer with new view data
-			  writeSamplesToAudioRingBuffer(grainViewBuffer,
-							view->bufferSamples[0], view->bufferSamples[1],
-							view->sampleCount);
-
-			  // NOTE: display view read and write positions
-			  r32 barThickness = 2.f;
-			  u32 readIndex = bufferReadIndex;
-			  r32 readPosition = (r32)readIndex/(r32)grainBufferCapacity;
-			  r32 readBarPosition = readPosition*dim.x;
-			  Rect2 readBar = rectMinDim(min + V2(readBarPosition, 0.f),
-						     V2(barThickness, dim.y));
-			  renderPushQuad(renderCommands, readBar, 0, 0.f, RenderLevel_front, V4(1, 0, 0, 1));
-		      
-			  u32 writeIndex = bufferWriteIndex;
-			  r32 writePosition = (r32)writeIndex/(r32)grainBufferCapacity;
-			  r32 writeBarPosition = writePosition*dim.x;
-			  Rect2 writeBar = rectMinDim(min + V2(writeBarPosition, 0.f),
-						      V2(barThickness, dim.y));
-			  renderPushQuad(renderCommands, writeBar, 0, 0.f, RenderLevel_front, V4(1, 1, 1, 1));
-
-			  // NOTE: display playing grain start and end positions
-#if 1
-			  v4 grainWindowColors[] =
-			    {
-			      //colorV4FromU32(0xFF4000FF),
-			      colorV4FromU32(0xFF8000FF),
-			      colorV4FromU32(0xFFBF00FF),
-			      colorV4FromU32(0xFFFF00FF),
-			  
-			      colorV4FromU32(0xBFFF00FF),
-			      colorV4FromU32(0x80FF00FF),
-			      colorV4FromU32(0x40FF00FF),
-			      colorV4FromU32(0x00FF00FF),
-
-			      colorV4FromU32(0x00FF40FF),
-			      colorV4FromU32(0x00FF80FF),
-			      colorV4FromU32(0x00FFBFFF),
-			      colorV4FromU32(0x00FFFFFF),
-
-			      colorV4FromU32(0x00BFFFFF),
-			      colorV4FromU32(0x0080FFFF),
-			      colorV4FromU32(0x0040FFFF),
-			      colorV4FromU32(0x0000FFFF),
-
-			      colorV4FromU32(0x4000FFFF),
-			      colorV4FromU32(0x8000FFFF),
-			      colorV4FromU32(0xBF00FFFF),
-			      colorV4FromU32(0xFF00FFFF),
-
-			      colorV4FromU32(0xFF00BFFF),
-			      colorV4FromU32(0xFF0080FF),
-			      //colorV4FromU32(0xFF0040FF),
-			    };
-
-			  for(u32 grainViewIndex = 0; grainViewIndex < view->grainCount; ++grainViewIndex)
-			    {
-			      GrainViewEntry *grainView = view->grainViews + grainViewIndex;
-			      //u32 grainReadIndex = grainView->readIndex;
-			      u32 grainStartIndex = grainView->startIndex;
-			      u32 grainEndIndex = grainView->endIndex;			  
-			      r32 grainStartPosition = (r32)grainStartIndex/(r32)grainBufferCapacity;
-			      r32 grainEndPosition = (r32)grainEndIndex/(r32)grainBufferCapacity;
-			      r32 grainStartBarPosition = grainStartPosition*dim.x;
-			      r32 grainEndBarPosition = grainEndPosition*dim.x;
-			      Rect2 grainStartBar = rectMinDim(min + V2(grainStartBarPosition, 0.f),
-							       V2(barThickness, dim.y));
-			      Rect2 grainEndBar = rectMinDim(min + V2(grainEndBarPosition, 0.f),
-							     V2(barThickness, dim.y));
-			      v4 grainWindowColor = grainWindowColors[grainViewIndex];
-			      renderPushQuad(renderCommands, grainStartBar, 0, 0.f, RenderLevel_front, grainWindowColor);
-			      renderPushQuad(renderCommands, grainEndBar, 0, 0.f, RenderLevel_front, grainWindowColor);
-			    }
-#endif
-			}
-
-#if 1		  
-		      r32 samplesPerPixel = (r32)grainBufferCapacity/dim.x;
-		      u32 lastSampleIndex = 0;
-		      u32 widthInPixels = (u32)dim.x;
-		      for(u32 pixel = 0; pixel < widthInPixels; ++pixel)
-			{
-			  r32 samplePosition = samplesPerPixel*pixel;
-			  u32 sampleIndex = (u32)samplePosition;
-			  r32 sampleL = 0.f;
-			  r32 sampleR = 0.f;
-			  for(u32 i = lastSampleIndex; i < sampleIndex; ++i)
-			    {
-			      sampleL += grainViewBuffer->samples[0][i];
-			      sampleR += grainViewBuffer->samples[1][i];
-			    }
-			  sampleL /= samplesPerPixel;
-			  sampleR /= samplesPerPixel;
-		      		      
-			  Rect2 sampleLBar = rectMinDim(lowerRegionMiddle + V2(pixel, 0.f),
-							V2(1.f, 0.5f*sampleL*regionDim.y));
-			  Rect2 sampleRBar = rectMinDim(upperRegionMiddle + V2(pixel, 0.f),
-							V2(1.f, 0.5f*sampleR*regionDim.y));
-			  renderPushQuad(renderCommands, sampleLBar, 0, 0.f, RenderLevel_front, V4(0, 1, 0, 1));
-			  renderPushQuad(renderCommands, sampleRBar, 0, 0.f, RenderLevel_front, V4(0, 1, 0, 1));
-
-			  lastSampleIndex = sampleIndex;
-			}
-#endif
-
-		      grainStateView->readIndex =
-			(viewEntryReadIndex + entriesQueued) % ARRAY_COUNT(grainStateView->views);
-		      u32 oldEntriesQueued = entriesQueued;
-		      while(globalPlatform.atomicCompareAndSwap(&grainStateView->entriesQueued,
-								entriesQueued,
-								entriesQueued - oldEntriesQueued) != entriesQueued)
-			{
-			  entriesQueued = globalPlatform.atomicLoad(&grainStateView->entriesQueued);
-			}
-		      // while(globalPlatform.atomicCompareAndSwap(&grainStateView->entriesQueued, entriesQueued, 0) !=
-		      // 	    entriesQueued)
-		      // 	{
-		      // 	  entriesQueued = globalPlatform.atomicLoad(&grainStateView->entriesQueued);
-		      // 	  grainStateView->readIndex =
-		      // 	    (viewReadIndex + entriesQueued) % ARRAY_COUNT(grainStateView->views);
-		      // 	}
-		    }
-#endif
 	      
 		  renderPushUILayout(renderCommands, panelLayout);
 		  uiEndLayout(panelLayout);
@@ -1545,172 +1106,9 @@ RENDER_NEW_FRAME(renderNewFrame)
       
       arenaEndTemporaryMemory(&scratchMemory);
       uiContextEndFrame(uiContext);
-#else
-      UILayout *layout = &pluginState->layout;
-      uiBeginLayout(layout, V2(windowWidth, windowHeight), &input->mouseState, &input->keyboardState);
-      
-#if 0
-      printf("\nlayout:\n  mouseP: (%.2f, %.2f)\n  left pressed: %s\n  left released: %s\n  left down: %s\n",
-	     layout->mouseP.x, layout->mouseP.y,
-	     layout->leftButtonPressed ? "true" : "false",
-	     layout->leftButtonReleased ? "true" : "false",
-	     layout->leftButtonDown ? "true" : "false");
-#endif
-      
-      UIComm title = uiMakeTextElement(layout, "I Will Become a Granular Synthesizer!", 0.75f, 0.f);
-      (void)title;
-      
-      UIComm play = uiMakeButton(layout, "play", V2(0.75f, 0.75f), V2(0.1f, 0.1f),
-				     &pluginState->soundIsPlaying, V4(0, 0, 1, 1));
-      if(play.flags & UICommFlag_pressed)
-	{	  
-	  ASSERT(play.element->parameterType = UIParameter_boolean);
-	  pluginSetBooleanParameter(play.element->bParam, true);
-
-	  // TODO: stop doing the queue here: we don't want to have to synchronize grain (de)queueing across
-	  //       the audio and video threads (once we actually have them on their own threads)
-	  //r64 currentTimestamp = (r64)globalPlatform.getCurrentTimestamp()/(r64)pluginState->osTimerFreq;
-	  //printf("grainQueue: %llu\n", currentTimestamp);
-	  queueAllGrainsFromFile(&pluginState->silo, &pluginState->loadedGrainPackfile);
-	}
-            
-      UIComm volume = uiMakeSlider(layout, "volume", V2(0.1f, 0.1f), V2(0.1f, 0.75f),
-				   &pluginState->parameters[PluginParameter_volume],// makeRange(0.f, 1.f),
-				   V4(0.8f, 0.8f, 0.8f, 1));
-#if 0
-      printf("\nvolume flags:\n %u(comm)\n %u(element)\n", volume.flags, volume.element->commFlags);
-      printf("volume rect:\n  min: (%.2f, %.2f)\n  max: (%.2f, %.2f)\n",
-	     volume.element->region.min.x, volume.element->region.min.y,
-	     volume.element->region.max.x, volume.element->region.max.y);
-#endif
-      if(volume.flags & UICommFlag_dragging)
-	{
-	  Rect2 volumeRegion = volume.element->region;
-	  v2 regionDim = getDim(volumeRegion);
-	  
-	  ASSERT(volume.element->parameterType == UIParameter_float);
-	  r32 oldVal = pluginReadFloatParameter(volume.element->fParam);
-	  r32 newVal = oldVal;
-	  if(volume.flags & UICommFlag_leftDragging)
-	    {  
-	      v2 clippedMouseP = clipToRect(layout->mouseP.xy, volumeRegion);	  
-	      newVal = (clippedMouseP.y - volumeRegion.min.y)/regionDim.y;
-	    }
-	  else if(volume.flags & UICommFlag_minusPressed)
-	    {
-	      newVal -= 0.02f*getLength(volume.element->fParam->range);
-	    }
-	  else if(volume.flags & UICommFlag_plusPressed)
-	    {
-	      newVal += 0.02f*getLength(volume.element->fParam->range);
-	    }
-#if 0
-	  printf("mouseP: (%.2f, %.2f)\n", layout->mouseP.x, layout->mouseP.y);
-	  printf("clippedMouseP: (%.2f, %.2f)\n", clippedMouseP.x, clippedMouseP.y);	  
-	  printf("newVolume: %.2f\n", newVal);
-	  printf("volume dim: %.2f\n", getDim(volume.element->region).y);
-#endif
-	  
-	  pluginSetFloatParameter(volume.element->fParam, newVal);
-	}
-
-      UIComm density = uiMakeKnob(layout, "density", V2(0.75f, 0.5f), V2(0.1f, 0.1f),
-				  &pluginState->parameters[PluginParameter_density], V4(0, 1, 0, 1));
-      if(density.flags & UICommFlag_dragging)
-	{
-	  //Rect2 knobDragRect = rectCenterDim(density.element->mouseClickedP - V2(20, 0), V2(5, 50));	  
-	  //renderPushQuad(renderCommands, knobDragRect, 0, 0, V4(0, 0, 0, 1));
-	  
-	  r32 oldValue = density.element->fParamValueAtClick;	  
-	  v2 dragDelta = layout->mouseP.xy - density.element->mouseClickedP;	  
-	  r32 newValue = oldValue + 0.1f*dragDelta.y;
-#if 0
-	  printf("layoutMouseP: (%.2f, %.2f)\n", layout->mouseP.x, layout->mouseP.y);
-	  printf("mouseClickedP: (%.2f, %.2f)\n", density.element->mouseClickedP.x, density.element->mouseClickedP.y);
-	  printf("oldValue: %.2f\n", oldValue);
-	  printf("newValue: %.2f\n", newValue);
-#endif
-	  
-	  ASSERT(density.element->parameterType == UIParameter_float);
-	  pluginSetFloatParameter(density.element->fParam, newValue);
-	}
-
-      UIComm paramList = uiMakeCollapsibleList(layout, "parameters", V2(200, 100), V2(0.2f, 0.f));
-      if(paramList.flags & UICommFlag_clicked)
-	{
-	  paramList.element->showChildren = !paramList.element->showChildren;
-	  
-	  uiPushParentElement(layout, paramList.element);
-	  {
-	    uiMakeKnob(layout, "squamblicity", V2(0, 0), V2(0.1f, 0.1f), 0, V4(1, 1, 0, 1));
-	    uiMakeKnob(layout, "blatherousness", V2(0.2f, 0), V2(0.1f, 0.1f), 0, V4(0, 1, 1, 1));
-	  }
-	  uiPopParentElement(layout);
-	}
-
-      // NOTE: keyboard navigation
-      if(wasPressed(input->keyboardState.keys[KeyboardButton_tab]))
-	{
-	  layout->selectedElementOrdinal = (layout->selectedElementOrdinal + 1) % (layout->elementCount + 1);	  
-	  layout->selectedElement = {};
-	}
-      
-      if(wasPressed(input->keyboardState.keys[KeyboardButton_backspace]))
-	{
-	  if(layout->selectedElementOrdinal)
-	    {
-	      --layout->selectedElementOrdinal;
-	    }	  
-
-	  layout->selectedElement = {};
-	}
-
-      //printf("element ordinal: %u\n", layout->selectedElementOrdinal);
-      UIElement *selectedElement = 0;
-      for(u32 i = 0; i < layout->selectedElementOrdinal; ++i)
-	{	  
-	  if(selectedElement)
-	    {
-	      bool advanced = false;
-	      if(selectedElement->first)
-		{
-		  if(selectedElement->first != ELEMENT_SENTINEL(selectedElement))
-		    {
-		      selectedElement = selectedElement->first;
-		      advanced = true;
-		    }
-		}
-	      
-	      if(!advanced && selectedElement->next)
-		{
-		  if(selectedElement->next != ELEMENT_SENTINEL(selectedElement->parent))
-		    {
-		      selectedElement = selectedElement->next;
-		      advanced = true;
-		    }
-		}
-	      
-	      ASSERT(advanced);
-	    }
-	  else
-	    {
-	      selectedElement = layout->root;
-	    }
-	}
-      
-      if(selectedElement)
-	{	
-	  layout->selectedElement = selectedElement->hashKey;
-	}      
-      
-      //uiPrintLayout(layout);
-      renderPushUILayout(renderCommands, layout);
-      uiEndLayout(layout);
-#endif
       
       arenaEnd(&pluginState->frameArena);
-      //printf("permanent arena used %zu bytes\n", pluginState->permanentArena.used);
-      //stringListPushFormat(globalLogger->logArena, &globalLogger->log, "permanent arena used %zu bytes\n", pluginState->permanentArena.used);
+
       logFormatString("permanent arena used %zu bytes", pluginState->permanentArena.used);
     }  
 }
@@ -1851,8 +1249,6 @@ AUDIO_PROCESS(audioProcess)
 		 framesToWrite);
 
       // NOTE: audio output
-      r64 nFreq = M_TAU*pluginState->freq/(r64)audioBuffer->outputSampleRate;                 
-
       r32 formatVolumeFactor = 1.f;      
       switch(audioBuffer->outputFormat)
 	{
@@ -1881,11 +1277,6 @@ AUDIO_PROCESS(audioProcess)
 
 	  r32 mixParam = pluginReadFloatParameter(&pluginState->parameters[PluginParameter_mix]);
 
-	  pluginState->phasor += nFreq;
-	  if(pluginState->phasor > M_TAU) pluginState->phasor -= M_TAU;
-				  
-	  r32 sinVal = sin(pluginState->phasor);
-	  UNUSED(sinVal);
 	  for(u32 channelIndex = 0; channelIndex < audioBuffer->outputChannels; ++channelIndex)
 	    {
 	      r32 mixedVal = 0.f;

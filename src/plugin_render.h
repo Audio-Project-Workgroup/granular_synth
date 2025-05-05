@@ -163,6 +163,8 @@ renderPushUIElement(RenderCommands *commands, UIElement *element)
   UILayout *layout = element->layout;
   //UIContext *context = layout->context;  
 
+  bool elementIsSelected = uiHashKeysAreEqual(element->hashKey, layout->selectedElement);
+
   v2 elementRegionCenter = getCenter(element->region);
   v2 elementRegionDim = getDim(element->region);
   // TODO: pull out common formatting computations
@@ -172,9 +174,9 @@ renderPushUIElement(RenderCommands *commands, UIElement *element)
 		     element->name, element->region.min, element->textScale, getDim(element->region).x,
 		     element->color);
     }
-  if(element->flags & UIElementFlag_drawBorder)
+  if((element->flags & UIElementFlag_drawBorder) || elementIsSelected)
     {
-      v4 color = uiHashKeysAreEqual(element->hashKey, layout->selectedElement) ? V4(1, 0.5f, 0, 1) : V4(0, 0, 0, 1);
+      v4 color = elementIsSelected ? V4(1, 0.5f, 0, 1) : V4(0, 0, 0, 1);
       Rect2 border = rectAddRadius(element->region, V2(1, 1));
       
       renderPushRectOutline(commands, border, 2.f, RenderLevel_front, color);
@@ -228,16 +230,6 @@ renderPushUIElement(RenderCommands *commands, UIElement *element)
   //logFormatString("textScale: (%.2f, %.2f)", textScale.x, textScale.y);
   textDim = hadamard(textScale, textDim);
   
-  /* if(element->flags & UIElementFlag_drawLabelAbove) */
-  /*   {                                    */
-  /*     v2 labelCenter = V2(elementRegionCenter.x, */
-  /* 			  elementRegionCenter.y + 0.5f*elementRegionDim.y + labelVSpace + 0.5f*labelHeight); */
-  /*     Rect2 labelRegion = rectAddRadius(rectCenterDim(labelCenter, labelDim), V2(2, 1)); */
-      
-  /*     renderPushRectOutline(commands, labelRegion, 2.f, RenderLevel_front, V4(0, 0, 0, 1)); */
-  /*     renderPushText(commands, layout->context->font, element->name, */
-  /* 		     labelRegion.min, V2(textScale, textScale), labelDim.x); */
-  /*   } */
   if(element->flags & UIElementFlag_drawLabelBelow)
     {
       //logFormatString("textOffset: (%.2f, %.2f)", element->textOffset);
@@ -251,14 +243,14 @@ renderPushUIElement(RenderCommands *commands, UIElement *element)
 	  v2 labelDim = hadamard(element->labelDim, elementRegionDim);
 	  Rect2 labelRegion = rectMinDim(labelOffset + element->region.min, labelDim);
 	  //renderPushRectOutline(commands, labelRegion, 2.f, RenderLevel_front, V4(0, 0, 0, 1));
-	  renderPushQuad(commands, labelRegion, element->labelTexture, 0, RenderLevel_front, V4(1, 1, 0, 1));
+	  renderPushQuad(commands, labelRegion, element->labelTexture, 0, RenderLevel_front, V4(1, 1, 1, 1));
 	}
-      renderPushRectOutline(commands, textRegion, 2.f, RenderLevel_front, V4(0, 0, 0, 1));
+      //renderPushRectOutline(commands, textRegion, 2.f, RenderLevel_front, V4(0, 0, 0, 1));
       renderPushText(commands, layout->context->font, element->name,
 		     textRegion.min, textScale, textDim.x);
     }
 
-  renderPushRectOutline(commands, element->clickableRegion, 2.f, RenderLevel_front, V4(1, 0, 1, 1));
+  //renderPushRectOutline(commands, element->clickableRegion, 2.f, RenderLevel_front, V4(1, 0, 1, 1));
 
   if(element->next)
     {

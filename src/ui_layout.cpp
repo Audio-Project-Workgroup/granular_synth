@@ -572,7 +572,7 @@ inline UIComm
 uiMakeSelectableTextElement(UILayout *layout, String8 message, r32 scale, v4 color = V4(1, 1, 1, 1))
 {
   UIContext *context = layout->context;
-  u32 flags = UIElementFlag_drawText | UIElementFlag_drawBorder | UIElementFlag_clickable;
+  u32 flags = UIElementFlag_drawText | UIElementFlag_clickable;
   UIElement *text = uiMakeElement(layout, message, flags, color, 0);
 
   v2 layoutRegionRemainingDim = getDim(layout->regionRemaining);
@@ -631,8 +631,7 @@ uiMakeSlider(UILayout *layout, String8 name,
 	     LoadedBitmap *backgroundTexture = 0, LoadedBitmap *clickableTexture = 0, LoadedBitmap *labelTexture = 0,
 	     v4 color = V4(1, 1, 1, 1))
 {
-  u32 flags =
-    (UIElementFlag_clickable | UIElementFlag_draggable | UIElementFlag_drawBorder | UIElementFlag_drawLabelBelow);
+  u32 flags = (UIElementFlag_clickable | UIElementFlag_draggable | UIElementFlag_drawLabelBelow);
   UIElement *slider = uiMakeElement(layout, name, flags, color, backgroundTexture);
   uiSetElementDataFloat(slider, param);
   slider->secondaryTexture = clickableTexture;
@@ -657,8 +656,7 @@ uiMakeKnob(UILayout *layout, String8 name, v2 offset, v2 dim, r32 aspectRatio, P
 	   v2 textOffset, v2 textScale,
 	   LoadedBitmap *texture = 0, LoadedBitmap *labelTexture = 0, v4 color = V4(1, 1, 1, 1))
 {
-  u32 flags =
-    (UIElementFlag_clickable | UIElementFlag_turnable | UIElementFlag_drawBorder | UIElementFlag_drawLabelBelow);
+  u32 flags = (UIElementFlag_clickable | UIElementFlag_turnable | UIElementFlag_drawLabelBelow);
   UIElement *knob = uiMakeElement(layout, name, flags, color, texture);
   uiSetElementDataFloat(knob, param);
   knob->labelOffset = labelOffset;

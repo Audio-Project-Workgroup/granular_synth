@@ -30,7 +30,8 @@ cl %CFLAGS% ..\src\plugin.cpp -Fmplugin.map -LD /link %LFLAGS% -PDB:plugin_%rand
 
 set PLUGIN_STATUS=%ERRORLEVEL%
 
-cl %CFLAGS% -D"PLUGIN_PATH=\"%cd:\=\\%\\plugin.dll\"" ..\src\main.cpp logo.res -Fmmain.map /link /SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup %LFLAGS% -LIBPATH:..\src\libs user32.lib gdi32.lib shell32.lib glfw3_mt.lib opengl32.lib miniaudio.lib /out:granade.exe
+::-D"PLUGIN_PATH=\"%cd:\=\\%\\plugin.dll\""
+cl %CFLAGS% -D"PLUGIN_PATH=\"plugin.dll\"" ..\src\main.cpp logo.res -Fmmain.map /link /SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup %LFLAGS% -LIBPATH:..\src\libs user32.lib gdi32.lib shell32.lib glfw3_mt.lib opengl32.lib miniaudio.lib /out:granade.exe
 REM onnxruntime.lib
 
 popd

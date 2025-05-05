@@ -515,12 +515,14 @@ main(int argc, char **argv)
 	  usz loggerMemorySize = KILOBYTES(512);
 	  void *loggerMemory = calloc(loggerMemorySize, 1);
 	  Arena loggerArena = arenaBegin(loggerMemory, loggerMemorySize);
-	  
+
+#if BUILD_DEBUG
 	  PluginLogger logger = {};
 	  logger.logArena = &loggerArena;
 	  logger.maxCapacity = loggerMemorySize/2;
 
 	  pluginMemory.logger = &logger;
+#endif
 
 	  RenderCommands commands = {};	  
 

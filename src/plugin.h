@@ -94,10 +94,9 @@ struct PluginState
   LoadedGrainPackfile loadedGrainPackfile;
   FileGrainState silo;
 
-  r64 phasor;
+  /* r64 phasor; */
   r32 freq;
   PluginBooleanParameter soundIsPlaying;
-  //PluginFloatParameter parameters[PluginParameter_count];
 
   PlayingSound loadedSound;
 
