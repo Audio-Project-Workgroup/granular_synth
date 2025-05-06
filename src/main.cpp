@@ -501,6 +501,7 @@ main(int argc, char **argv)
 	  pluginMemory.platformAPI.readEntireFile  = platformReadEntireFile;
 	  pluginMemory.platformAPI.freeFileMemory  = platformFreeFileMemory;
 	  pluginMemory.platformAPI.writeEntireFile = platformWriteEntireFile;
+	  pluginMemory.platformAPI.getPathToModule = platformGetPathToModule;
 	  
 	  //pluginMemory.platformAPI.runModel = platformRunModel;
 	  
@@ -529,6 +530,7 @@ main(int argc, char **argv)
 	  // plugin setup
 
 	  PluginCode plugin = loadPluginCode(PLUGIN_PATH);
+	  pluginMemory.pluginHandle = plugin.pluginCode;
 
 	  // model setup
 

@@ -4,6 +4,7 @@ set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_BUILD_TYPE Debug)
 
 project(GranularSynthTest VERSION 0.0.1)
+set(PLUGIN_NAME "Granular Synth Test")
 
 add_subdirectory(JUCE)
 
@@ -18,7 +19,8 @@ juce_add_plugin(
   PLUGIN_MANUFACTURER_CODE Test
   PLUGIN_CODE Test
   FORMATS VST3
-  PRODUCT_NAME "Granular Synth Test"
+  #  PRODUCT_NAME "Granular Synth Test"
+  PRODUCT_NAME ${PLUGIN_NAME}
 )
 
 get_filename_component(BASE_DIR ${CMAKE_SOURCE_DIR} DIRECTORY)
@@ -30,7 +32,7 @@ set(DATA_DIR "${BASE_DIR}/data")
 if(WIN32)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc")
 
-  set(DYNAMIC_PLUGIN_PATH "${BUILD_DIR}/plugin.dll")
+  set(DYNAMIC_PLUGIN_NAME "plugin.dll")  
 
   # set(ONNX_LIBRARY_DIR "${BASE_DIR}/src/libs")
   # set(ONNX_INCLUDE_DIR "${BASE_DIR}/src/include")
@@ -38,12 +40,12 @@ if(WIN32)
   # set(ONNX_DLL "${BUILD_DIR}/onnxruntime.dll")
   
   message("juce fucks up automatically installing plugins on windows. you have to do it yourself :(")
-  #set(JUCE_VST3_COPY_DIR ${USER_ROOT}AppData/Local/Programs/Common/VST3)
-  #set(JUCE_COPY_PLUGIN_AFTER_BUILD ON)
+  #juce_enable_copy_plugin_step(${PROJECT_NAME})
 elseif(APPLE)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
-  
-  set(DYNAMIC_PLUGIN_PATH "${BUILD_DIR}/plugin.dylib")
+
+  set(DYNAMIC_PLUGIN_NAME "plugin.dylib")
+
   #set(ONNX_LIBRARY "${ONNX_LIBRARY_DIR}/libonnxruntime.dylib")
 
   # find_package(onnxruntime REQUIRED)
@@ -54,13 +56,15 @@ elseif(APPLE)
   #   message("onnxruntime not found")	
   # endif()
 
-  set(JUCE_VST3_COPY_DIR "$ENV{HOME}/Library/Audio/Plug-Ins/VST")
-  message("${JUCE_VST3_COPY_DIR}")
-  set(JUCE_COPY_PLUGIN_AFTER_BUILD ON)
+  # set(JUCE_VST3_COPY_DIR "$ENV{HOME}/Library/Audio/Plug-Ins/VST")
+  # message("${JUCE_VST3_COPY_DIR}")
+  # set(JUCE_COPY_PLUGIN_AFTER_BUILD ON)
+  juce_enable_copy_plugin_step(${PROJECT_NAME})
 elseif(UNIX)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
+
+  set(DYNAMIC_PLUGIN_NAME "plugin.so")
   
-  set(DYNAMIC_PLUGIN_PATH "${BUILD_DIR}/plugin.so")
   #set(ONNX_LIBRARY "${ONNX_LIBRARY_DIR}/libonnxruntime.so")
 
   # find_package(onnxruntime REQUIRED)
@@ -71,9 +75,11 @@ elseif(UNIX)
   #   message("onnxruntime not found")	
   # endif()
 
-  set(JUCE_COPY_PLUGIN_AFTER_BUILD ON)	
+  # set(JUCE_COPY_PLUGIN_AFTER_BUILD ON)
+  juce_enable_copy_plugin_step(${PROJECT_NAME})
 endif()
 
+set(DYNAMIC_PLUGIN_PATH "${BUILD_DIR}/${DYNAMIC_PLUGIN_NAME}")    
 # message("${BUILD_DIR}")
 # message("${DATA_DIR}")
 # message("${DYNAMIC_PLUGIN_PATH}")
@@ -82,13 +88,25 @@ endif()
 # message("${ONNX_LIBRARY}")
 # message("${ONNX_MODEL_PATH}")
 
+add_custom_command(
+    TARGET ${PROJECT_NAME}
+    POST_BUILD
+    # copy plugin dynamic library to vst output directory
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    "${DYNAMIC_PLUGIN_PATH}"
+    "$<TARGET_FILE_DIR:${PROJECT_NAME}_VST3>"
+
+    # copy data folder to the vst bundle
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    "${DATA_DIR}"
+    "$<TARGET_FILE_DIR:${PROJECT_NAME}>/VST3/${PLUGIN_NAME}.vst3/Contents/data"
+  )
+
 target_compile_definitions(
   ${PROJECT_NAME}
   PRIVATE
-  BUILD_DEBUG=1
-  "BUILD_DIR=\"${BUILD_DIR}\""
-  "DATA_DIR=\"${DATA_DIR}\""
-  "DYNAMIC_PLUGIN_PATH=\"${DYNAMIC_PLUGIN_PATH}\""
+  BUILD_DEBUG=1  
+  "DYNAMIC_PLUGIN_FILE_NAME=\"${DYNAMIC_PLUGIN_NAME}\""
   # "ONNX_MODEL_PATH=\"${ONNX_MODEL_PATH}\""
 )
 

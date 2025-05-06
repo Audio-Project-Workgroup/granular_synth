@@ -4,11 +4,13 @@
 #include "platform.h"
 //#include "onnx.cpp"
 
+static juce::String globalVstBaseDirectory;
+
 PLATFORM_READ_ENTIRE_FILE(juceReadEntireFile)
 {
   ReadFileResult result = {};
 
-  juce::String filepath = juce::String(BUILD_DIR) + juce::String("/") + juce::String(filename);
+  juce::String filepath = globalVstBaseDirectory + "/" + juce::String(filename);
   juce::Logger::writeToLog(filepath);
   
   juce::File file(filepath);  
@@ -59,7 +61,7 @@ PLATFORM_READ_ENTIRE_FILE(juceReadEntireFile)
 
 PLATFORM_WRITE_ENTIRE_FILE(juceWriteEntireFile)
 { 
-  juce::String filepath = juce::String(BUILD_DIR) + juce::String("/") + juce::String(filename);
+  juce::String filepath = globalVstBaseDirectory + "/" + juce::String(filename);
   juce::Logger::writeToLog(filepath);
   
   juce::File file(filepath);  
@@ -158,6 +160,26 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
   resourcesReleased = false;
 
   ignoreParameterChange = false;
+
+  juce::File vstFile = juce::File::getSpecialLocation(juce::File::currentExecutableFile);
+  juce::File platformContentsDirectory = vstFile.getParentDirectory();
+  juce::File contentsDirectory = platformContentsDirectory.getParentDirectory();
+  juce::File resourcesDirectory = contentsDirectory.getChildFile("Resources");
+  juce::Logger::writeToLog("platform contents directory: " + platformContentsDirectory.getFullPathName());
+  juce::Logger::writeToLog("contents directory: " + contentsDirectory.getFullPathName());
+  juce::Logger::writeToLog("resources directory: " + resourcesDirectory.getFullPathName());
+
+  globalVstBaseDirectory = platformContentsDirectory.getFullPathName();
+
+  pathToVST = vstFile.getFullPathName();
+  pathToPlugin = platformContentsDirectory.getFullPathName() + "/" + juce::String(DYNAMIC_PLUGIN_FILE_NAME);
+  pathToData = resourcesDirectory.getFullPathName() + "/data";
+  
+  juce::Logger::writeToLog("path to vst: " + pathToVST);
+  juce::Logger::writeToLog("if the above path is the path to your daw, then there's a problem!");
+  
+  juce::Logger::writeToLog("path to plugin: " + pathToPlugin);
+  juce::Logger::writeToLog("path to data: " + pathToData);
 
   for(u32 parameterIndex = PluginParameter_none + 1; parameterIndex < PluginParameter_count; ++parameterIndex)
     {
@@ -265,9 +287,7 @@ changeProgramName(int index, const juce::String& newName)
 //==============================================================================
 void AudioPluginAudioProcessor::
 prepareToPlay(double sampleRate, int samplesPerBlock)
-{
-  juce::Logger::writeToLog("prepareToPlay called");
-  
+{   
   // const ORTCHAR_T *modelPath = ORT_TSTR_ON_MACRO(ONNX_MODEL_PATH);
   // juce::Logger::writeToLog(modelPath);
 
@@ -282,27 +302,15 @@ prepareToPlay(double sampleRate, int samplesPerBlock)
   //pluginMemory.platformAPI.readEntireFile = platformReadEntireFile;
   //pluginMemory.platformAPI.writeEntireFile = platformWriteEntireFile;
   //pluginMemory.platformAPI.freeFileMemory = platformFreeFileMemory;
+  pluginMemory.platformAPI.getPathToModule = platformGetPathToModule;
+  
   //pluginMemory.platformAPI.runModel = platformRunModel;
 
   pluginMemory.platformAPI.atomicLoad = atomicLoad;
-  //pluginMemory.platformAPI.atomicLoadPointer = atomicLoadPointer;
   pluginMemory.platformAPI.atomicStore = atomicStore;
   pluginMemory.platformAPI.atomicAdd = atomicAdd;
   pluginMemory.platformAPI.atomicCompareAndSwap = atomicCompareAndSwap;
-  pluginMemory.platformAPI.atomicCompareAndSwapPointers = atomicCompareAndSwapPointers;
-
-  // pluginMemory.platformAPI.wideLoadFloats	 = wideLoadFloats;
-  // pluginMemory.platformAPI.wideLoadInts		 = wideLoadInts;
-  // pluginMemory.platformAPI.wideSetConstantFloats = wideSetConstantFloats;
-  // pluginMemory.platformAPI.wideSetConstantInts	 = wideSetConstantInts;
-  // pluginMemory.platformAPI.wideStoreFloats	 = wideStoreFloats;
-  // pluginMemory.platformAPI.wideStoreInts	 = wideStoreInts;
-  // pluginMemory.platformAPI.wideAddFloats	 = wideAddFloats;
-  // pluginMemory.platformAPI.wideAddInts		 = wideAddInts;
-  // pluginMemory.platformAPI.wideSubFloats	 = wideSubFloats;
-  // pluginMemory.platformAPI.wideSubInts		 = wideSubInts;
-  // pluginMemory.platformAPI.wideMulFloats	 = wideMulFloats;
-  // pluginMemory.platformAPI.wideMulInts		 = wideMulInts;
+  pluginMemory.platformAPI.atomicCompareAndSwapPointers = atomicCompareAndSwapPointers;  
 
   usz loggerMemorySize = KILOBYTES(128);
   loggerMemory = calloc(loggerMemorySize, 1);
@@ -310,16 +318,15 @@ prepareToPlay(double sampleRate, int samplesPerBlock)
 
   pluginLogger.logArena = &loggerArena;
   pluginLogger.maxCapacity = loggerMemorySize/8;
-  pluginMemory.logger = &pluginLogger;
+  pluginMemory.logger = &pluginLogger;  
 
-  juce::String pluginPath(DYNAMIC_PLUGIN_PATH);
-  juce::Logger::writeToLog(pluginPath);  
+  //juce::String pluginPath(DYNAMIC_PLUGIN_PATH);
 
   // NOTE: JUCE's platform-independent DynamicLibrary abstraction doesn't provide an interface
   //       for getting error messages. If they haven't implemented that after 20 years, it must
   //       be really hard, right?
 
-  if(libPlugin.open(pluginPath))
+  if(libPlugin.open(pathToPlugin))
     {
       pluginCode.renderNewFrame = (RenderNewFrame *)libPlugin.getFunction("renderNewFrame");
       if(!pluginCode.renderNewFrame)
@@ -350,13 +357,12 @@ prepareToPlay(double sampleRate, int samplesPerBlock)
       pluginCode.initializePluginState = nullptr;
     }
 
+  pluginMemory.pluginHandle = libPlugin.getNativeHandle();
   pluginCode.initializePluginState(&pluginMemory);
   pluginParameters = (PluginFloatParameter *)pluginMemory.memory;    
   
   audioBuffer.inputFormat = audioBuffer.outputFormat = AudioFormat_r32;
   audioBuffer.inputSampleRate = audioBuffer.outputSampleRate = sampleRate;
-  //audioBuffer.channels = 1;
-  //audioBuffer.buffer = calloc(samplesPerBlock, 2*sizeof(float));
   audioBuffer.midiBuffer = (u8 *)calloc(KILOBYTES(1), 1); 
 }
 

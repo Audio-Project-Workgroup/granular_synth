@@ -64,7 +64,10 @@ public:
   PluginFloatParameter *pluginParameters;
   bool ignoreParameterChange;
 
-private:  
+private:
+  juce::String pathToVST;
+  juce::String pathToPlugin;
+  juce::String pathToData;
   juce::DynamicLibrary libPlugin;    
   
   PluginLogger pluginLogger;

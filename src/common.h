@@ -50,6 +50,9 @@ typedef PLATFORM_FREE_FILE_MEMORY(PlatformFreeFileMemory);
 #define PLATFORM_WRITE_ENTIRE_FILE(name) void (name)(char *filename, void *fileMemory, usz fileSize)
 typedef PLATFORM_WRITE_ENTIRE_FILE(PlatformWriteEntireFile);
 
+#define PLATFORM_GET_PATH_TO_MODULE(name) String8 (name)(void *handleToModule, void *functionInModule, Arena *allocator)
+typedef PLATFORM_GET_PATH_TO_MODULE(PlatformGetPathToModule);
+
 // atomics
 // NOTE: atomic operations return initial values
 
@@ -76,6 +79,7 @@ struct PlatformAPI
   PlatformReadEntireFile *readEntireFile;  
   PlatformFreeFileMemory *freeFileMemory;
   PlatformWriteEntireFile *writeEntireFile;
+  PlatformGetPathToModule *getPathToModule;
 
   //PlatformRunModel *runModel;
 
@@ -111,7 +115,9 @@ enum PluginHost
 struct PluginMemory
 {
   void *memory;
-  
+
+  void *pluginHandle;
+
   u64 osTimerFreq;
   PluginHost host;
 

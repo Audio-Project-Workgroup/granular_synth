@@ -113,11 +113,16 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 	      pluginState->pluginHost = memoryBlock->host;
 	      pluginState->pluginMode = PluginMode_editor;
 
+
 	      pluginState->permanentArena = arenaBegin((u8 *)memory + sizeof(PluginState), MEGABYTES(512));
 	      pluginState->frameArena = arenaSubArena(&pluginState->permanentArena, MEGABYTES(64));
 	      pluginState->framePermanentArena = arenaSubArena(&pluginState->permanentArena, MEGABYTES(64));
 	      pluginState->loadArena = arenaSubArena(&pluginState->permanentArena, MEGABYTES(128));
 	      pluginState->grainArena = arenaSubArena(&pluginState->permanentArena, KILOBYTES(32));
+
+	      pluginState->pathToPlugin =
+		globalPlatform.getPathToModule(memoryBlock->pluginHandle, initializePluginState,
+					       &pluginState->permanentArena);
 
 	      // NOTE: parameter initialization
 	      // pluginState->phasor = 0.f;
@@ -214,43 +219,41 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 	      pluginState->nullTexture = makeBitmap(&pluginState->permanentArena, 1920, 1080, 0xFFFFFFFF);
 	      // TODO: maybe have some kind of x macro list for the bitmap loading
 	      pluginState->editorReferenceLayout =
-		loadBitmap("../data/BMP/NEWGRANADE_UI_POSITIONSREFERENCE.bmp", &pluginState->permanentArena);
+		loadBitmap(DATA_PATH"/BMP/NEWGRANADE_UI_POSITIONSREFERENCE.bmp", &pluginState->permanentArena);
 	      pluginState->editorSkin =
-		loadBitmap("../data/BMP/TREE.bmp", &pluginState->permanentArena);
+		loadBitmap(DATA_PATH"/BMP/TREE.bmp", &pluginState->permanentArena);
 	      pluginState->pomegranateKnob =
-		loadBitmap("../data/BMP/POMEGRANATE_BUTTON.bmp", &pluginState->permanentArena,
+		loadBitmap(DATA_PATH"/BMP/POMEGRANATE_BUTTON.bmp", &pluginState->permanentArena,
 			   V2(0, -0.03f));
 	      pluginState->pomegranateKnobLabel =
-		loadBitmap("../data/BMP/POMEGRANATE_BUTTON_WHITEMARKERS.bmp", &pluginState->permanentArena,
+		loadBitmap(DATA_PATH"/BMP/POMEGRANATE_BUTTON_WHITEMARKERS.bmp", &pluginState->permanentArena,
 			   V2(0, 0));
 	      pluginState->halfPomegranateKnob =
-		loadBitmap("../data/BMP/HALFPOMEGRANATE_BUTTON.bmp", &pluginState->permanentArena,
+		loadBitmap(DATA_PATH"/BMP/HALFPOMEGRANATE_BUTTON.bmp", &pluginState->permanentArena,
 			   V2(-0.005f, -0.035f));
 	      pluginState->halfPomegranateKnobLabel =
-		loadBitmap("../data/BMP/HALFPOMEGRANATE_BUTTON_WHITEMARKERS.bmp", &pluginState->permanentArena,
+		loadBitmap(DATA_PATH"/BMP/HALFPOMEGRANATE_BUTTON_WHITEMARKERS.bmp", &pluginState->permanentArena,
 			   V2(0, 0));
 	      pluginState->densityKnob =
-		loadBitmap("../data/BMP/DENSITYPOMEGRANATE_BUTTON.bmp", &pluginState->permanentArena,
+		loadBitmap(DATA_PATH"/BMP/DENSITYPOMEGRANATE_BUTTON.bmp", &pluginState->permanentArena,
 			   V2(0.01f, -0.022f));
 	      pluginState->densityKnobShadow =
-		loadBitmap("../data/BMP/DENSITYPOMEGRANATE_BUTTON_SHADOW.bmp", &pluginState->permanentArena);
+		loadBitmap(DATA_PATH"/BMP/DENSITYPOMEGRANATE_BUTTON_SHADOW.bmp", &pluginState->permanentArena);
 	      pluginState->densityKnobLabel =
-		loadBitmap("../data/BMP/DENSITYPOMEGRANATE_BUTTON_WHITEMARKERS.bmp", &pluginState->permanentArena,
+		loadBitmap(DATA_PATH"/BMP/DENSITYPOMEGRANATE_BUTTON_WHITEMARKERS.bmp", &pluginState->permanentArena,
 			   V2(0, 0));
 	      pluginState->levelBar =
-		loadBitmap("../data/BMP/LEVELBAR.bmp", &pluginState->permanentArena);
+		loadBitmap(DATA_PATH"/BMP/LEVELBAR.bmp", &pluginState->permanentArena);
 	      pluginState->levelFader =
-		loadBitmap("../data/BMP/LEVELBAR_SLIDINGLEVER.bmp", &pluginState->permanentArena,
+		loadBitmap(DATA_PATH"/BMP/LEVELBAR_SLIDINGLEVER.bmp", &pluginState->permanentArena,
 			   V2(0, -0.416f));
 	      pluginState->grainViewBackground =
-		loadBitmap("../data/BMP/GREENFRAME_RECTANGLE.bmp", &pluginState->permanentArena);
+		loadBitmap(DATA_PATH"/BMP/GREENFRAME_RECTANGLE.bmp", &pluginState->permanentArena);
 	      pluginState->grainViewOutline =
-		loadBitmap("../data/BMP/GREENFRAME.bmp", &pluginState->permanentArena);
+		loadBitmap(DATA_PATH"/BMP/GREENFRAME.bmp", &pluginState->permanentArena);
 
 	      RangeU32 characterRange = {32, 127}; // NOTE: from SPACE up to (but not including) DEL
-	      pluginState->testFont = loadFont("../data/arial.ttf", &pluginState->loadArena,
-					       &pluginState->permanentArena, characterRange, 32.f);
-	      pluginState->agencyBold = loadFont("../data/FONT/AGENCYB.ttf", &pluginState->loadArena,
+	      pluginState->agencyBold = loadFont(DATA_PATH"/FONT/AGENCYB.ttf", &pluginState->loadArena,
 					       &pluginState->permanentArena, characterRange, 32.f);
 
 	      // NOTE: ui initialization
@@ -291,9 +294,9 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 	      //s64 testModelInputSampleCount = pluginState->loadedSound.sound.sampleCount;
 	      s64 testModelInputSampleCount = 2400; // TODO: feed the whole file
 #else	  
-	      ReadFileResult testInputFile = globalPlatform.readEntireFile("../data/test_input.data",
+	      ReadFileResult testInputFile = globalPlatform.readEntireFile(DATA_PATH"/test_input.data",
 									   &pluginState->permanentArena);
-	      ReadFileResult testOutputFile = globalPlatform.readEntireFile("../data/test_output.data",
+	      ReadFileResult testOutputFile = globalPlatform.readEntireFile(DATA_PATH"/test_output.data",
 									    &pluginState->permanentArena);
 	      r32 *testModelInput = (r32 *)testInputFile.contents;
 	      s64 testModelInputSampleCount = (testInputFile.contentsSize - 1)/(2*sizeof(r32));

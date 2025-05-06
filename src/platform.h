@@ -373,6 +373,27 @@ static PLATFORM_WRITE_ENTIRE_FILE(platformWriteEntireFile)
     }
 }
 
+static PLATFORM_GET_PATH_TO_MODULE(platformGetPathToModule)
+{
+  String8 result = {};
+
+  char buffer[MAX_PATH];
+  DWORD status = GetModuleFileNameA((HMODULE)handleToModule, buffer, MAX_PATH);
+  if(status)
+    {      
+      result = arenaPushString(allocator, STR8_CSTR(buffer));
+    }
+  else
+    {
+      DWORD errorCode = GetLastError();
+      char *errorMessage;
+      FORMAT_ERROR_AS_STRING(errorCode, errorMessage);
+      fprintf(stderr, "ERROR: GetModuleFilenameA failed: %s\n", errorMessage);
+    }
+
+  return(result);
+}
+
 #elif OS_LINUX || OS_MAC
 
 #include <unistd.h>
@@ -680,6 +701,21 @@ static PLATFORM_WRITE_ENTIRE_FILE(platformWriteEntireFile)
     {
       fprintf(stderr, "ERROR: open %s failed: %s\n", filename, strerror(errno));
     }
+}
+
+static PLATFORM_GET_PATH_TO_MODULE(platformGetPathToModule)
+{
+  String8 result = {};
+  Dl_info dlInfo = {};
+  if(dladdr(functionInModule, &dlInfo))
+    {
+      if(dlInfo.dli_fname)
+	{
+	  result = arenaPushString(allocator, STR8_CSTR(dlInfo.dli_fname));
+	}
+    }
+
+  return(result);
 }
 
 #else

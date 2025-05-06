@@ -83,6 +83,8 @@ struct PluginState
   PluginHost pluginHost;
   PluginMode pluginMode;
 
+  String8 pathToPlugin;
+
   String8 outputDeviceNames[32];
   u32 outputDeviceCount;
   u32 selectedOutputDeviceIndex;
@@ -94,7 +96,6 @@ struct PluginState
   LoadedGrainPackfile loadedGrainPackfile;
   FileGrainState silo;
 
-  /* r64 phasor; */
   r32 freq;
   PluginBooleanParameter soundIsPlaying;
 
@@ -115,7 +116,6 @@ struct PluginState
   LoadedBitmap grainViewBackground;
   LoadedBitmap grainViewOutline;
 
-  LoadedFont testFont;
   LoadedFont agencyBold;
 
   //UILayout layout;
@@ -124,11 +124,10 @@ struct PluginState
   UIPanel *menuPanel;
 
   GrainManager grainManager;
-  //GrainBuffer grainBuffer;
   AudioRingBuffer grainBuffer;
   GrainStateView grainStateView;
 
-  volatile u32 initializationMutex;
+  volatile u32 initializationLock;
   bool initialized;
 };
 

@@ -25,12 +25,10 @@ REM preprocessor
 ::pushd ..\build
 
 REM compile plugin and host
-REM /PDB:plugin_%date:~-4,4%%date:~-10,2%%date:~-7,2%_%time:~0,2%%time:~3,2%%time:~6,2%%time:~9,2%.pdb
-cl %CFLAGS% ..\src\plugin.cpp -Fmplugin.map -LD /link %LFLAGS% -PDB:plugin_%random%.pdb -EXPORT:renderNewFrame -EXPORT:audioProcess -EXPORT:initializePluginState
+cl %CFLAGS% -D"DATA_PATH=\"../data\"" ..\src\plugin.cpp -Fmplugin.map -LD /link %LFLAGS% -PDB:plugin_%random%.pdb -EXPORT:renderNewFrame -EXPORT:audioProcess -EXPORT:initializePluginState
 
 set PLUGIN_STATUS=%ERRORLEVEL%
 
-::-D"PLUGIN_PATH=\"%cd:\=\\%\\plugin.dll\""
 cl %CFLAGS% -D"PLUGIN_PATH=\"plugin.dll\"" ..\src\main.cpp logo.res -Fmmain.map /link /SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup %LFLAGS% -LIBPATH:..\src\libs user32.lib gdi32.lib shell32.lib glfw3_mt.lib opengl32.lib miniaudio.lib /out:granade.exe
 REM onnxruntime.lib
 
