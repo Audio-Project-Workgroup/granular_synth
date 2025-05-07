@@ -254,7 +254,7 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 
 	      RangeU32 characterRange = {32, 127}; // NOTE: from SPACE up to (but not including) DEL
 	      pluginState->agencyBold = loadFont(DATA_PATH"/FONT/AGENCYB.ttf", &pluginState->loadArena,
-					       &pluginState->permanentArena, characterRange, 32.f);
+					       &pluginState->permanentArena, characterRange, 36.f);
 
 	      // NOTE: ui initialization
 	      pluginState->uiContext =
@@ -523,7 +523,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 		  uiPushLayoutDimSizeType(panelLayout, UISizeType_percentOfParent);		  
 
 		  v2 panelDim = getDim(panelRect);
-		  v2 elementTextScale = 0.0005f*panelDim.x*V2(1.f, 1.f);
+		  v2 elementTextScale = 0.0008f*panelDim.x*V2(1.f, 1.f);
 
 		  r32 knobDimPOP = 0.235f;
 		  v2 knobLabelOffset = V2(0.02f, 0.06f);
@@ -565,11 +565,12 @@ RENDER_NEW_FRAME(renderNewFrame)
 					       volumeTextOffset, elementTextScale,
 					       &pluginState->levelBar, &pluginState->levelFader, 0,
 					       V4(1, 1, 1, 1));
-
+#if 0
 		  if(volume.flags & UICommFlag_hovering)
 		    {
 		      volume.element->color = hadamard(volume.element->color, V4(1, 1, 0, 1));
 		    }
+#endif
 		      
 		  if(volume.flags & UICommFlag_dragging)
 		    {
@@ -851,13 +852,13 @@ RENDER_NEW_FRAME(renderNewFrame)
 		    v2 panSizePOP = knobDimPOP * V2(1, 1);
 		    v2 panLabelOffset = V2(0.03f, 0.065f);
 		    v2 panTextOffset = hadamard(V2(0.003f, 0.043f), panelDim);
-		    v2 panTextScale = 0.0005f * panelDim.x * V2(1.f, 1.f);
+		    //v2 panTextScale = 0.0005f * panelDim.x * V2(1.f, 1.f);
 		    UIComm pan =
 		      uiMakeKnob(panelLayout, STR8_LIT("PAN"), panOffsetPOP, panSizePOP, 1.f,
 				 &pluginState->parameters[PluginParameter_pan],
 				 panLabelOffset, knobLabelDim,
 				 knobClickableOffset, knobClickableDim,
-				 panTextOffset, panTextScale,
+				 panTextOffset, elementTextScale,
 				 &pluginState->halfPomegranateKnob, &pluginState->halfPomegranateKnobLabel,
 				 V4(1, 1, 1, 1));
 
@@ -899,14 +900,14 @@ RENDER_NEW_FRAME(renderNewFrame)
 		    v2 windowOffsetPOP = V2(0.854f, 0.063f);
 		    v2 windowSizePOP = knobDimPOP*V2(1, 1);
 		    v2 windowLabelOffset = V2(0.03f, 0.065f);
-		    v2 windowTextOffset = hadamard(V2(0.003f, 0.043f), panelDim);
-		    v2 windowTextScale = 0.0005f*panelDim.x*V2(1.f, 1.f);
+		    v2 windowTextOffset = hadamard(V2(0.003f, 0.02f), panelDim);
+		    //v2 windowTextScale = 0.0005f*panelDim.x*V2(1.f, 1.f);
 		    UIComm window =
 		      uiMakeKnob(panelLayout, STR8_LIT("WINDOW"), windowOffsetPOP, windowSizePOP, 1.f,
 				 &pluginState->parameters[PluginParameter_window],
 				 windowLabelOffset, knobLabelDim,
 				 knobClickableOffset, knobClickableDim,
-				 windowTextOffset, windowTextScale,
+				 windowTextOffset, elementTextScale,
 				 &pluginState->halfPomegranateKnob, &pluginState->halfPomegranateKnobLabel,
 				 V4(1, 1, 1, 1));
 		    
