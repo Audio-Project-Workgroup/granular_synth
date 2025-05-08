@@ -37,7 +37,7 @@ popd > /dev/null
 pushd ../build > /dev/null
 
 # compile plugin and host
-clang $CFLAGS ../src/plugin.cpp -o $PLUGIN_NAME $PLUGIN_FLAGS -lm
+clang $CFLAGS -D"DATA_PATH=\"../data/\"" ../src/plugin.cpp -o $PLUGIN_NAME $PLUGIN_FLAGS -lm
 
 PLUGIN_STATUS=$?
 

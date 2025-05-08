@@ -839,7 +839,7 @@ static REAL_FFT_FUNCTION(fft_real_permute)
     }
 
   u32 mask = 0xFFFFFFFF;
-  r32 maskF = *(r32 *)&mask;
+  //r32 maskF = *(r32 *)&mask;
 
   for(u32 m = 2; m <= length; m <<= 1)
     {
@@ -865,15 +865,16 @@ static REAL_FFT_FUNCTION(fft_real_permute)
 	  r32 *dest1Im = destIm + k + m/2;
 	  for(u32 j = 0; j < m/2; j += simdWidth)
 	    {
-	      WideFloat storeMask = wideSetConstantFloats(0.f);
-	      WideFloat storeMaskInv = wideSetConstantFloats(0.f);
+	      WideInt storeMask = wideSetConstantInts(0);
+	      //WideFloat storeMaskInv = wideSetConstantFloats(0.f);
 	      for(u32 lane = 0; lane < simdWidth; ++lane)
 		{
-		  r32 val = (j + lane < m/2) ? maskF : 0;
-		  r32 valInv = (j + lane < m/2) ? 0 : maskF;
+		  //r32 val = (j + lane < m/2) ? maskF : 0;
+		  //r32 valInv = (j + lane < m/2) ? 0 : maskF;
+		  u32 val = (j + lane < m/2) ? mask : 0;
 		  
-		  wideSetLaneFloats(&storeMask, val, lane);
-		  wideSetLaneFloats(&storeMaskInv, valInv, lane);
+		  wideSetLaneInts(&storeMask, val, lane);
+		  //wideSetLaneFloats(&storeMaskInv, valInv, lane);
 		}
 
 	      // NOTE: loads
@@ -893,14 +894,19 @@ static REAL_FFT_FUNCTION(fft_real_permute)
 	      WideFloat out1Im = wideSubFloats(in0Im, productIm);
 
 	      // NOTE: mask out what not to store
-	      WideFloat store0Re = wideAddFloats(wideMaskFloats(out0Re, storeMask),
-						 wideMaskFloats(in0Re, storeMaskInv));
-	      WideFloat store0Im = wideAddFloats(wideMaskFloats(out0Im, storeMask),
-						 wideMaskFloats(in0Im, storeMaskInv));
-	      WideFloat store1Re = wideAddFloats(wideMaskFloats(out1Re, storeMask),
-						 wideMaskFloats(in1Re, storeMaskInv));
-	      WideFloat store1Im = wideAddFloats(wideMaskFloats(out1Im, storeMask),
-						 wideMaskFloats(in1Im, storeMaskInv));
+	      /* WideFloat store0Re = wideAddFloats(wideMaskFloats(out0Re, storeMask), */
+	      /* 					 wideMaskFloats(in0Re, storeMaskInv)); */
+	      /* WideFloat store0Im = wideAddFloats(wideMaskFloats(out0Im, storeMask), */
+	      /* 					 wideMaskFloats(in0Im, storeMaskInv)); */
+	      /* WideFloat store1Re = wideAddFloats(wideMaskFloats(out1Re, storeMask), */
+	      /* 					 wideMaskFloats(in1Re, storeMaskInv)); */
+	      /* WideFloat store1Im = wideAddFloats(wideMaskFloats(out1Im, storeMask), */
+	      /* 					 wideMaskFloats(in1Im, storeMaskInv)); */
+
+	      WideFloat store0Re = wideMaskFloats(out0Re, in0Re, storeMask);
+	      WideFloat store0Im = wideMaskFloats(out0Im, in0Im, storeMask);
+	      WideFloat store1Re = wideMaskFloats(out1Re, in1Re, storeMask);
+	      WideFloat store1Im = wideMaskFloats(out1Im, in1Im, storeMask);
 
 	      // NOTE: do the store
 	      wideStoreFloats(dest0Re, store0Re);
@@ -944,7 +950,7 @@ static REAL_IFFT_FUNCTION(ifft_real_permute)
     }
 
   u32 mask = 0xFFFFFFFF;
-  r32 maskF = *(r32 *)&mask;
+  //  r32 maskF = *(r32 *)&mask;
 
   for(u32 m = 2; m <= length; m <<= 1)
     {
@@ -970,15 +976,16 @@ static REAL_IFFT_FUNCTION(ifft_real_permute)
 	  r32 *dest1Im = destImTemp + k + m/2;
 	  for(u32 j = 0; j < m/2; j += simdWidth)
 	    {
-	      WideFloat storeMask = wideSetConstantFloats(0.f);
-	      WideFloat storeMaskInv = wideSetConstantFloats(0.f);
+	      WideInt storeMask = wideSetConstantInts(0.f);
+	      //WideFloat storeMaskInv = wideSetConstantFloats(0.f);
 	      for(u32 lane = 0; lane < simdWidth; ++lane)
 		{
-		  r32 val = (j + lane < m/2) ? maskF : 0;
-		  r32 valInv = (j + lane < m/2) ? 0 : maskF;
+		  //r32 val = (j + lane < m/2) ? maskF : 0;
+		  //r32 valInv = (j + lane < m/2) ? 0 : maskF;
+		  u32 val = (j + lane < m/2) ? mask : 0;
 		  
-		  wideSetLaneFloats(&storeMask, val, lane);
-		  wideSetLaneFloats(&storeMaskInv, valInv, lane);
+		  wideSetLaneInts(&storeMask, val, lane);
+		  //wideSetLaneFloats(&storeMaskInv, valInv, lane);
 		}
 
 	      // NOTE: loads
@@ -998,14 +1005,19 @@ static REAL_IFFT_FUNCTION(ifft_real_permute)
 	      WideFloat out1Im = wideSubFloats(in0Im, productIm);
 
 	      // NOTE: mask out what not to store
-	      WideFloat store0Re = wideAddFloats(wideMaskFloats(out0Re, storeMask),
-						 wideMaskFloats(in0Re, storeMaskInv));
-	      WideFloat store0Im = wideAddFloats(wideMaskFloats(out0Im, storeMask),
-						 wideMaskFloats(in0Im, storeMaskInv));
-	      WideFloat store1Re = wideAddFloats(wideMaskFloats(out1Re, storeMask),
-						 wideMaskFloats(in1Re, storeMaskInv));
-	      WideFloat store1Im = wideAddFloats(wideMaskFloats(out1Im, storeMask),
-						 wideMaskFloats(in1Im, storeMaskInv));
+	      /* WideFloat store0Re = wideAddFloats(wideMaskFloats(out0Re, storeMask), */
+	      /* 					 wideMaskFloats(in0Re, storeMaskInv)); */
+	      /* WideFloat store0Im = wideAddFloats(wideMaskFloats(out0Im, storeMask), */
+	      /* 					 wideMaskFloats(in0Im, storeMaskInv)); */
+	      /* WideFloat store1Re = wideAddFloats(wideMaskFloats(out1Re, storeMask), */
+	      /* 					 wideMaskFloats(in1Re, storeMaskInv)); */
+	      /* WideFloat store1Im = wideAddFloats(wideMaskFloats(out1Im, storeMask), */
+	      /* 					 wideMaskFloats(in1Im, storeMaskInv)); */
+
+	      WideFloat store0Re = wideMaskFloats(out0Re, in0Re, storeMask);
+	      WideFloat store0Im = wideMaskFloats(out0Im, in0Im, storeMask);
+	      WideFloat store1Re = wideMaskFloats(out1Re, in1Re, storeMask);
+	      WideFloat store1Im = wideMaskFloats(out1Im, in1Im, storeMask);
 
 	      // NOTE: do the store
 	      wideStoreFloats(dest0Re, store0Re);

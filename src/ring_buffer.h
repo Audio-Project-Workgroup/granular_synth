@@ -33,9 +33,9 @@ copyFloatArrayWide(r32 *destInit, r32 *srcInit, u32 count)
   // TODO: account for misalignment of dest and src
   u32 simdWidth = 4;
   u32 mask = 0xFFFFFFFF;
-  u32 maskInv = ~mask;
-  r32 maskF = *(r32 *)&mask;
-  r32 maskInvF = *(r32 *)&maskInv;
+  //u32 maskInv = ~mask;
+  //r32 maskF = *(r32 *)&mask;
+  //r32 maskInvF = *(r32 *)&maskInv;
 
   r32 *dest = destInit;
   r32 *src = srcInit;
@@ -44,21 +44,20 @@ copyFloatArrayWide(r32 *destInit, r32 *srcInit, u32 count)
   
   for(u32 i = 0; i < count; i += simdWidth)
     {
-      WideFloat storeMask = wideSetConstantFloats(maskF);
-      WideFloat storeMaskInv = wideSetConstantFloats(maskInvF);
+      WideInt storeMask = wideSetConstantInts(mask);
+      //      WideFloat storeMaskInv = wideSetConstantFloats(maskInvF);
       for(u32 lane = 0; lane < simdWidth; ++lane)
 	{
 	  if((i + lane) >= count)
 	    {
-	      wideSetLaneFloats(&storeMask, maskInvF, lane);
-	      wideSetLaneFloats(&storeMaskInv, maskF, lane);
+	      wideSetLaneInts(&storeMask, 0, lane);
+	      //wideSetLaneFloats(&storeMaskInv, maskF, lane);
 	    }
 	}
       
       WideFloat srcW = wideLoadFloats(src);
       WideFloat destW = wideLoadFloats(dest);
-      WideFloat storeW = wideAddFloats(wideMaskFloats(srcW, storeMask),
-				       wideMaskFloats(destW, storeMaskInv));
+      WideFloat storeW = wideMaskFloats(srcW, destW, storeMask);
       wideStoreFloats(dest, storeW);
 
       dest += simdWidth;

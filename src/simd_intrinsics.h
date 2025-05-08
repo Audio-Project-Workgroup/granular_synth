@@ -11,7 +11,7 @@ static void	 wideStoreFloats(r32 *dest, WideFloat src);
 static WideFloat wideAddFloats(WideFloat a, WideFloat b);
 static WideFloat wideSubFloats(WideFloat a, WideFloat b);
 static WideFloat wideMulFloats(WideFloat a, WideFloat b);
-static WideFloat wideMaskFloats(WideFloat a, WideFloat mask);
+static WideFloat wideMaskFloats(WideFloat a, WideFloat b, WideInt mask);
 
 static WideInt	 wideLoadInts(u32 *src);
 static WideInt	 wideSetConstantInts(u32 src);
@@ -170,15 +170,26 @@ wideMulFloats(WideFloat a, WideFloat b)
   return(result);
 }
 
-static WideFloat
-wideMaskFloats(WideFloat a, WideFloat mask)
-{  
-  //__m128i aInt = _mm_cvtps_epi32(a.val);
-  //__m128i resultInt = _mm_and_si128(aInt, mask.val);
+/* static WideFloat */
+/* wideMaskFloats(WideFloat a, WideFloat mask) */
+/* {   */
+/*   //__m128i aInt = _mm_cvtps_epi32(a.val); */
+/*   //__m128i resultInt = _mm_and_si128(aInt, mask.val); */
 
+/*   WideFloat result = {}; */
+/*   result.val = _mm_and_ps(a.val, mask.val); */
+/*   //result.val = _mm_cvtepi32_ps(resultInt); */
+/*   return(result); */
+/* } */
+
+static WideFloat
+wideMaskFloats(WideFloat a, WideFloat b, WideInt mask)
+{
   WideFloat result = {};
-  result.val = _mm_and_ps(a.val, mask.val);
-  //result.val = _mm_cvtepi32_ps(resultInt);
+  __m128 maskF = _mm_castsi128_ps(mask.val);
+  result.val = _mm_or_ps(_mm_and_ps(a, maskF),
+			 _mm_andnot_ps(b, maskF));
+
   return(result);
 }
 
@@ -250,6 +261,48 @@ wideSetConstantInts(u32 src)
   return(result);
 }
 
+static WideFloat
+wideSetFloats(r32 a, r32 b, r32 c, r32 d)
+{
+  WideFloat result = {};
+  result.val = {a, b, c, d};
+
+  return(result);
+}
+
+static WideInt
+wideSetInts(u32 a, u32 b, u32 c, u32 d)
+{
+  WideInt result = {};
+  result.val = {a, b, c, d};
+
+  return(result);
+}
+
+static void
+wideSetLaneFloats(WideFloat *w, r32 val, u32 lane)
+{
+  float32x4_t temp = vdupq_n_f32(val);
+  
+  u32 mask[4] = {};
+  mask[lane] = U32_MAX;
+  uint32x4_t maskVec = vld1q_u32(mask);
+    
+  w->val = vbslq_f32(maskVec, temp, w->val);
+}
+
+static void
+wideSetLaneInts(WideInt *w, u32 val, u32 lane)
+{
+  uint32x4_t temp = vdupq_n_u32(val);
+  
+  u32 mask[4] = {};
+  mask[lane] = U32_MAX;
+  uint32x4_t maskVec = vld1q_u32(mask);
+    
+  w->val = vbslq_u32(maskVec, temp, w->val);
+}
+
 static void
 wideStoreFloats(r32 *dest, WideFloat src)
 {
@@ -312,6 +365,15 @@ wideMulInts(WideInt a, WideInt b)
 {
   WideInt result = {};
   result.val = vmulq_u32(a.val, b.val);
+
+  return(result);
+}
+
+static WideFloat
+wideMaskFloats(WideFloat a, WideFloat b, WideInt mask)
+{
+  WideFloat result = {};
+  result.val = vbslq_f32(mask.val, a.val, b.val);
 
   return(result);
 }

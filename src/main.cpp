@@ -182,6 +182,16 @@ maDataCallback(ma_device *pDevice, void *pOutput, const void *pInput, ma_uint32 
 		{
 		  usz bytesToRead = CHANNELS*framesToRead*sizeof(s16);
 		  memcpy(pOutput, srcBuffer, bytesToRead);
+#if 0
+		  s16 *test = (s16 *)srcBuffer;
+		  for(u32 i = 0; i < framesToRead; ++i)
+		    {
+		      for(u32 j = 0; j < CHANNELS; ++j)
+			{
+			  fprintf(stderr, "srcBuffer val (%u, %u): %d\n", i, j, *test++);
+			}
+		    }
+#endif
 	      
 		  result = ma_pcm_rb_commit_read(outputBuffer, framesToRead);
 		  if(result == MA_SUCCESS)
@@ -270,11 +280,13 @@ static BASE_THREAD_PROC(audioThreadProc)
   for(;;)
     {
       s32 outputRBPtrDistance = ma_pcm_rb_pointer_distance(outputRingBuffer);
-      s32 inputRBPtrDistance = ma_pcm_rb_pointer_distance(inputRingBuffer);
-      UNUSED(inputRBPtrDistance);
-      //fprintf(stdout, "\n output rb ptr distance: %d\n", outputRBPtrDistance);
-      //fprintf(stdout, "input rb ptr distance: %d\n\n", inputRBPtrDistance);
-
+      if(inputRingBuffer)
+	{
+	  s32 inputRBPtrDistance = ma_pcm_rb_pointer_distance(inputRingBuffer);
+	  UNUSED(inputRBPtrDistance);
+	  //fprintf(stdout, "\n output rb ptr distance: %d\n", outputRBPtrDistance);
+	  //fprintf(stdout, "input rb ptr distance: %d\n\n", inputRBPtrDistance);
+	}
       // TODO: this timing code was hastily hacked together and should be thought out
       //       more and made better
       u32 framesRemaining = (outputRBPtrDistance < 2*(s32)audioData->targetLatencySamples) ?
@@ -290,7 +302,11 @@ static BASE_THREAD_PROC(audioThreadProc)
 	      void *readPtr = 0;
 	      u32 framesToWrite = framesRemaining;
 	      maResult = ma_pcm_rb_acquire_write(outputRingBuffer, &framesToWrite, &writePtr);
-	      maResult = ma_pcm_rb_acquire_read(inputRingBuffer, &framesToWrite, &readPtr);
+	      if(inputRingBuffer)
+		{	
+		  maResult = ma_pcm_rb_acquire_read(inputRingBuffer, &framesToWrite, &readPtr);
+		}
+	      
 	      if(maResult == MA_SUCCESS)
 		{
 		  if(plugin->audioProcess)
@@ -308,8 +324,12 @@ static BASE_THREAD_PROC(audioThreadProc)
 		      plugin->audioProcess(pluginMemory, audioBuffer);
 		    }
 
-		  maResult = ma_pcm_rb_commit_write(outputRingBuffer, framesToWrite);
-		  maResult = ma_pcm_rb_commit_read(inputRingBuffer, framesToWrite);
+		  maResult = ma_pcm_rb_commit_write(outputRingBuffer, framesToWrite);		  
+		  if(inputRingBuffer)
+		    {  
+		      maResult = ma_pcm_rb_commit_read(inputRingBuffer, framesToWrite);
+		    }
+		  
 		  if(maResult == MA_SUCCESS)
 		    {
 		      //fprintf(stdout, "wrote %u frames\n", framesToWrite);
@@ -563,41 +583,53 @@ main(int argc, char **argv)
 		  ma_device_info maDefaultPlaybackDeviceInfo;
 		  ma_device_info maDefaultCaptureDeviceInfo;
 		  
-		  if((ma_context_get_devices(&maContext, &maPlaybackInfos, &maPlaybackCount,
-					    &maCaptureInfos, &maCaptureCount) == MA_SUCCESS) &&
-		     (ma_context_get_device_info(&maContext, ma_device_type_playback, NULL,
-						 &maDefaultPlaybackDeviceInfo) == MA_SUCCESS) &&
-		     (ma_context_get_device_info(&maContext, ma_device_type_capture, NULL,
-						 &maDefaultCaptureDeviceInfo) == MA_SUCCESS))
+		  if(ma_context_get_devices(&maContext, &maPlaybackInfos, &maPlaybackCount,
+					    &maCaptureInfos, &maCaptureCount) == MA_SUCCESS)
 		    {
 		      // NOTE: enumerate devices, get default device indices
-		      for(u32 iPlayback = 0; iPlayback < maPlaybackCount; ++iPlayback)
-			{			  
-			  String8 deviceStr = STR8_CSTR(maPlaybackInfos[iPlayback].name);
-			  ASSERT(pluginMemory.outputDeviceCount < ARRAY_COUNT(pluginMemory.outputDeviceNames));
-			  pluginMemory.outputDeviceNames[pluginMemory.outputDeviceCount] = deviceStr;
-			  if(stringsAreEqual(deviceStr, STR8_CSTR(maDefaultPlaybackDeviceInfo.name)))
-			    {
-			      maPlaybackIndex = iPlayback;
-			      pluginMemory.selectedOutputDeviceIndex = pluginMemory.outputDeviceCount;
-			    }
+		      if(ma_context_get_device_info(&maContext, ma_device_type_playback, NULL,
+						 &maDefaultPlaybackDeviceInfo) == MA_SUCCESS)
+			{	
+			  for(u32 iPlayback = 0; iPlayback < maPlaybackCount; ++iPlayback)
+			    {			  
+			      String8 deviceStr = STR8_CSTR(maPlaybackInfos[iPlayback].name);
+			      ASSERT(pluginMemory.outputDeviceCount < ARRAY_COUNT(pluginMemory.outputDeviceNames));
+			      pluginMemory.outputDeviceNames[pluginMemory.outputDeviceCount] = deviceStr;
+			      if(stringsAreEqual(deviceStr, STR8_CSTR(maDefaultPlaybackDeviceInfo.name)))
+				{
+				  maPlaybackIndex = iPlayback;
+				  pluginMemory.selectedOutputDeviceIndex = pluginMemory.outputDeviceCount;
+				}
 
-			    ++pluginMemory.outputDeviceCount;
+			      ++pluginMemory.outputDeviceCount;
+			    }
 			}
-		      for(u32 iCapture = 0; iCapture < maCaptureCount; ++iCapture)
+
+		      if(ma_context_get_device_info(&maContext, ma_device_type_capture, NULL,
+						 &maDefaultCaptureDeviceInfo) == MA_SUCCESS)
 			{
-			  String8 deviceStr = STR8_CSTR(maCaptureInfos[iCapture].name);
-			  ASSERT(pluginMemory.inputDeviceCount < ARRAY_COUNT(pluginMemory.inputDeviceNames));
-			  pluginMemory.inputDeviceNames[pluginMemory.inputDeviceCount] = deviceStr;
-			  if(stringsAreEqual(deviceStr, STR8_CSTR(maDefaultCaptureDeviceInfo.name)))
+			  for(u32 iCapture = 0; iCapture < maCaptureCount; ++iCapture)
 			    {
-			      maCaptureIndex = iCapture;
-			      pluginMemory.selectedInputDeviceIndex = pluginMemory.inputDeviceCount;
+			      String8 deviceStr = STR8_CSTR(maCaptureInfos[iCapture].name);
+			      ASSERT(pluginMemory.inputDeviceCount < ARRAY_COUNT(pluginMemory.inputDeviceNames));
+			      pluginMemory.inputDeviceNames[pluginMemory.inputDeviceCount] = deviceStr;
+			      if(stringsAreEqual(deviceStr, STR8_CSTR(maDefaultCaptureDeviceInfo.name)))
+				{
+				  maCaptureIndex = iCapture;
+				  pluginMemory.selectedInputDeviceIndex = pluginMemory.inputDeviceCount;
+				}
+
+			      ++pluginMemory.inputDeviceCount;
 			    }
-
-			  ++pluginMemory.inputDeviceCount;
 			}
-
+		      else
+			{
+			  audioBuffer.inputFormat = AudioFormat_none;
+			  // audioBuffer.inputSampleRate = 0;
+			  // audioBuffer.inputChannels = 0;
+			  // audioBuffer.inputStride = 0;
+			}
+		      
 		      // TODO: this is about the lowest latency I could get on my machine while
 		      //       avoiding buffer underflows. Putting the audioProcess() call on a
 		      //       separate thread that doesn't have to wait for the monitor vblank
@@ -625,16 +657,31 @@ main(int argc, char **argv)
 			  maInputRBPtrDistance = ma_pcm_rb_pointer_distance(&maInputRingBuffer);
 			  UNUSED(maInputRBPtrDistance);
 
-			  MACallbackUserData maCallbackUserData = {&maOutputRingBuffer, &maInputRingBuffer};
+			  MACallbackUserData maCallbackUserData; 
 
-			  ma_device_config maConfig = ma_device_config_init(ma_device_type_duplex);
-			  maConfig.playback.format = maOutputRingBuffer.format;
-			  maConfig.playback.channels = maOutputRingBuffer.channels;
-			  maConfig.capture.format = maInputRingBuffer.format;
-			  maConfig.capture.channels = maInputRingBuffer.channels;
-			  maConfig.sampleRate = SR;
-			  maConfig.dataCallback = maDataCallback;
-			  maConfig.pUserData = &maCallbackUserData;
+			  ma_device_config maConfig;
+			  if(maCaptureCount)
+			    {
+			      maCallbackUserData = {&maOutputRingBuffer, &maInputRingBuffer};
+			      maConfig = ma_device_config_init(ma_device_type_duplex);
+			      maConfig.playback.format = maOutputRingBuffer.format;
+			      maConfig.playback.channels = maOutputRingBuffer.channels;
+			      maConfig.capture.format = maInputRingBuffer.format;
+			      maConfig.capture.channels = maInputRingBuffer.channels;
+			      maConfig.sampleRate = SR;
+			      maConfig.dataCallback = maDataCallback;
+			      maConfig.pUserData = &maCallbackUserData;
+			    }
+			  else
+			    {
+			      maCallbackUserData = {&maOutputRingBuffer, 0};
+			      maConfig = ma_device_config_init(ma_device_type_playback);
+			      maConfig.playback.format = maOutputRingBuffer.format;
+			      maConfig.playback.channels = maOutputRingBuffer.channels;
+			      maConfig.sampleRate = SR;
+			      maConfig.dataCallback = maDataCallback;
+			      maConfig.pUserData = &maCallbackUserData;
+			    }
 			  
 			  ma_device maDevice;
 			  if(ma_device_init(NULL, &maConfig, &maDevice) == MA_SUCCESS)
@@ -644,7 +691,7 @@ main(int argc, char **argv)
 			      OSThread audioThread;
 			      AudioThreadData audioThreadData = {};
 			      audioThreadData.outputBuffer = &maOutputRingBuffer;
-			      audioThreadData.inputBuffer = &maInputRingBuffer;
+			      audioThreadData.inputBuffer = maCaptureCount ? &maInputRingBuffer : 0;
 			      audioThreadData.targetLatencySamples = targetLatencySamples;
 			      audioThreadData.plugin = &plugin;
 			      audioThreadData.pluginMemory = &pluginMemory;

@@ -209,7 +209,7 @@ namespace midi {
 	  processMidiCommand(commandByte, data, bytesToRead, pluginState);
 
 #ifdef MIDI_VERBOSE
-	  printf("AFTER PARSING : 0x%x | %zu timeStamp(ms passed) | %d bytes to read | data points to 0x%x | midiBuffer ptr points to 0x%x\n", 
+	  printf("AFTER PARSING : 0x%x | %" PRIu64  " timeStamp(ms passed) | %d bytes to read | data points to 0x%x | midiBuffer ptr points to 0x%x\n", 
 		 (int)commandByte,
 		 timestamp, 
 		 (int)bytesToRead, 

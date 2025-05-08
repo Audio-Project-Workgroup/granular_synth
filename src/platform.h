@@ -711,7 +711,7 @@ static PLATFORM_GET_PATH_TO_MODULE(platformGetPathToModule)
     {
       if(dlInfo.dli_fname)
 	{
-	  result = arenaPushString(allocator, STR8_CSTR(dlInfo.dli_fname));
+	  result = arenaPushString(allocator, STR8_CSTR((char *)dlInfo.dli_fname));
 	}
     }
 

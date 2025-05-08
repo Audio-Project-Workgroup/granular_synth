@@ -121,7 +121,7 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
 	      pluginState->grainArena = arenaSubArena(&pluginState->permanentArena, KILOBYTES(32));
 
 	      pluginState->pathToPlugin =
-		globalPlatform.getPathToModule(memoryBlock->pluginHandle, initializePluginState,
+		globalPlatform.getPathToModule(memoryBlock->pluginHandle, (void *)initializePluginState,
 					       &pluginState->permanentArena);
 
 	      // NOTE: parameter initialization
@@ -1222,7 +1222,8 @@ AUDIO_PROCESS(audioProcess)
 		    genericInputFrames[channelIndex] = (u8 *)inputFrames + audioBuffer->inputStride;
 		  } break;
 
-		default: {ASSERT(!"invalid input format");} break;
+		  // default: {ASSERT(!"invalid input format");} break;
+		default: {} break;
 		}
 	      
 	      inputMixBuffers[channelIndex][frameIndex] = mixedVal;		   
@@ -1320,11 +1321,10 @@ AUDIO_PROCESS(audioProcess)
 			  grainVal = grainVal * (1 + panner);
 			}
 	      }
-
-
 #endif
 	      	      
 	      mixedVal += lerp(inputMixBuffers[channelIndex][frameIndex], grainVal, mixParam);
+	      //logFormatString("mixedVal: %.2f", mixedVal);
 	     
 	      switch(audioBuffer->outputFormat)
 		{
