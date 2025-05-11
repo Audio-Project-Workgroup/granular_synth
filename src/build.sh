@@ -1,8 +1,5 @@
 #!/bin/bash
 
-SRC_DIR=$PWD
-#-I$SRC_DIR/include
-
 CFLAGS="-g -Wall -Wno-writable-strings -Wno-missing-braces -Wno-unused-function -fno-exceptions -fno-rtti -march=native -std=gnu++11 -DBUILD_DEBUG=1"
 MAC_GL_FLAGS="-framework OpenGL"
 MAC_PLUGIN_FLAGS="-dynamiclib"
@@ -41,11 +38,7 @@ clang $CFLAGS -D"DATA_PATH=\"../data/\"" ../src/plugin.cpp -o $PLUGIN_NAME $PLUG
 
 PLUGIN_STATUS=$?
 
-BUILD_PATH="$PWD"
-PLUGIN_PATH="$BUILD_PATH/$PLUGIN_NAME"
-echo $BUILD_PATH
-
-clang $CFLAGS -D"PLUGIN_PATH=\"$PWD/$PLUGIN_NAME\"" ../src/main.cpp -o test -L. $GL_FLAGS -lglfw -lminiaudio -ldl -lpthread -lm
+clang $CFLAGS -D"PLUGIN_PATH=\"$PLUGIN_NAME\"" ../src/main.cpp -o test -L. $GL_FLAGS -lglfw -lminiaudio -ldl -lpthread -lm
 #$(pkg-config --libs --cflags libonnxruntime)
 #-L$SRC_DIR/libs -lonnxruntime
 

@@ -549,7 +549,19 @@ main(int argc, char **argv)
 
 	  // plugin setup
 
+#if OS_MAC || OS_LINUX
+	  usz stringMemorySize = KILOBYTES(1);
+	  void *stringMemory = calloc(stringMemorySize, 1);
+	  Arena stringArena = arenaBegin(stringMemory, stringMemorySize);
+	  
+	  String8 executablePath = platformGetPathToModule(0, (void *)main, &stringArena);
+	  String8 basePath = stringGetParentPath(executablePath);
+	  String8 pluginPath = concatenateStrings(&stringArena, basePath, STR8_LIT("/" PLUGIN_PATH));
+	  
+	  PluginCode plugin = loadPluginCode((char *)pluginPath.str);
+#else
 	  PluginCode plugin = loadPluginCode(PLUGIN_PATH);
+#endif	  
 	  pluginMemory.pluginHandle = plugin.pluginCode;
 
 	  // model setup

@@ -153,4 +153,28 @@ stringsAreEqual(String8 s0, String8 s1)
   return(result);
 }
   
+inline String8
+concatenateStrings(Arena *allocator, String8 s0, String8 s1)
+{
+  String8 result = {};
+  result.size = s0.size + s1.size;
+  result.str = arenaPushArray(allocator, result.size, u8);
+  COPY_ARRAY(result.str, s0.str, s0.size, u8);
+  COPY_ARRAY(result.str + s0.size, s1.str, s1.size, u8);
 
+  return(result);
+}
+
+inline String8
+stringGetParentPath(String8 s)
+{
+  u32 lastSlashIndex = 0;
+  for(u32 i = 0; i < s.size; ++i)
+    {
+      u8 c = s.str[i];
+      if(c == '/') lastSlashIndex = i;
+    }
+
+  String8 result = makeString8(s.str, lastSlashIndex);
+  return(result);
+}
