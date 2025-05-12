@@ -376,6 +376,11 @@ static PLATFORM_WRITE_ENTIRE_FILE(platformWriteEntireFile)
 static PLATFORM_GET_PATH_TO_MODULE(platformGetPathToModule)
 {
   String8 result = {};
+  
+  if(!handleToModule)
+    {
+      GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS, (LPCSTR)functionInModule, (HMODULE *)&handleToModule);
+    }
 
   char buffer[MAX_PATH];
   DWORD status = GetModuleFileNameA((HMODULE)handleToModule, buffer, MAX_PATH);

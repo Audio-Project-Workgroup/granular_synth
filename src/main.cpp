@@ -456,8 +456,21 @@ loadBitmap(Arena *destAllocator, Arena *loadAllocator, String8 filename)
 int
 main(int argc, char **argv)
 {
+#if BUILD_DEBUG  
   printf("plugin path: %s\n", PLUGIN_PATH);
+#endif
   int result = 0;
+
+  usz stringMemorySize = KILOBYTES(1);
+  void *stringMemory = calloc(stringMemorySize, 1);
+  Arena stringArena = arenaBegin(stringMemory, stringMemorySize);
+
+#if BUILD_DEBUG
+  String8 glfwPath = platformGetPathToModule(0, (void *)glfwInit, &stringArena);
+  String8 openGLPath = platformGetPathToModule(0, (void *)glBegin, &stringArena);
+  printf("glfw module source: %.*s\n", (int)glfwPath.size, glfwPath.str);
+  printf("opengl module source: %.*s\n", (int)openGLPath.size, openGLPath.str);
+#endif
   
   if(glfwInit())
     {
@@ -548,20 +561,15 @@ main(int argc, char **argv)
 	  RenderCommands commands = {};	  
 
 	  // plugin setup
-
-#if OS_MAC || OS_LINUX
-	  usz stringMemorySize = KILOBYTES(1);
-	  void *stringMemory = calloc(stringMemorySize, 1);
-	  Arena stringArena = arenaBegin(stringMemory, stringMemorySize);
 	  
+#if OS_MAC || OS_LINUX	  
 	  String8 executablePath = platformGetPathToModule(0, (void *)main, &stringArena);
 	  String8 basePath = stringGetParentPath(executablePath);
-	  String8 pluginPath = concatenateStrings(&stringArena, basePath, STR8_LIT("/" PLUGIN_PATH));
-	  
-	  PluginCode plugin = loadPluginCode((char *)pluginPath.str);
+	  String8 pluginPath = concatenateStrings(&stringArena, basePath, STR8_LIT("/" PLUGIN_PATH));	  	  
 #else
-	  PluginCode plugin = loadPluginCode(PLUGIN_PATH);
-#endif	  
+	  String8 pluginPath = STR8_LIT(PLUGIN_PATH);
+#endif
+	  PluginCode plugin = loadPluginCode((char *)pluginPath.str);
 	  pluginMemory.pluginHandle = plugin.pluginCode;
 
 	  // model setup
@@ -721,17 +729,18 @@ main(int argc, char **argv)
 				  u64 frameStartTime = readOSTimer();
 			  
 				  // reload plugin
-		      
-				  u64 newWriteTime = getLastWriteTimeU64(PLUGIN_PATH);
+#if BUILD_DEBUG
+				  u64 newWriteTime = getLastWriteTimeU64((char *)pluginPath.str);
 				  if(newWriteTime != plugin.lastWriteTime)
 				    {
 				      unloadPluginCode(&plugin);
 				      for(u32 tryIndex = 0; !plugin.isValid && (tryIndex < 50); ++tryIndex)
 					{
-					  plugin = loadPluginCode(PLUGIN_PATH);
+					  plugin = loadPluginCode((char *)pluginPath.str);
 					  msecWait(10);
 					}			  
-				    }		      
+				    }
+#endif
 
 				  // handle input
 
