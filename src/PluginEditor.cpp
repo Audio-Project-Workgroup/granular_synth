@@ -19,7 +19,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
   juce::ignoreUnused(processorRef);
     // Make sure that before the constructor has finished, you've set the
     // editor's size to whatever you need it to be.
-  setSize(400, 300);
+  setSize(640, 480);
   setResizable(true, true);
   
   glContext.setRenderer(this);
@@ -51,12 +51,6 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
   commands.widthInPixels = (u32)displayDim.x;
   commands.heightInPixels = (u32)displayDim.y; 
 
-  //commands = {};
-  //commands.vertexCapacity = 512;
-  //commands.indexCapacity = 1024;
-  //commands.vertices = (Vertex *)calloc(commands.vertexCapacity, sizeof(Vertex));
-  //commands.indices = (u32 *)calloc(commands.indexCapacity, sizeof(u32));
-
   setWantsKeyboardFocus(true);
   setMouseClickGrabsKeyboardFocus(true);
   //grabKeyboardFocus();
@@ -71,22 +65,12 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
 AudioPluginAudioProcessorEditor::~AudioPluginAudioProcessorEditor()
 {
   glContext.detach();
-  //free(commands.vertices);
-  //free(commands.indices);
 }
 
 //==============================================================================
 void AudioPluginAudioProcessorEditor::
 paint(juce::Graphics& g)
 {
-  // (Our component is opaque, so we must completely fill the background with a solid colour)
-  //g.fillAll(getLookAndFeel().findColour(juce::ResizableWindow::backgroundColourId));
-
-  //g.fillAll(juce::Colours::white);
-
-  //g.setColour(juce::Colours::black);
-  //g.setFont(15.0f);
-  //g.drawFittedText("Hello World!", getLocalBounds(), juce::Justification::centred, 1);
 }
 
 void AudioPluginAudioProcessorEditor::
@@ -267,12 +251,15 @@ keyPressed(const juce::KeyPress &key)
 void AudioPluginAudioProcessorEditor::
 newOpenGLContextCreated(void)
 {
+#if !OS_MAC
+  // NOTE: this function requires OpenGL version >= 4.3, and mac supports at most version 4.1
   glDebugMessageControl(GL_DEBUG_SOURCE_API,
 			GL_DEBUG_TYPE_OTHER,
 			GL_DEBUG_SEVERITY_NOTIFICATION,
 			0,
 			0,
 			GL_FALSE);
+#endif
   
   glEnable(GL_TEXTURE_2D);  
   glEnable(GL_SCISSOR_TEST);
@@ -280,8 +267,7 @@ newOpenGLContextCreated(void)
 
 void AudioPluginAudioProcessorEditor::
 renderOpenGL(void)
-{
-  
+{  
   glViewport(0, 0, editorWidth, editorHeight);
   glScissor(0, 0, editorWidth, editorHeight);
 
@@ -302,10 +288,6 @@ renderOpenGL(void)
   while(atomicCompareAndSwap(&inputLock, 0, 1)) {}
   if(processorRef.pluginCode.renderNewFrame)
     {      
-      // juce::Logger::writeToLog("left: down=" +
-      // 			       juce::String((int)isDown(newInput->mouseState.buttons[MouseButton_left])) +
-      // 			       " pressed=" +
-      // 			       juce::String((int)wasPressed(newInput->mouseState.buttons[MouseButton_left])));
       processorRef.pluginCode.renderNewFrame(&processorRef.pluginMemory, newInput, &commands);
 
       // NOTE: it's so cool that you can't set the mouse cursor here and have to defer setting it in a mouse callback
@@ -350,7 +332,6 @@ renderOpenGL(void)
 		    }
 		}
 
-	      //pluginLogger->log.first = 0;
 	      ZERO_STRUCT(&pluginLogger->log);
 	      arenaEnd(pluginLogger->logArena);
 	      
