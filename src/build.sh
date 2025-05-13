@@ -46,6 +46,7 @@ clang $CFLAGS -D"PLUGIN_PATH=\"$PLUGIN_NAME\"" ../src/main.cpp -o test -L. $GL_F
 #$(pkg-config --libs --cflags libonnxruntime)
 #-L$SRC_DIR/libs -lonnxruntime
 
+# create application bundle (.app on mac, .AppImage on linux), with nonstandard dependencies included
 if [[ "$OSTYPE" == "darwin"* ]]; then
     mkdir -p Granade.app
     pushd Granade.app > /dev/null
@@ -85,7 +86,38 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
 
     popd > /dev/null # Granade.app -> build
 elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    echo "TODO: create AppImage bundle on linux"
+    mkdir -p Granade.AppDir
+    pushd Granade.AppDir > /dev/null
+
+    touch AppRun
+    echo "TODO: Implement AppRun (should launch executable and set up PATH, if necessary)"
+
+    cp $DATA_DIR/Granade.desktop Granade.desktop
+    cp $DATA_DIR/PNG/DENSITYPOMEGRANATE_BUTTON.png Granade.png
+
+    mkdir -p usr
+    pushd usr > /dev/null
+
+    cp -r $DATA_DIR data
+
+    mkdir -p bin
+    pushd bin > /dev/null
+
+    cp $BUILD_DIR/test Granade
+    cp $BUILD_DIR/plugin.so plugin.so
+
+    popd > /dev/null # bin -> usr
+
+    mkdir -p lib
+    pushd lib > /dev/null
+
+    echo "TODO: put nonstandard dependencies here, and tell the executable where to find them"
+    
+    popd > /dev/null # lib -> usr    
+
+    popd > /dev/null # usr -> Granade.AppDir
+
+    popd > /dev/null # Granade.AppDir -> build
 fi
 
 popd > /dev/null # build -> src
