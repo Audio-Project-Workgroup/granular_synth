@@ -3,8 +3,10 @@ cmake_minimum_required(VERSION 3.22)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_BUILD_TYPE Debug)
 
-project(GranularSynthTest VERSION 0.0.1)
-set(PLUGIN_NAME "Granular Synth Test")
+#project(GranularSynthTest VERSION 0.0.1)
+#set(PLUGIN_NAME "Granular Synth Test")
+project(Granade VERSION 1.0.0)
+set(PLUGIN_NAME "Granade")
 
 add_subdirectory(JUCE)
 
@@ -132,8 +134,10 @@ target_link_libraries(
   # ${ONNX_LIBRARY}
 )
 
-set(VST3_HELPER_DIRECTORY "${CMAKE_BINARY_DIR}/Debug")
-set(VST3_OUTPUT_DIR "${CMAKE_BINARY_DIR}/GranularSynthTest_artefacts/${CMAKE_BUILD_TYPE}/VST3/Granular Synth Test.vst3")
+# we shouldn't have to copy the onnx dll all over the place anymore, if we start using it again
+
+# set(VST3_HELPER_DIRECTORY "${CMAKE_BINARY_DIR}/Debug")
+# set(VST3_OUTPUT_DIR "${CMAKE_BINARY_DIR}/GranularSynthTest_artefacts/${CMAKE_BUILD_TYPE}/VST3/Granular Synth Test.vst3")
 
 #if(WIN32)
 #  set(VST3_BIN_DIR "${VST3_OUTPUT_DIR}/Contents/x86_64-win")
