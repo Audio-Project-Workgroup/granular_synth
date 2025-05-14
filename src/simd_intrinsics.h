@@ -187,8 +187,8 @@ wideMaskFloats(WideFloat a, WideFloat b, WideInt mask)
 {
   WideFloat result = {};
   __m128 maskF = _mm_castsi128_ps(mask.val);
-  result.val = _mm_or_ps(_mm_and_ps(a, maskF),
-			 _mm_andnot_ps(b, maskF));
+  result.val = _mm_or_ps(_mm_and_ps(a.val, maskF),
+			 _mm_andnot_ps(b.val, maskF));
 
   return(result);
 }

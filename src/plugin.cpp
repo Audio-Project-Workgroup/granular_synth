@@ -533,7 +533,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 		  //v2 knobTextOffset = hadamard(V2(0, 0.04f), panelDim);
 		  r32 knobDragLength = 0.35f*panelDim.y;
 
-#if BUILD_DEBUG
+#if 0
 		  // NOTE: play (for now)
 		  {
 		    v2 playOffsetPOP = V2(0.05f, 0.6f);

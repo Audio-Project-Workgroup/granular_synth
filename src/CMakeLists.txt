@@ -3,8 +3,6 @@ cmake_minimum_required(VERSION 3.22)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_BUILD_TYPE Debug)
 
-#project(GranularSynthTest VERSION 0.0.1)
-#set(PLUGIN_NAME "Granular Synth Test")
 project(Granade VERSION 1.0.0)
 set(PLUGIN_NAME "Granade")
 
@@ -21,7 +19,7 @@ juce_add_plugin(
   PLUGIN_MANUFACTURER_CODE Test
   PLUGIN_CODE Test
   FORMATS VST3
-  #  PRODUCT_NAME "Granular Synth Test"
+  COMPANY_NAME ${PLUGIN_NAME}
   PRODUCT_NAME ${PLUGIN_NAME}
 )
 
@@ -94,6 +92,8 @@ add_custom_command(
     TARGET ${PROJECT_NAME}
     POST_BUILD
     # copy plugin dynamic library to vst output directory
+    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${PROJECT_NAME}_VST3>"
+    
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
     "${DYNAMIC_PLUGIN_PATH}"
     "$<TARGET_FILE_DIR:${PROJECT_NAME}_VST3>"
