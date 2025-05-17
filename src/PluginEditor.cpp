@@ -191,13 +191,13 @@ keyPressed(const juce::KeyPress &key)
     {
       result = true;
       juceProcessButtonPress(&newInput->keyboardState.keys[KeyboardButton_tab], result);
-      juce::Logger::writeToLog("tab pressed");
+      //juce::Logger::writeToLog("tab pressed");
     }
   else if(key == juce::KeyPress::backspaceKey)
     {
       result = true;
       juceProcessButtonPress(&newInput->keyboardState.keys[KeyboardButton_backspace], result);
-      juce::Logger::writeToLog("backspace pressed");
+      //juce::Logger::writeToLog("backspace pressed");
     }
   else if(key == juce::KeyPress::returnKey)
     {
@@ -317,7 +317,8 @@ renderOpenGL(void)
       
       renderCommands(&commands);
       //repaint();
-
+      
+#if BUILD_DEBUG
       PluginLogger *pluginLogger = processorRef.pluginMemory.logger;
       for(;;)
 	{
@@ -339,10 +340,10 @@ renderOpenGL(void)
 	      break;
 	    }
 	}
-      
+#endif
     }
   
-  juce::Logger::writeToLog(juce::String("inputs swapped"));  
+  //juce::Logger::writeToLog(juce::String("inputs swapped"));  
   
   PluginInput *temp = newInput;
   newInput = oldInput;

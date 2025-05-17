@@ -5,6 +5,7 @@
 inline void
 logString(char *string)
 {
+#if BUILD_DEBUG
   for(;;)
     {    
       if(globalPlatform.atomicCompareAndSwap(&globalLogger->mutex, 0, 1) == 0)
@@ -21,11 +22,16 @@ logString(char *string)
 	  break;
 	}
     }
+#else
+  UNUSED(string);
+  return;
+#endif
 }
 
 inline void
 logFormatString(char *format, ...)
 {
+#if BUILD_DEBUG
   va_list vaArgs;
   va_start(vaArgs, format);
 
@@ -45,6 +51,10 @@ logFormatString(char *format, ...)
 	  break;
 	}
     }
+#else
+  UNUSED(format);
+  return;
+#endif
 }
 
 #include "plugin_parameters.h"

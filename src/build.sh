@@ -87,18 +87,26 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
     popd > /dev/null # Granade.app -> build
 elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
     mkdir -p Granade.AppDir
-    pushd Granade.AppDir > /dev/null
-
-    touch AppRun
-    echo "TODO: Implement AppRun (should launch executable and set up PATH, if necessary)"
+    pushd Granade.AppDir > /dev/null    
 
     cp $DATA_DIR/Granade.desktop Granade.desktop
-    cp $DATA_DIR/PNG/DENSITYPOMEGRANATE_BUTTON.png Granade.png
+
+    cp $DATA_DIR/AppRun.sh AppRun.sh
+    ln -sf ./AppRun.sh AppRun
 
     mkdir -p usr
     pushd usr > /dev/null
 
     cp -r $DATA_DIR data
+
+    mkdir -p share/icons/hicolor/512x512
+    pushd share/icons/hicolor/512x512 > /dev/null
+    cp $DATA_DIR/PNG/DENSITYPOMEGRANATE_BUTTON.png Granade.png
+    popd > /dev/null # share/icons/hicolor/512x512 -> usr
+
+    mkdir -p lib
+    pushd lib > /dev/null    
+    popd > /dev/null # lib -> usr    
 
     mkdir -p bin
     pushd bin > /dev/null
@@ -106,18 +114,50 @@ elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
     cp $BUILD_DIR/test Granade
     cp $BUILD_DIR/plugin.so plugin.so
 
-    popd > /dev/null # bin -> usr
+    # copy dependencies (OpenGL, glfw, X11)
+    DEPENDENCY=$(ldd Granade | grep -oE "/(.+?)libGL.so.1")
+    ABSOLUTE_SYMLINK=$(realpath "$DEPENDENCY")
+    cp -P $DEPENDENCY ../lib
+    cp $ABSOLUTE_SYMLINK ../lib
+    DEPENDENCY=$(ldd Granade | grep -oE "/(.+?)libglfw.so.3")
+    ABSOLUTE_SYMLINK=$(realpath "$DEPENDENCY")
+    cp -P $DEPENDENCY ../lib
+    cp $ABSOLUTE_SYMLINK ../lib
+    DEPENDENCY=$(ldd Granade | grep -oE "/(.+?)libGLX.so.0")
+    ABSOLUTE_SYMLINK=$(realpath "$DEPENDENCY")
+    cp -P $DEPENDENCY ../lib
+    cp $ABSOLUTE_SYMLINK ../lib
+    DEPENDENCY=$(ldd Granade | grep -oE "/(.+?)libX11.so.6")
+    ABSOLUTE_SYMLINK=$(realpath "$DEPENDENCY")
+    cp -P $DEPENDENCY ../lib
+    cp $ABSOLUTE_SYMLINK ../lib
+    DEPENDENCY=$(ldd Granade | grep -oE "/(.+?)libXext.so.6")
+    ABSOLUTE_SYMLINK=$(realpath "$DEPENDENCY")
+    cp -P $DEPENDENCY ../lib
+    cp $ABSOLUTE_SYMLINK ../lib
+    DEPENDENCY=$(ldd Granade | grep -oE "/(.+?)libGLdispatch.so.0")
+    ABSOLUTE_SYMLINK=$(realpath "$DEPENDENCY")
+    cp -P $DEPENDENCY ../lib
+    cp $ABSOLUTE_SYMLINK ../lib
+    DEPENDENCY=$(ldd Granade | grep -oE "/(.+?)libxcb.so.1")
+    ABSOLUTE_SYMLINK=$(realpath "$DEPENDENCY")
+    cp -P $DEPENDENCY ../lib
+    cp $ABSOLUTE_SYMLINK ../lib
+    DEPENDENCY=$(ldd Granade | grep -oE "/(.+?)libXau.so.6")
+    ABSOLUTE_SYMLINK=$(realpath "$DEPENDENCY")
+    cp -P $DEPENDENCY ../lib
+    cp $ABSOLUTE_SYMLINK ../lib
 
-    mkdir -p lib
-    pushd lib > /dev/null
+    # patch executable to load from lib folder
+    #patchelf --set-rpath '$ORIGIN/../lib' Granade
 
-    echo "TODO: put nonstandard dependencies here, and tell the executable where to find them"
-    
-    popd > /dev/null # lib -> usr    
+    popd > /dev/null # bin -> usr    
 
     popd > /dev/null # usr -> Granade.AppDir
 
     popd > /dev/null # Granade.AppDir -> build
+
+    #appimagetool Granade.AppDir
 fi
 
 popd > /dev/null # build -> src

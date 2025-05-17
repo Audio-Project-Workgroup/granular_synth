@@ -17,23 +17,23 @@ namespace midi {
 #define MIDI_HANDLER(name) void (name)(u8 channel, u8* data, u8 len, PluginState *pluginState)
   typedef MIDI_HANDLER(MidiHandler); // Function pointer type for MIDI handlers
 
-  // Functions for each MIDI command
-  //void NoteOff(u8 channel, u8* data, u8 len, PluginState* pluginState) {
+  // Functions for each MIDI command  
   static MIDI_HANDLER(NoteOff)
   {
     //     assert(len == 2);
     u8 key = data[0];
     u8 velocity = data[1];
-    
+    UNUSED(velocity);
+
     pluginState->freq = hertzFromMidiNoteNumber(key);
     pluginSetFloatParameter(&pluginState->parameters[PluginParameter_volume], 0.0);
     
-    //printf("Note Off: Channel %u Key %u Velocity %u\n", channel, key, velocity);
+#if BUILD_DEBUG
     stringListPushFormat(globalLogger->logArena, &globalLogger->log,
 			 "Note Off: Channel %u Key %u Velocity %u\n", channel, key, velocity);
+#endif
   }
-
-  //void NoteOn(u8 channel, u8* data, u8 len, PluginState* pluginState) {
+  
   static MIDI_HANDLER(NoteOn)
   {
     //     assert(len == 2);
@@ -44,12 +44,12 @@ namespace midi {
     // TODO: it would be more "correct" to check the volume range here
     pluginSetFloatParameter(&pluginState->parameters[PluginParameter_volume], (r32)velocity / 127.f);
     
-    //printf("Note On: Channel %u Key %u Velocity %u\n", channel, key, velocity);
+#if BUILD_DEBUG
     stringListPushFormat(globalLogger->logArena, &globalLogger->log,
 			 "Note On: Channel %u Key %u Velocity %u\n", channel, key, velocity);
+#endif
   }
 
-  //void Aftertouch(u8 channel, u8* data, u8 len, PluginState* pluginState) {
   static MIDI_HANDLER(Aftertouch)
   {
     //     assert(len == 2);
@@ -59,14 +59,13 @@ namespace midi {
     pluginState->freq = hertzFromMidiNoteNumber(key);
     // TODO: it would be more "correct" to check the volume range here
     pluginSetFloatParameter(&pluginState->parameters[PluginParameter_volume], (r32)touch / 127.f);
-    
-    //printf("Aftertouch: Channel %u Key %u Touch %u\n", channel, key, touch);
+
+#if BUILD_DEBUG
     stringListPushFormat(globalLogger->logArena, &globalLogger->log,
 			 "Aftertouch: Channel %u Key %u Touch %u\n", channel, key, touch);
-			 
+#endif
   }
-
-  //void ContinuousController(u8 channel, u8* data, u8 len, PluginState* pluginState) {
+  
   static MIDI_HANDLER(ContinuousController)
   {
     //     assert(len == 2);
@@ -80,21 +79,22 @@ namespace midi {
 
     pluginSetFloatParameter(&pluginState->parameters[paramIndex], normalizedValue);
 
-    //printf("Continuous Controller: Channel %u Controller %u Value %u the normalized value is: %.2f\n", channel, controller, value, normalizedValue);
+#if BUILD_DEBUG
     stringListPushFormat(globalLogger->logArena, &globalLogger->log,
 			 "Continuous Controller: Channel %u Controller %u Value %u the normalized value is: %.2f\n", channel, controller, value, normalizedValue);
-			 
+#endif			 
   }
 
-  //void PatchChange(u8 channel, u8* data, u8 len, PluginState* pluginState) {
   static MIDI_HANDLER(PatchChange)
   {
     //     assert(len == 1);
-    u8 instument = data[0];
+    u8 instrument = data[0];
+    UNUSED(instrument);
     
-    //printf("Patch Change: Channel %u instument %u\n", channel, instument);
+#if BUILD_DEBUG
     stringListPushFormat(globalLogger->logArena, &globalLogger->log,
-			 "Patch Change: Channel %u instument %u\n", channel, instument);
+			 "Patch Change: Channel %u instrument %u\n", channel, instrument);
+#endif
   }
 
   //void ChannelPressure(u8 channel, u8* data, u8 len, PluginState *pluginState) {
@@ -102,10 +102,12 @@ namespace midi {
   {
     //     assert(len == 1);
     u8 pressure = data[0];  // Controller number (data[1])
-    
-    //printf("Channel Pressure: Channel %u pressure %u\n", channel, pressure);
+    UNUSED(pressure);
+
+#if BUILD_DEBUG
     stringListPushFormat(globalLogger->logArena, &globalLogger->log,
 			 "Channel Pressure: Channel %u pressure %u\n", channel, pressure);
+#endif
   }
 
   //void PitchBend(u8 channel, u8* data, u8 len, PluginState* pluginState) {
@@ -122,19 +124,21 @@ namespace midi {
     r32 pitchRange = 2.0f; //Semitones range
     r32 normalizedBend = (r32)pitchbenddata / 8192.0f; // Change made so we work in [-1,1] range
     r32 pitchFactor = powf(2.0f, normalizedBend * pitchRange / 12.0f); // semitones calculation 2^(ST/12)
+    UNUSED(pitchFactor);
 
     //pluginState->freq[channel] = pluginState->freq[channel] * pitchFactor;
-    //printf("Pitch Bend: Channel %u pitchFactor %.2f\n", channel, pitchFactor);
+#if BUILD_DEBUG
     stringListPushFormat(globalLogger->logArena, &globalLogger->log,
 			 "Pitch Bend: Channel %u pitchFactor %.2f\n", channel, pitchFactor);
+#endif
   }
 
   //void SystemMessages(u8 channel, u8* data, u8 len, PluginState *pluginState) {
   static MIDI_HANDLER(SystemMessages)
   {
-    //printf("System Messages\n");
+#if BUILD_DEBUG
     stringListPush(globalLogger->logArena, &globalLogger->log, STR8_LIT("System Messages"));
-			 
+#endif			 
   }
 
   // Define the MIDI command table as an array of function pointers

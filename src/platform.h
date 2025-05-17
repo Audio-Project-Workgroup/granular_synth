@@ -719,6 +719,10 @@ static PLATFORM_GET_PATH_TO_MODULE(platformGetPathToModule)
 	  result = arenaPushString(allocator, STR8_CSTR((char *)dlInfo.dli_fname));
 	}
     }
+  else
+    {
+      fprintf(stderr, "ERROR: could not match address to shared object: %p\n", functionInModule);
+    }
 
   return(result);
 }

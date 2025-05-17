@@ -131,7 +131,9 @@ struct PluginMemory
   
   PlatformAPI platformAPI;
 
+#if BUILD_DEBUG
   PluginLogger *logger;
+#endif
 };
 
 // input

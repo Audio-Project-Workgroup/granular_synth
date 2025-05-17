@@ -201,15 +201,19 @@ maDataCallback(ma_device *pDevice, void *pOutput, const void *pInput, ma_uint32 
 		    }
 		  else
 		    {
+#if BUILD_DEBUG
 		      fprintf(stderr, "ERROR: maDataCallback: ma_pcm_rb_commit_read failed: %s\n",
 			      ma_result_description(result));
+#endif
 		      break;
 		    }
 		}
 	      else
 		{
+#if BUILD_DEBUG
 		  fprintf(stderr, "ERROR: maDataCallback ma_pcm_rb_acquire_read failed: %s\n",
 			  ma_result_description(result));
+#endif
 		  break;
 		}
 	    }     
@@ -237,15 +241,19 @@ maDataCallback(ma_device *pDevice, void *pOutput, const void *pInput, ma_uint32 
 		    }
 		  else
 		    {
+#if BUILD_DEBUG
 		      fprintf(stderr, "ERROR: maDataCallback: ma_pcm_rb_commit_write failed: %s\n",
 			      ma_result_description(result));
+#endif
 		      break;
 		    }
 		}
 	      else
 		{
+#if BUILD_DEBUG
 		  fprintf(stderr, "ERROR: maDataCallback: ma_pcm_rb_acquire_write failed: %s\n",
 			  ma_result_description(result));
+#endif
 		  break;
 		}
 	    }
@@ -337,16 +345,20 @@ static BASE_THREAD_PROC(audioThreadProc)
 		    }
 		  else
 		    {
+#if BUILD_DEBUG
 		      fprintf(stderr,
 			      "ERROR: audioProcess: ma_pcm_rb_commit_write failed: %s\n",
 			      ma_result_description(maResult));
+#endif
 		    }
 		}
 	      else
 		{
+#if BUILD_DEBUG
 		  fprintf(stderr,
 			  "ERROR: audioProcess: ma_pcm_rb_acquire_write failed: %s\n",
 			  ma_result_description(maResult));
+#endif
 		}
 	    }
 	}
@@ -466,7 +478,7 @@ main(int argc, char **argv)
   Arena stringArena = arenaBegin(stringMemory, stringMemorySize);
 
 #if BUILD_DEBUG
-  String8 glfwPath = platformGetPathToModule(0, (void *)glfwInit, &stringArena);
+  String8 glfwPath = platformGetPathToModule(0, (void *)glfwCreateWindow, &stringArena);
   String8 openGLPath = platformGetPathToModule(0, (void *)glBegin, &stringArena);
   printf("glfw module source: %.*s\n", (int)glfwPath.size, glfwPath.str);
   printf("opengl module source: %.*s\n", (int)openGLPath.size, openGLPath.str);
@@ -816,7 +828,7 @@ main(int argc, char **argv)
 				      plugin.renderNewFrame(&pluginMemory, oldInput, &commands);
 				      glfwSetCursorState(window, commands.cursorState);				      
 				      renderCommands(&commands);
-			      
+#if BUILD_DEBUG
 				      for(String8Node *node = pluginMemory.logger->log.first; node; node = node->next)
 					{
 					  String8 string = node->string;
@@ -829,6 +841,7 @@ main(int argc, char **argv)
 				     
 				      ZERO_STRUCT(&pluginMemory.logger->log);
 				      arenaEnd(pluginMemory.logger->logArena);
+#endif
 
 				      if(commands.outputAudioDeviceChanged || commands.inputAudioDeviceChanged)
 					{

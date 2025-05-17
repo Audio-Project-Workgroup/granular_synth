@@ -9,10 +9,10 @@
    - the renderNewFrame() and audioProcess() functions are hot-reloadable, i.e. you modify the code,
      recompile, and perceive those changes in the running application automatically.
      
-     - currently, only the simple host application implements hot-reloading. This is intended to be a
+     - only the simple host application implements hot-reloading. This is intended to be a
        development feature, and is not needed in the release build.
        
-     - initializePluginState() is currently only called at startup. If you modify this function and
+     - initializePluginState() is called once at startup. If you modify this function and
        recompile at run-time, you will not see those changes since the function has already been called.
        
      - modifying the arguments to those functions, or adding fields to PluginState, will likely crash the
@@ -72,7 +72,9 @@
 //       between the plugin and host. These functions should either be similarly encapsulated in the host layer,
 //       or unencapsulated here.
 PlatformAPI globalPlatform;
+#if BUILD_DEBUG
 PluginLogger *globalLogger;
+#endif
 
 inline void
 printButtonState(ButtonState button, char *name)
@@ -99,7 +101,9 @@ extern "C"
 INITIALIZE_PLUGIN_STATE(initializePluginState)
 {
   globalPlatform = memoryBlock->platformAPI;
+#if BUILD_DEBUG
   globalLogger = memoryBlock->logger;
+#endif
 
   void *memory = memoryBlock->memory;
   PluginState *pluginState = 0;
