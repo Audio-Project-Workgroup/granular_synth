@@ -3,7 +3,7 @@
 SRC_DIR=$PWD
 DATA_DIR=$SRC_DIR/../data
 
-CFLAGS="-g -Wall -Wno-writable-strings -Wno-missing-braces -Wno-unused-function -fno-exceptions -fno-rtti -march=native -std=gnu++11 -DBUILD_DEBUG=1"
+CFLAGS="-g -Wall -Wno-writable-strings -Wno-missing-braces -Wno-unused-function -fno-exceptions -fno-rtti -march=native -std=gnu++11 -DBUILD_DEBUG=0"
 MAC_GL_FLAGS="-framework OpenGL"
 MAC_PLUGIN_FLAGS="-dynamiclib"
 LINUX_GL_FLAGS="-lGL"
@@ -157,7 +157,8 @@ elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
 
     popd > /dev/null # Granade.AppDir -> build
 
-    #appimagetool Granade.AppDir
+    appimagetool Granade.AppDir
+    cp Granade-*.AppImage ~/Applications
 fi
 
 popd > /dev/null # build -> src

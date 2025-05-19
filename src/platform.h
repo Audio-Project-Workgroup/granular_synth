@@ -17,6 +17,10 @@ struct OSThread
   
   BaseThreadProc *func;
   void *data;
+
+  volatile u32 lock;
+  u32 cancel;
+  u32 finished;
 };
 
 static void threadCreate(OSThread *thread, BaseThreadProc *func, void *data);
@@ -119,7 +123,11 @@ win32ThreadEntry(void *data)
 
 static void
 threadCreate(OSThread *thread, BaseThreadProc *func, void *threadData)
-{  
+{
+  thread->lock = 0;
+  thread->cancel = 0;
+  thread->finished = 0;
+
   thread->func = func;
   thread->data = threadData;
 
@@ -151,6 +159,37 @@ threadStart(OSThread thread)
     }
 }
 #endif
+
+// TODO: test on windows
+static void
+threadDestroy(OSThread *thread)
+{
+  // NOTE: take lock, set cancel, release lock
+  while(atomicCompareAndSwap(&thread->lock, 0, 1) != 0)
+    {
+      msecWait(1);
+    }
+  thread->cancel = 1;
+  atomicStore(&thread->lock, 0);
+
+  // NOTE: take lock, check finished, if not finished, release lock and loop, else return
+  for(;;)
+    {
+      while(atomicCompareAndSwap(&thread->lock, 0, 1) != 0)
+	{
+	  msecWait(1);
+	}
+      if(thread->finished == 1)
+	{
+	  return;
+	}
+      else
+	{
+	  atomicStore(&thread->lock, 0);
+	  msecWait(1);
+	}
+    }
+}
 
 //
 // atomic operations
@@ -473,6 +512,10 @@ posixThreadEntry(void *data)
 static void
 threadCreate(OSThread *thread, BaseThreadProc *func, void *data)
 {
+  thread->lock = 0;
+  thread->cancel = 0;
+  thread->finished = 0;
+
   thread->func = func;
   thread->data = data;
 
@@ -493,6 +536,36 @@ threadCreate(OSThread *thread, BaseThreadProc *func, void *data)
 	case EPERM: {errorMessage = "no permission to set scheduling policy and parameters in attr";} break;
 	}
       fprintf(stderr, "ERROR: threadCreate: pthread_create failed: %s\n", errorMessage);
+    }
+}
+
+static void
+threadDestroy(OSThread *thread)
+{
+  // NOTE: take lock, set cancel, release lock
+  while(atomicCompareAndSwap(&thread->lock, 0, 1) != 0)
+    {
+      msecWait(1);
+    }
+  thread->cancel = 1;
+  atomicStore(&thread->lock, 0);
+
+  // NOTE: take lock, check finished, if not finished, release lock and loop, else return
+  for(;;)
+    {
+      while(atomicCompareAndSwap(&thread->lock, 0, 1) != 0)
+	{
+	  msecWait(1);
+	}
+      if(thread->finished == 1)
+	{
+	  return;
+	}
+      else
+	{
+	  atomicStore(&thread->lock, 0);
+	  msecWait(1);
+	}
     }
 }
 
@@ -628,8 +701,12 @@ typedef ssize_t ssz;
 static PLATFORM_READ_ENTIRE_FILE(platformReadEntireFile)
 {
   ReadFileResult result = {};
-  
-  int fileHandle = open(filename, O_RDONLY);
+
+  String8 filePath = concatenateStrings(allocator,
+					concatenateStrings(allocator, basePath, STR8_LIT("/")),
+					STR8_CSTR(filename));
+
+  int fileHandle = open((char *)filePath.str, O_RDONLY);
   if(fileHandle != -1)
     {
       struct stat fileStatus;
@@ -651,7 +728,7 @@ static PLATFORM_READ_ENTIRE_FILE(platformReadEntireFile)
 		}
 	      else
 		{
-		  fprintf(stderr, "ERROR: read failed: %s\n", strerror(errno));
+		  fprintf(stderr, "ERROR: read failed: %.*s: %s\n", (int)filePath.size, filePath.str, strerror(errno));
 		  result.contents = 0;
 		  result.contentsSize = 0;
 		  break;
@@ -665,14 +742,14 @@ static PLATFORM_READ_ENTIRE_FILE(platformReadEntireFile)
 	}
       else
 	{
-	  fprintf(stderr, "ERROR: fstat failed: %s\n", strerror(errno));
+	  fprintf(stderr, "ERROR: fstat failed: %.*s: %s\n", (int)filePath.size, filePath.str, strerror(errno));
 	}
 
       close(fileHandle);
     }
   else
     {
-      fprintf(stderr, "ERROR: open failed: %s\n", strerror(errno));
+      fprintf(stderr, "ERROR: open failed: %.*s: %s\n", (int)filePath.size, filePath.str, strerror(errno));
     }
 
   return(result);
@@ -758,16 +835,3 @@ estimateCPUCyclesPerSecond(void)
     }
 }
 #endif
-
-/* static WIDE_LOAD_FLOATS(wideLoadFloats); */
-/* static WIDE_LOAD_INTS(wideLoadInts); */
-/* static WIDE_STORE_FLOATS(wideStoreFloats); */
-/* static WIDE_STORE_INTS(wideStoreInts); */
-/* static WIDE_ADD_FLOATS(wideAddFloats); */
-/* static WIDE_ADD_INTS(wideAddInts); */
-/* static WIDE_SUB_FLOATS(wideSubFloats); */
-/* static WIDE_SUB_INTS(wideSubInts); */
-/* static WIDE_MUL_FLOATS(wideMulFloats); */
-/* static WIDE_MUL_INTS(wideMulInts); */
-
-/* #include "simd_intrinsics.h" */

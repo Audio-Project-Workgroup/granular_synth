@@ -14,6 +14,8 @@
 #include <string.h>
 
 #include "common.h"
+static String8 executablePath;
+static String8 basePath;
 #include "platform.h"
 
 #if OS_MAC || OS_LINUX
@@ -264,6 +266,10 @@ maDataCallback(ma_device *pDevice, void *pOutput, const void *pInput, ma_uint32 
 
 struct AudioThreadData
 {
+  volatile u32 *lock;
+  u32 *cancel;
+  u32 *finished;
+
   ma_pcm_rb *outputBuffer;
   ma_pcm_rb *inputBuffer;
 
@@ -287,6 +293,8 @@ static BASE_THREAD_PROC(audioThreadProc)
 
   for(;;)
     {
+      //fprintf(stderr, "for(;;)\n");      
+
       s32 outputRBPtrDistance = ma_pcm_rb_pointer_distance(outputRingBuffer);
       if(inputRingBuffer)
 	{
@@ -306,17 +314,36 @@ static BASE_THREAD_PROC(audioThreadProc)
 	  ma_result maResult;
 	  while(framesRemaining)
 	    {
+	      //fprintf(stderr, "while(framesRemaining): %u\n", framesRemaining);	      
+	      
 	      void *writePtr = 0;
 	      void *readPtr = 0;
 	      u32 framesToWrite = framesRemaining;
+	      // TODO: think out better how to read from input buffer and write to output buffer simultaneously
+	      //       right now, we're frequently in a situation where framesToWrite gets set to zero after two
+	      //       calls to ma ring buffer functions.
 	      maResult = ma_pcm_rb_acquire_write(outputRingBuffer, &framesToWrite, &writePtr);
 	      if(inputRingBuffer)
 		{	
 		  maResult = ma_pcm_rb_acquire_read(inputRingBuffer, &framesToWrite, &readPtr);
 		}
 	      
-	      if(maResult == MA_SUCCESS)
+	      if(maResult == MA_SUCCESS && framesToWrite)
 		{
+		  //NOTE: check if we are canceled, set finished if we are
+		  while(atomicCompareAndSwap(audioData->lock, 0, 1) != 0)
+		    {
+		    }
+		  if(*audioData->cancel == 1)
+		    {
+		      *audioData->finished = 1;
+		      atomicStore(audioData->lock, 0);
+		      return;
+		    }
+		  else
+		    {
+		      atomicStore(audioData->lock, 0);
+		    }		  
 		  if(plugin->audioProcess)
 		    {
 		      // u64 audioProcessCallTime = readOSTimer();
@@ -329,6 +356,7 @@ static BASE_THREAD_PROC(audioThreadProc)
 		      audioBuffer->inputBuffer[0] = readPtr;
 		      audioBuffer->inputBuffer[1] = readPtr;
 		      audioBuffer->framesToWrite = framesToWrite;
+		      //fprintf(stderr, "calling audioProcess(). frameToWrite: %u\n", framesToWrite);
 		      plugin->audioProcess(pluginMemory, audioBuffer);
 		    }
 
@@ -340,7 +368,7 @@ static BASE_THREAD_PROC(audioThreadProc)
 		  
 		  if(maResult == MA_SUCCESS)
 		    {
-		      //fprintf(stdout, "wrote %u frames\n", framesToWrite);
+		      //fprintf(stderr, "wrote %u frames\n", framesToWrite);
 		      framesRemaining -= framesToWrite;
 		    }
 		  else
@@ -477,6 +505,13 @@ main(int argc, char **argv)
   void *stringMemory = calloc(stringMemorySize, 1);
   Arena stringArena = arenaBegin(stringMemory, stringMemorySize);
 
+  executablePath = platformGetPathToModule(0, (void *)main, &stringArena);
+  basePath = stringGetParentPath(executablePath);
+#if BUILD_DEBUG
+  fprintf(stderr, "executable path: %.*s\n", (int)executablePath.size, executablePath.str);
+  fprintf(stderr, "base path: %.*s\n", (int)basePath.size, basePath.str);
+#endif
+
 #if BUILD_DEBUG
   String8 glfwPath = platformGetPathToModule(0, (void *)glfwCreateWindow, &stringArena);
   String8 openGLPath = platformGetPathToModule(0, (void *)glBegin, &stringArena);
@@ -558,11 +593,11 @@ main(int argc, char **argv)
 	  pluginMemory.platformAPI.atomicCompareAndSwap		= atomicCompareAndSwap;
 	  pluginMemory.platformAPI.atomicCompareAndSwapPointers = atomicCompareAndSwapPointers;
 
+#if BUILD_DEBUG
 	  usz loggerMemorySize = KILOBYTES(512);
 	  void *loggerMemory = calloc(loggerMemorySize, 1);
 	  Arena loggerArena = arenaBegin(loggerMemory, loggerMemorySize);
 
-#if BUILD_DEBUG
 	  PluginLogger logger = {};
 	  logger.logArena = &loggerArena;
 	  logger.maxCapacity = loggerMemorySize/2;
@@ -574,9 +609,7 @@ main(int argc, char **argv)
 
 	  // plugin setup
 	  
-#if OS_MAC || OS_LINUX	  
-	  String8 executablePath = platformGetPathToModule(0, (void *)main, &stringArena);
-	  String8 basePath = stringGetParentPath(executablePath);
+#if OS_MAC || OS_LINUX	  	  
 	  String8 pluginPath = concatenateStrings(&stringArena, basePath, STR8_LIT("/" PLUGIN_PATH));	  	  
 #else
 	  String8 pluginPath = STR8_LIT(PLUGIN_PATH);
@@ -722,6 +755,9 @@ main(int argc, char **argv)
 
 			      OSThread audioThread;
 			      AudioThreadData audioThreadData = {};
+			      audioThreadData.lock = &audioThread.lock;
+			      audioThreadData.cancel = &audioThread.cancel;
+			      audioThreadData.finished = &audioThread.finished;
 			      audioThreadData.outputBuffer = &maOutputRingBuffer;
 			      audioThreadData.inputBuffer = maCaptureCount ? &maInputRingBuffer : 0;
 			      audioThreadData.targetLatencySamples = targetLatencySamples;
@@ -877,33 +913,62 @@ main(int argc, char **argv)
 				  frameElapsedTime = frameEndTime - frameStartTime;
 				}
 
+			      fprintf(stderr, "destroying audioThread\n");
+			      threadDestroy(&audioThread);
+			      //fprintf(stderr, "stopping maDevice\n");
 			      ma_device_stop(&maDevice);
+			      //fprintf(stderr, "uninitializing maDevice\n");
 			      ma_device_uninit(&maDevice);
 			    }
 
+			  //fprintf(stderr, "uninitializing maOutputRingBuffer\n");
 			  ma_pcm_rb_uninit(&maOutputRingBuffer);
+			  //fprintf(stderr, "uninitializing maInputRingBuffer\n");
 			  ma_pcm_rb_uninit(&maInputRingBuffer);
 			}		      
 		    }
 
+		  //fprintf(stderr, "uninitializing maContext\n");
 		  ma_context_uninit(&maContext);
 		}
 	      
 	      // onnxState.api->ReleaseSession(onnxState.session);
 	      // onnxState.api->ReleaseEnv(onnxState.env);
-	    }
 
+	      fprintf(stderr, "freeing audioBufferDataInput\n");
+	      free(audioBufferDataInput);
+	      fprintf(stderr, "freeing audioBufferDataOutput\n");
+	      free(audioBufferDataOutput);
+	      fprintf(stderr, "freeing audioBuffer.midiBuffer\n");
+	      free(audioBuffer.midiBuffer);
+	    }	    
+	    
+	    //fprintf(stderr, "destroying glfw cursors\n");
 	  glfwDestroyCursor(standardCursor);
 	  glfwDestroyCursor(hResizeCursor);
 	  glfwDestroyCursor(vResizeCursor);
 	  glfwDestroyCursor(handCursor);
 	  glfwDestroyCursor(textCursor);
+	  	 	  
+#if BUILD_DEBUG
+	  fprintf(stderr, "freeing loggerMemory\n");
+	  free(loggerMemory);
+#endif
+	  fprintf(stderr, "freeing pluginMemory.memory\n");
+	  free(pluginMemory.memory);
+	  fprintf(stderr, "freeing loadMemory\n");
+	  free(loadMemory);
 	  
-	  glfwDestroyWindow(window);
+	  //fprintf(stderr, "destroying glfw window\n");
+	  glfwDestroyWindow(window);	  
 	}
-      
+
+      //fprintf(stderr, "terminating glfw\n");
       glfwTerminate();
     }
 
+  fprintf(stderr, "freeing stringMemory\n");
+  free(stringMemory);
+  
   return(result);
 }
