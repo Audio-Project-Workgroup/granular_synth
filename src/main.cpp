@@ -913,37 +913,27 @@ main(int argc, char **argv)
 				  frameElapsedTime = frameEndTime - frameStartTime;
 				}
 
-			      fprintf(stderr, "destroying audioThread\n");
 			      threadDestroy(&audioThread);
-			      //fprintf(stderr, "stopping maDevice\n");
 			      ma_device_stop(&maDevice);
-			      //fprintf(stderr, "uninitializing maDevice\n");
 			      ma_device_uninit(&maDevice);
 			    }
 
-			  //fprintf(stderr, "uninitializing maOutputRingBuffer\n");
 			  ma_pcm_rb_uninit(&maOutputRingBuffer);
-			  //fprintf(stderr, "uninitializing maInputRingBuffer\n");
 			  ma_pcm_rb_uninit(&maInputRingBuffer);
 			}		      
 		    }
 
-		  //fprintf(stderr, "uninitializing maContext\n");
 		  ma_context_uninit(&maContext);
 		}
 	      
 	      // onnxState.api->ReleaseSession(onnxState.session);
 	      // onnxState.api->ReleaseEnv(onnxState.env);
 
-	      fprintf(stderr, "freeing audioBufferDataInput\n");
 	      free(audioBufferDataInput);
-	      fprintf(stderr, "freeing audioBufferDataOutput\n");
-	      free(audioBufferDataOutput);
-	      fprintf(stderr, "freeing audioBuffer.midiBuffer\n");
+	      free(audioBufferDataOutput);	    
 	      free(audioBuffer.midiBuffer);
 	    }	    
 	    
-	    //fprintf(stderr, "destroying glfw cursors\n");
 	  glfwDestroyCursor(standardCursor);
 	  glfwDestroyCursor(hResizeCursor);
 	  glfwDestroyCursor(vResizeCursor);
@@ -954,20 +944,15 @@ main(int argc, char **argv)
 	  fprintf(stderr, "freeing loggerMemory\n");
 	  free(loggerMemory);
 #endif
-	  fprintf(stderr, "freeing pluginMemory.memory\n");
-	  free(pluginMemory.memory);
-	  fprintf(stderr, "freeing loadMemory\n");
+	  free(pluginMemory.memory);	  
 	  free(loadMemory);
 	  
-	  //fprintf(stderr, "destroying glfw window\n");
 	  glfwDestroyWindow(window);	  
 	}
 
-      //fprintf(stderr, "terminating glfw\n");
       glfwTerminate();
     }
 
-  fprintf(stderr, "freeing stringMemory\n");
   free(stringMemory);
   
   return(result);

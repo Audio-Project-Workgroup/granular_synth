@@ -28,8 +28,8 @@ pushd ../build > /dev/null
 
 BUILD_DIR=$PWD
 # compile miniaudio to static library
-#clang -c ../src/miniaudio_impl.c -o miniaudio.o
-#ar rcs libminiaudio.a miniaudio.o
+clang -c ../src/miniaudio_impl.c -o miniaudio.o
+ar rcs libminiaudio.a miniaudio.o
 
 # preprocessor
 #clang $CFLAGS ../src/preprocessor.cpp -o preprocessor
@@ -42,7 +42,7 @@ clang $CFLAGS -D"DATA_PATH=\"../data/\"" ../src/plugin.cpp -o $PLUGIN_NAME $PLUG
 
 PLUGIN_STATUS=$?
 
-clang $CFLAGS -D"PLUGIN_PATH=\"$PLUGIN_NAME\"" ../src/main.cpp -o test -L. $GL_FLAGS -lglfw -lminiaudio -ldl -lpthread -lm
+clang $CFLAGS -D"PLUGIN_PATH=\"$PLUGIN_NAME\"" ../src/main.cpp -o granade -L. $GL_FLAGS -lglfw -lminiaudio -ldl -lpthread -lm
 #$(pkg-config --libs --cflags libonnxruntime)
 #-L$SRC_DIR/libs -lonnxruntime
 
@@ -69,7 +69,7 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
     mkdir -p MacOS
     pushd MacOS > /dev/null
 
-    cp $BUILD_DIR/test Granade
+    cp $BUILD_DIR/granade Granade
     cp $BUILD_DIR/plugin.dylib plugin.dylib
 
     # copy dependencies to app bundle
@@ -111,7 +111,7 @@ elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
     mkdir -p bin
     pushd bin > /dev/null
 
-    cp $BUILD_DIR/test Granade
+    cp $BUILD_DIR/granade Granade
     cp $BUILD_DIR/plugin.so plugin.so
 
     # copy dependencies (OpenGL, glfw, X11)
@@ -148,17 +148,15 @@ elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
     cp -P $DEPENDENCY ../lib
     cp $ABSOLUTE_SYMLINK ../lib
 
-    # patch executable to load from lib folder
-    #patchelf --set-rpath '$ORIGIN/../lib' Granade
-
     popd > /dev/null # bin -> usr    
 
     popd > /dev/null # usr -> Granade.AppDir
 
     popd > /dev/null # Granade.AppDir -> build
 
-    appimagetool Granade.AppDir
-    cp Granade-*.AppImage ~/Applications
+    # NOTE: uncomment if you want to make an appimage (need appimagetool)
+    # appimagetool Granade.AppDir
+    # cp Granade-*.AppImage ~/Applications
 fi
 
 popd > /dev/null # build -> src

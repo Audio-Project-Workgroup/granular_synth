@@ -1,6 +1,6 @@
 @echo off
 
-set CFLAGS=-DBUILD_DEBUG=1 -I..\src\include -nologo -Zi -W4 -wd"4201" -wd"4100" -wd"4146" -wd"4310" -wd"4244" -wd"4505" -MT -EHa- -GR-
+set CFLAGS=-DBUILD_DEBUG=0 -I..\src\include -nologo -Zi -W4 -wd"4201" -wd"4100" -wd"4146" -wd"4310" -wd"4244" -wd"4505" -MT -EHa- -GR-
 set LFLAGS=-incremental:no -opt:ref
 
 IF NOT EXIST ..\build mkdir ..\build
@@ -14,8 +14,8 @@ del *.pdb > NUL 2> NUL
 del *.rdi > NUL 2> NUL
 
 REM compile miniaudio to static library
-rem cl %CFLAGS% -c ..\src\miniaudio_impl.c
-rem lib -OUT:miniaudio.lib miniaudio_impl.obj
+cl %CFLAGS% -c ..\src\miniaudio_impl.c
+lib -OUT:miniaudio.lib miniaudio_impl.obj
 
 REM preprocessor
 ::cl %CFLAGS% ..\src\preprocessor.cpp /link %LFLAGS%
