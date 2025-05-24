@@ -277,3 +277,15 @@ This is a list of missing features for concrete Granade implementation, or envis
 
 - [ ] screen reader support
 - [ ] Integrate ML into the pipeline for grouping grains
+
+## Release Notes
+
+### 0.1.0 (Initial Release) - 1st June 2025
+Initial release with real-time granular synthesis, cross-platform support, and VST3 plugin.
+
+---
+
+*For a complete changelog of all versions, see [CHANGELOG.md](data/docs/CHANGELOG.md)*
+
+
+## Acknowledgments
