@@ -289,3 +289,5 @@ Initial release with real-time granular synthesis, cross-platform support, and V
 
 
 ## Acknowledgments
+
+- Born from connections made at [ADC 24](https://audio.dev/archive/adc24-bristol/), Granade exists thanks to the Audio-Project-Workgroup's initiative to unite developers with shared interests. Special appreciation to all who contributed their time into it.
