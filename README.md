@@ -18,6 +18,7 @@ Granade provides both a standalone application and a VST3 plugin.
 	- [Download Releases](#download-releases)
 	- [Requirements](#requirements)
 	- [Building from Source](#building-from-source)
+- [Documentation](#documentation)
 - [Quick Start Guide](#quick-start-guide)
 - [FAQ](#faq)
 - [Future Work](#future-work)
@@ -130,6 +131,10 @@ For building from source, you'll need:
 	./build_juce.sh
 	``` 
 	The `Granade.vst3` file will be created into a nested directory within the build directory (i.e. within `granular_synth\build\build_JUCE\Granade_artefacts\Debug\VST3` for Windows builds). *Make sure it is visible by your DAW by either moving it inside the default VST directory, or adding the parent directory in the VST3 plugins scanned directories of your DAW.*
+
+## Documentation
+
+Some files include comments explaining implementation details. Documentation coverage is currently limited but being expanded. For more technical information, visit [How Granade Works](data\docs\HOW_GRANADE_WORKS.md).
 
 ## Quick Start Guide
 
