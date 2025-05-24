@@ -158,31 +158,46 @@ Feel free to experiment - Granade is destined for artistic exploration and creat
 
 ## FAQ
 
-**Is Granade a cross-platform project? Does it support both standalone apps and VST3 plugins for each platform?**
-
+<details>
+<summary><strong>Is Granade a cross-platform project? Does it support both standalone apps and VST3 plugins for each platform?</strong></summary>
+<br>
 Yes it is. And so it does!
+</details>
 
-**What makes Granade different from other granular synthesizers?**
+<details>
+<summary><strong>What makes Granade different from other granular synthesizers?</strong></summary>
+<br>
+While inspired by existing granular synths, Granade brings its own unique approach  to granular synthesis.
+</details>
 
-While inspired by existing granular synths, Granade brings its own unique approach 	to granular synthesis.
-
-**Is Granade ready for production use?**
-
+<details>
+<summary><strong>Is Granade ready for production use?</strong></summary>
+<br>
 Granade is currently in active development. While functional for experimentation and creative use, some features are incomplete. We recommend it for creative exploration rather than critical production work at this stage.
+</details>
 
-**Can I load my own audio files?**
+<details>
+<summary><strong>Can I load my own audio files?</strong></summary>
+<br>
+File loading is supported in the codebase under the hood but the UI control is not yet implemented. Currently, the standalone application uses microphone input and the VST processes audio directly from your DAW tracks.
+</details>
 
-File loading is supported in the codebase under the hood but the UI control is not yet implemented. Currently, the standalone application uses microphone input and the VST processes audio directly from your audio DAW tracks.
+<details>
+<summary><strong>Some controls in the interface don't seem to work. Is this a bug?</strong></summary>
+<br>
+No, this is expected. Granade is in active development and not all visible controls are fully functional yet. For more details, see <a href="#future-work">Future work</a>.
+</details>
 
-**Some controls in the interface don't seem to work. Is this a bug?**
+<details>
+<summary><strong>Does Granade use machine learning for audio processing?</strong></summary>
+<br>
+Not currently. The codebase includes ONNX runtime integration to support potential ML features, but the current audio processing pipeline is purely algorithmic. ML inclusion for granular synthesis is on our <a href="#future-work">future development</a> list.
 
-No, this is expected. Granade is in active development and not all visible controls are fully functional yet. For more details, see [Future work](future-work).
+</details>
 
-**Does Granade use machine learning for audio processing?**
-
-Not currently. The codebase includes ONNX runtime integration to support potential ML features, but the current audio processing pipeline is purely algorithmic. ML inclusion for granular synthesis is on our [future development](future-work) list.
-
-**How can I speed up build times after the first compilation?**  
+<details>
+<summary><strong>How can I speed up build times after the first compilation?</strong></summary>
+<br>
 After your first successful build, you can comment out the miniaudio compilation lines in your platform's build script to significantly reduce recompilation time:
 
 *Windows (`build.bat`):*
@@ -190,14 +205,21 @@ After your first successful build, you can comment out the miniaudio compilation
 REM compile miniaudio to static library
 REM cl %CFLAGS% -c ..\src\miniaudio_impl.c
 REM lib -OUT:miniaudio.lib miniaudio_impl.obj
-```
 
+```
 *macOS/Linux (`build.sh`):*
 ```bash
 # compile miniaudio to static library
 # clang -c ../src/miniaudio_impl.c -o miniaudio.o
 # ar rcs libminiaudio.a miniaudio.o
 ```
+</details>
+
+
+
+## Future Work
+
+tatata
 
 ## Issues
 
