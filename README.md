@@ -144,15 +144,15 @@ The `Granade.vst3` file will be created into a nested directory within the build
 
 #### Verify your build
 
-	#### Standalone application:
+##### Standalone application:
 
-	To test the standalone application, simply:
-		- in Windows: Run `build\Granade.exe`
-		- in macOS/Linux: Run `./build/Granade`
+To test the standalone application, simply:
+	- in Windows: Run `build\Granade.exe`
+	- in macOS/Linux: Run `./build/Granade`
 
-	#### VST3 plugin:
+##### VST3 plugin:
 
-	To test the VST3 plugin, make sure it is visible by your DAW by either moving it inside the default VST directory, or adding the parent directory in the VST3 plugins scanned directories of your DAW.*
+To test the VST3 plugin, make sure it is visible by your DAW by either moving it inside the default VST directory, or adding the parent directory in the VST3 plugins scanned directories of your DAW.*
 
 ## Documentation
 
