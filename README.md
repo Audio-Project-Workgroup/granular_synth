@@ -20,7 +20,7 @@ Granade provides both a standalone application and a VST3 plugin.
 	- [Building from Source](#building-from-source)
 - [Quick Start Guide](#quick-start-guide)
 - [FAQ](#faq)
-- [Todo List](#todo-list)
+- [Future Work](#future-work)
 - [Release Notes](#release-notes)
 - [Acknowledgments](#acknowledgments)
 
@@ -155,6 +155,49 @@ Level | The level the grains are played independently
 #### Start Exploring
 
 Feel free to experiment - Granade is destined for artistic exploration and creative discovery!
+
+## FAQ
+
+**Is Granade a cross-platform project? Does it support both standalone apps and VST3 plugins for each platform?**
+
+Yes it is. And so it does!
+
+**What makes Granade different from other granular synthesizers?**
+
+While inspired by existing granular synths, Granade brings its own unique approach 	to granular synthesis.
+
+**Is Granade ready for production use?**
+
+Granade is currently in active development. While functional for experimentation and creative use, some features are incomplete. We recommend it for creative exploration rather than critical production work at this stage.
+
+**Can I load my own audio files?**
+
+File loading is supported in the codebase under the hood but the UI control is not yet implemented. Currently, the standalone application uses microphone input and the VST processes audio directly from your audio DAW tracks.
+
+**Some controls in the interface don't seem to work. Is this a bug?**
+
+No, this is expected. Granade is in active development and not all visible controls are fully functional yet. For more details, see [Future work](future-work).
+
+**Does Granade use machine learning for audio processing?**
+
+Not currently. The codebase includes ONNX runtime integration to support potential ML features, but the current audio processing pipeline is purely algorithmic. ML inclusion for granular synthesis is on our [future development](future-work) list.
+
+**How can I speed up build times after the first compilation?**  
+After your first successful build, you can comment out the miniaudio compilation lines in your platform's build script to significantly reduce recompilation time:
+
+*Windows (`build.bat`):*
+```batch
+REM compile miniaudio to static library
+REM cl %CFLAGS% -c ..\src\miniaudio_impl.c
+REM lib -OUT:miniaudio.lib miniaudio_impl.obj
+```
+
+*macOS/Linux (`build.sh`):*
+```bash
+# compile miniaudio to static library
+# clang -c ../src/miniaudio_impl.c -o miniaudio.o
+# ar rcs libminiaudio.a miniaudio.o
+```
 
 ## Issues
 
