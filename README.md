@@ -7,7 +7,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green)](https://github.com/Audio-Project-Workgroup/granular_synth/tree/readme?tab=License-1-ov-file)
 [![Year](https://img.shields.io/badge/year-2025-brightgreen)](https://github.com/Audio-Project-Workgroup/granular_synth)
 
-The Granade is a granular synth that deconstructs sound into microscopic "grains" and manipulates them in real-time to create complex textures and sonic landscapes. By controlling parameters such as grain size, density, pitch, and position, you can transform any audio source into an entirely new sonic experience. 
+The **Granade** is a granular synth that deconstructs sound into microscopic *"grains"* and manipulates them in real-time to create complex textures and sonic landscapes. By controlling parameters such as grain size, density, pitch, and position, you can transform any audio source into an entirely new sonic experience. 
 
 Granade provides both a standalone application and a VST3 plugin.
 
@@ -15,24 +15,33 @@ Granade provides both a standalone application and a VST3 plugin.
 
 - [Key Features](#key-features)
 - [Installation](#installation)
+	- [Download Releases](#download-releases)
 	- [Requirements](#requirements)
-
+	- [Building from Source](#building-from-source)
+- [Quick Start Guide](#quick-start-guide)
+- [FAQ](#faq)
+- [Todo List](#todo-list)
+- [Release Notes](#release-notes)
+- [Acknowledgments](#acknowledgments)
 
 ## Key Features
 
 - Real-time granular synthesis
 - Advanced grain control: size, density, position, pitch, envelope, and spatial distribution
-- Low-latency performance
 - Cross-platform support (Windows, macOS, Linux)
-- Any novelty?
-- Any other feature?
 
 ## Installation
 
+### Download Releases
+
+The easiest way to get Granade is to download pre-built releases from our [GitHub Releases page](https://github.com/Audio-Project-Workgroup/granular_synth/releases).
+
 ### Requirements
 
+For building from source, you'll need:
+
 * GLFW: https://github.com/glfw/glfw (to build from source), https://www.glfw.org/download.html (for the precompiled binaries)
-* ONNX: https://github.com/microsoft/onnxruntime (source), https://github.com/microsoft/onnxruntime/releases/tag/v1.20.1 (releases)
+<!--* ONNX: https://github.com/microsoft/onnxruntime (source), https://github.com/microsoft/onnxruntime/releases/tag/v1.20.1 (releases)-->
 * OpenGL
 * CMake (for vst)
 * msvc (windows)
@@ -43,60 +52,53 @@ Granade provides both a standalone application and a VST3 plugin.
 
 1. Clone the repository and initialize submodules:
 	```bash
-	git clone https://github.com/Audio-Project-Workgroup/granular_synth
-	git submodule init
-	git submodule update --recursive
+	git clone --recurse-submodules https://github.com/Audio-Project-Workgroup/granular_synth
 	```
 	This places the `https://github.com/juce-framework/JUCE` repository within `src/JUCE` directory.
 
 2. Platform-specific setup:
+	
 	#### Windows 
 
-	1. Set up GLFW:
-		 - Copy the `GLFW` folder from your downloaded GLFW package to `src\include`
-		 - from the `lib-vc[YEAR]` folder (corresponding to your version of Visual Studio), copy `glfw3_mt.lib` and `glfw3.lib` to `src\libs`
-
-	2. Set up ONNX Runtime:
-		 - copy the file `onnxruntime_c_api.h` from the ONNX include directory to `src\include`
-		 - copy `onnxruntime.lib` and `onnxruntime.pdb` to `src\libs`
-		 - copy `onnxruntime.dll` to the `build` directory (if this is your first build, that directory won't be there yet, so defer this step until after you run `build.bat`)
+	1. **Set up GLFW:**
+		- Copy the `GLFW` folder from your downloaded GLFW package to `src\include`
+		- From the `lib-vc[YEAR]` folder (corresponding to your version of Visual Studio), copy `glfw3_mt.lib` and `glfw3.lib` to `src\libs`
 	
-	3. Configure your shell to be able to call a C compiler from the command line:
-		 - Open a Developer Command Prompt or run (i.e. for x64 architectures):
-		 ```
-		 "C:\Program Files\Microsoft Visual Studio\[YEAR]\Community\VC\Auxiliary\Build\vcvarsall.bat" x64
-		 ```
+	2. **Configure your shell to be able to call a C compiler from the command line:**
+		- Open a Developer Command Prompt or run (i.e. for x64 architectures):
+		```batch
+		"C:\Program Files\Microsoft Visual Studio\[YEAR]\Community\VC\Auxiliary\Build\vcvarsall.bat" x64
+		```
 
-	 4. Uncomment two lines in `src/build.bat` to compile miniaudio.
-		 This can be done by removing the REM command from the statements, as follows:
-		 .\build_all.bat
-		 ```
-		 REM compile miniaudio to static library
-		 cl %CFLAGS% -c ..\src\miniaudio_impl.c
-		 lib -OUT:miniaudio.lib miniaudio_impl.obj
-		 ```   
-		 After built once the application, recomment the two lines in `build.bat` for subsequent builds.
+	3. **Build the native host application and the dynamic library plugin:**
+		```
+		cd src
+		.\build.bat
+		```
+		These will be located in a new directory called `build` (with names `main.exe` and `plugin.dll`)
 
-	 5. to build the native host application and the dynamic library plugin:
-		 ```
-		 cd src
-		 .\build.bat
-		 ```
-		 These will be located in a new directory called `build` (with names `main.exe` and `plugin.dll`)
+	4. **Build the VST3 plugin with JUCE:**
+		```batch
+		cd src
+		.\build_juce.bat
+		```
+		you will have to put the resulting vst3 bundle somewhere where your DAW/plugin host can find it (@TODO: get JUCE to do the installation auomatically)
 
-	 6. to build the vst3 plugin with JUCE:
-		 ```
-		 cd src
-		 .\build_juce.bat
-		 ```
-		 you will have to put the resulting vst3 bundle somewhere where your DAW/plugin host can find it (TODO: get JUCE to do the installation auomatically)
-	
+	<!-- Uncomment in the future in case that onnx is supported.
+	N. Set up ONNX Runtime:
+		- copy the file `onnxruntime_c_api.h` from the ONNX include directory to `src\include`
+		- copy `onnxruntime.lib` and `onnxruntime.pdb` to `src\libs`
+		- copy `onnxruntime.dll` to the `build` directory (if this is your first build, that directory won't be there yet, so defer this step until after you run `build.bat`)
+
 	NOTE:
-		on your first build, you will also have to copy `onnxruntime.dll` from your `build` folder to the folder containing your DAW's executable (TODO: install the onnxruntime dll globally with a custom name (to not interfere with the one that's installed by default))
-	
-### Mac and Linux
+		on your first build, you will also have to copy `onnxruntime.dll` from your `build` folder to the folder containing your DAW's executable (TODO: install the onnxruntime dll globally with a custom name (to not interfere with the one that's installed by default)) -->
 
-* ensure the [required dependencies](#requirements) are installed via your package manager
+	#### Mac and Linux
+	
+	1. **Install the the [required dependencies](#requirements) via your package manager
+
+	2. **Set up environment paths (optional):**
+
 	* on mac, you may need to set/modify your shell's include, library, and pkg-config paths. For example:
 	```
 	# ~/.zshrc
@@ -105,12 +107,23 @@ Granade provides both a standalone application and a VST3 plugin.
 	export LIBRARY_PATH=/opt/homebrew/lib # append to this path if it exists already
 	export PKG_CONFIG_PATH="/opt/homebrew/lib/pkgconfig:$PKG_CONFIG_PATH"
 	```
-	* on linux, onnx is not available via standard package managers. Download the binaries (recommended version is 1.20.1) and install them globally (the exact directories can be found in the libonnxruntime.pc file, located in `[onnxruntime folder]/lib/pkgconfig`)
-* navigate to the src directory
-* open `build.sh` and uncomment the two lines to compile miniaudio to a static library
-* run `./build.sh` to build the native host application and the dynamic library plugin. These will be located in a new directory called build  
-	* recomment those two lines in `build.sh` for subsequent builds
-* run `./build_juce.sh` to build the vst3 plugin with JUCE and install it
+	<!--
+	* on linux, onnx is not available via standard package managers. Download the binaries (recommended version is 1.20.1) and install them globally (the exact directories can be found in the libonnxruntime.pc file, located in `[onnxruntime folder]/lib/pkgconfig`) -->
+
+	3. **Build the native host application and the dynamic library plugin**
+	
+	```bash
+	cd src
+	./build.sh
+	``` 
+	The compiled native host application and the dynamic library plugin will be located in a new directory called build
+
+	4. **Build the VST3 plugin with JUCE:**
+
+	```bash
+	cd src
+	./build_juce.sh
+	``` 
 
 ## RUN
 Test the installation for the application and for the VST plugin.
