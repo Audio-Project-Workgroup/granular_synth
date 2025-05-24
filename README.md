@@ -129,7 +129,7 @@ For building from source, you'll need:
 	cd src
 	./build_juce.sh
 	``` 
-	The `Granular Synth Test.vst3` file will be created into a nested directory within the build directory (i.e. within `granular_synth\build\build_JUCE\Granade_artefacts\Debug\VST3` for Windows builds). *Make sure it is visible by your DAW by either moving it inside the default VST directory, or adding the parent directory in the VST3 plugins scanned directories of your DAW.*
+	The `Granade.vst3` file will be created into a nested directory within the build directory (i.e. within `granular_synth\build\build_JUCE\Granade_artefacts\Debug\VST3` for Windows builds). *Make sure it is visible by your DAW by either moving it inside the default VST directory, or adding the parent directory in the VST3 plugins scanned directories of your DAW.*
 
 ## Quick Start Guide
 
