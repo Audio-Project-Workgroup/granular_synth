@@ -15,6 +15,10 @@ Granade is a real-time granular synthesizer, available as a vst3 plugin and as a
 - [Installation](#installation)
 	- [Download Releases](#download-releases)
 	- [Building from Source](#building-from-source)
+		- [Requirements](#install-requirements)
+		- [Initialize local repo](#Clone-the-repository-and-initialize-submodules)
+		- [Platform-specific-setup](#Platform-specific-setup)
+		- [Verify build](#Verify-your-build)
 - [Documentation](#documentation)
 - [Quick Start Guide](#quick-start-guide)
 - [FAQ](#faq)
@@ -48,7 +52,7 @@ Once you have appimaged running, copy Granade to ~/Applications and appimaged wi
 
 ### Building from Source
 
-1. Install requirements
+#### Install requirements
 
 For building from source, you'll need:
 
@@ -60,89 +64,90 @@ For building from source, you'll need:
 * clang (mac and linux)
 * pkg-config (mac and linux)
 
-2. Clone the repository and initialize submodules:
+#### Clone the repository and initialize submodules:
+	
 	```bash
 	git clone --recurse-submodules https://github.com/Audio-Project-Workgroup/granular_synth
 	```
 	This places the `https://github.com/juce-framework/JUCE` repository within `src/JUCE` directory.
 
-3. Platform-specific setup:
+#### Platform-specific setup:
 	
-	#### Windows 
+##### Windows 
 
-	1. **Set up GLFW:**
-		- Copy the `GLFW` folder from your downloaded GLFW package to `src\include`
-		- From the `lib-vc[YEAR]` folder (corresponding to your version of Visual Studio), copy `glfw3_mt.lib` and `glfw3.lib` to `src\libs`
-	
-	2. **Configure your shell to be able to call a C compiler from the command line:**
-		- Open a Developer Command Prompt or run (i.e. for x64 architectures):
-		```batch
-		"C:\Program Files\Microsoft Visual Studio\[YEAR]\Community\VC\Auxiliary\Build\vcvarsall.bat" x64
-		```
+1. **Set up GLFW:**
+	- Copy the `GLFW` folder from your downloaded GLFW package to `src\include`
+	- From the `lib-vc[YEAR]` folder (corresponding to your version of Visual Studio), copy `glfw3_mt.lib` and `glfw3.lib` to `src\libs`
 
-	3. **Build the native host application and the dynamic library plugin:**
-		```
-		cd src
-		.\build.bat
-		```
-		These will be located in a new directory called `build` (with names `main.exe` and `plugin.dll`)
-
-	4. **Build the VST3 plugin with JUCE:**
-		```batch
-		cd src
-		.\build_juce.bat
-		```
-		you will have to put the resulting vst3 bundle somewhere where your DAW/plugin host can find it (@TODO: get JUCE to do the installation auomatically)
-
-	<!-- Uncomment in the future in case that onnx is supported.
-	N. Set up ONNX Runtime:
-		- copy the file `onnxruntime_c_api.h` from the ONNX include directory to `src\include`
-		- copy `onnxruntime.lib` and `onnxruntime.pdb` to `src\libs`
-		- copy `onnxruntime.dll` to the `build` directory (if this is your first build, that directory won't be there yet, so defer this step until after you run `build.bat`)
-
-	NOTE:
-		on your first build, you will also have to copy `onnxruntime.dll` from your `build` folder to the folder containing your DAW's executable (TODO: install the onnxruntime dll globally with a custom name (to not interfere with the one that's installed by default)) -->
-
-	#### Mac and Linux
-	
-	1. **Install the the [required dependencies](#requirements) via your package manager
-
-	2. **Set up environment paths (optional):**
-
-	* on mac, you may need to set/modify your shell's include, library, and pkg-config paths. For example:
+2. **Configure your shell to be able to call a C compiler from the command line:**
+	- Open a Developer Command Prompt or run (i.e. for x64 architectures):
+	```batch
+	"C:\Program Files\Microsoft Visual Studio\[YEAR]\Community\VC\Auxiliary\Build\vcvarsall.bat" x64
 	```
-	# ~/.zshrc
-	# replace /opt/homebrew with /usr/local on intel macs
-	export CPATH=/opt/homebrew/include # append to this path if it exists already
-	export LIBRARY_PATH=/opt/homebrew/lib # append to this path if it exists already
-	export PKG_CONFIG_PATH="/opt/homebrew/lib/pkgconfig:$PKG_CONFIG_PATH"
+
+3. **Build the native host application and the dynamic library plugin:**
 	```
-	<!--
-	* on linux, onnx is not available via standard package managers. Download the binaries (recommended version is 1.20.1) and install them globally (the exact directories can be found in the libonnxruntime.pc file, located in `[onnxruntime folder]/lib/pkgconfig`) -->
-
-	3. **Build the native host application and the dynamic library plugin**
-	
-	```bash
 	cd src
-	./build.sh
-	``` 
-	The compiled native host application and the dynamic library plugin will be located in a new directory called `build`
+	.\build.bat
+	```
+	These will be located in a new directory called `build` (with names `Granade.exe` and `plugin.dll`)
 
-	4. **Build the VST3 plugin with JUCE:**
-
-	```bash
+4. **Build the VST3 plugin with JUCE:**
+	```batch
 	cd src
-	./build_juce.sh
-	``` 
-	The `Granade.vst3` file will be created into a nested directory within the build directory (i.e. within `granular_synth\build\build_JUCE\Granade_artefacts\Debug\VST3` for Windows builds). 
+	.\build_juce.bat
+	```
+	you will have to put the resulting vst3 bundle somewhere where your DAW/plugin host can find it (@TODO: get JUCE to do the installation automatically)
+
+<!-- Uncomment in the future in case that onnx is supported.
+N. Set up ONNX Runtime:
+	- copy the file `onnxruntime_c_api.h` from the ONNX include directory to `src\include`
+	- copy `onnxruntime.lib` and `onnxruntime.pdb` to `src\libs`
+	- copy `onnxruntime.dll` to the `build` directory (if this is your first build, that directory won't be there yet, so defer this step until after you run `build.bat`)
+
+NOTE:
+	on your first build, you will also have to copy `onnxruntime.dll` from your `build` folder to the folder containing your DAW's executable (TODO: install the onnxruntime dll globally with a custom name (to not interfere with the one that's installed by default)) -->
+
+##### Mac and Linux
+
+1. **Install the [required dependencies](#install-requirements) via your package manager
+
+2. **Set up environment paths (optional):**
+
+* on mac, you may need to set/modify your shell's include, library, and pkg-config paths. For example:
+```
+# ~/.zshrc
+# replace /opt/homebrew with /usr/local on intel macs
+export CPATH=/opt/homebrew/include # append to this path if it exists already
+export LIBRARY_PATH=/opt/homebrew/lib # append to this path if it exists already
+export PKG_CONFIG_PATH="/opt/homebrew/lib/pkgconfig:$PKG_CONFIG_PATH"
+```
+<!--
+* on linux, onnx is not available via standard package managers. Download the binaries (recommended version is 1.20.1) and install them globally (the exact directories can be found in the libonnxruntime.pc file, located in `[onnxruntime folder]/lib/pkgconfig`) -->
+
+3. **Build the native host application and the dynamic library plugin**
+
+```bash
+cd src
+./build.sh
+``` 
+The compiled native host application and the dynamic library plugin will be located in a new directory called `build`
+
+4. **Build the VST3 plugin with JUCE:**
+
+```bash
+cd src
+./build_juce.sh
+``` 
+The `Granade.vst3` file will be created into a nested directory within the build directory (i.e. within `granular_synth\build\build_JUCE\Granade_artefacts\Debug\VST3` for Windows builds). 
 
 
-4. **Verify your build**
+#### Verify your build
 
 	#### Standalone application:
 
 	To test the standalone application, simply:
-		- in Windows: Run `build\Granade .exe`
+		- in Windows: Run `build\Granade.exe`
 		- in macOS/Linux: Run `./build/Granade`
 
 	#### VST3 plugin:
@@ -196,7 +201,7 @@ Yes it is. And so it does!
 <details>
 <summary><strong>What makes Granade different from other granular synthesizers?</strong></summary>
 <br>
-While inspired by existing granular synths, Granade brings its own unique approach  to granular synthesis. Therefore, it does not differ much. It is simply unique.
+While inspired by existing granular synths, Granade brings its own unique approach to granular synthesis. Therefore, it's not novel, but unique.
 </details>
 
 <details>
