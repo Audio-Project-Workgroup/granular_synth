@@ -118,18 +118,18 @@ For building from source, you'll need:
 	``` 
 	The compiled native host application and the dynamic library plugin will be located in a new directory called build
 
+	Test the installation by running the executable:
+
+	- in Windows: Run `build\Granade .exe`
+	- in macOS/Linux: Run `./build/Granade`
+
 	4. **Build the VST3 plugin with JUCE:**
 
 	```bash
 	cd src
 	./build_juce.sh
 	``` 
-
-## RUN
-Test the installation for the application and for the VST plugin.
-
-* To run the application find the executable within the build directory. The file names are `main.exe` for Windows and `test` for Linux. (TODO: real names)
-* To test the VST3 plugin, find the `Granular Synth Test.vst3` file, and import it in your DAW.
+	The `Granular Synth Test.vst3` file will be created into a nested directory within the build directory (i.e. within `granular_synth\build\build_JUCE\Granade_artefacts\Debug\VST3` for Windows builds). *Make sure it is visible by your DAW by either moving it inside the default VST directory, or adding the parent directory in the VST3 plugins scanned directories of your DAW.*
 
 ## Issues
 
