@@ -7,9 +7,9 @@
 [![License](https://img.shields.io/badge/license-MIT-green)](https://github.com/Audio-Project-Workgroup/granular_synth/tree/readme?tab=License-1-ov-file)
 [![Year](https://img.shields.io/badge/year-2025-brightgreen)](https://github.com/Audio-Project-Workgroup/granular_synth)
 
-The **Granade** is a granular synth that deconstructs sound into microscopic *"grains"* and manipulates them in real-time to create complex textures and sonic landscapes. By controlling parameters such as grain size, density, spread, and windowing, you can transform any audio source into an entirely new sonic experience. 
+Granade is a real-time granular synthesizer, available as a vst3 plugin and as a standalone application for mac, windows, and linux. Granade records audio input into a buffer and deconstructs the sound into multiple overlapping delayed, enveloped, and panned segments called grains, creating complex textures and new sonic landscapes.
 
-Granade provides both a standalone application and a VST3 plugin.
+Granade provides several interactive parameters such as grain size, density, spread, and windowing, for manipulating grain playback in real time. 
 
 ## Contents
 
@@ -35,6 +35,18 @@ Granade provides both a standalone application and a VST3 plugin.
 ### Download Releases
 
 The easiest way to get Granade is to download pre-built releases from our [GitHub Releases page](https://github.com/Audio-Project-Workgroup/granular_synth/releases).
+
+<!-- Skip these notes
+**NOTE TO WINDOWS USERS**
+The relative locations of files/directories in the folder you downloaded is critical for the application to function.
+If you want to move the executable to a more convenient location, either move the entire folder, or create an alias
+to the executable. Appologies for not shipping an installer.
+
+**NOTE TO LINUX USERS**
+We distribute Granade as an AppImage on linux. We recommend using appimaged
+(download: github.com/probonopd/go-appimage) to automate the integration of AppImages into the desktop environment. 
+Once you have appimaged running, copy Granade to ~/Applications and appimaged will handle the rest.
+-->
 
 ### Building from Source
 
@@ -153,16 +165,23 @@ Some files include comments explaining implementation details. Documentation cov
 - **VST:** Works as audio effect
 
 #### Controls
-Parameter | Description
-:--- | ---:
-Spread or width | How much opened in stereo are the grains played
-Offset | How many samples between the grain buffer read and write indices (not applicable to file-backed grains)disc
-Size | How many samples a grain plays (not applicable to file-backed grains)
-Density |	How many grains are playing at once, or how long until a new grain starts playing 
-Mix | Blend between the original signal and the signal with with the granulator. Being 0% the original signal only and 100% only the grains. (Efficient for separate the effect from the signal and easier to mix) 
-Pan | Panning of the out signal
-Window | Control over a windowing function applied to grain samples
-Level | The level the grains are played independently
+
+- Left click and drag a knob or slider up or down to change its value.
+- You can also navigate the ui with tab and backspace. Use + and - on a selected control to change parameter values.
+- Pressing ESC opens a menu to select audio input and output devices with the mouse. Press ESC again to close.
+
+#### Parameters
+
+Parameter | Description | How to Use
+:--- | :---: | ---:
+Density | Controls the number of playing grains | Turn left for fewer grains, and right for more.  
+Spread | Controls the random stereo widening applied to each grain | Fully left is dual mono, middle is unmodified, right is wider.
+Offset | Controls the space between the read and write heads of the buffer | Turn left for less delay, and right for more.
+Size | Controls the size of new grains | Left is shorter, right is longer.
+Mix | Controls the dry/wet mix |Fully left is completely dry, fully right is completely wet.
+Pan | Controls the pan of the wet signal | Left is left, right is right.
+Window | Controls the amplitude window shape applied to each grain | Turn left for a smoother ramp, and right for a choppier sound
+Level | Controls the overall amplitude of the output signal | Up for louder, down for quieter
 
 #### Start Exploring
 
@@ -185,7 +204,7 @@ While inspired by existing granular synths, Granade brings its own unique approa
 <details>
 <summary><strong>Is Granade ready for production use?</strong></summary>
 <br>
-Granade is in its initial release. While functional for experimentation and creative use, some features are incomplete. We recommend it for creative exploration rather than critical production work at this stage.
+Granade is in a nascent stage of development, developed by a small team, and only tested on a handful of systems. As such, you may experience crashes, bugs, or be missing certain features. In any of these cases, please let us know by submitting an issue (bug report or feature request) on github. While functional for experimentation and creative use, some features are incomplete. We recommend it for creative exploration rather than critical production work at this stage.
 </details>
 
 <details>
@@ -230,6 +249,10 @@ REM lib -OUT:miniaudio.lib miniaudio_impl.obj
 ## Future Work
 
 ### Bugs/Issues
+<!-- 
+- [ ] for empty items
+- [x] for accomplished items
+ -->
 
 This is a list of bugs and issues that require fixing:
 
