@@ -7,7 +7,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green)](https://github.com/Audio-Project-Workgroup/granular_synth/tree/readme?tab=License-1-ov-file)
 [![Year](https://img.shields.io/badge/year-2025-brightgreen)](https://github.com/Audio-Project-Workgroup/granular_synth)
 
-The **Granade** is a granular synth that deconstructs sound into microscopic *"grains"* and manipulates them in real-time to create complex textures and sonic landscapes. By controlling parameters such as grain size, density, pitch, and position, you can transform any audio source into an entirely new sonic experience. 
+The **Granade** is a granular synth that deconstructs sound into microscopic *"grains"* and manipulates them in real-time to create complex textures and sonic landscapes. By controlling parameters such as grain size, density, spread, and windowing, you can transform any audio source into an entirely new sonic experience. 
 
 Granade provides both a standalone application and a VST3 plugin.
 
@@ -16,7 +16,6 @@ Granade provides both a standalone application and a VST3 plugin.
 - [Key Features](#key-features)
 - [Installation](#installation)
 	- [Download Releases](#download-releases)
-	- [Requirements](#requirements)
 	- [Building from Source](#building-from-source)
 - [Documentation](#documentation)
 - [Quick Start Guide](#quick-start-guide)
@@ -28,7 +27,7 @@ Granade provides both a standalone application and a VST3 plugin.
 ## Key Features
 
 - Real-time granular synthesis
-- Advanced grain control: size, density, position, pitch, envelope, and spatial distribution
+- Advanced grain control: size, density, spread, windowing, and mix controls
 - Cross-platform support (Windows, macOS, Linux)
 
 ## Installation
@@ -37,7 +36,9 @@ Granade provides both a standalone application and a VST3 plugin.
 
 The easiest way to get Granade is to download pre-built releases from our [GitHub Releases page](https://github.com/Audio-Project-Workgroup/granular_synth/releases).
 
-### Requirements
+### Building from Source
+
+1. Install requirements
 
 For building from source, you'll need:
 
@@ -49,15 +50,13 @@ For building from source, you'll need:
 * clang (mac and linux)
 * pkg-config (mac and linux)
 
-### Building from Source
-
-1. Clone the repository and initialize submodules:
+2. Clone the repository and initialize submodules:
 	```bash
 	git clone --recurse-submodules https://github.com/Audio-Project-Workgroup/granular_synth
 	```
 	This places the `https://github.com/juce-framework/JUCE` repository within `src/JUCE` directory.
 
-2. Platform-specific setup:
+3. Platform-specific setup:
 	
 	#### Windows 
 
@@ -117,12 +116,7 @@ For building from source, you'll need:
 	cd src
 	./build.sh
 	``` 
-	The compiled native host application and the dynamic library plugin will be located in a new directory called build
-
-	Test the installation by running the executable:
-
-	- in Windows: Run `build\Granade .exe`
-	- in macOS/Linux: Run `./build/Granade`
+	The compiled native host application and the dynamic library plugin will be located in a new directory called `build`
 
 	4. **Build the VST3 plugin with JUCE:**
 
@@ -130,7 +124,20 @@ For building from source, you'll need:
 	cd src
 	./build_juce.sh
 	``` 
-	The `Granade.vst3` file will be created into a nested directory within the build directory (i.e. within `granular_synth\build\build_JUCE\Granade_artefacts\Debug\VST3` for Windows builds). *Make sure it is visible by your DAW by either moving it inside the default VST directory, or adding the parent directory in the VST3 plugins scanned directories of your DAW.*
+	The `Granade.vst3` file will be created into a nested directory within the build directory (i.e. within `granular_synth\build\build_JUCE\Granade_artefacts\Debug\VST3` for Windows builds). 
+
+
+4. **Verify your build**
+
+	#### Standalone application:
+
+	To test the standalone application, simply:
+		- in Windows: Run `build\Granade .exe`
+		- in macOS/Linux: Run `./build/Granade`
+
+	#### VST3 plugin:
+
+	To test the VST3 plugin, make sure it is visible by your DAW by either moving it inside the default VST directory, or adding the parent directory in the VST3 plugins scanned directories of your DAW.*
 
 ## Documentation
 
@@ -138,7 +145,7 @@ Some files include comments explaining implementation details. Documentation cov
 
 ## Quick Start Guide
 
-*Granade is in active development. Some features shown may not be fully implemented yet.*
+*Granade is a working granular synthesizer with room for future development. Some interface elements may not yet be fully functional.*
 
 #### Audio Input Sources
 
@@ -172,13 +179,13 @@ Yes it is. And so it does!
 <details>
 <summary><strong>What makes Granade different from other granular synthesizers?</strong></summary>
 <br>
-While inspired by existing granular synths, Granade brings its own unique approach  to granular synthesis.
+While inspired by existing granular synths, Granade brings its own unique approach  to granular synthesis. Therefore, it does not differ much. It is simply unique.
 </details>
 
 <details>
 <summary><strong>Is Granade ready for production use?</strong></summary>
 <br>
-Granade is currently in active development. While functional for experimentation and creative use, some features are incomplete. We recommend it for creative exploration rather than critical production work at this stage.
+Granade is in its initial release. While functional for experimentation and creative use, some features are incomplete. We recommend it for creative exploration rather than critical production work at this stage.
 </details>
 
 <details>
@@ -190,7 +197,7 @@ File loading is supported in the codebase under the hood but the UI control is n
 <details>
 <summary><strong>Some controls in the interface don't seem to work. Is this a bug?</strong></summary>
 <br>
-No, this is expected. Granade is in active development and not all visible controls are fully functional yet. For more details, see <a href="#future-work">Future work</a>.
+No, this is expected. Granade is in its first release and not all visible controls are fully functional yet. For more details, see <a href="#future-work">Future work</a>.
 </details>
 
 <details>
@@ -295,4 +302,4 @@ Initial release with real-time granular synthesis, cross-platform support, and V
 
 ## Acknowledgments
 
-- Born from connections made at [ADC 24](https://audio.dev/archive/adc24-bristol/), Granade exists thanks to the Audio-Project-Workgroup's initiative to unite developers with shared interests. Special appreciation to all who contributed their time into it.
+- Born from connections made at [ADC 24](https://audio.dev/archive/adc24-bristol/), Granade exists thanks to the Audio-Project-Workgroup's initiative to unite developers with shared interests. Special appreciation to all the people who contributed their time into it.
