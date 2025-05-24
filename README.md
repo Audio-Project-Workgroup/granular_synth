@@ -215,15 +215,65 @@ REM lib -OUT:miniaudio.lib miniaudio_impl.obj
 ```
 </details>
 
-
-
 ## Future Work
 
-tatata
+### Bugs/Issues
 
-## Issues
+This is a list of bugs and issues that require fixing:
 
-* vst3 automatic installation doesn't work anymore
-* must put onnxruntime dlls everywhere on windows. We don't want to make users do that, so we should put a dll with a custom name (to not conflict with the default) in System32.
-* should automatically detect if we need to build a miniaudio library, and not need to comment and uncomment crap
-* should condense builds into a single script, with optional arguments
+- [ ] vst3 automatic installation into default VST3 directory
+- [ ] make parameters visible to fl studio last tweaked automation menu
+	- [ ] per-grain level
+	- [ ] modulation
+- [ ] linux hot reloading sometimes fails (recompiling the executable at runtime sometimes crashes the application)
+
+### Improvements
+
+This is a list of existing features that require curation and improvement:
+
+- [ ] automatically detect if we need to build a miniaudio library, discarding the need of commenting out compilation instructions
+- [ ] condense builds into a single script, with optional arguments
+- Improve UI:
+	- [ ] improve font rendering
+	- [ ] allow specification of horizontal vs. vertical slider, or knob for draggable elements
+	- [ ] collapsable element groups, sized relative to children
+	- [ ] tooltips when hovering (eg show numeric parameter value)
+	- [ ] display the state of grains and the grain buffer (wip)
+- [ ] full state (de)serialization (not just parameters, also grain buffer)
+- File Loading: (on hold):
+	- [ ] speed up reads (ie SIMD)
+	- [ ] better samplerate conversion (ie FFT method (TODO: speed up fft and czt))
+- MIDI: 
+	- [ ] cc channel - parameter remapping at runtime
+- Misc:
+	- [ ] speed up fft (aligned loads/stores, different radix?)
+	- [ ] work queues?
+	- allocate hardware ring buffer?
+- Enhance development practices:
+	- [ ] static analysis
+- Optimize codebase:
+	- [ ] profiling
+	- [ ] simd everywhere
+ 
+### Additions
+
+This is a list of missing features for concrete Granade implementation, or envisioned features that aim to highly leverage Granade:
+
+- Implement missing grain controls:
+	- [ ] Pitch-Shift
+	- [ ] Time-Stretch
+	- [ ] Modulation
+- Extend UI:
+	- [ ] interface for selecting files to load at runtime.
+	- [ ] interface for remapping midi cc channels with parameters.
+- Extend File Loading (on hold): 
+	- Support more audio file formats 
+		- [ ] flac
+		- [ ] ogg
+		- [ ] mp3
+		- [ ] ...
+	- [ ] (ML depended) load in batches to pass to ML model
+- [ ] save and restore plugin state
+
+- [ ] screen reader support
+- [ ] Integrate ML into the pipeline for grouping grains
