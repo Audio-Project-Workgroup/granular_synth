@@ -131,6 +131,31 @@ For building from source, you'll need:
 	``` 
 	The `Granular Synth Test.vst3` file will be created into a nested directory within the build directory (i.e. within `granular_synth\build\build_JUCE\Granade_artefacts\Debug\VST3` for Windows builds). *Make sure it is visible by your DAW by either moving it inside the default VST directory, or adding the parent directory in the VST3 plugins scanned directories of your DAW.*
 
+## Quick Start Guide
+
+*Granade is in active development. Some features shown may not be fully implemented yet.*
+
+#### Audio Input Sources
+
+- **Standalone:** Uses microphone input
+- **VST:** Works as audio effect
+
+#### Controls
+Parameter | Description
+:--- | ---:
+Spread or width | How much opened in stereo are the grains played
+Offset | How many samples between the grain buffer read and write indices (not applicable to file-backed grains)disc
+Size | How many samples a grain plays (not applicable to file-backed grains)
+Density |	How many grains are playing at once, or how long until a new grain starts playing 
+Mix | Blend between the original signal and the signal with with the granulator. Being 0% the original signal only and 100% only the grains. (Efficient for separate the effect from the signal and easier to mix) 
+Pan | Panning of the out signal
+Window | Control over a windowing function applied to grain samples
+Level | The level the grains are played independently
+
+#### Start Exploring
+
+Feel free to experiment - Granade is destined for artistic exploration and creative discovery!
+
 ## Issues
 
 * vst3 automatic installation doesn't work anymore
