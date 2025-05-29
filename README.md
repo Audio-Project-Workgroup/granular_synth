@@ -31,7 +31,7 @@ Granade is a real-time granular synthesizer, available as a vst3 plugin and as a
 ## Key Features
 
 - Real-time granular synthesis
-- Advanced grain control: size, density, spread, windowing, and mix controls
+- Advanced grain control: size, density, spread, windowing, panning, and mix controls
 - Cross-platform support (Windows, macOS, Linux)
 
 ## Installation
@@ -40,7 +40,8 @@ Granade is a real-time granular synthesizer, available as a vst3 plugin and as a
 
 The easiest way to get Granade is to download pre-built releases from our [GitHub Releases page](https://github.com/Audio-Project-Workgroup/granular_synth/releases).
 
-<!-- Skip these notes
+<!--
+Skip these notes
 **NOTE TO WINDOWS USERS**
 The relative locations of files/directories in the folder you downloaded is critical for the application to function.
 If you want to move the executable to a more convenient location, either move the entire folder, or create an alias
@@ -58,21 +59,21 @@ Once you have appimaged running, copy Granade to ~/Applications and appimaged wi
 
 For building from source, you'll need:
 
-* GLFW: https://github.com/glfw/glfw (to build from source), https://www.glfw.org/download.html (for the precompiled binaries)
+* GLFW: [source](https://github.com/glfw/glfw), [binaries](https://www.glfw.org/download.html)
 <!--* ONNX: https://github.com/microsoft/onnxruntime (source), https://github.com/microsoft/onnxruntime/releases/tag/v1.20.1 (releases)-->
 * OpenGL
 * CMake (for vst)
 * msvc (windows)
 * clang (mac and linux)
-* pkg-config (mac and linux)
+<!--* pkg-config (mac and linux)-->
 
-#### Clone the repository and initialize submodules:
-	
-	```bash
-	git clone --recurse-submodules https://github.com/Audio-Project-Workgroup/granular_synth
-	```
-	This places the `https://github.com/juce-framework/JUCE` repository within `src/JUCE` directory.
+linux users will also need the development versions (ie with headers) of all packages JUCE requires for building VSTs (eg gtk, asound, ...).
 
+#### Clone the repository and initialize submodules: 
+``` bash
+git clone --recurse-submodules https://github.com/Audio-Project-Workgroup/granular_synth	
+```
+This places the `https://github.com/juce-framework/JUCE` repository within `src/JUCE` directory.
 #### Platform-specific setup:
 	
 ##### Windows 
@@ -82,50 +83,53 @@ For building from source, you'll need:
 	- From the `lib-vc[YEAR]` folder (corresponding to your version of Visual Studio), copy `glfw3_mt.lib` and `glfw3.lib` to `src\libs`
 
 2. **Configure your shell to be able to call a C compiler from the command line:**
-	- Open a Developer Command Prompt or run (i.e. for x64 architectures):
+	- Open a Developer Command Prompt and run (e.g. for x64 architectures):
 	```batch
 	"C:\Program Files\Microsoft Visual Studio\[YEAR]\Community\VC\Auxiliary\Build\vcvarsall.bat" x64
 	```
 
 3. **Build the native host application and the dynamic library plugin:**
-	```
+	```batch
 	cd src
-	.\build.bat
+	build
 	```
 	These will be located in a new directory called `build` (with names `Granade.exe` and `plugin.dll`)
 
 4. **Build the VST3 plugin with JUCE:**
 	```batch
 	cd src
-	.\build_juce.bat
+	build_juce
 	```
-	you will have to put the resulting vst3 bundle somewhere where your DAW/plugin host can find it (@TODO: get JUCE to do the installation automatically)
+	you will have to put the resulting vst3 bundle (located in `granular_synth\build\build_JUCE\Granade_artefacts\Debug\VST3`) somewhere where your DAW/plugin host can find it (@TODO: get JUCE to do the installation automatically)
 
-<!-- Uncomment in the future in case that onnx is supported.
+<!--
+Uncomment in the future in case that onnx is supported.
 N. Set up ONNX Runtime:
 	- copy the file `onnxruntime_c_api.h` from the ONNX include directory to `src\include`
 	- copy `onnxruntime.lib` and `onnxruntime.pdb` to `src\libs`
 	- copy `onnxruntime.dll` to the `build` directory (if this is your first build, that directory won't be there yet, so defer this step until after you run `build.bat`)
 
 NOTE:
-	on your first build, you will also have to copy `onnxruntime.dll` from your `build` folder to the folder containing your DAW's executable (TODO: install the onnxruntime dll globally with a custom name (to not interfere with the one that's installed by default)) -->
+	on your first build, you will also have to copy `onnxruntime.dll` from your `build` folder to the folder containing your DAW's executable (TODO: install the onnxruntime dll globally with a custom name (to not interfere with the one that's installed by default)) 
+-->
 
 ##### Mac and Linux
 
-1. **Install the [required dependencies](#install-requirements) via your package manager
+1. **Install the [required dependencies](#install-requirements) via your package manager**
 
 2. **Set up environment paths (optional):**
+	- on mac, you may need to set/modify your shell's include, library, and pkg-config paths. For example:
+   ```bash
+   # ~/.zshrc
+   # replace /opt/homebrew with /usr/local on intel macs
+   export CPATH=/opt/homebrew/include # append to this path if it exists already
+   export LIBRARY_PATH=/opt/homebrew/lib # append to this path if it exists already
+   export PKG_CONFIG_PATH="/opt/homebrew/lib/pkgconfig:$PKG_CONFIG_PATH"
+   ```
 
-* on mac, you may need to set/modify your shell's include, library, and pkg-config paths. For example:
-```
-# ~/.zshrc
-# replace /opt/homebrew with /usr/local on intel macs
-export CPATH=/opt/homebrew/include # append to this path if it exists already
-export LIBRARY_PATH=/opt/homebrew/lib # append to this path if it exists already
-export PKG_CONFIG_PATH="/opt/homebrew/lib/pkgconfig:$PKG_CONFIG_PATH"
-```
 <!--
-* on linux, onnx is not available via standard package managers. Download the binaries (recommended version is 1.20.1) and install them globally (the exact directories can be found in the libonnxruntime.pc file, located in `[onnxruntime folder]/lib/pkgconfig`) -->
+	on linux, onnx is not available via standard package managers. Download the binaries (recommended version is 1.20.1) and install them globally (the exact directories can be found in the libonnxruntime.pc file, located in `[onnxruntime folder]/lib/pkgconfig`) 
+-->
 
 3. **Build the native host application and the dynamic library plugin**
 
@@ -141,7 +145,7 @@ The compiled native host application and the dynamic library plugin will be loca
 cd src
 ./build_juce.sh
 ``` 
-The `Granade.vst3` file will be created into a nested directory within the build directory (i.e. within `granular_synth\build\build_JUCE\Granade_artefacts\Debug\VST3` for Windows builds). 
+The `Granade.vst3` file will be created into a nested directory within the build directory (i.e. within `granular_synth\build\build_JUCE\Granade_artefacts\Debug\VST3`). 
 
 
 #### Verify your build
@@ -149,12 +153,12 @@ The `Granade.vst3` file will be created into a nested directory within the build
 ##### Standalone application:
 
 To test the standalone application, simply:
-	- in Windows: Run `build\Granade.exe`
-	- in macOS/Linux: Run `./build/Granade`
+- in Windows: Run `build\Granade`
+- in macOS/Linux: Run `./build/Granade`
 
 ##### VST3 plugin:
 
-To test the VST3 plugin, make sure it is visible by your DAW by either moving it inside the default VST directory, or adding the parent directory in the VST3 plugins scanned directories of your DAW.*
+To test the VST3 plugin, make sure it is visible by your DAW by either moving it inside the default VST directory, or adding the parent directory of the VST3 bundle to your DAW's list of scanned directories.
 
 ## Documentation
 
@@ -178,8 +182,8 @@ Some files include comments explaining implementation details. Documentation cov
 #### Parameters
 
 Parameter | Description | How to Use
-:--- | :---: | ---:
-Density | Controls the number of playing grains | Turn left for fewer grains, and right for more.  
+:-- | :--: | --:
+Density | Controls the number of playing grains | Turn left for fewer grains, and right for more.
 Spread | Controls the random stereo widening applied to each grain | Fully left is dual mono, middle is unmodified, right is wider.
 Offset | Controls the space between the read and write heads of the buffer | Turn left for less delay, and right for more.
 Size | Controls the size of new grains | Left is shorter, right is longer.
@@ -190,14 +194,15 @@ Level | Controls the overall amplitude of the output signal | Up for louder, dow
 
 #### Start Exploring
 
-Feel free to experiment - Granade is destined for artistic exploration and creative discovery!
+Feel free to experiment - Granade is designed for artistic exploration and creative discovery!
 
 ## FAQ
 
 <details>
 <summary><strong>Is Granade a cross-platform project? Does it support both standalone apps and VST3 plugins for each platform?</strong></summary>
 <br>
-Yes it is. And so it does!
+Yes it is, and so it does! You can download <a href="https://github.com/Audio-Project-Workgroup/granular_synth/releases">precompiled binaries</a> for macOS (arm), Windows (x64), and Linux (x64). Other combinations of OS and architecture are supported via <a href="#building-from-source">building from source</a>.
+
 </details>
 
 <details>
@@ -209,7 +214,7 @@ While inspired by existing granular synths, Granade brings its own unique approa
 <details>
 <summary><strong>Is Granade ready for production use?</strong></summary>
 <br>
-Granade is in a nascent stage of development, developed by a small team, and only tested on a handful of systems. As such, you may experience crashes, bugs, or be missing certain features. In any of these cases, please let us know by submitting an issue (bug report or feature request) on github. While functional for experimentation and creative use, some features are incomplete. We recommend it for creative exploration rather than critical production work at this stage.
+Granade is in a nascent stage of development, developed by a small team, and only tested on a handful of systems. As such, you may experience crashes, bugs, or be missing certain features. In any of these cases, please let us know by submitting an <a href="https://github.com/Audio-Project-Workgroup/granular_synth/issues">issue</a> (bug report or feature request) on github. While functional for experimentation and creative use, some features are incomplete. We recommend it for creative exploration rather than critical production work at this stage.
 </details>
 
 <details>
@@ -275,22 +280,19 @@ This is a list of existing features that require curation and improvement:
 - [ ] condense builds into a single script, with optional arguments
 - Improve UI:
 	- [ ] improve font rendering
-	- [ ] allow specification of horizontal vs. vertical slider, or knob for draggable elements
-	- [ ] collapsable element groups, sized relative to children
 	- [ ] tooltips when hovering (eg show numeric parameter value)
-	- [ ] display the state of grains and the grain buffer (wip)
+	- [ ] improve grain buffer state display
+	- [ ] support modifying parameters with mouse wheel scrolling
 - [ ] full state (de)serialization (not just parameters, also grain buffer)
-- File Loading: (on hold):
-	- [ ] speed up reads (ie SIMD)
-	- [ ] better samplerate conversion (ie FFT method (TODO: speed up fft and czt))
+- File Loading:
+	- [ ] speed up reads
+	- [ ] better samplerate conversion
 - MIDI: 
 	- [ ] cc channel - parameter remapping at runtime
-- Misc:
-	- [ ] speed up fft (aligned loads/stores, different radix?)
-	- [ ] work queues?
-	- allocate hardware ring buffer?
 - Enhance development practices:
 	- [ ] static analysis
+	- [ ] hook a fuzzer up to the input for resilience testing
+	- [ ] remove plugin dependence on crt for maximum portability
 - Optimize codebase:
 	- [ ] profiling
 	- [ ] simd everywhere
@@ -306,7 +308,7 @@ This is a list of missing features for concrete Granade implementation, or envis
 - Extend UI:
 	- [ ] interface for selecting files to load at runtime.
 	- [ ] interface for remapping midi cc channels with parameters.
-- Extend File Loading (on hold): 
+- Extend File Loading: 
 	- Support more audio file formats 
 		- [ ] flac
 		- [ ] ogg
