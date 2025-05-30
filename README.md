@@ -10,6 +10,7 @@
 -->
 ![Linux](https://github.com/Audio-Project-Workgroup/granular_synth/workflows/Linux/badge.svg)
 ![MacOs](https://github.com/Audio-Project-Workgroup/granular_synth/workflows/macOS/badge.svg)
+![Windows](https://github.com/Audio-Project-Workgroup/granular_synth/workflows/Windows/badge.svg)
 
 Granade is a real-time granular synthesizer, available as a vst3 plugin and as a standalone application for mac, windows, and linux. Granade records audio input into a buffer and deconstructs the sound into multiple overlapping delayed, enveloped, and panned segments called grains, creating complex textures and new sonic landscapes. Several interactive parameters such as grain size, density, spread, and windowing, are provided for manipulating grain playback in real time. 
 
