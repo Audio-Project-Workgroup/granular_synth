@@ -1,0 +1,41 @@
+name: macOS
+run-name: "🚀 MacOs Build | Commit: ${{ github.sha }} 🛠️"
+on:
+  push:
+    branches:
+      - main
+      - readme
+  pull_request:
+    branches:
+      - main
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          ref: 67061a8026ac613b7809db39fcb6a841fa19760c
+
+      - name: Install dependencies
+        run: |
+          brew install cmake pkg-config glfw glew 
+          
+      - name: Set up environment paths
+        run: |
+          echo "CPATH=/opt/homebrew/include:$CPATH" >> $GITHUB_ENV
+          echo "LIBRARY_PATH=/opt/homebrew/lib:$LIBRARY_PATH" >> $GITHUB_ENV
+          echo "PKG_CONFIG_PATH=/opt/homebrew/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
+          
+      - name: Build standalone
+        run: |
+          cd src
+          chmod +x build.sh
+          ./build.sh
+          
+      - name: Build VST3 plugin
+        run: |
+          cd src
+          chmod +x build_juce.sh
+          ./build_juce.sh
