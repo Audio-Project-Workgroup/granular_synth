@@ -1,7 +1,7 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
-#include "platform.h"
+//#include "platform.h"
 //#include "onnx.cpp"
 
 static juce::String globalVstBaseDirectory;
@@ -169,9 +169,9 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
   juce::Logger::writeToLog("contents directory: " + contentsDirectory.getFullPathName());
   juce::Logger::writeToLog("resources directory: " + resourcesDirectory.getFullPathName());
 
-  globalVstBaseDirectory = platformContentsDirectory.getFullPathName();
+  globalVstBaseDirectory = platformContentsDirectory.getFullPathName();  
 
-  pathToVST = vstFile.getFullPathName();
+  pathToVST = vstFile.getFullPathName();  
   pathToPlugin = platformContentsDirectory.getFullPathName() + "/" + juce::String(DYNAMIC_PLUGIN_FILE_NAME);
   pathToData = resourcesDirectory.getFullPathName() + "/data";
   
@@ -293,7 +293,7 @@ prepareToPlay(double sampleRate, int samplesPerBlock)
 
   //onnxState = {};
   //onnxState = onnxInitializeState(modelPath);
-  
+
   pluginMemory.memory = calloc(pluginMemoryBlockSizeInBytes, 1);
   pluginMemory.host = PluginHost_daw;
   pluginMemory.platformAPI.readEntireFile = juceReadEntireFile;

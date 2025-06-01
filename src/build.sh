@@ -10,6 +10,7 @@ LINUX_GL_FLAGS="-lGL"
 LINUX_PLUGIN_FLAGS="-shared -fPIC"
 
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    #CFLAGS+= " -Wl,rpath,'$ORIGIN/../lib' -Wl,--enable-new-dtags"
     GL_FLAGS=$LINUX_GL_FLAGS
     PLUGIN_NAME="plugin.so"
     PLUGIN_FLAGS=$LINUX_PLUGIN_FLAGS
@@ -112,42 +113,17 @@ elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
     pushd bin > /dev/null
 
     cp $BUILD_DIR/granade Granade
-    cp $BUILD_DIR/plugin.so plugin.so
+    cp $BUILD_DIR/plugin.so plugin.so    
 
-    # copy dependencies (OpenGL, glfw, X11)
-    DEPENDENCY=$(ldd Granade | grep -oE "/(.+?)libGL.so.1")
-    ABSOLUTE_SYMLINK=$(realpath "$DEPENDENCY")
-    cp -P $DEPENDENCY ../lib
-    cp $ABSOLUTE_SYMLINK ../lib
-    DEPENDENCY=$(ldd Granade | grep -oE "/(.+?)libglfw.so.3")
-    ABSOLUTE_SYMLINK=$(realpath "$DEPENDENCY")
-    cp -P $DEPENDENCY ../lib
-    cp $ABSOLUTE_SYMLINK ../lib
-    DEPENDENCY=$(ldd Granade | grep -oE "/(.+?)libGLX.so.0")
-    ABSOLUTE_SYMLINK=$(realpath "$DEPENDENCY")
-    cp -P $DEPENDENCY ../lib
-    cp $ABSOLUTE_SYMLINK ../lib
-    DEPENDENCY=$(ldd Granade | grep -oE "/(.+?)libX11.so.6")
-    ABSOLUTE_SYMLINK=$(realpath "$DEPENDENCY")
-    cp -P $DEPENDENCY ../lib
-    cp $ABSOLUTE_SYMLINK ../lib
-    DEPENDENCY=$(ldd Granade | grep -oE "/(.+?)libXext.so.6")
-    ABSOLUTE_SYMLINK=$(realpath "$DEPENDENCY")
-    cp -P $DEPENDENCY ../lib
-    cp $ABSOLUTE_SYMLINK ../lib
-    DEPENDENCY=$(ldd Granade | grep -oE "/(.+?)libGLdispatch.so.0")
-    ABSOLUTE_SYMLINK=$(realpath "$DEPENDENCY")
-    cp -P $DEPENDENCY ../lib
-    cp $ABSOLUTE_SYMLINK ../lib
-    DEPENDENCY=$(ldd Granade | grep -oE "/(.+?)libxcb.so.1")
-    ABSOLUTE_SYMLINK=$(realpath "$DEPENDENCY")
-    cp -P $DEPENDENCY ../lib
-    cp $ABSOLUTE_SYMLINK ../lib
-    DEPENDENCY=$(ldd Granade | grep -oE "/(.+?)libXau.so.6")
-    ABSOLUTE_SYMLINK=$(realpath "$DEPENDENCY")
-    cp -P $DEPENDENCY ../lib
-    cp $ABSOLUTE_SYMLINK ../lib
-
+    # NOTE: copy dependencies (OpenGL, glfw, X11)
+    DEPENDENCIES=$(ldd Granade | grep -oE "/(.+?)\\.so\\.[0-9]+" | grep -vE "(libc|libm|libdl|libpthread|ld-linux-)")
+    for DEPENDENCY in $DEPENDENCIES
+    do
+	ABSOLUTE_SYMLINK=$(realpath "$DEPENDENCY")
+	cp -P $DEPENDENCY ../lib
+	cp $ABSOLUTE_SYMLINK ../lib
+    done
+    
     popd > /dev/null # bin -> usr    
 
     popd > /dev/null # usr -> Granade.AppDir

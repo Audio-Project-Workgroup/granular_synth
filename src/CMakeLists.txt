@@ -73,7 +73,7 @@ elseif(UNIX)
   #   set(ONNX_INCLUDE_DIR ${onnxruntime_INCLUDE_DIRS})
   # else()
   #   message("onnxruntime not found")	
-  # endif()
+  # endif()  
 
   # set(JUCE_COPY_PLUGIN_AFTER_BUILD ON)
   juce_enable_copy_plugin_step(${PROJECT_NAME})
@@ -97,12 +97,24 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
     "${DYNAMIC_PLUGIN_PATH}"
     "$<TARGET_FILE_DIR:${PROJECT_NAME}_VST3>"
-
+    
     # copy data folder to the vst bundle
     COMMAND ${CMAKE_COMMAND} -E copy_directory
     "${DATA_DIR}"
     "$<TARGET_FILE_DIR:${PROJECT_NAME}>/VST3/${PLUGIN_NAME}.vst3/Contents/data"
   )
+
+  if(UNIX)
+    add_custom_command(
+      TARGET ${PROJECT_NAME}
+      POST_BUILD
+      
+      # copy script for bundling dependencies on linux
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${CMAKE_SOURCE_DIR}/bundle_dependencies.sh"
+      "$<TARGET_FILE_DIR:${PROJECT_NAME}_VST3>"
+    )
+  endif()
 
 target_compile_definitions(
   ${PROJECT_NAME}
