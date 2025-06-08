@@ -1,10 +1,9 @@
 name: Linux
-run-name: "🚀 Continuous Integration | Build | Commit: ${{ github.sha }} 🛠️"
+run-name: "🚀 Linux Build | Commit: ${{ github.sha }} 🛠️"
 on:
   push:
     branches:
       - main
-      - readme
   pull_request:
     branches:
       - main
@@ -16,7 +15,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
-          ref: 94edd9dc8f30684a311eef7ae07526a34be45a42
 
       - name: Install dependencies
         run: |
@@ -33,7 +31,7 @@ jobs:
           libglu1-mesa-dev mesa-common-dev
           sudo apt install -y build-essential cmake pkg-config libglfw3-dev clang libgl1-mesa-dev libglew-dev
                     
-      - name: Build standalone and plugin
+      - name: Build standalone
         run: |
           cd src
           chmod +x build.sh

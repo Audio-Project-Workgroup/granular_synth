@@ -1,0 +1,47 @@
+name: Windows
+run-name: "🚀 Windows Build | Commit: ${{ github.sha }} 🛠️"
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          ref: 67061a8026ac613b7809db39fcb6a841fa19760c
+          
+      - name: Set up Visual Studio environment
+        uses: microsoft/setup-msbuild@v1.3
+        
+      - name: Download and setup GLFW
+        run: |
+          # Download GLFW precompiled binaries
+          Invoke-WebRequest -Uri "https://github.com/glfw/glfw/releases/download/3.3.8/glfw-3.3.8.bin.WIN64.zip" -OutFile "glfw.zip"
+          Expand-Archive -Path "glfw.zip" -DestinationPath "."
+          
+          # Copy GLFW to src/include and src/libs
+          Copy-Item -Recurse "glfw-3.3.8.bin.WIN64/include/GLFW" "src/include/"
+          Copy-Item "glfw-3.3.8.bin.WIN64/lib-vc2022/glfw3_mt.lib" "src/libs/"
+          Copy-Item "glfw-3.3.8.bin.WIN64/lib-vc2022/glfw3.lib" "src/libs/"
+        shell: powershell
+        
+      - name: Build standalone
+        run: |
+          cd src
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" x64
+          .\build.bat
+        shell: cmd
+      
+      - name: Build plugin
+        run: |
+          cd src
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" x64
+          .\build_juce.bat
+        shell: cmd
