@@ -3,4 +3,4 @@ Name=Granade
 Exec=Granade
 Icon=Granade
 Type=Application
-Categories=Audio
+Categories=AudioVideo;Audio

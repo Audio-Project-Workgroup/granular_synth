@@ -92,6 +92,8 @@ elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
 
     cp $DATA_DIR/Granade.desktop Granade.desktop
 
+    cp $DATA_DIR/PNG/DENSITYPOMEGRANATE_BUTTON.png Granade.png
+
     cp $DATA_DIR/AppRun.sh AppRun.sh
     ln -sf ./AppRun.sh AppRun
 
@@ -100,6 +102,7 @@ elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
 
     cp -r $DATA_DIR data
 
+    # TODO: is this necessary?
     mkdir -p share/icons/hicolor/512x512
     pushd share/icons/hicolor/512x512 > /dev/null
     cp $DATA_DIR/PNG/DENSITYPOMEGRANATE_BUTTON.png Granade.png

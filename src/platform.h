@@ -705,6 +705,9 @@ static PLATFORM_READ_ENTIRE_FILE(platformReadEntireFile)
   String8 filePath = concatenateStrings(allocator,
 					concatenateStrings(allocator, basePath, STR8_LIT("/")),
 					STR8_CSTR(filename));
+#if BUILD_DEBUG
+  fprintf(stderr, "reading entire file: %s\n", (char *)filePath.str);
+#endif
 
   int fileHandle = open((char *)filePath.str, O_RDONLY);
   if(fileHandle != -1)
@@ -728,7 +731,7 @@ static PLATFORM_READ_ENTIRE_FILE(platformReadEntireFile)
 		}
 	      else
 		{
-		  fprintf(stderr, "ERROR: read failed: %.*s: %s\n", (int)filePath.size, filePath.str, strerror(errno));
+		  fprintf(stderr, "ERROR: read failed: %s: %s\n", (char *)filePath.str, strerror(errno));
 		  result.contents = 0;
 		  result.contentsSize = 0;
 		  break;

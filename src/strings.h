@@ -158,7 +158,7 @@ concatenateStrings(Arena *allocator, String8 s0, String8 s1)
 {
   String8 result = {};
   result.size = s0.size + s1.size;
-  result.str = arenaPushArray(allocator, result.size, u8);
+  result.str = arenaPushArray(allocator, result.size + 1, u8, arenaFlagsZeroNoAlign()); // NOTE: null-terminate
   COPY_ARRAY(result.str, s0.str, s0.size, u8);
   COPY_ARRAY(result.str + s0.size, s1.str, s1.size, u8);
 
