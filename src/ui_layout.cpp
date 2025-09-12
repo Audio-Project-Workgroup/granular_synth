@@ -392,11 +392,13 @@ uiPrintElement(UIElement *element, u32 depth)
     {
       for(u32 i = 0; i < depth; ++i)
 	{
-	  printf("-");
+	  //printf("-");
+	  logString("-");
 	}
       if(element->name.str)
 	{
-	  printf("%s\n", element->name.str);
+	  //printf("%s\n", element->name.str);
+	  logFormatString("%s\n", element->name.str);
 	}
 
       if(element->first)

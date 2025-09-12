@@ -164,7 +164,8 @@ namespace midi {
 
     // TODO: this can't happen
     if (midiCommandTable[commandTableIndex] == nullptr) {
-      printf("Unknown MIDI command\n");
+      //printf("Unknown MIDI command\n");
+      logString("Unknown MIDI command\n");
       return;
     }
 
@@ -180,12 +181,15 @@ namespace midi {
         
     if(midiMessageCount){
 #ifdef MIDI_VERBOSE
-      printf("ALL BYTES : ");
+      //printf("ALL BYTES : ");
+      logString("ALL BYTES : ");
       size_t numberOfBytesAheadToPrint = 15;
       for (size_t i = 0; i < numberOfBytesAheadToPrint; ++i) {
-	printf("0x%02x ", (unsigned char)atMidiBuffer[i]);
+	//printf("0x%02x ", (unsigned char)atMidiBuffer[i]);
+	logFormatString("0x%02x ", (unsigned char)atMidiBuffer[i]);
       }
-      printf("\n");
+      //printf("\n");
+      logString("\n");
 #endif
       
       // get header metadata to check if we should consume the message
@@ -213,13 +217,21 @@ namespace midi {
 	  processMidiCommand(commandByte, data, bytesToRead, pluginState);
 
 #ifdef MIDI_VERBOSE
-	  printf("AFTER PARSING : 0x%x | %" PRIu64  " timeStamp(ms passed) | %d bytes to read | data points to 0x%x | midiBuffer ptr points to 0x%x\n", 
+	  //printf("AFTER PARSING : 0x%x | %" PRIu64  " timeStamp(ms passed) | %d bytes to read | data points to 0x%x | midiBuffer ptr points to 0x%x\n",
+	  // printf("AFTER PARSING : 0x%x | %llu timeStamp(ms passed) | %d bytes to read | data points to 0x%x | midiBuffer ptr points to 0x%x\n", 
+	  // 	 (int)commandByte,
+	  // 	 timestamp, 
+	  // 	 (int)bytesToRead, 
+	  // 	 (int)data[0], 
+	  // 	 (int)atMidiBuffer[0]);
+	  logFormatString("AFTER PARSING : 0x%x | %llu timeStamp(ms passed) | %d bytes to read | data points to 0x%x | midiBuffer ptr points to 0x%x\n", 
 		 (int)commandByte,
 		 timestamp, 
 		 (int)bytesToRead, 
 		 (int)data[0], 
 		 (int)atMidiBuffer[0]);
-	  printf("\n\n");
+	  //printf("\n\n");
+	  logString("\n\n");
 #endif
       
 	  --midiMessageCount;

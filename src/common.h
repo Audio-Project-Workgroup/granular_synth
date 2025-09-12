@@ -53,6 +53,22 @@ typedef PLATFORM_WRITE_ENTIRE_FILE(PlatformWriteEntireFile);
 #define PLATFORM_GET_PATH_TO_MODULE(name) String8 (name)(void *handleToModule, void *functionInModule, Arena *allocator)
 typedef PLATFORM_GET_PATH_TO_MODULE(PlatformGetPathToModule);
 
+// math
+#define ABS(name) r32 (name)(r32 num)
+typedef ABS(PlatformAbs);
+
+#define SQRT(name) r32 (name)(r32 num)
+typedef SQRT(PlatformSqrt);
+
+#define SIN(name) r32 (name)(r32 num)
+typedef SIN(PlatformSin);
+
+#define COS(name) r32 (name)(r32 num)
+typedef COS(PlatformCos);
+
+#define POW(name) r32 (name)(r32 base, r32 exp)
+typedef POW(PlatformPow);
+
 // atomics
 // NOTE: atomic operations return initial values
 
@@ -84,6 +100,12 @@ struct PlatformAPI
   //PlatformRunModel *runModel;
 
   PlatformGetCurrentTimestamp *getCurrentTimestamp;
+
+  PlatformAbs	*abs;
+  PlatformSqrt	*sqrt;
+  PlatformSin	*sin;
+  PlatformCos	*cos;
+  PlatformPow	*pow;
 
   AtomicLoad *atomicLoad;
   AtomicStore *atomicStore;

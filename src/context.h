@@ -1,4 +1,5 @@
 // detect compiler, OS, and architecture defines
+// TODO: detect WASM
 #pragma once
 
 #if defined(__clang__)

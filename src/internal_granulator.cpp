@@ -25,7 +25,7 @@ initializeWindows(GrainManager* grainManager)
   r32 *rectangularBuffer = grainManager->windowBuffer[WindowShape_rectangle];
   for(u32 sample = 0; sample < WINDOW_LENGTH; ++sample)
     {
-      *hannBuffer++ = 0.5f * (1.f - Cos(M_TAU * sample * windowLengthInv));
+      *hannBuffer++ = 0.5f * (1.f - Cos(GS_TAU * sample * windowLengthInv));
       *sineBuffer++ = Sin(M_PI * sample * windowLengthInv);
       *triangleBuffer++ = (1.f - Abs((sample - (windowLengthF - 1.f) / 2.f) / ((windowLengthF - 1.f) / 2.f)));
       *rectangularBuffer++ = 1.f;

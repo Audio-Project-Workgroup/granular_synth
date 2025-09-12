@@ -1,5 +1,9 @@
 // structures/functions for making string processing and amalgamation convenient
-#include <stdio.h>
+//#include <stdio.h>
+#define STB_SPRINTF_IMPLEMENTATION
+#define STB_SPRINTF_DECORATE(name) gs_##name
+#include "stb_sprintf.h"
+
 #include <stdarg.h>
 
 // base string types
@@ -119,7 +123,7 @@ stringListPushFormat(Arena *arena, String8List *list, char *fmt, ...)
   va_start(varArgs, fmt);
 
   char buffer[256] = {};
-  int len = vsnprintf(buffer, ARRAY_COUNT(buffer), fmt, varArgs);
+  int len = gs_vsnprintf(buffer, ARRAY_COUNT(buffer), fmt, varArgs);
 
   String8 string = makeString8((u8 *)buffer, len);
   stringListPush(arena, list, string);
@@ -129,7 +133,7 @@ inline void
 stringListPushFormatV(Arena *arena, String8List *list, char *fmt, va_list vaArgs)
 {
   char buffer[256] = {};
-  int len = vsnprintf(buffer, ARRAY_COUNT(buffer), fmt, vaArgs);
+  int len = gs_vsnprintf(buffer, ARRAY_COUNT(buffer), fmt, vaArgs);
 
   String8 string = makeString8((u8 *)buffer, len);
   stringListPush(arena, list, string);

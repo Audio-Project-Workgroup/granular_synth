@@ -1,15 +1,26 @@
 @echo off
 
-set CFLAGS=-DBUILD_DEBUG=0 -I..\src\include -nologo -Zi -W4 -wd"4201" -wd"4100" -wd"4146" -wd"4310" -wd"4244" -wd"4505" -MT -EHa- -GR-
+set BUILD_DEBUG=1
+
+set CFLAGS=
+set CFLAGS=%CFLAGS% -nologo -W3 -wd"4244" -wd"4146"
+if %BUILD_DEBUG%==1 (
+   set CFLAGS=%CFLAGS% -Z7
+)
+set CFLAGS=%CFLAGS% -I..\src\include
+set CFLAGS=%CFLAGS% -MT -EHa- -GR-
+rem set CFLAGS=-DBUILD_DEBUG=0 -I..\src\include -nologo -Zi -W4 -wd"4201" -wd"4100" -wd"4146" -wd"4310" -wd"4244" -wd"4505" -MT -EHa- -GR-
+set CFLAGS=%CFLAGS% -DBUILD_DEBUG=%BUILD_DEBUG%
+
 set LFLAGS=-incremental:no -opt:ref
 
 IF NOT EXIST ..\build mkdir ..\build
 pushd ..\build
 
-REM produce logo icon file
+:: produce logo icon file
 call rc /nologo /fo logo.res ..\data\logo.rc
 
-REM delete old pdbs and rdis
+:: delete old pdbs and rdis
 del *.pdb > NUL 2> NUL
 del *.rdi > NUL 2> NUL
 
@@ -25,7 +36,7 @@ REM preprocessor
 ::pushd ..\build
 
 REM compile plugin and host
-cl %CFLAGS% -D"DATA_PATH=\"../data\"" ..\src\plugin.cpp -Fmplugin.map -LD /link %LFLAGS% -PDB:plugin_%random%.pdb -EXPORT:renderNewFrame -EXPORT:audioProcess -EXPORT:initializePluginState
+cl %CFLAGS% -D"DATA_PATH=\"../data/\"" ..\src\plugin.cpp -Fmplugin.map -LD /link %LFLAGS% -PDB:plugin_%random%.pdb -EXPORT:renderNewFrame -EXPORT:audioProcess -EXPORT:initializePluginState
 
 set PLUGIN_STATUS=%ERRORLEVEL%
 

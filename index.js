@@ -24,7 +24,7 @@ async function main() {
 	maximum: 2,
 	shared: false,
     });
-    const wasm = await WebAssembly.instantiateStreaming(fetch("./build/wasm_glue.wasm"), {
+    const wasm = await WebAssembly.instantiateStreaming(fetch("./wasm_glue.wasm"), {
 	env: {
 	    memory: sharedMemory,
 	}	
@@ -88,41 +88,31 @@ async function main() {
     const transformPosition = gl.getUniformLocation(shaderProgram, "transform");
     const rotatePosition = gl.getUniformLocation(shaderProgram, "rotate");
 
+    // init buffer
+    const vertexBuffer = gl.createBuffer();
+    const vertexBufferSize = 32*1024;
+    const positions = [
+	1.0,  1.0,
+	-1.0,  1.0,
+	1.0, -1.0,
+	-1.0, -1.0,
+    ];
+    gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, vertexBufferSize, gl.STATIC_DRAW);
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, new Float32Array(positions));
+
     // render loop
     function render(now) {
 	gl.clearColor(0.0, 0.0, 0.0, 1.0);
 	gl.clearDepth(1.0);
 	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
-	// init buffers
-	const vertexBuffer = gl.createBuffer();
-	gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
-	const rectMinX1 = 0.1*canvas.width;
-	const rectMinY1 = 0.1*canvas.height;
-	const rectMaxX1 = 0.4*canvas.width;
-	const rectMaxY1 = 0.4*canvas.height;
-	const rectMinX2 = 0.6*canvas.width;
-	const rectMinY2 = 0.6*canvas.height;
-	const rectMaxX2 = 0.9*canvas.width;
-	const rectMaxY2 = 0.9*canvas.height;    
-	const positions = [
-	    1.0, 1.0,
-	    -1.0, 1.0,
-	    1.0, -1.0,
-	    -1.0, -1.0,
-
-	    // rectMinX1, rectMinY1, rectMaxX1, rectMaxY1,
-	    // rectMinX2, rectMinY2, rectMaxX2, rectMaxY2,
-	];
-	gl.bufferData(gl.ARRAY_BUFFER, 1024*16, gl.STATIC_DRAW);
-	gl.bufferSubData(gl.ARRAY_BUFFER, 0, new Float32Array(positions));
 	
 	const quadOffset = wasm.instance.exports.beginDrawQuads(canvas.width, canvas.height);
 	const quadCount = wasm.instance.exports.endDrawQuads();
 	//console.log(quadOffset);
 	//console.log(quadCount);
 	const quadData = new Float32Array(sharedMemory.buffer, quadOffset, 4*quadCount);
-	console.log(quadData);
+	//console.log(quadData);
 	gl.bufferSubData(gl.ARRAY_BUFFER, 32, quadData);
 
 	const vPatternNumComponents = 2;

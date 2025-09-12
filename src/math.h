@@ -2,8 +2,15 @@
 #define _USE_MATH_DEFINES
 #endif
 
-#include <math.h>
-#define M_TAU (2.0*M_PI)
+//#include <math.h>
+extern r32 gs_fabsf(r32 num);
+extern r32 gs_sqrtf(r32 num);
+extern r32 gs_sinf(r32 num);
+extern r32 gs_cosf(r32 num);
+extern r32 gs_powf(r32 base, r32 exp);
+
+#define GS_PI 3.141592653589793
+#define GS_TAU (2.0*GS_PI)
 
 //
 // scalar
@@ -44,25 +51,35 @@ cubicInterp(r32 val0, r32 val1, r32 val2, r32 val3, r32 t0)
 inline r32
 Abs(r32 val)
 {
-  return(fabsf(val));
+  //return(fabsf(val));
+  return(gs_fabsf(val));
 }
 
 inline r32
 Sqrt(r32 val)
 {
-  return(sqrtf(val));
+  //return(sqrtf(val));
+  return(gs_sqrtf(val));
 }
 
 inline r32
 Sin(r32 angle)
 {
-  return(sinf(angle));
+  //return(sinf(angle));
+  return(gs_sinf(angle));
 }
 
 inline r32
 Cos(r32 angle)
 {
-  return(cosf(angle));
+  //return(cosf(angle));
+  return(gs_cosf(angle));
+}
+
+inline r32
+Pow(r32 base, r32 exp)
+{
+  return(gs_powf(base, exp));
 }
 
 inline u32
@@ -843,7 +860,7 @@ static REAL_FFT_FUNCTION(fft_real_permute)
 
   for(u32 m = 2; m <= length; m <<= 1)
     {
-      r32 angle = -M_TAU/(r32)m;
+      r32 angle = -GS_TAU/(r32)m;
       
       // TODO: make trig ops fast
       c64 wm = C64Polar(1.f, angle);
@@ -954,7 +971,7 @@ static REAL_IFFT_FUNCTION(ifft_real_permute)
 
   for(u32 m = 2; m <= length; m <<= 1)
     {
-      r32 angle = M_TAU/(r32)m;
+      r32 angle = GS_TAU/(r32)m;
       
       // TODO: make trig ops fast
       c64 wm = C64Polar(1.f, angle);
@@ -1066,7 +1083,7 @@ static REAL_FFT_FUNCTION(fft_real_noPermute)
   //for(u32 m = length; m >= 2; m >>= 1)
   for(u32 m = length; m >= 2*simdWidth; m >>= 1)
     {
-      r32 angle = -M_TAU/(r32)m;
+      r32 angle = -GS_TAU/(r32)m;
 
       c64 wm = C64Polar(1.f, angle);
       c64 wmSq = wm*wm;
@@ -1146,7 +1163,7 @@ static REAL_FFT_FUNCTION(fft_real_noPermute)
     }  
   for(u32 m = simdWidth; m >= 2; m >>= 1)
     {
-      r32 angle = -M_TAU/(r32)m;
+      r32 angle = -GS_TAU/(r32)m;
       c64 wm = C64Polar(1.f, angle);
       r32 wmRe = wm.re;
       r32 wmIm = wm.im;
@@ -1217,7 +1234,7 @@ static REAL_IFFT_FUNCTION(ifft_real_noPermute)
   //r32 maskF = *(r32 *)&mask;
   for(u32 m = 2; m <= simdWidth; m <<= 1)
     {
-      r32 angle = M_TAU/(r32)m;
+      r32 angle = GS_TAU/(r32)m;
       c64 wm = C64Polar(1.f, angle);
       r32 wmRe = wm.re;
       r32 wmIm = wm.im;
@@ -1258,7 +1275,7 @@ static REAL_IFFT_FUNCTION(ifft_real_noPermute)
     }
   for(u32 m = 2*simdWidth; m <= length; m <<= 1)
     {
-      r32 angle = M_TAU/(r32)m;
+      r32 angle = GS_TAU/(r32)m;
       
       // TODO: make trig ops fast
       c64 wm = C64Polar(1.f, angle);
@@ -1407,7 +1424,7 @@ fft(c64 *destBuffer, r32 *sourceBuffer, u32 lengthInit, u32 stride = 1)
 
       for(u32 k = 0; k < length/2; ++k)
 	{
-	  c64 w = C64Polar(1, -M_TAU*k/(r32)length);
+	  c64 w = C64Polar(1, -GS_TAU*k/(r32)length);
 	  c64 in0 = destBuffer[k];
 	  c64 in1 = destBuffer[k + length/2];
 
@@ -1437,7 +1454,7 @@ fft(c64 *destBuffer, r32 *sourceBuffer, u32 lengthInit, u32 stride = 1)
   for(u32 level = 1; level <= logLength; ++level)
     {
       u32 m = (1 << level);
-      r32 angle = -M_TAU/(r32)m;
+      r32 angle = -GS_TAU/(r32)m;
       c64 wm = C64Polar(1, angle);
       
       for(u32 k = 0; k < length; k += m)
@@ -1478,7 +1495,7 @@ ifft(r32 *destBuffer, r32 *destImScratch, c64 *sourceBuffer, u32 lengthInit, u32
 
       for(u32 k = 0; k < length/2; ++k)
 	{
-	  c64 w = C64Polar(1, M_TAU*k/(r32)length);
+	  c64 w = C64Polar(1, GS_TAU*k/(r32)length);
 	  c64 in0 = destBuffer[k];
 	  c64 in1 = destBuffer[k + length/2];
 
@@ -1510,7 +1527,7 @@ ifft(r32 *destBuffer, r32 *destImScratch, c64 *sourceBuffer, u32 lengthInit, u32
   for(u32 level = 1; level <= logLength; ++level)
     {
       u32 m = 1 << level;
-      r32 angle = M_TAU/(r32)m;
+      r32 angle = GS_TAU/(r32)m;
       c64 wm = C64Polar(1, angle);
 
       for(u32 k = 0; k < length; k += m)
@@ -1558,7 +1575,7 @@ fft(c64 *output, c64 *input, u32 lengthInit)
   for(u32 s = 1; s <= logLength; ++s)
     {
       u32 m = 1 << s;
-      r32 angle = -M_TAU/(r32)m;
+      r32 angle = -GS_TAU/(r32)m;
       c64 wm = C64Polar(1, angle);
 
       for(u32 k = 0; k < length; k += m)
@@ -1600,7 +1617,7 @@ ifft(c64 *output, c64 *input, u32 lengthInit)
   for(u32 s = 1; s <= logLength; ++s)
     {
       u32 m = 1 << s;
-      r32 angle = M_TAU/(r32)m;
+      r32 angle = GS_TAU/(r32)m;
       c64 wm = C64Polar(1, angle);
 
       for(u32 k = 0; k < length; k += m)
@@ -1633,7 +1650,7 @@ czt(c64 *output, r32 *input, u32 length, Arena *scratchAllocator)
   u32 chirpLength = 2*length - 1;
   u32 fftLength = ROUND_UP_TO_POWER_OF_2(chirpLength);
 
-  r32 angle = -M_PI/(r32)length;
+  r32 angle = -GS_PI/(r32)length;
   c64 wBase = C64Polar(1, angle);  
   c64 *chirp = arenaPushArray(scratchAllocator, chirpLength, c64);//, arenaFlagsZeroNoAlign());
   c64 *reciprocalChirp = arenaPushArray(scratchAllocator, fftLength, c64);//, arenaFlagsZeroNoAlign());
@@ -1691,7 +1708,7 @@ iczt(r32 *outputReal, r32 *outputImag, c64 *input, u32 length, Arena *scratchAll
   u32 chirpLength = 2*length - 1;
   u32 fftLength = ROUND_UP_TO_POWER_OF_2(chirpLength);
 
-  r32 angle = M_PI/(r32)length;
+  r32 angle = GS_PI/(r32)length;
   c64 wBase = C64Polar(1, angle);  
   c64 *chirp = arenaPushArray(scratchAllocator, chirpLength, c64);//, arenaFlagsZeroNoAlign());
   c64 *reciprocalChirp = arenaPushArray(scratchAllocator, fftLength, c64);//, arenaFlagsZeroNoAlign());

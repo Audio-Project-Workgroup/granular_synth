@@ -3,7 +3,7 @@ fftTest(Arena *allocator)
 {
   u32 testSignalLength = 16;
   r32 freq = 4;
-  r32 nFreq = freq*M_TAU/(r32)testSignalLength;
+  r32 nFreq = freq*GS_TAU/(r32)testSignalLength;
   r32 *testSignal = arenaPushArray(allocator, testSignalLength, r32, arenaFlagsZeroAlign(4*sizeof(r32)));
   for(u32 i = 0; i < testSignalLength; ++i)
     {

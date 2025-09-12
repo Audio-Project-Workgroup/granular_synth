@@ -379,5 +379,150 @@ wideMaskFloats(WideFloat a, WideFloat b, WideInt mask)
 }
 
 #else
-#error ERROR: unsupported architecture
+// NOTE: default to scalar
+// TODO: wasm
+
+struct WideFloat
+{
+  r32 val;
+};
+
+struct WideInt
+{
+  u32 val;
+};
+
+static WideFloat
+wideLoadFloats(r32 *src)
+{
+  WideFloat result = { *src };
+  return(result);
+}
+
+static WideFloat
+wideSetConstantFloats(r32 src)
+{
+  WideFloat result = { src };
+  return(result);
+}
+
+// TODO: make sure this is ok
+static WideFloat
+wideSetFloats(r32 a, r32 b, r32 c, r32 d)
+{
+  WideFloat result = { a };
+  UNUSED(b);
+  UNUSED(c);
+  UNUSED(d);
+  return(result);
+}
+
+static void
+wideSetLaneFloats(WideFloat *w, r32 val, u32 lane)
+{
+  w->val = val;
+  UNUSED(lane);
+}
+
+static void
+wideStoreFloats(r32 *dest, WideFloat src)
+{
+  *dest = src.val;
+}
+
+static WideFloat
+wideAddFloats(WideFloat a, WideFloat b)
+{
+  WideFloat result = { a.val + b.val };
+  return(result);
+}
+
+static WideFloat
+wideSubFloats(WideFloat a, WideFloat b)
+{
+  WideFloat result = { a.val - b.val };
+  return(result);
+}
+
+static WideFloat
+wideMulFloats(WideFloat a, WideFloat b)
+{
+  WideFloat result = { a.val * b.val };
+  return(result);
+}
+
+static WideFloat
+wideMaskFloats(WideFloat a, WideFloat b, WideInt mask)
+{
+  //  TODO: implement
+  WideFloat result = {};
+  return(result);
+}
+
+static WideInt
+wideLoadInts(u32 *src)
+{
+  WideInt result = { *src };
+  return(result);
+}
+
+static WideInt
+wideSetConstantInts(u32 src)
+{
+  WideInt result = { src };
+  return(result);
+}
+
+static WideInt
+wideSetInts(u32 a, u32 b, u32 c, u32 d)
+{
+  // TODO: make sure this is ok
+  WideInt result = { a };
+  UNUSED(b);
+  UNUSED(c);
+  UNUSED(d);
+  return(result);
+}
+
+static void
+wideSetLaneInts(WideInt *w, u32 val, u32 lane)
+{
+  w->val = val;
+  UNUSED(lane);
+}
+
+static void
+wideStoreInts(u32 *dest, WideInt src)
+{
+  *dest = src.val;
+}
+
+static WideInt
+wideAddInts(WideInt a, WideInt b)
+{
+  WideInt result = { a.val + b.val };
+  return(result);
+}
+
+static WideInt
+wideSubInts(WideInt a, WideInt b)
+{
+  WideInt result = { a.val - b.val };
+  return(result);
+}
+
+static WideInt
+wideMulInts(WideInt a, WideInt b)
+{
+  WideInt result = { a.val * b.val };
+  return(result);
+}
+
+static WideInt
+wideAndInts(WideInt a, WideInt b)
+{
+  WideInt result = { a.val & b.val };
+  return(result);
+}
+
 #endif

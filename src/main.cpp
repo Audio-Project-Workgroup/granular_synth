@@ -18,6 +18,14 @@ static String8 executablePath;
 static String8 basePath;
 #include "platform.h"
 
+// TODO: it would be cool to not use the crt implementations
+#include <math.h>
+r32 gs_fabsf(r32 num)		{ return(fabsf(num)); }
+r32 gs_sqrtf(r32 num)		{ return(sqrtf(num)); }
+r32 gs_sinf(r32 num)		{ return(sinf(num)); }
+r32 gs_cosf(r32 num)		{ return(cosf(num)); }
+r32 gs_powf(r32 base, r32 exp)	{ return(powf(base, exp)); }
+
 #if OS_MAC || OS_LINUX
 #include <GL/glew.h>
 #endif
@@ -586,6 +594,12 @@ main(int argc, char **argv)
 	  //pluginMemory.platformAPI.runModel = platformRunModel;
 	  
 	  pluginMemory.platformAPI.getCurrentTimestamp = platformGetCurrentTimestamp;
+
+	  pluginMemory.platformAPI.abs	= gs_fabsf;
+	  pluginMemory.platformAPI.sqrt = gs_sqrtf;
+	  pluginMemory.platformAPI.sin	= gs_sinf;
+	  pluginMemory.platformAPI.cos	= gs_cosf;
+	  pluginMemory.platformAPI.pow	= gs_powf;
 
 	  pluginMemory.platformAPI.atomicLoad			= atomicLoad;
 	  pluginMemory.platformAPI.atomicStore			= atomicStore;

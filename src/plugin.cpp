@@ -76,12 +76,21 @@ PlatformAPI globalPlatform;
 PluginLogger *globalLogger;
 #endif
 
+r32 gs_fabsf(r32 num)		{ return(globalPlatform.abs(num)); }
+r32 gs_sqrtf(r32 num)		{ return(globalPlatform.sqrt(num)); }
+r32 gs_sinf(r32 num)		{ return(globalPlatform.sin(num)); }
+r32 gs_cosf(r32 num)		{ return(globalPlatform.cos(num)); }
+r32 gs_powf(r32 base, r32 exp)	{ return(globalPlatform.pow(base, exp)); }
+
 inline void
 printButtonState(ButtonState button, char *name)
 {
-  printf("%s: %s, %s\n", name,
-	 wasPressed(button) ? "pressed" : "not pressed",
-	 isDown(button) ? "down" : "up");
+  // printf("%s: %s, %s\n", name,
+  // 	 wasPressed(button) ? "pressed" : "not pressed",
+  // 	 isDown(button) ? "down" : "up");
+  logFormatString("%s: %s, %s\n", name,
+		  wasPressed(button) ? "pressed" : "not pressed",
+		  isDown(button) ? "down" : "up");
 }
 
 static PluginState *
