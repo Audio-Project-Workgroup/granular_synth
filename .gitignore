@@ -24,6 +24,7 @@ data/fingertips_old.grains
 data/test_input.data
 data/test_output.data
 
+src/*.txt
 onnx_build_debug.txt
 
 # ignore emacs turds
@@ -34,6 +35,7 @@ src/*.*~
 src/\#*\#
 src/.\#*
 
+emacs.bat
 src/emacs.bat
 src/shell.bat
 
