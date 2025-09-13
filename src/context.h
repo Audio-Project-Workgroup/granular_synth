@@ -11,6 +11,8 @@
 #  define OS_MAC 1
 # elif defined(_WIN32)
 #  define OS_WINDOWS 1
+# elif defined(__wasm__)
+#  define OS_WASM 1
 # else
 #  error ERROR: OS undetected
 # endif // clang OS
@@ -23,6 +25,10 @@
 #  define ARCH_ARM 1
 # elif defined(__aarch64__)
 #  define ARCH_ARM64 1
+# elif defined(__wasm32__)
+#  define ARCH_WASM32
+# elif defined(__wasm64__)
+#  define ARCH_WASM64
 # else
 #  error ERROR: architecture undetected
 # endif // clang architecture

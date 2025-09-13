@@ -3,7 +3,7 @@
 SRC_DIR=$PWD
 DATA_DIR=$SRC_DIR/../data
 
-CFLAGS="-Wall -Wextra -Wno-missing-braces -c"
+CFLAGS="-Wall -Wextra -Wno-missing-braces -Wno-unused-function -c"
 WASM_CFLAGS="--target=wasm32 -nostdlib"
 WASM_LFLAGS="--no-entry --export-all --import-memory"
 

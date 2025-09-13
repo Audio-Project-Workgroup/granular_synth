@@ -11,7 +11,6 @@
 #include "utils.h"
 #include "arena.h"
 #include "strings.h"
-#include "simd_intrinsics.h"
 #include "profile.h"
 #include "math.h"
 #include "render.h"

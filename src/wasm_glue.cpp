@@ -1,7 +1,10 @@
-#include "types.h"
-//#include "common.h"
+//#include "types.h"
+#include "common.h"
 
-extern "C" int fmadd(int a, int b, int c) {
+#define proc_export C_LINKAGE
+
+proc_export int
+fmadd(int a, int b, int c) {
   return(a * b + c);
 }
 
@@ -21,7 +24,7 @@ static R_Quad *quads = 0;
 static s32 width = 0;
 static s32 height = 0;
 
-extern "C" R_Quad*
+proc_export R_Quad*
 beginDrawQuads(s32 windowWidth, s32 windowHeight)
 {
   R_Quad *result = (R_Quad*)(memory + memoryAt);
@@ -34,7 +37,7 @@ beginDrawQuads(s32 windowWidth, s32 windowHeight)
   return(result);
 }
 
-extern "C" u32
+proc_export u32
 endDrawQuads(void)
 {
   r32 widthFrac = (r32)width / (r32)quadsToDraw;

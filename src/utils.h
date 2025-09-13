@@ -1,5 +1,15 @@
 // common utilities and miscellaneous functions
 
+#if LANGUAGE_CXX
+#  define BEGIN_C_LINKAGE extern "C" {
+#  define END_C_LINKAGE }
+#  define C_LINKAGE extern "C"
+#else
+#  define BEGIN_C_LINKAGE
+#  define END_C_LINKAGE
+#  define C_LINKAGE
+#endif
+
 #if BUILD_DEBUG
 #  if COMPILER_MSVC
 #    define ASSERT(cond) if(!(cond)) __debugbreak();
