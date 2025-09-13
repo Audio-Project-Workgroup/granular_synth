@@ -53,6 +53,7 @@ typedef PLATFORM_WRITE_ENTIRE_FILE(PlatformWriteEntireFile);
 typedef PLATFORM_GET_PATH_TO_MODULE(PlatformGetPathToModule);
 
 // math
+
 #define ABS(name) r32 (name)(r32 num)
 typedef ABS(PlatformAbs);
 

@@ -1,3 +1,5 @@
+let sharedMemory = null;
+
 let vsSource = `
 attribute vec2 v_pattern;
 attribute vec4 v_min_max;
@@ -18,8 +20,29 @@ void main() {
 }
 `;
 
+function cstrGetLen(ptr) {
+    const mem = new Uint8Array(sharedMemory.buffer);
+    let len = 0;
+    while(mem[ptr] != 0) {
+	++len;
+	++ptr;
+    }
+    return len;
+}
+
+function cstrFromPtr(ptr) {
+    const len = cstrGetLen(ptr);
+    const bytes = new Uint8Array(sharedMemory.buffer, ptr, len);
+    return new TextDecoder().decode(bytes);
+}
+
+function platformLog(msgPtr) {
+    const msg = cstrFromPtr(msgPtr);
+    console.log(msg);
+}
+
 async function main() {
-    const sharedMemory = new WebAssembly.Memory({
+    sharedMemory = new WebAssembly.Memory({
 	initial: 2,
 	maximum: 2,
 	shared: false,
@@ -27,9 +50,13 @@ async function main() {
     const wasm = await WebAssembly.instantiateStreaming(fetch("./wasm_glue.wasm"), {
 	env: {
 	    memory: sharedMemory,
+	    platformLog,
 	}	
     });
-    //console.log(wasm.instance.exports.fmadd(4, 5, 6));
+    const wasmStateOffset = wasm.instance.exports.wasmInit(64*1024); // TODO: real heap size
+    console.log(wasmStateOffset);
+    const quadsOffset = wasm.instance.exports.getQuadsOffset();
+    console.log(quadsOffset);
     
     const canvas = document.querySelector("#gl-canvas");
     const gl = canvas.getContext("webgl2");
@@ -107,11 +134,11 @@ async function main() {
 	gl.clearDepth(1.0);
 	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 	
-	const quadOffset = wasm.instance.exports.beginDrawQuads(canvas.width, canvas.height);
-	const quadCount = wasm.instance.exports.endDrawQuads();
-	//console.log(quadOffset);
-	//console.log(quadCount);
-	const quadData = new Float32Array(sharedMemory.buffer, quadOffset, 4*quadCount);
+	//const quadOffset = wasm.instance.exports.beginDrawQuads(canvas.width, canvas.height);
+	const quadCount = wasm.instance.exports.drawQuads(canvas.width, canvas.height);
+	//console.log(`quadCount: ${quadCount}`);
+	const quadFloatCount = 4;
+	const quadData = new Float32Array(sharedMemory.buffer, quadsOffset, quadFloatCount*quadCount);
 	//console.log(quadData);
 	gl.bufferSubData(gl.ARRAY_BUFFER, 32, quadData);
 
