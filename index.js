@@ -33,7 +33,10 @@ function cstrGetLen(ptr) {
 function cstrFromPtr(ptr) {
     const len = cstrGetLen(ptr);
     const bytes = new Uint8Array(sharedMemory.buffer, ptr, len);
-    return new TextDecoder().decode(bytes);
+    const tempBuffer = new ArrayBuffer(len);
+    const tempView = new Uint8Array(tempBuffer);
+    tempView.set(bytes);
+    return new TextDecoder().decode(tempView);
 }
 
 function platformLog(msgPtr) {
@@ -41,19 +44,41 @@ function platformLog(msgPtr) {
     console.log(msg);
 }
 
+let wasmModule = null;
+let wasmInstance = null;
+
 async function main() {
     sharedMemory = new WebAssembly.Memory({
 	initial: 2,
 	maximum: 2,
-	shared: false,
-    });
-    const wasm = await WebAssembly.instantiateStreaming(fetch("./wasm_glue.wasm"), {
+	shared: true,
+    });    
+    // const wasm = await WebAssembly.instantiateStreaming(fetch("./wasm_glue.wasm"), {    
+    // 	env: {
+    // 	    memory: sharedMemory,
+    // 	    platformLog,
+    // 	}	
+    // });
+    const importObject = {
 	env: {
 	    memory: sharedMemory,
 	    platformLog,
-	}	
-    });
-    const wasmStateOffset = wasm.instance.exports.wasmInit(64*1024); // TODO: real heap size
+	}
+    };
+    const wasmModule = await WebAssembly.compileStreaming(fetch("./wasm_glue.wasm"));
+    const wasmInstance = await WebAssembly.instantiate(wasmModule, importObject);
+    const wasm = {
+	module: wasmModule,
+	instance: wasmInstance,
+    };
+
+    // await WebAssembly.compileStreaming(fetch("./wasm_glue.wasm"))
+    // 	.then((module) => WebAssembly.instantiate(module, importObject))
+    // 	.then((instance) => wasmInstance = instance);
+    console.log(wasm.module);
+    console.log(wasm.instance);
+
+    const wasmStateOffset = wasmInstance.exports.wasmInit(64*1024); // TODO: real heap size
     console.log(wasmStateOffset);
     const quadsOffset = wasm.instance.exports.getQuadsOffset();
     console.log(quadsOffset);
@@ -65,7 +90,12 @@ async function main() {
 
     const audioCtx = new AudioContext();    
     await audioCtx.audioWorklet.addModule("./src/granade_audio.js");
-    const granadeNode = new AudioWorkletNode(audioCtx, "granade-processor");
+    const granadeNode = new AudioWorkletNode(audioCtx, "granade-processor", {
+	processorOptions: {
+	    sharedMemory: null,//sharedMemory, TODO: configure http headers so we can share memory
+	    wasmModule: wasmModule,
+	}
+    });
     granadeNode.connect(audioCtx.destination);
 
     const playButton = document.querySelector("button");

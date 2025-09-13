@@ -1,9 +1,20 @@
+function platformLog(msgPtr) { msgPtr = null; }
+
 class GranadeProcessor extends AudioWorkletProcessor {
-    constructor() {
-	super();
+    constructor(options) {
+	super(options);
 	this.phase = 0;
 	this.freq = 440.0;
 	this.volume = 0.1;
+	this.sharedMemory = options.processorOptions.sharedMemory;
+	this.wasmModule = options.processorOptions.wasmModule;
+	this.wasmInstance = await WebAssembly.instantiate(this.wasmModule, {
+	    env: {
+		memory: this.sharedMemory,
+		platformLog,
+	    }
+	});
+	console.log(this.wasmInstance); // ?
     }
 
     process(inputs, outputs, parameters) {
