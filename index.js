@@ -44,21 +44,13 @@ function platformLog(msgPtr) {
     console.log(msg);
 }
 
-let wasmModule = null;
-let wasmInstance = null;
-
 async function main() {
     sharedMemory = new WebAssembly.Memory({
 	initial: 2,
 	maximum: 2,
 	shared: true,
-    });    
-    // const wasm = await WebAssembly.instantiateStreaming(fetch("./wasm_glue.wasm"), {    
-    // 	env: {
-    // 	    memory: sharedMemory,
-    // 	    platformLog,
-    // 	}	
-    // });
+    });
+
     const importObject = {
 	env: {
 	    memory: sharedMemory,
@@ -71,10 +63,6 @@ async function main() {
 	module: wasmModule,
 	instance: wasmInstance,
     };
-
-    // await WebAssembly.compileStreaming(fetch("./wasm_glue.wasm"))
-    // 	.then((module) => WebAssembly.instantiate(module, importObject))
-    // 	.then((instance) => wasmInstance = instance);
     console.log(wasm.module);
     console.log(wasm.instance);
 
@@ -82,17 +70,16 @@ async function main() {
     console.log(wasmStateOffset);
     const quadsOffset = wasm.instance.exports.getQuadsOffset();
     console.log(quadsOffset);
-    
+
     const canvas = document.querySelector("#gl-canvas");
     const gl = canvas.getContext("webgl2");
     gl.enable(gl.DEPTH_TEST);
     gl.depthFunc(gl.LEQUAL);
 
-    const audioCtx = new AudioContext();    
+    const audioCtx = new AudioContext();
     await audioCtx.audioWorklet.addModule("./src/granade_audio.js");
     const granadeNode = new AudioWorkletNode(audioCtx, "granade-processor", {
 	processorOptions: {
-	    sharedMemory: null,//sharedMemory, TODO: configure http headers so we can share memory
 	    wasmModule: wasmModule,
 	}
     });
@@ -121,15 +108,15 @@ async function main() {
 	console.log(`vertex shader compilation failed: ${gl.getShaderInfoLog(vertexShader)}`);
 	gl.deleteShader(vertexShader);
     }
-    
+
     const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
     gl.shaderSource(fragmentShader, fsSource);
-    gl.compileShader(fragmentShader);    
+    gl.compileShader(fragmentShader);
     if(!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
 	console.log(`fragment shader compilation failed: ${gl.getShaderInfoLog(fragmentShader)}`);
 	gl.deleteShader(fragmentShader);
     }
-    
+
     const shaderProgram = gl.createProgram();
     gl.attachShader(shaderProgram, vertexShader);
     gl.attachShader(shaderProgram, fragmentShader);
@@ -163,8 +150,7 @@ async function main() {
 	gl.clearColor(0.0, 0.0, 0.0, 1.0);
 	gl.clearDepth(1.0);
 	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-	
-	//const quadOffset = wasm.instance.exports.beginDrawQuads(canvas.width, canvas.height);
+
 	const quadCount = wasm.instance.exports.drawQuads(canvas.width, canvas.height);
 	//console.log(`quadCount: ${quadCount}`);
 	const quadFloatCount = 4;
