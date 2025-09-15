@@ -27,6 +27,8 @@ data/test_output.data
 src/*.txt
 onnx_build_debug.txt
 
+sw.js
+
 # ignore emacs turds
 *.*~
 \#*\#

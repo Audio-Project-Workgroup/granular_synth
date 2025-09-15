@@ -45,6 +45,9 @@ function platformLog(msgPtr) {
 }
 
 async function main() {
+
+    console.log(crossOriginIsolated);    
+
     sharedMemory = new WebAssembly.Memory({
 	initial: 2,
 	maximum: 2,
@@ -80,6 +83,7 @@ async function main() {
     await audioCtx.audioWorklet.addModule("./src/granade_audio.js");
     const granadeNode = new AudioWorkletNode(audioCtx, "granade-processor", {
 	processorOptions: {
+	    sharedMemory: sharedMemory,
 	    wasmModule: wasmModule,
 	}
     });
