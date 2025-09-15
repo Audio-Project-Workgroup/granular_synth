@@ -1,5 +1,13 @@
 function platformLog(msgPtr) { msgPtr = null; }
 
+function platformSin(val) {
+    return Math.sin(val);
+}
+
+function platformCos(val) {
+    return Math.cos(val);
+}
+
 class GranadeProcessor extends AudioWorkletProcessor {
     constructor(options) {
 	super(options);
@@ -12,10 +20,12 @@ class GranadeProcessor extends AudioWorkletProcessor {
 	    env: {
 		memory: this.sharedMemory,
 		platformLog,
+		platformSin,
+		platformCos,
 	    }
 	})
 	    .then(instance => {
-		this.wasmInstance = instance
+		this.wasmInstance = instance;
 	    })
 	    .catch(error => console.log("error instantiating wasm in audio processor: ", error));
     }
@@ -26,16 +36,16 @@ class GranadeProcessor extends AudioWorkletProcessor {
 	const tau = 2.0 * Math.PI;
 	const phaseInc = tau * this.freq * samplePeriod;
 
-	output.forEach((channel) => {
-	    for(let sampleIdx = 0; sampleIdx < channel.length; ++sampleIdx) {
-		channel[sampleIdx] = this.volume * Math.sin(this.phase);
+	const outputChannelCount = output.length;
+	const outputSampleCount = output[0].length;
 
-		this.phase += phaseInc;
-		if(this.phase >= tau) {
-		    this.phase -= tau;
-		}
+	for(let channelIdx = 0; channelIdx < outputChannelCount; ++channelIdx) {
+	    const samplesOffset = this.wasmInstance.exports.outputSamples(channelIdx, outputSampleCount, samplePeriod);
+	    const samples = new Float32Array(this.sharedMemory.buffer, samplesOffset, outputSampleCount);
+	    for(let sampleIdx = 0; sampleIdx < outputSampleCount; ++sampleIdx) {
+		output[channelIdx][sampleIdx] = samples[sampleIdx];
 	    }
-	});
+	}
 
 	return true;
     }

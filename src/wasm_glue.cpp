@@ -6,6 +6,20 @@
 
 // imported functions
 proc_import(platformLog, void, (const char *msg));
+proc_import(platformSin, r32, (r32 val));
+proc_import(platformCos, r32, (r32 val));
+
+r32
+gs_sinf(r32 num)
+{
+  return(platformSin(num));
+}
+
+r32
+gs_cosf(r32 num)
+{
+  return(platformCos(num));
+}
 
 // internal and exported functions
 static void
@@ -28,13 +42,13 @@ fmadd(int a, int b, int c) {
 
 extern u8 __heap_base;
 
-// static usz memoryAt = 0;
-// static u8 *memory = &__heap_base;
-
 struct R_Quad
 {
   v2 min;
   v2 max;
+
+  u32 color;
+  r32 angle;
 };
 
 struct WasmState
@@ -47,6 +61,13 @@ struct WasmState
 
   u32 quadsToDraw;
   b32 calledLog;
+
+  r32 *outputSamples[2];
+  u32 outputSampleCapacity;
+
+  r32 phase;
+  r32 freq;
+  r32 volume;
 };
 
 static WasmState *wasmState = 0;
@@ -69,6 +90,13 @@ wasmInit(usz memorySize)
       result->quadCapacity = 1024;      
       result->quads = arenaPushArray(arena, result->quadCapacity, R_Quad);
       result->quadsToDraw = 3;
+
+      result->outputSampleCapacity = 2048;
+      result->outputSamples[0] = arenaPushArray(arena, result->outputSampleCapacity, r32);
+      result->outputSamples[1] = arenaPushArray(arena, result->outputSampleCapacity, r32);
+      result->phase = 0.f;
+      result->freq = 440.f;
+      result->volume = 0.1f;
       
       wasmState = result;
       platformLogf("wasmState: %X\n  quads=%X\n  quadCount=%u\n  quadCapacity=%u\n",
@@ -79,16 +107,8 @@ wasmInit(usz memorySize)
   return(result);
 }
 
-// static u32 quadCount = 0;
-// static u32 quadsToDraw = 3;
-// static R_Quad *quads = 0;
-// static s32 width = 0;
-// static s32 height = 0;
-
-// static b32 calledLog = 0;
-
 static R_Quad*
-pushQuad(v2 min, v2 max)
+pushQuad(v2 min, v2 max, v4 color, r32 angle)
 {
   R_Quad *result = 0;
   if(wasmState->quadCount < wasmState->quadCapacity) {
@@ -96,6 +116,8 @@ pushQuad(v2 min, v2 max)
     if(result) {
       result->min = min;
       result->max = max;
+      result->color = colorU32FromV4(color);
+      result->angle = angle;
     }
   }
   
@@ -110,15 +132,25 @@ getQuadsOffset(void)
 }
 
 proc_export u32
-drawQuads(s32 width, s32 height)
+drawQuads(s32 width, s32 height, r32 timestamp)
 {
+  r32 timestampSec = timestamp * 0.001f;
+
+  v4 colors[3] = {
+    V4(1, 0, 0, 1),
+    V4(0, 1, 0, 1),
+    V4(0, 0, 1, 1),
+  };
+
   u32 quadsToDraw = wasmState->quadsToDraw;
   v2 dim = V2((r32)width/(r32)(quadsToDraw + 1), (r32)height/(r32)(quadsToDraw + 1));
   v2 advance = V2((r32)width/(r32)quadsToDraw, (r32)height/(r32)quadsToDraw);
   v2 min = V2(0, 0);
   v2 max = dim;
   for(u32 quadIdx = 0; quadIdx < wasmState->quadsToDraw; ++quadIdx) {
-    pushQuad(min, max);
+    r32 angularVelocity = (r32)(quadIdx + 1);
+    r32 angle = timestampSec * angularVelocity;
+    pushQuad(min, max, colors[quadIdx], angle);
     min += advance;
     max += advance;
   }
@@ -133,52 +165,19 @@ drawQuads(s32 width, s32 height)
   return(result);
 }
 
-#if 0
-proc_export R_Quad*
-beginDrawQuads(s32 windowWidth, s32 windowHeight)
+proc_export r32*
+outputSamples(u32 channelIdx, u32 sampleCount, r32 samplePeriod)
 {
-  R_Quad *result = (R_Quad*)(memory + memoryAt);
-  if(result) {    
-    memoryAt += quadsToDraw * sizeof(R_Quad);
-    width = windowWidth;
-    height = windowHeight;
+  ASSERT(sampleCount <= wasmState->outputSampleCapacity);
+  r32 phaseInc = GS_TAU * wasmState->freq * samplePeriod;
+  for(u32 sampleIdx = 0; sampleIdx < sampleCount; ++sampleIdx) {
+    r32 sineSample = wasmState->volume * platformSin(wasmState->phase);
+    wasmState->outputSamples[channelIdx][sampleIdx] = sineSample;
+
+    wasmState->phase += phaseInc;
+    if(wasmState->phase >= GS_TAU) wasmState->phase -= GS_TAU;
   }
-  quads = result;
+  
+  r32 *result = wasmState->outputSamples[channelIdx];
   return(result);
 }
-
-proc_export u32
-endDrawQuads(void)
-{
-  r32 widthFrac = (r32)width / (r32)quadsToDraw;
-  r32 heightFrac = (r32)height / (r32)quadsToDraw;
-  r32 startX = 0.1f * (r32)width;
-  r32 startY = 0.1f * (r32)height;
-  r32 dimX = (r32)width / (r32)(quadsToDraw + 1);
-  r32 dimY = (r32)height / (r32)(quadsToDraw + 1);
-  if(quads) {
-    while(quadCount < quadsToDraw) {
-      u32 quadIdx = quadCount;
-      R_Quad *quad = quads + quadCount++;
-      quad->min.x = startX + widthFrac*(r32)quadIdx;
-      quad->min.y = startY + heightFrac*(r32)quadIdx;
-      quad->max.x = startX + dimX + widthFrac*(r32)quadIdx;
-      quad->max.y = startY + dimY + heightFrac*(r32)quadIdx;
-      // quad->min.y = 100 + quadIdx*300;
-      // quad->max.x = 300 + quadIdx*300;
-      // quad->max.y = 300 + quadIdx*300;
-    }
-  }
-  u32 result = quadCount;
-
-  if(!calledLog) {
-    platformLog("drew quads\n");
-    calledLog = 1;
-  }
-
-  quadCount = 0;
-  memoryAt = 0;
-  quads = 0;
-  return(result);
-}
-#endif

@@ -1,7 +1,7 @@
 import http.server
 import socketserver
 
-PORT = 8080
+PORT = 8082
 
 class TestHandler(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):
