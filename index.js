@@ -1,3 +1,5 @@
+import { makeImportObject } from './src/wasm_imports.js';
+
 let sharedMemory = null;
 
 let vsSource = `
@@ -5,6 +7,7 @@ attribute vec2 v_pattern;
 attribute vec4 v_min_max;
 attribute vec4 v_color;
 attribute float v_angle;
+attribute float v_level;
 
 uniform mat4 transform;
 
@@ -19,7 +22,7 @@ void main() {
   vec2 rot_pattern = vec2(cosa*v_pattern.x - sina*v_pattern.y, sina*v_pattern.x + cosa*v_pattern.y);
 
   vec2 pos = center + half_dim*rot_pattern;
-  gl_Position = transform * vec4(pos, 0.0, 1.0);
+  gl_Position = transform * vec4(pos, v_level, 1.0);
   f_color = v_color;
 }
 `;
@@ -32,38 +35,6 @@ void main() {
 }
 `;
 
-function cstrGetLen(ptr) {
-    const mem = new Uint8Array(sharedMemory.buffer);
-    let len = 0;
-    while(mem[ptr] != 0) {
-	++len;
-	++ptr;
-    }
-    return len;
-}
-
-function cstrFromPtr(ptr) {
-    const len = cstrGetLen(ptr);
-    const bytes = new Uint8Array(sharedMemory.buffer, ptr, len);
-    const tempBuffer = new ArrayBuffer(len);
-    const tempView = new Uint8Array(tempBuffer);
-    tempView.set(bytes);
-    return new TextDecoder().decode(tempView);
-}
-
-function platformLog(msgPtr) {
-    const msg = cstrFromPtr(msgPtr);
-    console.log(msg);
-}
-
-function platformSin(val) {
-    return Math.sin(val);
-}
-
-function platformCos(val) {
-    return Math.cos(val);
-}
-
 async function main() {
 
     console.log(crossOriginIsolated);    
@@ -74,14 +45,7 @@ async function main() {
 	shared: true,
     });
 
-    const importObject = {
-	env: {
-	    memory: sharedMemory,
-	    platformLog,
-	    platformSin,
-	    platformCos,
-	}
-    };
+    const importObject = makeImportObject(sharedMemory);
     const wasmModule = await WebAssembly.compileStreaming(fetch("./wasm_glue.wasm"));
     const wasmInstance = await WebAssembly.instantiate(wasmModule, importObject);
     const wasm = {
@@ -158,8 +122,8 @@ async function main() {
     const vMinMaxPosition = gl.getAttribLocation(shaderProgram, "v_min_max");
     const vColorPosition = gl.getAttribLocation(shaderProgram, "v_color");
     const vAnglePosition = gl.getAttribLocation(shaderProgram, "v_angle");
+    const vLevelPosition = gl.getAttribLocation(shaderProgram, "v_level");
     const transformPosition = gl.getUniformLocation(shaderProgram, "transform");
-    //const rotatePosition = gl.getUniformLocation(shaderProgram, "rotate");
 
     // init buffer
     const vertexBuffer = gl.createBuffer();
@@ -180,51 +144,67 @@ async function main() {
 	gl.clearDepth(1.0);
 	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-	console.log(now);
+	//console.log(now);
 
 	const quadCount = wasm.instance.exports.drawQuads(canvas.width, canvas.height, now);
-	const quadSize = 24;
+	const quadSize = 28;
 	//console.log(`quadCount: ${quadCount}`);
 	const quadFloatCount = quadSize / 4;
 	const quadData = new Float32Array(sharedMemory.buffer, quadsOffset, quadFloatCount*quadCount);
-	console.log(quadData);
+	//console.log(quadData);
 	gl.bufferSubData(gl.ARRAY_BUFFER, 32, quadData);
+
+	let currentOffset = 0;
 
 	const vPatternNumComponents = 2;
 	const vPatternType = gl.FLOAT;
 	const vPatternNormalize = false;
 	const vPatternStride = 0;
-	const vPatternOffset = 0;
+	const vPatternOffset = currentOffset;	
 	gl.enableVertexAttribArray(vPatternPosition);
 	gl.vertexAttribDivisor(vPatternPosition, 0);
 	gl.vertexAttribPointer(vPatternPosition, vPatternNumComponents, vPatternType, vPatternNormalize, vPatternStride, vPatternOffset);
+	currentOffset += 32;
 
 	const vMinMaxNumComponents = 4;
 	const vMinMaxType = gl.FLOAT;
 	const vMinMaxNormalize = false;
 	const vMinMaxStride = quadSize;
-	const vMinMaxOffset = 32;
+	const vMinMaxOffset = currentOffset;
 	gl.enableVertexAttribArray(vMinMaxPosition);
 	gl.vertexAttribDivisor(vMinMaxPosition, 1);
 	gl.vertexAttribPointer(vMinMaxPosition, vMinMaxNumComponents, vMinMaxType, vMinMaxNormalize, vMinMaxStride, vMinMaxOffset);
+	currentOffset += 16;
 
 	const vColorNumComponents = 4;
 	const vColorType = gl.UNSIGNED_BYTE;
 	const vColorNormalize = false;
 	const vColorStride = quadSize;
-	const vColorOffset = 32 + 16;
+	const vColorOffset = currentOffset;
 	gl.enableVertexAttribArray(vColorPosition);
 	gl.vertexAttribDivisor(vColorPosition, 1);
 	gl.vertexAttribPointer(vColorPosition, vColorNumComponents, vColorType, vColorNormalize, vColorStride, vColorOffset);
+	currentOffset += 4;
  
 	const vAngleNumComponents = 1;
 	const vAngleType = gl.FLOAT;
 	const vAngleNormalize = false;
 	const vAngleStride = quadSize;
-	const vAngleOffset = 32 + 16 + 4;
+	const vAngleOffset = currentOffset;
 	gl.enableVertexAttribArray(vAnglePosition);
 	gl.vertexAttribDivisor(vAnglePosition, 1);
 	gl.vertexAttribPointer(vAnglePosition, vAngleNumComponents, vAngleType, vAngleNormalize, vAngleStride, vAngleOffset);
+	currentOffset += 4;
+
+	const vLevelNumComponents = 1;
+	const vLevelType = gl.FLOAT;
+	const vLevelNormalized = false;
+	const vLevelStride = quadSize;
+	const vLevelOffset = currentOffset;
+	gl.enableVertexAttribArray(vLevelPosition);
+	gl.vertexAttribDivisor(vLevelPosition, 1);
+	gl.vertexAttribPointer(vLevelPosition, vLevelNumComponents, vLevelType, vLevelNormalized, vLevelStride, vLevelOffset);
+	currentOffset += 4;
 
 	const a = 2.0 / canvas.width;
 	const b = 2.0 / canvas.height;
@@ -235,20 +215,6 @@ async function main() {
 	    -1.0, -1.0, 0.0, 1.0,
 	];
 	gl.uniformMatrix4fv(transformPosition, false, new Float32Array(transformMatrix));
-
-	// const angularVelocity = 2; // rad/s
-	// const angle = now * 0.001 * angularVelocity;
-	// const cosA = Math.cos(angle);
-	// const sinA = Math.sin(angle);
-	// const centerX = 0.5 * canvas.width;
-	// const centerY = 0.5 * canvas.height;
-	// const rotateMatrix = [
-	//     cosA, sinA, 0.0, 0.0,
-	//     -sinA, cosA, 0.0, 0.0,
-	//     0.0, 0.0, 1.0, 0.0,
-	//     centerX*(1.0 - cosA) + centerY*sinA, centerY*(1.0 - cosA) - centerX*sinA, 0.0, 1.0,
-	// ];
-	// gl.uniformMatrix4fv(rotatePosition, false, new Float32Array(rotateMatrix));
 
 	// draw
 	gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, quadCount);

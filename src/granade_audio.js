@@ -1,12 +1,4 @@
-function platformLog(msgPtr) { msgPtr = null; }
-
-function platformSin(val) {
-    return Math.sin(val);
-}
-
-function platformCos(val) {
-    return Math.cos(val);
-}
+import { makeImportObject } from './wasm_imports.js';
 
 class GranadeProcessor extends AudioWorkletProcessor {
     constructor(options) {
@@ -16,14 +8,9 @@ class GranadeProcessor extends AudioWorkletProcessor {
 	this.volume = 0.1;
 	this.sharedMemory = options.processorOptions.sharedMemory;
 	this.wasmModule = options.processorOptions.wasmModule;
-	WebAssembly.instantiate(this.wasmModule, {
-	    env: {
-		memory: this.sharedMemory,
-		platformLog,
-		platformSin,
-		platformCos,
-	    }
-	})
+	this.importObject = makeImportObject(this.sharedMemory);
+	// NOTE: `platformLog` can't be called from the audio worker
+	WebAssembly.instantiate(this.wasmModule, this.importObject)
 	    .then(instance => {
 		this.wasmInstance = instance;
 	    })

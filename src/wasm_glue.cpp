@@ -49,6 +49,7 @@ struct R_Quad
 
   u32 color;
   r32 angle;
+  r32 level;
 };
 
 struct WasmState
@@ -108,7 +109,7 @@ wasmInit(usz memorySize)
 }
 
 static R_Quad*
-pushQuad(v2 min, v2 max, v4 color, r32 angle)
+pushQuad(v2 min, v2 max, v4 color, r32 angle, r32 level)
 {
   R_Quad *result = 0;
   if(wasmState->quadCount < wasmState->quadCapacity) {
@@ -118,6 +119,7 @@ pushQuad(v2 min, v2 max, v4 color, r32 angle)
       result->max = max;
       result->color = colorU32FromV4(color);
       result->angle = angle;
+      result->level = level;
     }
   }
   
@@ -150,7 +152,7 @@ drawQuads(s32 width, s32 height, r32 timestamp)
   for(u32 quadIdx = 0; quadIdx < wasmState->quadsToDraw; ++quadIdx) {
     r32 angularVelocity = (r32)(quadIdx + 1);
     r32 angle = timestampSec * angularVelocity;
-    pushQuad(min, max, colors[quadIdx], angle);
+    pushQuad(min, max, colors[quadIdx], angle, 0.f);
     min += advance;
     max += advance;
   }
@@ -177,7 +179,7 @@ outputSamples(u32 channelIdx, u32 sampleCount, r32 samplePeriod)
     wasmState->phase += phaseInc;
     if(wasmState->phase >= GS_TAU) wasmState->phase -= GS_TAU;
   }
-  
+
   r32 *result = wasmState->outputSamples[channelIdx];
   return(result);
 }
