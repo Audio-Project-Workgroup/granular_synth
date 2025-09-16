@@ -70,28 +70,44 @@ struct TexturedTriangle
 
 struct GLState
 {
-  u32 vertexCount;
-  //u32 vertexCapacity;
-  Vertex vertices[256];
+  u32 vPatternPosition;
+  u32 vMinMaxPosition;
+  u32 vColorPosition;
+  u32 vAnglePosition;
+  u32 vLevelPosition;
 
-  u32 indexCount;
-  //u32 indexCapacity;
-  u32 indices[512];
+  u32 transformPosition;
 
-  //u32 textureCount;
-  //Texture textures[64];  
+  u32 vao;
+  u32 vbo;
 
-  /*
-  u32 vboID;
-  u32 vaoID;
-  u32 eboID;
+  u32 vertexShader;
+  u32 fragmentShader;
+  u32 program;
 
-  u32 samplerID;
+  u32 quadDataOffset;
+  u32 quadCapacity;
+};
 
-  u32 programID;  
-  u32 vertexShaderID;
-  u32 fragmentShaderID;
-  */
+struct R_Quad
+{
+  v2 min;
+  v2 max;
+
+  u32 color;
+  r32 angle;
+  r32 level;
+};
+
+struct R_Batch
+{
+  R_Batch *next;
+  
+  u32 quadCapacity;
+  u32 quadCount;
+  R_Quad *quads;
+
+  LoadedBitmap *texture;
 };
 
 enum RenderCursorState
@@ -117,17 +133,26 @@ struct RenderCommands
   bool inputAudioDeviceChanged;
   u32 selectedInputAudioDeviceIndex;
 
-  u32 texturedQuadCount;
-  u32 texturedQuadCapacity;
-  TexturedQuad *texturedQuads;
+  GLState *glState;
 
-  u32 quadCount;
-  u32 quadCapacity;
-  Quad *quads;
+  R_Batch *first;
+  R_Batch *last;
+  u32 batchCount;
+  u32 totalQuadCount;
 
-  u32 triangleCount;
-  u32 triangleCapacity;
-  TexturedTriangle *triangles;
+  LoadedBitmap *whiteTexture;
+
+  /* u32 texturedQuadCount; */
+  /* u32 texturedQuadCapacity; */
+  /* TexturedQuad *texturedQuads; */
+
+  /* u32 quadCount; */
+  /* u32 quadCapacity; */
+  /* Quad *quads; */
+
+  /* u32 triangleCount; */
+  /* u32 triangleCapacity; */
+  /* TexturedTriangle *triangles; */  
 
   bool generateNewTextures;
   bool windowResized;
@@ -143,37 +168,43 @@ renderBeginCommands(RenderCommands *commands, Arena *perFrameAllocator)
   commands->outputAudioDeviceChanged = false;
   commands->inputAudioDeviceChanged = false;  
 
-  commands->texturedQuadCount = 0;
-  commands->texturedQuadCapacity = THOUSAND(4);
-  commands->texturedQuads = arenaPushArray(commands->allocator, commands->texturedQuadCapacity, TexturedQuad);
+  /* commands->texturedQuadCount = 0; */
+  /* commands->texturedQuadCapacity = THOUSAND(4); */
+  /* commands->texturedQuads = arenaPushArray(commands->allocator, commands->texturedQuadCapacity, TexturedQuad); */
 
-  commands->quadCount = 0;
-  commands->quadCapacity = THOUSAND(16);
-  commands->quads = arenaPushArray(commands->allocator, commands->quadCapacity, Quad);
+  /* commands->quadCount = 0; */
+  /* commands->quadCapacity = THOUSAND(16); */
+  /* commands->quads = arenaPushArray(commands->allocator, commands->quadCapacity, Quad); */
 
-  commands->triangleCount = 0;
-  commands->triangleCapacity = 32;
-  commands->triangles = arenaPushArray(commands->allocator, commands->triangleCapacity, TexturedTriangle);  
+  /* commands->triangleCount = 0; */
+  /* commands->triangleCapacity = 32; */
+  /* commands->triangles = arenaPushArray(commands->allocator, commands->triangleCapacity, TexturedTriangle);   */
 }
 
 static inline void
 renderEndCommands(RenderCommands *commands)
 {
+  arenaEnd(commands->allocator);
   commands->allocator = 0;
 
   commands->cursorState = CursorState_default;
   
-  commands->quadCount = 0;
-  commands->quadCapacity = 0;
-  commands->quads = 0;
+  /* commands->quadCount = 0; */
+  /* commands->quadCapacity = 0; */
+  /* commands->quads = 0; */
 
-  commands->texturedQuadCount = 0;
-  commands->texturedQuadCapacity = 0;
-  commands->texturedQuads = 0;
+  /* commands->texturedQuadCount = 0; */
+  /* commands->texturedQuadCapacity = 0; */
+  /* commands->texturedQuads = 0; */
 
-  commands->triangleCount = 0;
-  commands->triangleCapacity = 0;
-  commands->triangles = 0;
+  /* commands->triangleCount = 0; */
+  /* commands->triangleCapacity = 0; */
+  /* commands->triangles = 0; */
+
+  commands->first = 0;
+  commands->last = 0;
+  commands->batchCount = 0;
+  commands->totalQuadCount = 0;
 
   commands->generateNewTextures = false;
 }

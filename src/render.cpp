@@ -2,6 +2,150 @@
 using namespace juce::gl;
 #endif
 
+enum GLShaderKind
+{
+  GLShaderKind_vertex,
+  GLShaderKind_fragment,
+  GLShaderKind_COUNT,
+};
+
+static GLenum shaderKinds[GLShaderKind_COUNT] =
+{
+  GL_VERTEX_SHADER,
+  GL_FRAGMENT_SHADER,
+};
+
+static char vertexShaderSource[] = R"VSRC(
+#version 330
+ 
+in vec2 v_pattern;
+in vec4 v_min_max;
+in vec4 v_color;
+in float v_angle;
+in float v_level;
+
+uniform mat4 transform;
+
+out vec4 f_color;
+
+void main() {
+  vec2 center = (v_min_max.zw + v_min_max.xy)*0.5;
+  vec2 half_dim = (v_min_max.zw - v_min_max.xy)*0.5;
+
+  float cosa = cos(v_angle);
+  float sina = sin(v_angle);
+  vec2 rot_pattern = vec2(cosa*v_pattern.x - sina*v_pattern.y, sina*v_pattern.x + cosa*v_pattern.y);
+
+  vec2 pos = center + half_dim*rot_pattern;
+  gl_Position = transform * vec4(pos, v_level, 1.0);
+  f_color = v_color;
+}
+)VSRC";
+
+static char fragmentShaderSource[] = R"FSRC(
+#version 330
+
+in vec4 f_color;
+
+void main() {
+  gl_FragColor = f_color;
+}
+)FSRC";
+
+static inline GLuint
+makeGLShader(const char *source, GLShaderKind kind)
+{
+  GLuint shader = glCreateShader(shaderKinds[kind]);
+  glShaderSource(shader, 1, &source, 0);
+  glCompileShader(shader);
+
+  GLint compiled = 0;
+  glGetShaderiv(shader, GL_COMPILE_STATUS, &compiled);
+  if(compiled != GL_TRUE)
+    {
+      GLsizei logLength;
+      GLchar msg[1024];
+      glGetShaderInfoLog(shader, ARRAY_COUNT(msg), &logLength, message);
+      fprintf(stderr, "shader compilation failed: %s\n", msg);
+    }
+  
+  return(shader);
+}
+
+static inline GLuint
+makeGLprogram(GLuint vs, GLuint fs)
+{
+  GLuint program = glCreateProgram();
+  glAttachShader(program, vs);
+  glAttachShader(program, fs);
+  glLinkProgram(program);
+
+  GLint linked = 0;
+  glGetProgramiv(program, GL_LINK_STATUS, &linked);
+  if(linked != GL_TRUE)
+    {
+      GLsizei logLength;
+      GLchar msg[1024];
+      glGetProgramInfoLog(program, ARRAY_COUNT(msg), &logLength, message);
+      fprintf(stderr, "program compilation failed: %s\n", msg);
+    }
+
+  return(program);
+}
+
+static inline GLState
+makeGLState(void)
+{
+  GLuint vertexShader = makeGLShader(vertexShaderSource, GLShaderKind_vertex);
+  GLuint fragmentShader = makeGLShader(fragmentShaderSource, GLShaderKind_fragment);
+  GLuint program = (vertexShader, fragmentShader);
+  glUseProgram(program);
+  
+  GLuint vPatternPosition = glGetAttribLocation("v_pattern");
+  GLuint vMinMaxPosition  = glGetAttribLocation("v_min_max");
+  GLuint vColorPosition   = glGetAttribLocation("v_color");
+  GLuint vAnglePosition   = glGetAttribLocation("v_angle");
+  GLuint vLevelPosition   = glGetAttribLocation("v_level");
+
+  GLuint transformPosition = glGetUniformLocation("transform");
+
+  GLuint vao;
+  glGenVertexArrays(1, &vao);
+  glBindVertexArray(vao);
+
+  GLuint vbo;
+  glGenBuffers(1, &vbo);
+  glBindBuffer(GL_ARRAY_BUFFER, vbo);
+
+  GLsizei bufferDataSize = KILOBYTES(32);
+  glBufferData(GL_ARRAY_BUFFER, bufferDataSize, 0, GL_STREAM_DRAW);
+  r32 patternData[] = {
+    -1.f, -1.f,
+    1.f, -1.f,
+    -1.f, 1.f,
+    1.f, 1.f,
+  };
+  u32 patternDataSize = sizeof(patternData);
+  glBufferSubData(GL_ARRAY_BUFFER, 0, patternDataSize, patternData);
+
+  GLState result = {};
+  result.vPatternPosition = vPatternPosition;
+  result.vMinMaxPosition  = vMinMaxPosition;
+  result.vColorPosition   = vColorPosition;
+  result.vAnglePosition   = vAnglePosition;
+  result.vLevelPosition   = vLevelPosition;
+  result.transformPosition = transformPosition;
+  result.vao = vao;
+  result.vbo = vbo;
+  result.vertexShader = vertexShader;
+  result.fragmentShader = fragmentShader;
+  result.program = program;
+  result.quadDataOffset = patternDataSize;
+  result.quadCapacity = bufferDataSize / sizeof(R_Quad);
+  
+  return(result);
+}
+
 static inline void
 renderTexturedVertex(TexturedVertex v)
 {  
@@ -96,7 +240,37 @@ renderSortQuads(Quad *quads, u32 quadCount)
 
 static void
 renderCommands(RenderCommands *commands)
-{      
+{
+#if 1
+
+  glEnableVertexAttribArray(commands->glState->vPatternPosition);
+  glVertexAttribDivisor(commands->glState->vPatternPosition, 0);
+  glVertexAttribPointer(commands->glState->vPatternPosition, 2, GL_FLOAT, 0, 0, 0);
+
+  glEnableVertexAttribArray(commands->glState->vMinMaxPosition);
+  glVertexAttribDivisor(commands->glState->vMinMaxPosition, 1);
+  glVertexAttribPointer(commands->glState->vMinMaxPosition, 4, GL_FLOAT, 0, sizeof(R_Quad), 32);
+
+  glEnableVertexAttribArray(commands->glState->vColorPosition);
+  glVertexAttribPointer(commands->glState->vColorPosition, 1);
+  glVertexAttribPointer(commands->glState->vColorPosition, 4, GL_UNSIGNED_BYTE, 0, sizeof(R_Quad), 32 + 16);
+
+  glEnableVertexAttribArray(commands->glState->vAnglePosition);
+  glVertexAttribPointer(commands->glState->vAnglePosition, 1);
+  glVertexAttribPointer(commands->glState->vAnglePosition, 1, GL_FLOAT, 0, sizeof(R_Quad), 32 + 16 + 4);
+
+  glEnableVertexAttribArray(commands->glState->vLevelPosition);
+  glVertexAttribPointer(commands->glState->vLevelPosition, 1);
+  glVertexAttribPointer(commands->glState->vLevelPosition, 1, GL_FLOAT, 0, sizeof(R_Quad), 32 + 16 + 4 + 4);
+
+  for(R_Batch *batch = commands->first; batch; batch = batch->next)
+    {
+      renderBindTexture(batch->texture, commands->generateNewTextures);
+      glBufferSubData(GL_ARRAY_BUFFER, commands->glState->quadDataOffset, batch->quadCount*sizeof(R_Quad), batch->quads);
+      glDrawArraysInstanced(GL_TRINAGLE_STRIP, 0, 4, batch->quadCount);
+    }
+
+#else
   bool textureEnabled = true;
 
   glMatrixMode(GL_TEXTURE);
@@ -222,112 +396,5 @@ renderCommands(RenderCommands *commands)
     }
   
   renderEndCommands(commands);  
-  
-#if 0
-  GLenum error = glGetError();
-  if(error)
-    {
-      fprintf(stderr, "GL ERROR: %u at renderCommands start\n", error);
-    }
-  
-  for(u32 textureIndex = 0; textureIndex < commands->textureCount; ++textureIndex)
-    {
-      Texture *texture = commands->textures + textureIndex;
-      LoadedBitmap *texBitmap = texture->bitmap;
-      if(!texBitmap->glHandle)
-	{
-	  glGenTextures(1, &texBitmap->glHandle);
-	  glBindTexture(GL_TEXTURE_2D, texBitmap->glHandle);
-	  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
-		       texBitmap->width, texBitmap->height, 0,
-		       GL_BGRA_EXT, GL_UNSIGNED_BYTE, texBitmap->pixels);
-	      
-	  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
-	  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
-	  glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
-	  
-	  error = glGetError();
-	  if(error)
-	    {
-	      fprintf(stderr, "GL ERROR: %u in renderCommands after generating texture %u\n", error, textureIndex);
-	    }
-	}
-    }
-
-  glBindBuffer(GL_ARRAY_BUFFER, glState->vboID);
-  glBufferData(GL_ARRAY_BUFFER, commands->vertexCount*sizeof(Vertex), commands->vertices, GL_STATIC_DRAW);
-
-  glUseProgram(glState->programID);
-
-  glActiveTextre(GL_TEXTURE0);
-  glBindTexture(GL_TEXTURE_2D, commands->textures[0].bitmap->glHandle);
-  glUniform1i(glState->samplerID, 0);
-
-  glEnableVertexAttribArray(0);
-  glBindBuffer(GL_ARRAY_BUFFER, glState->vboID);
-  glVertexAttribPointer(0, ARRAY_COUNT(commands->vertices[0].vPos.E),
-			GL_FLOAT, GL_FALSE, sizeof(Vertex), &OFFSET_OF(Vertex, vpos));
-
-  glEnableVertexAttribArray(1);
-  //glBindBuffer(GL_ARRAY_BUFFER, glState->vboID);
-  glVertexAttribPointer(1, ARRAY_COUNT(commands->vertices[0].uv.E),
-			GL_FLOAT, GL_FALSE, sizeof(Vertex), &OFFSET_OF(Vertex, uv));
-
-  glEnableVertexAttribArray(2);
-  //glBindBuffer(GL_ARRAY_BUFFER, glState->vboID);
-  glVertexAttribPointer(2, ARRAY_COUNT(commands->vertices[0].color.E),
-			GL_FLOAT, GL_FALSE, sizeof(Vertex), &OFFSET_OF(Vertex, color));
-
-  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, glState->eboID);
-  glDrawElements(GL_TRIANGLES, commands->indexCount, GL_UNSIGNED_INT, 0);
-
-  /*
-  bool textureBound = false;
-  u32 textureAt = 0;
-  Texture *nextTexture = commands->textures + textureAt++;
-
-  //glDisable(GL_TEXTURE_2D);
-  glBegin(GL_TRIANGLES);
-
-  u32 *indices = commands->indices++;
-  for(u32 i = 0; i < commands->indexCount; ++i)
-    {
-      u32 index = *indices++;
-      Vertex vertex = commands->vertices[index];
-      
-      if(index == nextTexture->vertexRange.min)
-	{
-	  ASSERT(!textureBound);
-	  //glEnable(GL_TEXTURE_2D);
-	  LoadedBitmap *textureBitmap = nextTexture->bitmap;
-	  glBindTexture(GL_TEXTURE_2D, textureBitmap->glHandle);
-
-	  error = glGetError();
-	  if(error)
-	    {
-	      fprintf(stderr, "GL ERROR: %u binding texture %u\n", error, textureBitmap->glHandle);
-	    }
-	  textureBound = true;	  
-	}
-      else if(index == nextTexture->vertexRange.max)
-	{
-	  ASSERT(textureBound);	  
-	  textureBound = false;
-	  //glDisable(GL_TEXTURE_2D);
-	  nextTexture = commands->textures + textureAt++;
-	}
-
-      glColor4fv(vertex.color.E);
-      glTexCoord2fv(vertex.uv.E);
-      glVertex2fv(vertex.vPos.E);
-    }
-  
-  glEnd();  
-
-  commands->vertexCount = 0;
-  commands->indexCount = 0;
-  */
 #endif
 }

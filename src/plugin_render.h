@@ -1,7 +1,50 @@
 static inline void 
-renderPushQuad(RenderCommands *commands, Rect2 rect, LoadedBitmap *texture, r32 angle, RenderLevel level,
-	       v4 color = V4(1, 1, 1, 1))
+renderPushQuad(RenderCommands *commands, Rect2 rect, LoadedBitmap *texture, r32 angle,
+	       RenderLevel level, v4 color = V4(1, 1, 1, 1))
 {
+#if 1
+  if(!texture)
+    {
+      texture = commands->whiteTexture;
+    }
+
+  R_Batch *batch = 0;
+  for(R_Batch *b = commands->first; b; b = b->next)
+    {
+      // TODO: check if pointers uniquely identify LoadedBitmap textures
+      if(b->texture == texture)
+	{
+	  if(b->quadCount < b->quadCapacity)
+	    {
+	      batch = b;
+	      break;
+	    }
+	}
+    }
+
+  if(!batch)
+    {
+      batch = arenaPushStruct(commands->allocator, R_Batch);
+      batch->quadCapacity = commands->glState->quadCapacity;
+      batch->quadCount = 0;
+      batch->quads = arenaPushArray(commands->allocator, batch->quadCapacity, R_Quad, arenaFlagsZeroNoAlign());
+      batch->texture = texture;
+      QUEUE_PUSH(commands->first, commands->last, batch);
+      ++commands->batchCount;
+    }
+  ASSERT(batch);
+
+  ASSERT(batch->quadCount < batch->quadCapacity);
+  R_Quad *quad = batch->quads + batch->quadCount++;
+  quad->min = rect.min;
+  quad->max = rect.max;
+  quad->color = colorU32FromV4(color);
+  quad->angle = angle;
+  quad->level = (r32)level;
+
+  ++commands->totalQuadCount;
+
+#else
   if(texture)
     {
       ASSERT(commands->texturedQuadCount < commands->texturedQuadCapacity);
@@ -40,6 +83,7 @@ renderPushQuad(RenderCommands *commands, Rect2 rect, LoadedBitmap *texture, r32 
       quad->matrix = transpose(makeRotationMatrixXY(center, angle));
       quad->level = level;
     }
+#endif
 }
 
 static inline void
@@ -61,19 +105,19 @@ renderPushRectOutline(RenderCommands *commands, Rect2 rect, r32 thickness, Rende
   renderPushQuad(commands, rectCenterDim(topMiddle, hDim), 0, 0, level, color);
 }
 
-static inline void
-renderPushTriangle(RenderCommands *commands, TexturedVertex v1, TexturedVertex v2, TexturedVertex v3,
-		   LoadedBitmap *texture = 0)
-{
-  ASSERT(commands->triangleCount < commands->triangleCapacity);
-  TexturedTriangle *triangle = commands->triangles + commands->triangleCount++;
+/* static inline void */
+/* renderPushTriangle(RenderCommands *commands, TexturedVertex v1, TexturedVertex v2, TexturedVertex v3, */
+/* 		   LoadedBitmap *texture = 0) */
+/* { */
+/*   ASSERT(commands->triangleCount < commands->triangleCapacity); */
+/*   TexturedTriangle *triangle = commands->triangles + commands->triangleCount++; */
   
-  triangle->vertices[0] = v1;
-  triangle->vertices[1] = v2;
-  triangle->vertices[2] = v3;
+/*   triangle->vertices[0] = v1; */
+/*   triangle->vertices[1] = v2; */
+/*   triangle->vertices[2] = v3; */
 
-  triangle->texture = texture;
-}
+/*   triangle->texture = texture; */
+/* } */
 
 static inline v2
 renderPushText(RenderCommands *commands, LoadedFont *font, String8 string,
