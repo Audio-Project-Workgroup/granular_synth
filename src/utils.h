@@ -38,6 +38,9 @@
 #define ARRAY_COUNT(arr) (sizeof(arr)/sizeof(arr[0]))
 #define OFFSET_OF(type, member) ((usz)&(((type *)0)->member))
 
+#define INT_FROM_PTR(ptr) (usz)((u8*)(ptr))
+#define PTR_FROM_INT(n) (void*)((usz)(n))
+
 #define IS_MULTIPLE_OF_2(num) (((num) & ((num) - 1)) == (num))
 #define ROUND_UP_TO_MULTIPLE_OF_2(num) (((num) + 1) & (~1))
 #define ALIGN_POW_2(num, alignment) (((num) + ((alignment)-1LL)) & (~((alignment)-1LL)))

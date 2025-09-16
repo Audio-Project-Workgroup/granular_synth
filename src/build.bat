@@ -8,6 +8,7 @@ if %BUILD_DEBUG%==1 (
    set CFLAGS=%CFLAGS% -Z7
 )
 set CFLAGS=%CFLAGS% -I..\src\include
+set CFLAGS=%CFLAGS% -I..\src\include\glad\include
 set CFLAGS=%CFLAGS% -MT -EHa- -GR-
 rem set CFLAGS=-DBUILD_DEBUG=0 -I..\src\include -nologo -Zi -W4 -wd"4201" -wd"4100" -wd"4146" -wd"4310" -wd"4244" -wd"4505" -MT -EHa- -GR-
 set CFLAGS=%CFLAGS% -DBUILD_DEBUG=%BUILD_DEBUG%

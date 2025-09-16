@@ -65,7 +65,7 @@ makeGLShader(const char *source, GLShaderKind kind)
     {
       GLsizei logLength;
       GLchar msg[1024];
-      glGetShaderInfoLog(shader, ARRAY_COUNT(msg), &logLength, message);
+      glGetShaderInfoLog(shader, ARRAY_COUNT(msg), &logLength, msg);
       fprintf(stderr, "shader compilation failed: %s\n", msg);
     }
   
@@ -86,7 +86,7 @@ makeGLprogram(GLuint vs, GLuint fs)
     {
       GLsizei logLength;
       GLchar msg[1024];
-      glGetProgramInfoLog(program, ARRAY_COUNT(msg), &logLength, message);
+      glGetProgramInfoLog(program, ARRAY_COUNT(msg), &logLength, msg);
       fprintf(stderr, "program compilation failed: %s\n", msg);
     }
 
@@ -101,13 +101,13 @@ makeGLState(void)
   GLuint program = (vertexShader, fragmentShader);
   glUseProgram(program);
   
-  GLuint vPatternPosition = glGetAttribLocation("v_pattern");
-  GLuint vMinMaxPosition  = glGetAttribLocation("v_min_max");
-  GLuint vColorPosition   = glGetAttribLocation("v_color");
-  GLuint vAnglePosition   = glGetAttribLocation("v_angle");
-  GLuint vLevelPosition   = glGetAttribLocation("v_level");
+  GLuint vPatternPosition = glGetAttribLocation(program, "v_pattern");
+  GLuint vMinMaxPosition  = glGetAttribLocation(program, "v_min_max");
+  GLuint vColorPosition   = glGetAttribLocation(program, "v_color");
+  GLuint vAnglePosition   = glGetAttribLocation(program, "v_angle");
+  GLuint vLevelPosition   = glGetAttribLocation(program, "v_level");
 
-  GLuint transformPosition = glGetUniformLocation("transform");
+  GLuint transformPosition = glGetUniformLocation(program, "transform");
 
   GLuint vao;
   glGenVertexArrays(1, &vao);
@@ -146,6 +146,7 @@ makeGLState(void)
   return(result);
 }
 
+#if 0
 static inline void
 renderTexturedVertex(TexturedVertex v)
 {  
@@ -162,6 +163,7 @@ renderVertex(Vertex v)
   glColor4ubv((const GLubyte *)&v.color);
   glVertex2fv(v.vPos.E);
 }
+#endif
 
 static void
 renderBindTexture(LoadedBitmap *texture, bool generateNewTextures)
@@ -176,13 +178,13 @@ renderBindTexture(LoadedBitmap *texture, bool generateNewTextures)
       glBindTexture(GL_TEXTURE_2D, texture->glHandle);
       glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
 		   texture->width, texture->height, 0,
-		   GL_BGRA_EXT, GL_UNSIGNED_BYTE, texture->pixels);
+		   GL_BGRA, GL_UNSIGNED_BYTE, texture->pixels);
 	      
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
-      glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);	      
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+      //glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
     }
 }
 
@@ -249,25 +251,29 @@ renderCommands(RenderCommands *commands)
 
   glEnableVertexAttribArray(commands->glState->vMinMaxPosition);
   glVertexAttribDivisor(commands->glState->vMinMaxPosition, 1);
-  glVertexAttribPointer(commands->glState->vMinMaxPosition, 4, GL_FLOAT, 0, sizeof(R_Quad), 32);
+  glVertexAttribPointer(commands->glState->vMinMaxPosition, 4, GL_FLOAT, 0, sizeof(R_Quad),
+			PTR_FROM_INT(32 + OFFSET_OF(R_Quad, min)));
 
   glEnableVertexAttribArray(commands->glState->vColorPosition);
-  glVertexAttribPointer(commands->glState->vColorPosition, 1);
-  glVertexAttribPointer(commands->glState->vColorPosition, 4, GL_UNSIGNED_BYTE, 0, sizeof(R_Quad), 32 + 16);
+  glVertexAttribDivisor(commands->glState->vColorPosition, 1);
+  glVertexAttribPointer(commands->glState->vColorPosition, 4, GL_UNSIGNED_BYTE, 0, sizeof(R_Quad),
+			PTR_FROM_INT(32 + OFFSET_OF(R_Quad, color)));
 
   glEnableVertexAttribArray(commands->glState->vAnglePosition);
-  glVertexAttribPointer(commands->glState->vAnglePosition, 1);
-  glVertexAttribPointer(commands->glState->vAnglePosition, 1, GL_FLOAT, 0, sizeof(R_Quad), 32 + 16 + 4);
+  glVertexAttribDivisor(commands->glState->vAnglePosition, 1);
+  glVertexAttribPointer(commands->glState->vAnglePosition, 1, GL_FLOAT, 0, sizeof(R_Quad),
+			PTR_FROM_INT(32 + OFFSET_OF(R_Quad, angle)));
 
   glEnableVertexAttribArray(commands->glState->vLevelPosition);
-  glVertexAttribPointer(commands->glState->vLevelPosition, 1);
-  glVertexAttribPointer(commands->glState->vLevelPosition, 1, GL_FLOAT, 0, sizeof(R_Quad), 32 + 16 + 4 + 4);
+  glVertexAttribDivisor(commands->glState->vLevelPosition, 1);
+  glVertexAttribPointer(commands->glState->vLevelPosition, 1, GL_FLOAT, 0, sizeof(R_Quad),
+			PTR_FROM_INT(32 + OFFSET_OF(R_Quad, level)));
 
   for(R_Batch *batch = commands->first; batch; batch = batch->next)
     {
       renderBindTexture(batch->texture, commands->generateNewTextures);
       glBufferSubData(GL_ARRAY_BUFFER, commands->glState->quadDataOffset, batch->quadCount*sizeof(R_Quad), batch->quads);
-      glDrawArraysInstanced(GL_TRINAGLE_STRIP, 0, 4, batch->quadCount);
+      glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, batch->quadCount);
     }
 
 #else

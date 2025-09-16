@@ -26,9 +26,11 @@ r32 gs_sinf(r32 num)		{ return(sinf(num)); }
 r32 gs_cosf(r32 num)		{ return(cosf(num)); }
 r32 gs_powf(r32 base, r32 exp)	{ return(powf(base, exp)); }
 
+#include <glad/glad.h>
 #if OS_MAC || OS_LINUX
 #include <GL/glew.h>
 #endif
+#define GLFW_INCLUDE_GLEXT
 #include <GLFW/glfw3.h>
 
 #define GL_PRINT_ERROR(msg, ...) do {		\
@@ -39,6 +41,8 @@ r32 gs_powf(r32 base, r32 exp)	{ return(powf(base, exp)); }
   } while(0)
 
 #include "miniaudio.h"
+
+#include <glad/src/glad.c>
 
 #include "render.cpp"
 //#include "onnx.cpp"
@@ -522,7 +526,7 @@ main(int argc, char **argv)
 
 #if BUILD_DEBUG
   String8 glfwPath = platformGetPathToModule(0, (void *)glfwCreateWindow, &stringArena);
-  String8 openGLPath = platformGetPathToModule(0, (void *)glBegin, &stringArena);
+  String8 openGLPath = platformGetPathToModule(0, (void *)glTexImage2D, &stringArena);
   printf("glfw module source: %.*s\n", (int)glfwPath.size, glfwPath.str);
   printf("opengl module source: %.*s\n", (int)openGLPath.size, openGLPath.str);
 #endif
@@ -567,6 +571,8 @@ main(int argc, char **argv)
 	  glfwSetKeyCallback(window, glfwKeyCallback);
 	  glfwSetMouseButtonCallback(window, glfwMouseButtonCallback);
 	  glfwMakeContextCurrent(window);
+
+	  gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
 
 	  glfwSwapInterval(1);
 	  
