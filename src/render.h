@@ -70,13 +70,15 @@ struct TexturedTriangle
 
 struct GLState
 {
-  u32 vPatternPosition;
+  u32 patternPosition;
   u32 vMinMaxPosition;
+  u32 vUVMinMaxPosition;
   u32 vColorPosition;
   u32 vAnglePosition;
   u32 vLevelPosition;
 
   u32 transformPosition;
+  u32 samplerPosition;
 
   u32 vao;
   u32 vbo;
@@ -93,6 +95,9 @@ struct R_Quad
 {
   v2 min;
   v2 max;
+
+  v2 uvMin;
+  v2 uvMax;
 
   u32 color;
   r32 angle;
@@ -140,6 +145,8 @@ struct RenderCommands
   u32 batchCount;
   u32 totalQuadCount;
 
+  R_Batch *batchFreelist;
+
   LoadedBitmap *whiteTexture;
 
   /* u32 texturedQuadCount; */
@@ -159,9 +166,14 @@ struct RenderCommands
 };
 
 static inline void
-renderBeginCommands(RenderCommands *commands, Arena *perFrameAllocator)
-{  
-  commands->allocator = perFrameAllocator;
+renderBeginCommands(RenderCommands *commands, u32 widthInPixels, u32 heightInPixels)
+		    //Arena *perFrameAllocator)
+{
+  commands->windowResized = (commands->widthInPixels != widthInPixels ||
+			     commands->heightInPixels != heightInPixels);
+  commands->widthInPixels = widthInPixels;
+  commands->heightInPixels = heightInPixels;
+  //commands->allocator = perFrameAllocator;
 
   commands->cursorState = CursorState_default;
   
@@ -184,10 +196,10 @@ renderBeginCommands(RenderCommands *commands, Arena *perFrameAllocator)
 static inline void
 renderEndCommands(RenderCommands *commands)
 {
-  arenaEnd(commands->allocator);
-  commands->allocator = 0;
+  //arenaEnd(commands->allocator);
+  //commands->allocator = 0;
 
-  commands->cursorState = CursorState_default;
+  //commands->cursorState = CursorState_default;
   
   /* commands->quadCount = 0; */
   /* commands->quadCapacity = 0; */
@@ -201,6 +213,7 @@ renderEndCommands(RenderCommands *commands)
   /* commands->triangleCapacity = 0; */
   /* commands->triangles = 0; */
 
+  commands->batchFreelist = commands->first;
   commands->first = 0;
   commands->last = 0;
   commands->batchCount = 0;

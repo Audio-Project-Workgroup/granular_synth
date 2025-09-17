@@ -332,7 +332,7 @@ RENDER_NEW_FRAME(renderNewFrame)
   PluginState *pluginState = initializePluginState(memory);
   if(pluginState)
     {      
-      renderBeginCommands(renderCommands, &pluginState->frameArena);
+      //renderBeginCommands(renderCommands, &pluginState->frameArena);
      
       logFormatString("mouseP: (%.2f, %.2f)", input->mouseState.position.x, input->mouseState.position.y);
       logFormatString("mouseLeft: %s, %s",

@@ -24,10 +24,19 @@ renderPushQuad(RenderCommands *commands, Rect2 rect, LoadedBitmap *texture, r32 
 
   if(!batch)
     {
-      batch = arenaPushStruct(commands->allocator, R_Batch);
-      batch->quadCapacity = commands->glState->quadCapacity;
+      if(commands->batchFreelist)
+	{
+	  batch = commands->batchFreelist;
+	  STACK_POP(commands->batchFreelist);
+	}
+      else
+	{
+	  batch = arenaPushStruct(commands->allocator, R_Batch);
+	  batch->quadCapacity = commands->glState->quadCapacity;
+	  batch->quads = arenaPushArray(commands->allocator, batch->quadCapacity, R_Quad,
+					arenaFlagsZeroNoAlign());
+	}
       batch->quadCount = 0;
-      batch->quads = arenaPushArray(commands->allocator, batch->quadCapacity, R_Quad, arenaFlagsZeroNoAlign());
       batch->texture = texture;
       QUEUE_PUSH(commands->first, commands->last, batch);
       ++commands->batchCount;
@@ -38,6 +47,8 @@ renderPushQuad(RenderCommands *commands, Rect2 rect, LoadedBitmap *texture, r32 
   R_Quad *quad = batch->quads + batch->quadCount++;
   quad->min = rect.min;
   quad->max = rect.max;
+  quad->uvMin = V2(0, 0);
+  quad->uvMax = V2(1, 1);
   quad->color = colorU32FromV4(color);
   quad->angle = angle;
   quad->level = (r32)level;

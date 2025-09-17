@@ -505,6 +505,27 @@ loadBitmap(Arena *destAllocator, Arena *loadAllocator, String8 filename)
   return(result);
 }
 
+static inline LoadedBitmap
+makeBitmap(Arena *allocator, s32 width, s32 height, u32 color)
+{
+  LoadedBitmap result = {};
+  result.width = width;
+  result.height = height;
+  result.stride = width*sizeof(u32);
+  result.pixels = arenaPushArray(allocator, width*height, u32);
+
+  u32 *dest = result.pixels;
+  for(s32 y = 0; y < height; ++y)
+    {      
+      for(s32 x = 0; x < width; ++x)
+	{
+	  *dest++ = color;
+	}
+    }
+
+  return(result);
+}
+
 int
 main(int argc, char **argv)
 {
@@ -625,7 +646,16 @@ main(int argc, char **argv)
 	  pluginMemory.logger = &logger;
 #endif
 
-	  RenderCommands commands = {};	  
+	  usz renderMemorySize = MEGABYTES(64);
+	  void *renderMemory = calloc(renderMemorySize, 1);
+	  Arena renderArena = arenaBegin(renderMemory, renderMemorySize);
+	    
+	  GLState glState = makeGLState();
+	  LoadedBitmap whiteTexture = makeBitmap(&renderArena, 16, 16, 0xFFFFFFFF);
+	  RenderCommands commands = {};
+	  commands.allocator = &renderArena;
+	  commands.glState = &glState;
+	  commands.whiteTexture = &whiteTexture;	  
 
 	  // plugin setup
 	  
@@ -861,11 +891,12 @@ main(int argc, char **argv)
 				      viewportDim.x = viewportDim.y*targetAspectRatio;
 				      viewportMin = V2(((r32)framebufferWidth - viewportDim.x)*0.5f, 0);
 				    }
-		      		          
-				  commands.windowResized = (commands.widthInPixels != (u32)viewportDim.x ||
-							    commands.heightInPixels != (u32)viewportDim.y);
-				  commands.widthInPixels = (u32)viewportDim.x;
-				  commands.heightInPixels = (u32)viewportDim.y;
+
+				  renderBeginCommands(&commands, (u32)viewportDim.x, (u32)viewportDim.y);
+				  // commands.windowResized = (commands.widthInPixels != (u32)viewportDim.x ||
+				  // 			    commands.heightInPixels != (u32)viewportDim.y);
+				  // commands.widthInPixels = (u32)viewportDim.x;
+				  // commands.heightInPixels = (u32)viewportDim.y;
 			  
 				  glViewport((GLint)viewportMin.x, (GLint)viewportMin.y,
 					     (GLsizei)viewportDim.x, (GLsizei)viewportDim.y);

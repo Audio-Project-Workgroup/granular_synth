@@ -18,8 +18,9 @@ static GLenum shaderKinds[GLShaderKind_COUNT] =
 static char vertexShaderSource[] = R"VSRC(
 #version 330
  
-in vec2 v_pattern;
+in vec4 pattern;
 in vec4 v_min_max;
+in vec4 v_uv_min_max;
 in vec4 v_color;
 in float v_angle;
 in float v_level;
@@ -27,10 +28,17 @@ in float v_level;
 uniform mat4 transform;
 
 out vec4 f_color;
+out vec2 f_uv;
 
 void main() {
+  vec2 v_pattern = pattern.xy;
+  vec2 uv_pattern = pattern.zw;
+
   vec2 center = (v_min_max.zw + v_min_max.xy)*0.5;
   vec2 half_dim = (v_min_max.zw - v_min_max.xy)*0.5;
+
+  vec2 uv_center = (v_uv_min_max.zw + v_uv_min_max.xy)*0.5;
+  vec2 uv_half_dim = (v_uv_min_max.zw - v_uv_min_max.xy)*0.5;
 
   float cosa = cos(v_angle);
   float sina = sin(v_angle);
@@ -39,6 +47,7 @@ void main() {
   vec2 pos = center + half_dim*rot_pattern;
   gl_Position = transform * vec4(pos, v_level, 1.0);
   f_color = v_color;
+  f_uv = uv_center + uv_half_dim*uv_pattern;
 }
 )VSRC";
 
@@ -46,9 +55,15 @@ static char fragmentShaderSource[] = R"FSRC(
 #version 330
 
 in vec4 f_color;
+in vec2 f_uv;
+
+uniform sampler2D atlas;
+
+out vec4 out_color;
 
 void main() {
-  gl_FragColor = f_color;
+  vec4 sampled = texture(atlas, f_uv);
+  out_color = f_color * sampled;
 }
 )FSRC";
 
@@ -67,13 +82,14 @@ makeGLShader(const char *source, GLShaderKind kind)
       GLchar msg[1024];
       glGetShaderInfoLog(shader, ARRAY_COUNT(msg), &logLength, msg);
       fprintf(stderr, "shader compilation failed: %s\n", msg);
+      ASSERT(!"failed");
     }
   
   return(shader);
 }
 
 static inline GLuint
-makeGLprogram(GLuint vs, GLuint fs)
+makeGLProgram(GLuint vs, GLuint fs)
 {
   GLuint program = glCreateProgram();
   glAttachShader(program, vs);
@@ -88,6 +104,7 @@ makeGLprogram(GLuint vs, GLuint fs)
       GLchar msg[1024];
       glGetProgramInfoLog(program, ARRAY_COUNT(msg), &logLength, msg);
       fprintf(stderr, "program compilation failed: %s\n", msg);
+      ASSERT(!"failed");
     }
 
   return(program);
@@ -98,16 +115,19 @@ makeGLState(void)
 {
   GLuint vertexShader = makeGLShader(vertexShaderSource, GLShaderKind_vertex);
   GLuint fragmentShader = makeGLShader(fragmentShaderSource, GLShaderKind_fragment);
-  GLuint program = (vertexShader, fragmentShader);
+  GLuint program = makeGLProgram(vertexShader, fragmentShader);
   glUseProgram(program);
   
-  GLuint vPatternPosition = glGetAttribLocation(program, "v_pattern");
-  GLuint vMinMaxPosition  = glGetAttribLocation(program, "v_min_max");
-  GLuint vColorPosition   = glGetAttribLocation(program, "v_color");
-  GLuint vAnglePosition   = glGetAttribLocation(program, "v_angle");
-  GLuint vLevelPosition   = glGetAttribLocation(program, "v_level");
+  GLuint patternPosition   = glGetAttribLocation(program, "pattern");
+  GLuint vMinMaxPosition   = glGetAttribLocation(program, "v_min_max");
+  GLuint vUVMinMaxPosition = glGetAttribLocation(program, "v_uv_min_max");
+  GLuint vColorPosition    = glGetAttribLocation(program, "v_color");
+  GLuint vAnglePosition    = glGetAttribLocation(program, "v_angle");
+  GLuint vLevelPosition    = glGetAttribLocation(program, "v_level");
 
   GLuint transformPosition = glGetUniformLocation(program, "transform");
+  GLuint samplerPosition   = glGetUniformLocation(program, "atlas");
+  glUniform1i(samplerPosition, 0);
 
   GLuint vao;
   glGenVertexArrays(1, &vao);
@@ -120,21 +140,23 @@ makeGLState(void)
   GLsizei bufferDataSize = KILOBYTES(32);
   glBufferData(GL_ARRAY_BUFFER, bufferDataSize, 0, GL_STREAM_DRAW);
   r32 patternData[] = {
-    -1.f, -1.f,
-    1.f, -1.f,
-    -1.f, 1.f,
-    1.f, 1.f,
+    -1.f, -1.f,  0.f, 0.f,
+     1.f, -1.f,  1.f, 0.f,
+    -1.f,  1.f,  0.f, 1.f,
+     1.f,  1.f,  1.f, 1.f,
   };
   u32 patternDataSize = sizeof(patternData);
   glBufferSubData(GL_ARRAY_BUFFER, 0, patternDataSize, patternData);
 
   GLState result = {};
-  result.vPatternPosition = vPatternPosition;
-  result.vMinMaxPosition  = vMinMaxPosition;
-  result.vColorPosition   = vColorPosition;
-  result.vAnglePosition   = vAnglePosition;
-  result.vLevelPosition   = vLevelPosition;
+  result.patternPosition   = patternPosition;
+  result.vMinMaxPosition   = vMinMaxPosition;
+  result.vUVMinMaxPosition = vUVMinMaxPosition;
+  result.vColorPosition    = vColorPosition;
+  result.vAnglePosition    = vAnglePosition;
+  result.vLevelPosition    = vLevelPosition;
   result.transformPosition = transformPosition;
+  result.samplerPosition   = samplerPosition;
   result.vao = vao;
   result.vbo = vbo;
   result.vertexShader = vertexShader;
@@ -245,32 +267,41 @@ renderCommands(RenderCommands *commands)
 {
 #if 1
 
-  glEnableVertexAttribArray(commands->glState->vPatternPosition);
-  glVertexAttribDivisor(commands->glState->vPatternPosition, 0);
-  glVertexAttribPointer(commands->glState->vPatternPosition, 2, GL_FLOAT, 0, 0, 0);
+  glEnableVertexAttribArray(commands->glState->patternPosition);
+  glVertexAttribDivisor(commands->glState->patternPosition, 0);
+  glVertexAttribPointer(commands->glState->patternPosition, 4, GL_FLOAT, 0, 0, 0);
 
   glEnableVertexAttribArray(commands->glState->vMinMaxPosition);
   glVertexAttribDivisor(commands->glState->vMinMaxPosition, 1);
   glVertexAttribPointer(commands->glState->vMinMaxPosition, 4, GL_FLOAT, 0, sizeof(R_Quad),
-			PTR_FROM_INT(32 + OFFSET_OF(R_Quad, min)));
+			PTR_FROM_INT(commands->glState->quadDataOffset + OFFSET_OF(R_Quad, min)));
+
+  glEnableVertexAttribArray(commands->glState->vUVMinMaxPosition);
+  glVertexAttribDivisor(commands->glState->vUVMinMaxPosition, 1);
+  glVertexAttribPointer(commands->glState->vUVMinMaxPosition, 4, GL_FLOAT, 0, sizeof(R_Quad),
+			PTR_FROM_INT(commands->glState->quadDataOffset + OFFSET_OF(R_Quad, uvMin)));
 
   glEnableVertexAttribArray(commands->glState->vColorPosition);
   glVertexAttribDivisor(commands->glState->vColorPosition, 1);
   glVertexAttribPointer(commands->glState->vColorPosition, 4, GL_UNSIGNED_BYTE, 0, sizeof(R_Quad),
-			PTR_FROM_INT(32 + OFFSET_OF(R_Quad, color)));
+			PTR_FROM_INT(commands->glState->quadDataOffset + OFFSET_OF(R_Quad, color)));
 
   glEnableVertexAttribArray(commands->glState->vAnglePosition);
   glVertexAttribDivisor(commands->glState->vAnglePosition, 1);
   glVertexAttribPointer(commands->glState->vAnglePosition, 1, GL_FLOAT, 0, sizeof(R_Quad),
-			PTR_FROM_INT(32 + OFFSET_OF(R_Quad, angle)));
+			PTR_FROM_INT(commands->glState->quadDataOffset + OFFSET_OF(R_Quad, angle)));
 
   glEnableVertexAttribArray(commands->glState->vLevelPosition);
   glVertexAttribDivisor(commands->glState->vLevelPosition, 1);
   glVertexAttribPointer(commands->glState->vLevelPosition, 1, GL_FLOAT, 0, sizeof(R_Quad),
-			PTR_FROM_INT(32 + OFFSET_OF(R_Quad, level)));
+			PTR_FROM_INT(commands->glState->quadDataOffset + OFFSET_OF(R_Quad, level)));
+
+  mat4 transform = transpose(makeProjectionMatrix(commands->widthInPixels, commands->heightInPixels));
+  glUniformMatrix4fv(commands->glState->transformPosition, 1, 0, (GLfloat*)transform.E);
 
   for(R_Batch *batch = commands->first; batch; batch = batch->next)
     {
+      glActiveTexture(GL_TEXTURE0);
       renderBindTexture(batch->texture, commands->generateNewTextures);
       glBufferSubData(GL_ARRAY_BUFFER, commands->glState->quadDataOffset, batch->quadCount*sizeof(R_Quad), batch->quads);
       glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, batch->quadCount);
