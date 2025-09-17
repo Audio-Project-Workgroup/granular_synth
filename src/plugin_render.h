@@ -1,6 +1,6 @@
 static inline void 
 renderPushQuad(RenderCommands *commands, Rect2 rect, LoadedBitmap *texture, r32 angle,
-	       RenderLevel level, v4 color = V4(1, 1, 1, 1))
+	       r32 level, v4 color = V4(1, 1, 1, 1))
 {
 #if 1
   if(!texture)
@@ -98,7 +98,7 @@ renderPushQuad(RenderCommands *commands, Rect2 rect, LoadedBitmap *texture, r32 
 }
 
 static inline void
-renderPushRectOutline(RenderCommands *commands, Rect2 rect, r32 thickness, RenderLevel level,
+renderPushRectOutline(RenderCommands *commands, Rect2 rect, r32 thickness, r32 level,
 		      v4 color = V4(1, 1, 1, 1))
 { 
   v2 rectDim = getDim(rect);
@@ -159,7 +159,8 @@ renderPushText(RenderCommands *commands, LoadedFont *font, String8 string,
       if(i >= 2)
 	{
 	  GlyphPushData glyphPushData = pastGlyphs[2];
-	  renderPushQuad(commands, glyphPushData.rect, glyphPushData.glyph, 0, RenderLevel_front, color);
+	  renderPushQuad(commands, glyphPushData.rect, glyphPushData.glyph, 0,
+			 RENDER_LEVEL(text), color);
 	}
 
       //pastGlyphs[3] = pastGlyphs[2];
@@ -182,11 +183,11 @@ renderPushText(RenderCommands *commands, LoadedFont *font, String8 string,
   if(!overflow)
     {
       GlyphPushData glyphPushData = pastGlyphs[2];
-      renderPushQuad(commands, glyphPushData.rect, glyphPushData.glyph, 0, RenderLevel_front, color);
+      renderPushQuad(commands, glyphPushData.rect, glyphPushData.glyph, 0, RENDER_LEVEL(text), color);
       glyphPushData = pastGlyphs[1];
-      renderPushQuad(commands, glyphPushData.rect, glyphPushData.glyph, 0, RenderLevel_front, color);
+      renderPushQuad(commands, glyphPushData.rect, glyphPushData.glyph, 0, RENDER_LEVEL(text), color);
       glyphPushData = pastGlyphs[0];
-      renderPushQuad(commands, glyphPushData.rect, glyphPushData.glyph, 0, RenderLevel_front, color);
+      renderPushQuad(commands, glyphPushData.rect, glyphPushData.glyph, 0, RENDER_LEVEL(text), color);
     }
   else
     {
@@ -197,7 +198,7 @@ renderPushText(RenderCommands *commands, LoadedFont *font, String8 string,
       for(u32 i = 0; i < 3; ++i)
 	{
 	  Rect2 glyphRect = rectMinDim(atPos, scaledGlyphDim);
-	  renderPushQuad(commands, glyphRect, glyph, 0, RenderLevel_front, color);
+	  renderPushQuad(commands, glyphRect, glyph, 0, RENDER_LEVEL(text), color);
 	  atPos.x += hAdvance;
 	}
     }
@@ -234,18 +235,20 @@ renderPushUIElement(RenderCommands *commands, UIElement *element)
       v4 color = elementIsSelected ? V4(1, 0.5f, 0, 1) : V4(0, 0, 0, 1);
       Rect2 border = rectAddRadius(element->region, V2(1, 1));
       
-      renderPushRectOutline(commands, border, 2.f, RenderLevel_front, color);
+      renderPushRectOutline(commands, border, 2.f, RENDER_LEVEL(front), color);
     }
   if(element->flags & UIElementFlag_drawBackground)
     {
-      renderPushQuad(commands, element->region, element->texture, 0, RenderLevel_background, element->color);
+      renderPushQuad(commands, element->region, element->texture, 0,
+		     RENDER_LEVEL(background), element->color);
     }  
   if(element->flags & UIElementFlag_draggable)
     {            
       v2 travelDim = V2(elementRegionDim.x, elementRegionDim.y);
       Rect2 travelRect = rectCenterDim(elementRegionCenter, travelDim);
       
-      renderPushQuad(commands, travelRect, element->texture, 0, RenderLevel_front, element->color);
+      renderPushQuad(commands, travelRect, element->texture, 0,
+		     RENDER_LEVEL(control), element->color);
 
       if(element->parameterType == UIParameter_float)
 	{
@@ -259,7 +262,8 @@ renderPushUIElement(RenderCommands *commands, UIElement *element)
 	  Rect2 faderRect = rectCenterDim(faderCenter, V2(elementRegionDim.x, elementRegionDim.y));
 
 	  //renderPushRectOutline(commands, faderRect, 2.f, RenderLevel_front, V4(0, 0, 0, 1));
-	  renderPushQuad(commands, faderRect, element->secondaryTexture, 0, RenderLevel_front, element->color);
+	  renderPushQuad(commands, faderRect, element->secondaryTexture, 0,
+			 RENDER_LEVEL(control), element->color);
 	}
     }
   if(element->flags & UIElementFlag_turnable)
@@ -275,7 +279,8 @@ renderPushUIElement(RenderCommands *commands, UIElement *element)
 	      //r32 paramAngle = -paramPercentage*M_PI;
 
 	      renderPushQuad(commands,
-			     element->region, element->texture, paramAngle, RenderLevel_front, element->color);
+			     element->region, element->texture, paramAngle,
+			     RENDER_LEVEL(control), element->color);
 	    }
 	}
     }
@@ -298,7 +303,8 @@ renderPushUIElement(RenderCommands *commands, UIElement *element)
 	  v2 labelDim = hadamard(element->labelDim, elementRegionDim);
 	  Rect2 labelRegion = rectMinDim(labelOffset + element->region.min, labelDim);
 	  //renderPushRectOutline(commands, labelRegion, 2.f, RenderLevel_front, V4(0, 0, 0, 1));
-	  renderPushQuad(commands, labelRegion, element->labelTexture, 0, RenderLevel_front, V4(1, 1, 1, 1));
+	  renderPushQuad(commands, labelRegion, element->labelTexture, 0,
+			 RENDER_LEVEL(label), V4(1, 1, 1, 1));
 	}
       //renderPushRectOutline(commands, textRegion, 2.f, RenderLevel_front, V4(0, 0, 0, 1));
       renderPushText(commands, layout->context->font, element->name,

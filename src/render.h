@@ -34,13 +34,28 @@ makeVertex(v2 vPos, v4 color)
   return(result);
 }
 
+// enum RenderLevel
+// {
+//   RenderLevel_background,
+//   //RenderLevel_boxBackground,
+//   RenderLevel_control,
+  
+//   RenderLevel_front,
+// };
+#define RENDER_LEVEL(l) ((r32)(RenderLevel_##l)/(r32)RenderLevel_COUNT)
 enum RenderLevel
 {
-  RenderLevel_background,
-  //RenderLevel_boxBackground,
-  RenderLevel_control,
-  
   RenderLevel_front,
+
+  RenderLevel_text,
+  RenderLevel_label,
+  RenderLevel_control,
+
+  RenderLevel_grainViewBackground,
+
+  //RenderLevel_boxBackground,
+  RenderLevel_background,
+  RenderLevel_COUNT,
 };
 
 struct Quad

@@ -40,6 +40,8 @@ r32 gs_powf(r32 base, r32 exp)	{ return(powf(base, exp)); }
     }						\
   } while(0)
 
+#define GL_CATCH_ERROR() do { GLenum err = glGetError(); if(err != GL_NO_ERROR) ASSERT(0); } while(0)
+
 #include "miniaudio.h"
 
 #include <glad/src/glad.c>
@@ -554,10 +556,10 @@ main(int argc, char **argv)
   
   if(glfwInit())
     {
-      //glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-      //glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-      //glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
-      //glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+      glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+      glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+      glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+      glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
       GLFWwindow *window = glfwCreateWindow(640, 480, "granade", NULL, NULL);
       if(window)	
@@ -595,16 +597,7 @@ main(int argc, char **argv)
 
 	  gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
 
-	  glfwSwapInterval(1);
-	  
-	  glEnable(GL_TEXTURE_2D);
-	  GL_PRINT_ERROR("GL ERROR %u: enable texture 2D failed at startup\n");
-	  
-	  glEnable(GL_BLEND);
-	  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	  GL_PRINT_ERROR("GL ERROR %u: enable alpha blending failed at startup\n");
-
-	  glEnable(GL_SCISSOR_TEST);
+	  glfwSwapInterval(1);	  
 	  
 	  // memory/grahics setup
 
@@ -868,11 +861,18 @@ main(int argc, char **argv)
 
 				  // render new frame			  
 
+				  GL_CATCH_ERROR();
+
 				  glViewport(0, 0, framebufferWidth, framebufferHeight);
 				  glScissor(0, 0, framebufferWidth, framebufferHeight);
+				  
+				  GL_CATCH_ERROR();
 
 				  glClearColor(0.2f, 0.2f, 0.2f, 0.f);
-				  glClear(GL_COLOR_BUFFER_BIT);		      
+				  glClearDepth(1);
+				  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+				  GL_CATCH_ERROR();
 
 				  r32 targetAspectRatio = 16.f/9.f;
 				  r32 windowAspectRatio = (r32)framebufferWidth/(r32)framebufferHeight;
@@ -903,6 +903,7 @@ main(int argc, char **argv)
 				  glScissor((GLint)viewportMin.x, (GLint)viewportMin.y,
 					    (GLsizei)viewportDim.x, (GLsizei)viewportDim.y);
 
+				  GL_CATCH_ERROR();
 				  GL_PRINT_ERROR("GL ERROR: %u at frame start\n");
 
 				  double mouseX, mouseY;
@@ -915,6 +916,7 @@ main(int argc, char **argv)
 				      plugin.renderNewFrame(&pluginMemory, oldInput, &commands);
 				      glfwSetCursorState(window, commands.cursorState);				      
 				      renderCommands(&commands);
+				      GL_CATCH_ERROR();
 #if BUILD_DEBUG
 				      for(String8Node *node = pluginMemory.logger->log.first; node; node = node->next)
 					{

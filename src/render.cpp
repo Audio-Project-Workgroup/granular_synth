@@ -37,8 +37,8 @@ void main() {
   vec2 center = (v_min_max.zw + v_min_max.xy)*0.5;
   vec2 half_dim = (v_min_max.zw - v_min_max.xy)*0.5;
 
-  vec2 uv_center = (v_uv_min_max.zw + v_uv_min_max.xy)*0.5;
-  vec2 uv_half_dim = (v_uv_min_max.zw - v_uv_min_max.xy)*0.5;
+  vec2 uv_min = v_uv_min_max.xy;
+  vec2 uv_dim = v_uv_min_max.zw - v_uv_min_max.xy;
 
   float cosa = cos(v_angle);
   float sina = sin(v_angle);
@@ -47,7 +47,7 @@ void main() {
   vec2 pos = center + half_dim*rot_pattern;
   gl_Position = transform * vec4(pos, v_level, 1.0);
   f_color = v_color;
-  f_uv = uv_center + uv_half_dim*uv_pattern;
+  f_uv = uv_min + uv_dim*uv_pattern;
 }
 )VSRC";
 
@@ -148,6 +148,23 @@ makeGLState(void)
   u32 patternDataSize = sizeof(patternData);
   glBufferSubData(GL_ARRAY_BUFFER, 0, patternDataSize, patternData);
 
+  GL_CATCH_ERROR();
+	  
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  
+  GL_CATCH_ERROR();
+  //GL_PRINT_ERROR("GL ERROR %u: enable alpha blending failed at startup\n");
+
+  glEnable(GL_DEPTH_TEST);
+  glDepthFunc(GL_LEQUAL);
+
+  GL_CATCH_ERROR();
+
+  glEnable(GL_SCISSOR_TEST);
+
+  GL_CATCH_ERROR();
+
   GLState result = {};
   result.patternPosition   = patternPosition;
   result.vMinMaxPosition   = vMinMaxPosition;
@@ -163,7 +180,7 @@ makeGLState(void)
   result.fragmentShader = fragmentShader;
   result.program = program;
   result.quadDataOffset = patternDataSize;
-  result.quadCapacity = bufferDataSize / sizeof(R_Quad);
+  result.quadCapacity = (bufferDataSize - patternDataSize) / sizeof(R_Quad);
   
   return(result);
 }
@@ -193,21 +210,22 @@ renderBindTexture(LoadedBitmap *texture, bool generateNewTextures)
   if(texture->glHandle && !generateNewTextures)
     {
       glBindTexture(GL_TEXTURE_2D, texture->glHandle);
+      GL_CATCH_ERROR();
     }
   else
     {
       glGenTextures(1, &texture->glHandle);
-      glBindTexture(GL_TEXTURE_2D, texture->glHandle);
+      glBindTexture(GL_TEXTURE_2D, texture->glHandle);      
       glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
 		   texture->width, texture->height, 0,
 		   GL_BGRA, GL_UNSIGNED_BYTE, texture->pixels);
-	      
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-      //glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+      GL_CATCH_ERROR();
     }
+    
 }
 
 static void
@@ -267,6 +285,8 @@ renderCommands(RenderCommands *commands)
 {
 #if 1
 
+  GL_CATCH_ERROR();
+
   glEnableVertexAttribArray(commands->glState->patternPosition);
   glVertexAttribDivisor(commands->glState->patternPosition, 0);
   glVertexAttribPointer(commands->glState->patternPosition, 4, GL_FLOAT, 0, 0, 0);
@@ -283,7 +303,7 @@ renderCommands(RenderCommands *commands)
 
   glEnableVertexAttribArray(commands->glState->vColorPosition);
   glVertexAttribDivisor(commands->glState->vColorPosition, 1);
-  glVertexAttribPointer(commands->glState->vColorPosition, 4, GL_UNSIGNED_BYTE, 0, sizeof(R_Quad),
+  glVertexAttribPointer(commands->glState->vColorPosition, 4, GL_UNSIGNED_BYTE, 1, sizeof(R_Quad),
 			PTR_FROM_INT(commands->glState->quadDataOffset + OFFSET_OF(R_Quad, color)));
 
   glEnableVertexAttribArray(commands->glState->vAnglePosition);
@@ -296,15 +316,29 @@ renderCommands(RenderCommands *commands)
   glVertexAttribPointer(commands->glState->vLevelPosition, 1, GL_FLOAT, 0, sizeof(R_Quad),
 			PTR_FROM_INT(commands->glState->quadDataOffset + OFFSET_OF(R_Quad, level)));
 
+  GL_CATCH_ERROR();
+
   mat4 transform = transpose(makeProjectionMatrix(commands->widthInPixels, commands->heightInPixels));
   glUniformMatrix4fv(commands->glState->transformPosition, 1, 0, (GLfloat*)transform.E);
+
+  GL_CATCH_ERROR();
 
   for(R_Batch *batch = commands->first; batch; batch = batch->next)
     {
       glActiveTexture(GL_TEXTURE0);
+      
+      GL_CATCH_ERROR();
+      
       renderBindTexture(batch->texture, commands->generateNewTextures);
-      glBufferSubData(GL_ARRAY_BUFFER, commands->glState->quadDataOffset, batch->quadCount*sizeof(R_Quad), batch->quads);
+      
+      glBufferSubData(GL_ARRAY_BUFFER,
+		      commands->glState->quadDataOffset, batch->quadCount*sizeof(R_Quad), batch->quads);
+      
+      GL_CATCH_ERROR();
+      
       glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, batch->quadCount);
+
+      GL_CATCH_ERROR();
     }
 
 #else

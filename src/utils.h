@@ -12,7 +12,7 @@
 
 #if BUILD_DEBUG
 #  if COMPILER_MSVC
-#    define ASSERT(cond) if(!(cond)) __debugbreak();
+#    define ASSERT(cond) if(!(cond)) { __debugbreak(); *(int*)0 = 0; }
 #  elif COMPILER_CLANG || COMPILER_GCC
 #    define ASSERT(cond) if(!(cond)) __builtin_trap();
 #  else

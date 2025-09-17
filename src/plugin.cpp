@@ -532,6 +532,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 		{
 		  UILayout *panelLayout = &panel->layout;
 		  uiBeginLayout(panelLayout, uiContext, panelRect, panel->color, panel->texture);
+		  //uiBeginLayout(panelLayout, uiContext, panelRect, V4(0, 0, 0, 1), panel->texture);
 		  uiPushLayoutOffsetSizeType(panelLayout, UISizeType_percentOfParent);
 		  uiPushLayoutDimSizeType(panelLayout, UISizeType_percentOfParent);		  
 
@@ -965,20 +966,24 @@ RENDER_NEW_FRAME(renderNewFrame)
 		  v2 viewMin = hadamard(V2(0.24f, 0.55f), drawRegionDim);
 		  Rect2 viewRect = rectMinDim(viewMin, viewDim);
 		  
-		  renderPushRectOutline(renderCommands, viewRect, 2.f, RenderLevel_front, V4(1, 1, 1, 1));
-		  renderPushQuad(renderCommands, viewRect, &pluginState->grainViewBackground, 0, RenderLevel_front);
-		  renderPushQuad(renderCommands, viewRect, &pluginState->grainViewOutline, 0, RenderLevel_front);
+		  renderPushRectOutline(renderCommands, viewRect, 2.f,
+					RENDER_LEVEL(front), V4(1, 1, 1, 1));
+		  renderPushQuad(renderCommands, viewRect, &pluginState->grainViewBackground, 0,
+				 RENDER_LEVEL(grainViewBackground));
+		  renderPushQuad(renderCommands, viewRect, &pluginState->grainViewOutline, 0,
+				 RENDER_LEVEL(front));
 
 		  v2 dim = hadamard(V2(0.843f, 0.62f), viewDim);
 		  v2 min = viewMin + hadamard(V2(0.075f, 0.2f), viewDim);
 		  Rect2 rect = rectMinDim(min, dim);
-		  renderPushRectOutline(renderCommands, rect, 2.f, RenderLevel_front, V4(1, 1, 1, 1));
-		  
+		  renderPushRectOutline(renderCommands, rect, 2.f,
+					RENDER_LEVEL(front), V4(1, 1, 1, 1));		  
 
 		  r32 middleBarThickness = 4.f;
 		  Rect2 middleBar = rectMinDim(min + V2(0, 0.5f*dim.y),
 					       V2(dim.x, middleBarThickness));
-		  renderPushQuad(renderCommands, middleBar, 0, 0.f, RenderLevel_front, V4(0, 0, 0, 1));
+		  renderPushQuad(renderCommands, middleBar, 0, 0.f,
+				 RENDER_LEVEL(front), V4(0, 0, 0, 1));
 
 		  v2 upperRegionMin = min + V2(0, 0.5f*(dim.y + middleBarThickness));
 		  v2 lowerRegionMin = min;
@@ -1015,14 +1020,16 @@ RENDER_NEW_FRAME(renderNewFrame)
 		      r32 readBarPosition = readPosition*dim.x;
 		      Rect2 readBar = rectMinDim(min + V2(readBarPosition, 0.f),
 						 V2(barThickness, dim.y));
-		      renderPushQuad(renderCommands, readBar, 0, 0.f, RenderLevel_front, V4(1, 0, 0, 1));
+		      renderPushQuad(renderCommands, readBar, 0, 0.f,
+				     RENDER_LEVEL(front), V4(1, 0, 0, 1));
 		      
 		      u32 writeIndex = bufferWriteIndex;
 		      r32 writePosition = (r32)writeIndex/(r32)grainBufferCapacity;
 		      r32 writeBarPosition = writePosition*dim.x;
 		      Rect2 writeBar = rectMinDim(min + V2(writeBarPosition, 0.f),
 						  V2(barThickness, dim.y));
-		      renderPushQuad(renderCommands, writeBar, 0, 0.f, RenderLevel_front, V4(1, 1, 1, 1));
+		      renderPushQuad(renderCommands, writeBar, 0, 0.f,
+				     RENDER_LEVEL(front), V4(1, 1, 1, 1));
 
 		      // NOTE: display playing grain start and end positions
 		      v4 grainWindowColors[] =
@@ -1059,7 +1066,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 
 		      for(u32 grainViewIndex = 0; grainViewIndex < view->grainCount; ++grainViewIndex)
 			{
-			  GrainViewEntry *grainView = view->grainViews + grainViewIndex;			  
+			  GrainViewEntry *grainView = view->grainViews + grainViewIndex;
 			  u32 grainStartIndex = grainView->startIndex;
 			  u32 grainEndIndex = grainView->endIndex;			  
 			  r32 grainStartPosition = (r32)grainStartIndex/(r32)grainBufferCapacity;
@@ -1072,9 +1079,11 @@ RENDER_NEW_FRAME(renderNewFrame)
 			  Rect2 grainEndBar = rectMinDim(min + V2(grainEndBarPosition, 0.f),
 							 V2(barThickness, dim.y));
 			  
-			  v4 grainWindowColor = grainWindowColors[grainViewIndex];			  
-			  renderPushQuad(renderCommands, grainStartBar, 0, 0.f, RenderLevel_front, grainWindowColor);
-			  renderPushQuad(renderCommands, grainEndBar, 0, 0.f, RenderLevel_front, grainWindowColor);
+			  v4 grainWindowColor = grainWindowColors[grainViewIndex];
+			  renderPushQuad(renderCommands, grainStartBar, 0, 0.f,
+					 RENDER_LEVEL(front), grainWindowColor);
+			  renderPushQuad(renderCommands, grainEndBar, 0, 0.f,
+					 RENDER_LEVEL(front), grainWindowColor);
 			}
 		    }
 	  
@@ -1099,8 +1108,10 @@ RENDER_NEW_FRAME(renderNewFrame)
 						    V2(1.f, 0.5f*sampleL*regionDim.y));
 		      Rect2 sampleRBar = rectMinDim(upperRegionMiddle + V2(pixel, 0.f),
 						    V2(1.f, 0.5f*sampleR*regionDim.y));
-		      renderPushQuad(renderCommands, sampleLBar, 0, 0.f, RenderLevel_front, V4(0, 1, 0, 1));
-		      renderPushQuad(renderCommands, sampleRBar, 0, 0.f, RenderLevel_front, V4(0, 1, 0, 1));
+		      renderPushQuad(renderCommands, sampleLBar, 0, 0.f,
+				     RENDER_LEVEL(front), V4(0, 1, 0, 1));
+		      renderPushQuad(renderCommands, sampleRBar, 0, 0.f,
+				     RENDER_LEVEL(front), V4(0, 1, 0, 1));
 
 		      lastSampleIndex = sampleIndex;
 		    }
