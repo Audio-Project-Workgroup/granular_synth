@@ -228,6 +228,7 @@ renderEndCommands(RenderCommands *commands)
   /* commands->triangleCapacity = 0; */
   /* commands->triangles = 0; */
 
+  commands->last->next = commands->batchFreelist;
   commands->batchFreelist = commands->first;
   commands->first = 0;
   commands->last = 0;

@@ -26,8 +26,9 @@ renderPushQuad(RenderCommands *commands, Rect2 rect, LoadedBitmap *texture, r32 
     {
       if(commands->batchFreelist)
 	{
-	  batch = commands->batchFreelist;
+	  batch = commands->batchFreelist;	  
 	  STACK_POP(commands->batchFreelist);
+	  batch->next = 0;
 	}
       else
 	{

@@ -560,6 +560,7 @@ main(int argc, char **argv)
       glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
       glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
       glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+      glfwWindowHint(GLFW_DEPTH_BITS, 24);
 
       GLFWwindow *window = glfwCreateWindow(640, 480, "granade", NULL, NULL);
       if(window)	
@@ -917,6 +918,7 @@ main(int argc, char **argv)
 				      glfwSetCursorState(window, commands.cursorState);				      
 				      renderCommands(&commands);
 				      GL_CATCH_ERROR();
+				      renderEndCommands(&commands);
 #if BUILD_DEBUG
 				      for(String8Node *node = pluginMemory.logger->log.first; node; node = node->next)
 					{
