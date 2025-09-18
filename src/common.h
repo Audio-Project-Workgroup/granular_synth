@@ -69,6 +69,19 @@ typedef COS(PlatformCos);
 #define POW(name) r32 (name)(r32 base, r32 exp)
 typedef POW(PlatformPow);
 
+// memory
+#define PLATFORM_ALLOCATE_MEMORY(name) void* (name)(usz size)
+typedef PLATFORM_ALLOCATE_MEMORY(PlatformAllocateMemory);
+
+#define PLATFORM_FREE_MEMORY(name) void (name)(void *memory, usz size)
+typedef PLATFORM_FREE_MEMORY(PlatformFreeMemory);
+
+#define PLATFORM_ARENA_ACQUIRE(name) Arena* (name)(usz size)
+typedef PLATFORM_ARENA_ACQUIRE(PlatformArenaAcquire);
+
+#define PLATFORM_ARENA_DISCARD(name) void (name)(Arena *arena)
+typedef PLATFORM_ARENA_DISCARD(PlatformArenaDiscard);
+
 // atomics
 // NOTE: atomic operations return initial values
 
@@ -107,6 +120,11 @@ struct PlatformAPI
   PlatformCos	*cos;
   PlatformPow	*pow;
 
+  PlatformAllocateMemory *allocateMemory;
+  PlatformFreeMemory *freeMemory;
+  PlatformArenaAcquire *arenaAcquire;
+  PlatformArenaDiscard *arenaDiscard;
+
   AtomicLoad *atomicLoad;
   AtomicStore *atomicStore;
   AtomicAdd *atomicAdd;
@@ -136,7 +154,7 @@ enum PluginHost
 
 struct PluginMemory
 {
-  void *memory;
+  //void *memory;
 
   void *pluginHandle;
 

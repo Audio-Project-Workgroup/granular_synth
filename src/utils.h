@@ -30,6 +30,8 @@
 #  define ASSERT(cond)
 #endif
 
+#define STATIC_ASSERT(cond, var) typedef char var##__FILE__##__LINE__ [(cond) ? 1 : -1]
+
 #define UNUSED(var) (void)var
 
 #define KILOBYTES(count) (1024LL*count)

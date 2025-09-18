@@ -192,6 +192,21 @@ threadDestroy(OSThread *thread)
 }
 
 //
+// memory
+//
+
+static PLATFORM_ALLOCATE_MEMORY(platformAllocateMemory)
+{
+  void *result = VirtualAlloc(0, size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+  return(result);
+}
+
+static PLATFORM_FREE_MEMORY(platformFreeMemory)
+{
+  VirtualFree(memory, size, MEM_RELEASE);
+}
+
+//
 // atomic operations
 //
 

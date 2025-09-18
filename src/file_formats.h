@@ -89,11 +89,13 @@ nextChunk(RiffIterator it)
 }
 
 static inline LoadedSound
-loadWav(char *filename, Arena *loadAllocator, Arena *permanentAllocator)
+loadWav(Arena *permanentAllocator, String8 filename)
 {
   LoadedSound result = {};
 
-  ReadFileResult readResult = globalPlatform.readEntireFile(filename, loadAllocator);
+  TemporaryMemory scratch = arenaGetScratch(&permanentAllocator, 1);
+
+  ReadFileResult readResult = globalPlatform.readEntireFile((char*)filename.str, scratch.arena);
   if(readResult.contents)
     {
       WavHeader *header = (WavHeader *)readResult.contents;
@@ -258,9 +260,9 @@ loadWav(char *filename, Arena *loadAllocator, Arena *permanentAllocator)
 	{
 #if 1
 	  // NOTE: stupid linear interpolation until the fft method (or another better one) works
-	  Arena tempAllocator = arenaSubArena(loadAllocator, 2*sourceSampleCount*sizeof(r32) + 1);
-	  r32 *tempL = arenaPushArray(&tempAllocator, sourceSampleCount, r32);
-	  r32 *tempR = arenaPushArray(&tempAllocator, sourceSampleCount, r32);
+	  //Arena tempAllocator = arenaSubArena(loadAllocator, 2*sourceSampleCount*sizeof(r32) + 1);
+	  r32 *tempL = arenaPushArray(scratch.arena, sourceSampleCount, r32);
+	  r32 *tempR = arenaPushArray(scratch.arena, sourceSampleCount, r32);
 	  for(u32 index = 0; index < sourceSampleCount; ++index)
 	    {
 	      tempL[index] = result.samples[0][index];
@@ -291,7 +293,7 @@ loadWav(char *filename, Arena *loadAllocator, Arena *permanentAllocator)
 	      result.samples[1][padIndex] = 0.f;
 	    }
 
-	  arenaEndArena(loadAllocator, tempAllocator);
+	  //arenaEndArena(loadAllocator, tempAllocator);
 #else
 	  // TODO: make this work (problem is speed, numerical accuracy)
 	  usz tempBufferSize = 4*maxSampleCount*sizeof(c64);
@@ -382,9 +384,10 @@ loadWav(char *filename, Arena *loadAllocator, Arena *permanentAllocator)
 #endif
 	} 
       
-      globalPlatform.freeFileMemory(readResult, loadAllocator);
+      //globalPlatform.freeFileMemory(readResult, loadAllocator);
     }
 
+  arenaReleaseScratch(scratch);
   return(result);
 }
 
@@ -470,12 +473,13 @@ makeBitmap(Arena *allocator, s32 width, s32 height, u32 color)
 #include "stb_truetype.h"
 
 static inline LoadedFont
-loadFont(char *filename, Arena *loadAllocator, Arena *permanentAllocator,
-	 RangeU32 characterRange, r32 scaleInPixels)
+loadFont(Arena *permanentAllocator, String8 filename, RangeU32 characterRange, r32 scaleInPixels)
 {
   LoadedFont result = {};
 
-  ReadFileResult readResult = globalPlatform.readEntireFile(filename, loadAllocator);
+  TemporaryMemory scratch = arenaGetScratch(&permanentAllocator, 1);
+
+  ReadFileResult readResult = globalPlatform.readEntireFile((char*)filename.str, scratch.arena);
   if(readResult.contents)
     {
       stbtt_fontinfo stbFontInfo;
@@ -550,9 +554,10 @@ loadFont(char *filename, Arena *loadAllocator, Arena *permanentAllocator,
 	}
 
       // TODO: need to think harder about how file memory is allocated and used
-      globalPlatform.freeFileMemory(readResult, loadAllocator);
+      //globalPlatform.freeFileMemory(readResult, loadAllocator);
     }
 
+  arenaReleaseScratch(scratch);
   return(result);
 }
 

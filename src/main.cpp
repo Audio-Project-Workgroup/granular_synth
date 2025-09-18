@@ -441,12 +441,14 @@ struct BitmapHeader
 #define FOURCC(str) (((u32)((str)[0]) << 0) | ((u32)((str)[1]) << 8) | ((u32)((str)[2]) << 16) | ((u32)((str)[3]) << 24))
 
 static LoadedBitmap
-loadBitmap(Arena *destAllocator, Arena *loadAllocator, String8 filename)
+loadBitmap(Arena *destAllocator, String8 filename)
 {
   LoadedBitmap result = {};
   LoadedBitmap temp = {};
 
-  ReadFileResult readResult = platformReadEntireFile((char *)filename.str, loadAllocator);
+  TemporaryMemory scratch = arenaGetScratch(&destAllocator, 1);
+
+  ReadFileResult readResult = platformReadEntireFile((char *)filename.str, scratch.arena);
   if(readResult.contents)
     {
       BitmapHeader *header = (BitmapHeader *)readResult.contents;      
@@ -528,6 +530,46 @@ makeBitmap(Arena *allocator, s32 width, s32 height, u32 color)
   return(result);
 }
 
+struct HostMemoryState
+{
+  usz arenaHeaderPoolSize;
+  usz arenaHeaderPoolUsed;
+  void *arenaHeaderPool;
+
+  usz arenaDataPoolSize;
+  usz arenaDataPoolUsed;
+  void *arenaDataPool;
+
+  Arena *firstFree;
+  Arena *lastFree;
+};
+
+static HostMemoryState *hostMemoryState = 0;
+
+#define ARENA_MIN_ALLOCATION_SIZE KILOBYTES(64)
+
+Arena*
+gs_arenaAcquire(usz size)
+{
+  usz allocSize = MAX(size, ARENA_MIN_ALLOCATION_SIZE);
+
+  void *base = platformAllocateMemory(allocSize);
+  Arena *result = (Arena*)base;
+  result->current = result;
+  result->prev = 0;
+  result->base = 0;
+  result->capacity = allocSize;
+  result->pos = ARENA_HEADER_SIZE;
+
+  return(result);
+}
+
+void
+gs_arenaDiscard(Arena *arena)
+{
+  platformFreeMemory(arena, arena->capacity);
+}
+
 int
 main(int argc, char **argv)
 {
@@ -536,11 +578,13 @@ main(int argc, char **argv)
 #endif
   int result = 0;
 
-  usz stringMemorySize = KILOBYTES(1);
-  void *stringMemory = calloc(stringMemorySize, 1);
-  Arena stringArena = arenaBegin(stringMemory, stringMemorySize);
+  TemporaryMemory scratch = arenaGetScratch(0, 0);
 
-  executablePath = platformGetPathToModule(0, (void *)main, &stringArena);
+  // usz stringMemorySize = KILOBYTES(1);
+  // void *stringMemory = calloc(stringMemorySize, 1);
+  // Arena stringArena = arenaBegin(stringMemory, stringMemorySize);
+
+  executablePath = platformGetPathToModule(0, (void *)main, scratch.arena);
   basePath = stringGetParentPath(executablePath);
 #if BUILD_DEBUG
   fprintf(stderr, "executable path: %.*s\n", (int)executablePath.size, executablePath.str);
@@ -548,8 +592,8 @@ main(int argc, char **argv)
 #endif
 
 #if BUILD_DEBUG
-  String8 glfwPath = platformGetPathToModule(0, (void *)glfwCreateWindow, &stringArena);
-  String8 openGLPath = platformGetPathToModule(0, (void *)glTexImage2D, &stringArena);
+  String8 glfwPath = platformGetPathToModule(0, (void *)glfwCreateWindow, scratch.arena);
+  String8 openGLPath = platformGetPathToModule(0, (void *)glTexImage2D, scratch.arena);
   printf("glfw module source: %.*s\n", (int)glfwPath.size, glfwPath.str);
   printf("opengl module source: %.*s\n", (int)openGLPath.size, openGLPath.str);
 #endif
@@ -567,12 +611,12 @@ main(int argc, char **argv)
 	{
 	  // TODO: stop using crt allocation functions - use os allocation functions (VirtualAlloc(), mmap())
 	  // NOTE: set applcation icon
-	  usz loadMemorySize = MEGABYTES(64);
-	  void *loadMemory = calloc(loadMemorySize, 1);
-	  Arena loadArena = arenaBegin(loadMemory, loadMemorySize);
-	  Arena destArena = arenaSubArena(&loadArena, loadMemorySize/2);
-	  LoadedBitmap iconBitmap = loadBitmap(&destArena, &loadArena,
-					       STR8_LIT("../data/BMP/DENSITYPOMEGRANATE_BUTTON.bmp"));
+	  // usz loadMemorySize = MEGABYTES(64);
+	  // void *loadMemory = calloc(loadMemorySize, 1);
+	  // Arena loadArena = arenaBegin(loadMemory, loadMemorySize);
+	  // Arena destArena = arenaSubArena(&loadArena, loadMemorySize/2);
+	  LoadedBitmap iconBitmap =
+	    loadBitmap(scratch.arena, STR8_LIT("../data/BMP/DENSITYPOMEGRANATE_BUTTON.bmp"));
 	  
 	  GLFWimage appIcon[1];
 	  appIcon[0].width = iconBitmap.width;
@@ -603,7 +647,7 @@ main(int argc, char **argv)
 	  // memory/grahics setup
 
 	  PluginMemory pluginMemory = {};
-	  pluginMemory.memory = calloc(MEGABYTES(512), 1);
+	  //pluginMemory.memory = calloc(MEGABYTES(512), 1);
 	  pluginMemory.osTimerFreq = getOSTimerFreq();
 	  pluginMemory.host = PluginHost_executable;
 	  
@@ -622,6 +666,11 @@ main(int argc, char **argv)
 	  pluginMemory.platformAPI.cos	= gs_cosf;
 	  pluginMemory.platformAPI.pow	= gs_powf;
 
+	  pluginMemory.platformAPI.allocateMemory = platformAllocateMemory;
+	  pluginMemory.platformAPI.freeMemory = platformFreeMemory;
+	  pluginMemory.platformAPI.arenaAcquire = gs_arenaAcquire;
+	  pluginMemory.platformAPI.arenaDiscard = gs_arenaDiscard;
+
 	  pluginMemory.platformAPI.atomicLoad			= atomicLoad;
 	  pluginMemory.platformAPI.atomicStore			= atomicStore;
 	  pluginMemory.platformAPI.atomicAdd			= atomicAdd;
@@ -629,25 +678,27 @@ main(int argc, char **argv)
 	  pluginMemory.platformAPI.atomicCompareAndSwapPointers = atomicCompareAndSwapPointers;
 
 #if BUILD_DEBUG
-	  usz loggerMemorySize = KILOBYTES(512);
-	  void *loggerMemory = calloc(loggerMemorySize, 1);
-	  Arena loggerArena = arenaBegin(loggerMemory, loggerMemorySize);
+	  // usz loggerMemorySize = KILOBYTES(512);
+	  // void *loggerMemory = calloc(loggerMemorySize, 1);
+	  // Arena loggerArena = arenaBegin(loggerMemory, loggerMemorySize);
+	  Arena *loggerArena = gs_arenaAcquire(0);
 
 	  PluginLogger logger = {};
-	  logger.logArena = &loggerArena;
-	  logger.maxCapacity = loggerMemorySize/2;
+	  logger.logArena = loggerArena;
+	  logger.maxCapacity = loggerArena->capacity/2;
 
 	  pluginMemory.logger = &logger;
 #endif
 
-	  usz renderMemorySize = MEGABYTES(64);
-	  void *renderMemory = calloc(renderMemorySize, 1);
-	  Arena renderArena = arenaBegin(renderMemory, renderMemorySize);
+	  // usz renderMemorySize = MEGABYTES(64);
+	  // void *renderMemory = calloc(renderMemorySize, 1);
+	  // Arena renderArena = arenaBegin(renderMemory, renderMemorySize);
+	  Arena *renderArena = gs_arenaAcquire(MEGABYTES(2));
 	    
 	  GLState glState = makeGLState();
-	  LoadedBitmap whiteTexture = makeBitmap(&renderArena, 16, 16, 0xFFFFFFFF);
+	  LoadedBitmap whiteTexture = makeBitmap(renderArena, 16, 16, 0xFFFFFFFF);
 	  RenderCommands commands = {};
-	  commands.allocator = &renderArena;
+	  commands.allocator = renderArena;
 	  commands.glState = &glState;
 	  commands.whiteTexture = &whiteTexture;	  
 
@@ -997,10 +1048,10 @@ main(int argc, char **argv)
 	  	 	  
 #if BUILD_DEBUG
 	  fprintf(stderr, "freeing loggerMemory\n");
-	  free(loggerMemory);
+	  //free(loggerMemory);
 #endif
-	  free(pluginMemory.memory);	  
-	  free(loadMemory);
+	  //free(pluginMemory.memory);	  
+	  //free(loadMemory);
 	  
 	  glfwDestroyWindow(window);	  
 	}
@@ -1008,7 +1059,7 @@ main(int argc, char **argv)
       glfwTerminate();
     }
 
-  free(stringMemory);
+  //free(stringMemory);
   
   return(result);
 }

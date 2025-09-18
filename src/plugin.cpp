@@ -97,6 +97,9 @@ r32 gs_sinf(r32 num)		{ return(globalPlatform.sin(num)); }
 r32 gs_cosf(r32 num)		{ return(globalPlatform.cos(num)); }
 r32 gs_powf(r32 base, r32 exp)	{ return(globalPlatform.pow(base, exp)); }
 
+Arena* gs_arenaAcquire(usz size)     { return(globalPlatform.arenaAcquire(size)); }
+void   gs_arenaDiscard(Arena *arena) { return(globalPlatform.arenaDiscard(arena)); }
+
 inline void
 printButtonState(ButtonState button, char *name)
 {
@@ -108,246 +111,255 @@ printButtonState(ButtonState button, char *name)
 		  isDown(button) ? "down" : "up");
 }
 
-static PluginState *
-getPluginState(PluginMemory *memoryBlock)
-{
-  void *memory = memoryBlock->memory;
-  PluginState *pluginState = 0;
-  if(memory)
-    {      
-      pluginState = (PluginState *)memory;
-    }
+// static PluginState *
+// getPluginState(PluginMemory *memoryBlock)
+// {
+//   void *memory = memoryBlock->memory;
+//   PluginState *pluginState = 0;
+//   if(memory)
+//     {      
+//       pluginState = (PluginState *)memory;
+//     }
 
-  return(pluginState);
-}
+//   return(pluginState);
+// }
+
+static PluginState *globalPluginState = 0;
 
 extern "C"
 INITIALIZE_PLUGIN_STATE(initializePluginState)
 {
-  globalPlatform = memoryBlock->platformAPI;
-#if BUILD_DEBUG
-  globalLogger = memoryBlock->logger;
-#endif
-
-  void *memory = memoryBlock->memory;
   PluginState *pluginState = 0;
-  if(memory)
-    {      
-      pluginState = (PluginState *)memory;
-      if(!pluginState->initialized)
-	{
-	    {
-	      pluginState->osTimerFreq = memoryBlock->osTimerFreq;
-	      pluginState->pluginHost = memoryBlock->host;
-	      pluginState->pluginMode = PluginMode_editor;
-
-
-	      pluginState->permanentArena = arenaBegin((u8 *)memory + sizeof(PluginState), MEGABYTES(512));
-	      pluginState->frameArena = arenaSubArena(&pluginState->permanentArena, MEGABYTES(64));
-	      pluginState->framePermanentArena = arenaSubArena(&pluginState->permanentArena, MEGABYTES(64));
-	      pluginState->loadArena = arenaSubArena(&pluginState->permanentArena, MEGABYTES(128));
-	      pluginState->grainArena = arenaSubArena(&pluginState->permanentArena, KILOBYTES(32));
-
-	      pluginState->pathToPlugin =
-		globalPlatform.getPathToModule(memoryBlock->pluginHandle, (void *)initializePluginState,
-					       &pluginState->permanentArena);
-
-	      // NOTE: parameter initialization
-	      // pluginState->phasor = 0.f;
-	      pluginState->freq = 440.f;
-	      
-	      initializeFloatParameter(&pluginState->parameters[PluginParameter_volume], 
-				       pluginParameterInitData[PluginParameter_volume], decibelsToAmplitude);
-	      
-	      initializeFloatParameter(&pluginState->parameters[PluginParameter_density],
-				       pluginParameterInitData[PluginParameter_density], densityTransform);
-	      
-	      //avail range: [0, 3], default value: 0
-	      initializeFloatParameter(&pluginState->parameters[PluginParameter_window], 
-				       pluginParameterInitData[PluginParameter_window]);
-	      
-	      //avail range: [0, 16000], default value: 2600
-	      initializeFloatParameter(&pluginState->parameters[PluginParameter_size], 
-				       pluginParameterInitData[PluginParameter_size]);
-	      
-	      initializeFloatParameter(&pluginState->parameters[PluginParameter_spread],
-						pluginParameterInitData[PluginParameter_spread]);
-	      
-	      initializeFloatParameter(&pluginState->parameters[PluginParameter_mix],
-						pluginParameterInitData[PluginParameter_mix]);
-
-		  initializeFloatParameter(&pluginState->parameters[PluginParameter_pan],
-						pluginParameterInitData[PluginParameter_pan]);
-
-	      initializeFloatParameter(&pluginState->parameters[PluginParameter_offset],
-						pluginParameterInitData[PluginParameter_offset]);
-
-	      // NOTE: devices
-	      pluginState->outputDeviceCount = memoryBlock->outputDeviceCount;
-	      pluginState->selectedOutputDeviceIndex = memoryBlock->selectedOutputDeviceIndex;
-	      for(u32 i = 0; i < pluginState->outputDeviceCount; ++i)
-		{
-		  pluginState->outputDeviceNames[i] =
-		    arenaPushString(&pluginState->permanentArena, memoryBlock->outputDeviceNames[i]);
-		}
-	      
-	      pluginState->inputDeviceCount = memoryBlock->inputDeviceCount;
-	      pluginState->selectedInputDeviceIndex = memoryBlock->selectedInputDeviceIndex;
-	      for(u32 i = 0; i < pluginState->inputDeviceCount; ++i)
-		{
-		  pluginState->inputDeviceNames[i] =
-		    arenaPushString(&pluginState->permanentArena, memoryBlock->inputDeviceNames[i]);
-		}
-
-	      // NOTE: grain buffer initialization
-	      u32 grainBufferCount = 48000;
-	      pluginState->grainBuffer = initializeGrainBuffer(pluginState, grainBufferCount);
-	      pluginState->grainManager = initializeGrainManager(pluginState);
-
-	      // NOTE: grain view initialization
-	      GrainStateView *grainStateView = &pluginState->grainStateView;
-	      grainStateView->viewWriteIndex = 1;
-	      grainStateView->viewBuffer.capacity = grainBufferCount;
-	      grainStateView->viewBuffer.samples[0] = arenaPushArray(&pluginState->permanentArena,
-								     grainStateView->viewBuffer.capacity, r32,
-								     arenaFlagsNoZeroAlign(4*sizeof(r32)));
-	      grainStateView->viewBuffer.samples[1] = arenaPushArray(&pluginState->permanentArena,
-								     grainStateView->viewBuffer.capacity, r32,
-								     arenaFlagsNoZeroAlign(4*sizeof(r32)));
-	      grainStateView->viewBuffer.readIndex = pluginState->grainBuffer.readIndex;
-	      grainStateView->viewBuffer.writeIndex = pluginState->grainBuffer.writeIndex;
-
-	      u32 grainViewSampleCapacity = 4096;
-	      for(u32 i = 0; i < ARRAY_COUNT(grainStateView->views); ++i)
-		{
-		  GrainBufferViewEntry *view = grainStateView->views + i;
-		  view->sampleCapacity = grainViewSampleCapacity;
-		  view->bufferSamples[0] = arenaPushArray(&pluginState->permanentArena, grainViewSampleCapacity, r32);
-		  view->bufferSamples[1] = arenaPushArray(&pluginState->permanentArena, grainViewSampleCapacity, r32);
-		}
-
-	      // NOTE: file loading, embedded grain caching
-	      pluginState->soundIsPlaying.value = false;
-	      pluginState->loadedSound.sound = loadWav("../data/fingertips_44100_PCM_16.wav",
-						       &pluginState->loadArena, &pluginState->permanentArena);
-	      pluginState->loadedSound.samplesPlayed = 0;// + pluginState->start_pos);
-#if 0
-	      char *fingertipsPackfilename = "../data/fingertips.grains";
-	      TemporaryMemory packfileMemory = arenaBeginTemporaryMemory(&pluginState->loadArena, MEGABYTES(64));
-	      GrainPackfile fingertipsGrains = beginGrainPackfile((Arena *)&packfileMemory);
-	      addSoundToGrainPackfile(&fingertipsGrains, &pluginState->loadedSound.sound);
-	      writePackfileToDisk(&fingertipsGrains, fingertipsPackfilename);
-	      arenaEndTemporaryMemory(&packfileMemory);
-
-	      pluginState->loadedGrainPackfile = loadGrainPackfile(fingertipsPackfilename,
-								   &pluginState->permanentArena);
-	      pluginState->silo = initializeFileGrainState(&pluginState->permanentArena);
+  if(!globalPluginState)
+    {
+      globalPlatform = memoryBlock->platformAPI;
+#if BUILD_DEBUG
+      globalLogger = memoryBlock->logger;
 #endif
 
-	      pluginState->nullTexture = makeBitmap(&pluginState->permanentArena, 1920, 1080, 0xFFFFFFFF);
-	      // TODO: maybe have some kind of x macro list for the bitmap loading
-	      pluginState->editorReferenceLayout =
-		loadBitmap(DATA_PATH"BMP/NEWGRANADE_UI_POSITIONSREFERENCE.bmp", &pluginState->permanentArena);
-	      pluginState->editorSkin =
-		loadBitmap(DATA_PATH"BMP/TREE.bmp", &pluginState->permanentArena);
-	      pluginState->pomegranateKnob =
-		loadBitmap(DATA_PATH"BMP/POMEGRANATE_BUTTON.bmp", &pluginState->permanentArena,
-			   V2(0, -0.03f));
-	      pluginState->pomegranateKnobLabel =
-		loadBitmap(DATA_PATH"BMP/POMEGRANATE_BUTTON_WHITEMARKERS.bmp", &pluginState->permanentArena,
-			   V2(0, 0));
-	      pluginState->halfPomegranateKnob =
-		loadBitmap(DATA_PATH"BMP/HALFPOMEGRANATE_BUTTON.bmp", &pluginState->permanentArena,
-			   V2(-0.005f, -0.035f));
-	      pluginState->halfPomegranateKnobLabel =
-		loadBitmap(DATA_PATH"BMP/HALFPOMEGRANATE_BUTTON_WHITEMARKERS.bmp", &pluginState->permanentArena,
-			   V2(0, 0));
-	      pluginState->densityKnob =
-		loadBitmap(DATA_PATH"BMP/DENSITYPOMEGRANATE_BUTTON.bmp", &pluginState->permanentArena,
-			   V2(0.01f, -0.022f));
-	      pluginState->densityKnobShadow =
-		loadBitmap(DATA_PATH"BMP/DENSITYPOMEGRANATE_BUTTON_SHADOW.bmp", &pluginState->permanentArena);
-	      pluginState->densityKnobLabel =
-		loadBitmap(DATA_PATH"BMP/DENSITYPOMEGRANATE_BUTTON_WHITEMARKERS.bmp", &pluginState->permanentArena,
-			   V2(0, 0));
-	      pluginState->levelBar =
-		loadBitmap(DATA_PATH"BMP/LEVELBAR.bmp", &pluginState->permanentArena);
-	      pluginState->levelFader =
-		loadBitmap(DATA_PATH"BMP/LEVELBAR_SLIDINGLEVER.bmp", &pluginState->permanentArena,
-			   V2(0, -0.416f));
-	      pluginState->grainViewBackground =
-		loadBitmap(DATA_PATH"BMP/GREENFRAME_RECTANGLE.bmp", &pluginState->permanentArena);
-	      pluginState->grainViewOutline =
-		loadBitmap(DATA_PATH"BMP/GREENFRAME.bmp", &pluginState->permanentArena);
+      Arena *permanentArena = gs_arenaAcquire(MEGABYTES(1));
+      pluginState = arenaPushStruct(permanentArena, PluginState);  
+      pluginState->permanentArena = permanentArena;
 
-	      RangeU32 characterRange = {32, 127}; // NOTE: from SPACE up to (but not including) DEL
-	      pluginState->agencyBold = loadFont(DATA_PATH"FONT/AGENCYB.ttf", &pluginState->loadArena,
-					       &pluginState->permanentArena, characterRange, 36.f);
+      pluginState->osTimerFreq = memoryBlock->osTimerFreq;
+      pluginState->pluginHost = memoryBlock->host;
+      pluginState->pluginMode = PluginMode_editor;
 
-	      // NOTE: ui initialization
-	      pluginState->uiContext =
-		uiInitializeContext(&pluginState->frameArena, &pluginState->framePermanentArena,
-				    &pluginState->agencyBold);
+      //pluginState->permanentArena = gs_arenaAcquire(0);
+      pluginState->frameArena = gs_arenaAcquire(0);
+      pluginState->framePermanentArena = gs_arenaAcquire(0);
+      pluginState->grainArena = gs_arenaAcquire(0);
+      // pluginState->permanentArena = arenaBegin((u8 *)memory + sizeof(PluginState), MEGABYTES(512));
+      // pluginState->frameArena = arenaSubArena(&pluginState->permanentArena, MEGABYTES(64));
+      // pluginState->framePermanentArena = arenaSubArena(&pluginState->permanentArena, MEGABYTES(64));
+      // pluginState->loadArena = arenaSubArena(&pluginState->permanentArena, MEGABYTES(128));
+      // pluginState->grainArena = arenaSubArena(&pluginState->permanentArena, KILOBYTES(32));
 
-	      // TODO: our editor interface doesn't use resizable panels,
-	      //       so it doesn't make sense to still be using them
-	      pluginState->rootPanel = arenaPushStruct(&pluginState->permanentArena, UIPanel,
-						       arenaFlagsZeroNoAlign());
-	      pluginState->rootPanel->sizePercentOfParent = 1.f;
-	      pluginState->rootPanel->splitAxis = UIAxis_y;
-	      pluginState->rootPanel->name = STR8_LIT("editor");
-	      pluginState->rootPanel->color = V4(1, 1, 1, 1);
-	      pluginState->rootPanel->texture = &pluginState->editorSkin;
-	      //pluginState->rootPanel->texture = &pluginState->editorReferenceLayout;
+      pluginState->pathToPlugin =
+	globalPlatform.getPathToModule(memoryBlock->pluginHandle, (void *)initializePluginState,
+				       pluginState->permanentArena);
 
-	      pluginState->menuPanel = arenaPushStruct(&pluginState->permanentArena, UIPanel,
-						       arenaFlagsZeroNoAlign());
-	      pluginState->menuPanel->sizePercentOfParent = 1.f;
-	      pluginState->menuPanel->splitAxis = UIAxis_x;
+      // NOTE: parameter initialization
+      // pluginState->phasor = 0.f;
+      pluginState->freq = 440.f;
+	      
+      initializeFloatParameter(&pluginState->parameters[PluginParameter_volume], 
+			       pluginParameterInitData[PluginParameter_volume], decibelsToAmplitude);
+	      
+      initializeFloatParameter(&pluginState->parameters[PluginParameter_density],
+			       pluginParameterInitData[PluginParameter_density], densityTransform);
+	      
+      //avail range: [0, 3], default value: 0
+      initializeFloatParameter(&pluginState->parameters[PluginParameter_window], 
+			       pluginParameterInitData[PluginParameter_window]);
+	      
+      //avail range: [0, 16000], default value: 2600
+      initializeFloatParameter(&pluginState->parameters[PluginParameter_size], 
+			       pluginParameterInitData[PluginParameter_size]);
+	      
+      initializeFloatParameter(&pluginState->parameters[PluginParameter_spread],
+			       pluginParameterInitData[PluginParameter_spread]);
+	      
+      initializeFloatParameter(&pluginState->parameters[PluginParameter_mix],
+			       pluginParameterInitData[PluginParameter_mix]);
 
-	      v4 menuBackgroundColor = colorV4FromU32(0x080C1CFF);
-	      UIPanel *currentParentPanel = pluginState->menuPanel;
-	      UIPanel *menuLeft = makeUIPanel(currentParentPanel, &pluginState->permanentArena,
-					      UIAxis_x, 0.5f, STR8_LIT("menu left"),
-					      &pluginState->nullTexture, menuBackgroundColor);
-	      UIPanel *menuRight = makeUIPanel(currentParentPanel, &pluginState->permanentArena,
-					       UIAxis_x, 0.5f, STR8_LIT("menu right"),
-					       &pluginState->nullTexture, menuBackgroundColor);
-	      UNUSED(menuLeft);
-	      UNUSED(menuRight);
+      initializeFloatParameter(&pluginState->parameters[PluginParameter_pan],
+			       pluginParameterInitData[PluginParameter_pan]);
+
+      initializeFloatParameter(&pluginState->parameters[PluginParameter_offset],
+			       pluginParameterInitData[PluginParameter_offset]);
+
+      // NOTE: devices
+      pluginState->outputDeviceCount = memoryBlock->outputDeviceCount;
+      pluginState->selectedOutputDeviceIndex = memoryBlock->selectedOutputDeviceIndex;
+      for(u32 i = 0; i < pluginState->outputDeviceCount; ++i)
+	{
+	  pluginState->outputDeviceNames[i] =
+	    arenaPushString(pluginState->permanentArena, memoryBlock->outputDeviceNames[i]);
+	}
+	      
+      pluginState->inputDeviceCount = memoryBlock->inputDeviceCount;
+      pluginState->selectedInputDeviceIndex = memoryBlock->selectedInputDeviceIndex;
+      for(u32 i = 0; i < pluginState->inputDeviceCount; ++i)
+	{
+	  pluginState->inputDeviceNames[i] =
+	    arenaPushString(pluginState->permanentArena, memoryBlock->inputDeviceNames[i]);
+	}
+
+      // NOTE: grain buffer initialization
+      u32 grainBufferCount = 48000;
+      pluginState->grainBuffer = initializeGrainBuffer(pluginState, grainBufferCount);
+      pluginState->grainManager = initializeGrainManager(pluginState);
+
+      // NOTE: grain view initialization
+      GrainStateView *grainStateView = &pluginState->grainStateView;
+      grainStateView->viewWriteIndex = 1;
+      grainStateView->viewBuffer.capacity = grainBufferCount;
+      grainStateView->viewBuffer.samples[0] =
+	arenaPushArray(pluginState->permanentArena, grainStateView->viewBuffer.capacity, r32,
+		       arenaFlagsNoZeroAlign(4*sizeof(r32)));
+      grainStateView->viewBuffer.samples[1] =
+	arenaPushArray(pluginState->permanentArena, grainStateView->viewBuffer.capacity, r32,
+		       arenaFlagsNoZeroAlign(4*sizeof(r32)));
+      grainStateView->viewBuffer.readIndex = pluginState->grainBuffer.readIndex;
+      grainStateView->viewBuffer.writeIndex = pluginState->grainBuffer.writeIndex;
+
+      u32 grainViewSampleCapacity = 4096;
+      for(u32 i = 0; i < ARRAY_COUNT(grainStateView->views); ++i)
+	{
+	  GrainBufferViewEntry *view = grainStateView->views + i;
+	  view->sampleCapacity = grainViewSampleCapacity;
+	  view->bufferSamples[0] =
+	    arenaPushArray(pluginState->permanentArena, grainViewSampleCapacity, r32);
+	  view->bufferSamples[1] =
+	    arenaPushArray(pluginState->permanentArena, grainViewSampleCapacity, r32);
+	}
+
+      // NOTE: file loading, embedded grain caching
+      pluginState->soundIsPlaying.value = false;
+      pluginState->loadedSound.sound =
+	loadWav(pluginState->permanentArena, STR8_LIT("../data/fingertips_44100_PCM_16.wav"));
+      pluginState->loadedSound.samplesPlayed = 0;// + pluginState->start_pos);
+#if 0
+      char *fingertipsPackfilename = "../data/fingertips.grains";
+      TemporaryMemory packfileMemory = arenaBeginTemporaryMemory(&pluginState->loadArena, MEGABYTES(64));
+      GrainPackfile fingertipsGrains = beginGrainPackfile((Arena *)&packfileMemory);
+      addSoundToGrainPackfile(&fingertipsGrains, &pluginState->loadedSound.sound);
+      writePackfileToDisk(&fingertipsGrains, fingertipsPackfilename);
+      arenaEndTemporaryMemory(&packfileMemory);
+
+      pluginState->loadedGrainPackfile = loadGrainPackfile(fingertipsPackfilename,
+							   &pluginState->permanentArena);
+      pluginState->silo = initializeFileGrainState(&pluginState->permanentArena);
+#endif
+
+      pluginState->nullTexture =
+	makeBitmap(pluginState->permanentArena, 1920, 1080, 0xFFFFFFFF);
+      // TODO: maybe have some kind of x macro list for the bitmap loading
+      pluginState->editorReferenceLayout =
+	loadBitmap(DATA_PATH"BMP/NEWGRANADE_UI_POSITIONSREFERENCE.bmp", pluginState->permanentArena);
+      pluginState->editorSkin =
+	loadBitmap(DATA_PATH"BMP/TREE.bmp", pluginState->permanentArena);
+      pluginState->pomegranateKnob =
+	loadBitmap(DATA_PATH"BMP/POMEGRANATE_BUTTON.bmp", pluginState->permanentArena,
+		   V2(0, -0.03f));
+      pluginState->pomegranateKnobLabel =
+	loadBitmap(DATA_PATH"BMP/POMEGRANATE_BUTTON_WHITEMARKERS.bmp", pluginState->permanentArena,
+		   V2(0, 0));
+      pluginState->halfPomegranateKnob =
+	loadBitmap(DATA_PATH"BMP/HALFPOMEGRANATE_BUTTON.bmp", pluginState->permanentArena,
+		   V2(-0.005f, -0.035f));
+      pluginState->halfPomegranateKnobLabel =
+	loadBitmap(DATA_PATH"BMP/HALFPOMEGRANATE_BUTTON_WHITEMARKERS.bmp", pluginState->permanentArena,
+		   V2(0, 0));
+      pluginState->densityKnob =
+	loadBitmap(DATA_PATH"BMP/DENSITYPOMEGRANATE_BUTTON.bmp", pluginState->permanentArena,
+		   V2(0.01f, -0.022f));
+      pluginState->densityKnobShadow =
+	loadBitmap(DATA_PATH"BMP/DENSITYPOMEGRANATE_BUTTON_SHADOW.bmp", pluginState->permanentArena);
+      pluginState->densityKnobLabel =
+	loadBitmap(DATA_PATH"BMP/DENSITYPOMEGRANATE_BUTTON_WHITEMARKERS.bmp", pluginState->permanentArena,
+		   V2(0, 0));
+      pluginState->levelBar =
+	loadBitmap(DATA_PATH"BMP/LEVELBAR.bmp", pluginState->permanentArena);
+      pluginState->levelFader =
+	loadBitmap(DATA_PATH"BMP/LEVELBAR_SLIDINGLEVER.bmp", pluginState->permanentArena,
+		   V2(0, -0.416f));
+      pluginState->grainViewBackground =
+	loadBitmap(DATA_PATH"BMP/GREENFRAME_RECTANGLE.bmp", pluginState->permanentArena);
+      pluginState->grainViewOutline =
+	loadBitmap(DATA_PATH"BMP/GREENFRAME.bmp", pluginState->permanentArena);
+
+      RangeU32 characterRange = {32, 127}; // NOTE: from SPACE up to (but not including) DEL
+      pluginState->agencyBold =
+	loadFont(pluginState->permanentArena, STR8_LIT(DATA_PATH"FONT/AGENCYB.ttf"),
+		 characterRange, 36.f);
+
+      // NOTE: ui initialization
+      pluginState->uiContext =
+	uiInitializeContext(pluginState->frameArena, pluginState->framePermanentArena,
+			    &pluginState->agencyBold);
+
+      // TODO: our editor interface doesn't use resizable panels,
+      //       so it doesn't make sense to still be using them
+      pluginState->rootPanel =
+	arenaPushStruct(pluginState->permanentArena, UIPanel,
+			arenaFlagsZeroNoAlign());
+      pluginState->rootPanel->sizePercentOfParent = 1.f;
+      pluginState->rootPanel->splitAxis = UIAxis_y;
+      pluginState->rootPanel->name = STR8_LIT("editor");
+      pluginState->rootPanel->color = V4(1, 1, 1, 1);
+      pluginState->rootPanel->texture = &pluginState->editorSkin;
+      //pluginState->rootPanel->texture = &pluginState->editorReferenceLayout;
+
+      pluginState->menuPanel = arenaPushStruct(pluginState->permanentArena, UIPanel,
+					       arenaFlagsZeroNoAlign());
+      pluginState->menuPanel->sizePercentOfParent = 1.f;
+      pluginState->menuPanel->splitAxis = UIAxis_x;
+
+      v4 menuBackgroundColor = colorV4FromU32(0x080C1CFF);
+      UIPanel *currentParentPanel = pluginState->menuPanel;
+      UIPanel *menuLeft = makeUIPanel(currentParentPanel, pluginState->permanentArena,
+				      UIAxis_x, 0.5f, STR8_LIT("menu left"),
+				      &pluginState->nullTexture, menuBackgroundColor);
+      UIPanel *menuRight = makeUIPanel(currentParentPanel, pluginState->permanentArena,
+				       UIAxis_x, 0.5f, STR8_LIT("menu right"),
+				       &pluginState->nullTexture, menuBackgroundColor);
+      UNUSED(menuLeft);
+      UNUSED(menuRight);
 	      
 #if 0
 #if 1
-	      r32 *testModelInput = pluginState->loadedSound.sound.samples[0];
-	      //s64 testModelInputSampleCount = pluginState->loadedSound.sound.sampleCount;
-	      s64 testModelInputSampleCount = 2400; // TODO: feed the whole file
+      r32 *testModelInput = pluginState->loadedSound.sound.samples[0];
+      //s64 testModelInputSampleCount = pluginState->loadedSound.sound.sampleCount;
+      s64 testModelInputSampleCount = 2400; // TODO: feed the whole file
 #else	  
-	      ReadFileResult testInputFile = globalPlatform.readEntireFile(DATA_PATH"/test_input.data",
-									   &pluginState->permanentArena);
-	      ReadFileResult testOutputFile = globalPlatform.readEntireFile(DATA_PATH"/test_output.data",
-									    &pluginState->permanentArena);
-	      r32 *testModelInput = (r32 *)testInputFile.contents;
-	      s64 testModelInputSampleCount = (testInputFile.contentsSize - 1)/(2*sizeof(r32));
+      ReadFileResult testInputFile = globalPlatform.readEntireFile(DATA_PATH"/test_input.data",
+								   &pluginState->permanentArena);
+      ReadFileResult testOutputFile = globalPlatform.readEntireFile(DATA_PATH"/test_output.data",
+								    &pluginState->permanentArena);
+      r32 *testModelInput = (r32 *)testInputFile.contents;
+      s64 testModelInputSampleCount = (testInputFile.contentsSize - 1)/(2*sizeof(r32));
 #endif
-	      void *outputData = globalPlatform.runModel(testModelInput, testModelInputSampleCount);
-	      r32 *outputFloat = (r32 *)outputData;
+      void *outputData = globalPlatform.runModel(testModelInput, testModelInputSampleCount);
+      r32 *outputFloat = (r32 *)outputData;
 #endif
 
-	      pluginState->initialized = true;
-	    }
-	}
-    }
-  
+      pluginState->initialized = true;
+      globalPluginState = pluginState;
+    }  
   return(pluginState);
 }
 
 extern "C"
 RENDER_NEW_FRAME(renderNewFrame)
 { 
-  PluginState *pluginState = initializePluginState(memory);
-  if(pluginState)
-    {      
+  initializePluginState(memory);
+  if(globalPluginState)
+    {
+      PluginState *pluginState = globalPluginState;
       //renderBeginCommands(renderCommands, &pluginState->frameArena);
+      TemporaryMemory scratch = arenaGetScratch(0, 0);
      
       logFormatString("mouseP: (%.2f, %.2f)", input->mouseState.position.x, input->mouseState.position.y);
       logFormatString("mouseLeft: %s, %s",
@@ -371,7 +383,7 @@ RENDER_NEW_FRAME(renderNewFrame)
       UIContext *uiContext = &pluginState->uiContext;
       uiContextNewFrame(uiContext, &input->mouseState, &input->keyboardState, renderCommands->windowResized);
       
-      TemporaryMemory scratchMemory = arenaBeginTemporaryMemory(&pluginState->frameArena, KILOBYTES(128));
+      //TemporaryMemory scratchMemory = arenaBeginTemporaryMemory(&pluginState->frameArena, KILOBYTES(128));
 
       if(pluginState->pluginHost == PluginHost_executable)
 	{
@@ -386,7 +398,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 	{
 	  for(UIPanel *panel = pluginState->menuPanel; panel; panel = uiPanelIteratorDepthFirstPreorder(panel).next)
 	    {
-	      Rect2 panelRect = uiComputeRectFromPanel(panel, screenRect, (Arena *)&scratchMemory);	      
+	      Rect2 panelRect = uiComputeRectFromPanel(panel, screenRect, scratch.arena);	      
 
 	      if(!panel->first)
 		{
@@ -462,7 +474,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 	  // NOTE: non-leaf ui
 	  for(UIPanel *panel = pluginState->rootPanel; panel; panel = uiPanelIteratorDepthFirstPreorder(panel).next)
 	    {
-	      Rect2 panelRect = uiComputeRectFromPanel(panel, screenRect, (Arena *)&scratchMemory);
+	      Rect2 panelRect = uiComputeRectFromPanel(panel, screenRect, scratch.arena);
 	      v2 panelDim = getDim(panelRect);
 
 	      if(panel->first)
@@ -540,7 +552,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 	  for(UIPanel *panel = pluginState->rootPanel; panel; panel = uiPanelIteratorDepthFirstPreorder(panel).next)
 	    {
 	      // NOTE: calculate rectangles
-	      Rect2 panelRect = uiComputeRectFromPanel(panel, screenRect, (Arena *)&scratchMemory);	  
+	      Rect2 panelRect = uiComputeRectFromPanel(panel, screenRect, scratch.arena);	  
 	  	  
 	      // NOTE: build ui
 	      if(!panel->first)
@@ -1147,254 +1159,262 @@ RENDER_NEW_FRAME(renderNewFrame)
 	    }
 	}
       
-      arenaEndTemporaryMemory(&scratchMemory);
+      //arenaEndTemporaryMemory(&scratchMemory);
+      arenaReleaseScratch(scratch);
       uiContextEndFrame(uiContext);
       
-      arenaEnd(&pluginState->frameArena);
+      arenaEnd(pluginState->frameArena);
 
-      logFormatString("permanent arena used %zu bytes", pluginState->permanentArena.used);
+      logFormatString("permanent arena used %zu bytes", pluginState->permanentArena->pos);
     }  
 }
 
 extern "C"
 AUDIO_PROCESS(audioProcess)
 {  
-  PluginState *pluginState = getPluginState(memory);
-  if(pluginState->initialized)
+  //PluginState *pluginState = getPluginState(memory);  
+  if(globalPluginState)
     {
-      // NOTE: dequeue host-driven parameter value changes
-      u32 queuedCount = globalPlatform.atomicLoad(&audioBuffer->queuedCount);
-      if(queuedCount)
+      PluginState *pluginState = globalPluginState;
+      if(pluginState->initialized)
 	{
-	  u32 parameterValueQueueReadIndex = audioBuffer->parameterValueQueueReadIndex;
-	  for(u32 entryIndex = 0; entryIndex < queuedCount; ++entryIndex)
+	  TemporaryMemory scratch = arenaGetScratch(0, 0);
+
+	  // NOTE: dequeue host-driven parameter value changes
+	  u32 queuedCount = globalPlatform.atomicLoad(&audioBuffer->queuedCount);
+	  if(queuedCount)
 	    {
-	      ParameterValueQueueEntry *entry =
-		audioBuffer->parameterValueQueueEntries + parameterValueQueueReadIndex;
-
-	      PluginFloatParameter *parameter = pluginState->parameters + entry->index;
-	      //r32 parameterRangeLen = getLength(parameter->range);
-	      //r32 newVal = entry->value.asFloat*parameterRangeLen + parameter->range.min;
-	      r32 newVal = mapToRange(entry->value.asFloat, parameter->range);
-	      pluginSetFloatParameter(parameter, newVal);
-	    }
-
-	  audioBuffer->parameterValueQueueReadIndex =
-	    (parameterValueQueueReadIndex + queuedCount) % ARRAY_COUNT(audioBuffer->parameterValueQueueEntries);
-
-	  u32 entriesRead = queuedCount;
-	  while(globalPlatform.atomicCompareAndSwap(&audioBuffer->queuedCount,
-						    queuedCount, queuedCount - entriesRead) != queuedCount)
-	    {
-	      queuedCount = globalPlatform.atomicLoad(&audioBuffer->queuedCount);
-	    }
-	}
-      
-      // NOTE: copy plugin input audio to the grain buffer
-      u32 framesToRead = audioBuffer->framesToWrite;      
-      r32 inputBufferReadSpeed = ((audioBuffer->inputSampleRate != 0) ?
-				  (r32)INTERNAL_SAMPLE_RATE/(r32)audioBuffer->inputSampleRate : 1.f);
-      r32 scaledFramesToRead = inputBufferReadSpeed*framesToRead;
-      
-      AudioRingBuffer *gbuff = &pluginState->grainBuffer;
-      PlayingSound *loadedSound = &pluginState->loadedSound;
-
-      r32 *inputMixBuffers[2] = {};
-      TemporaryMemory inputMixerMemory = arenaBeginTemporaryMemory(&pluginState->permanentArena, KILOBYTES(32));      
-      inputMixBuffers[0] = arenaPushArray((Arena *)&inputMixerMemory, framesToRead, r32,
-					  arenaFlagsZeroAlign(4*sizeof(r32)));
-      inputMixBuffers[1] = arenaPushArray((Arena *)&inputMixerMemory, framesToRead, r32,
-					  arenaFlagsZeroAlign(4*sizeof(r32)));
-
-      const void *genericInputFrames[2] = {};
-      genericInputFrames[0] = audioBuffer->inputBuffer[0];
-      genericInputFrames[1] = audioBuffer->inputBuffer[1];
-
-      for(u32 frameIndex = 0; frameIndex < framesToRead; ++frameIndex)
-	{		
-	  bool soundIsPlaying = pluginReadBooleanParameter(&pluginState->soundIsPlaying);       
-	  r32 currentTime = (r32)loadedSound->samplesPlayed + inputBufferReadSpeed*(r32)frameIndex;
-	  u32 soundReadIndex = (u32)currentTime;
-	  r32 soundReadFrac = currentTime - (r32)soundReadIndex;		
-
-	  for(u32 channelIndex = 0; channelIndex < audioBuffer->inputChannels; ++channelIndex)
-	    {
-	      r32 mixedVal = 0.f;		   
-	      if(soundIsPlaying)		       
-		{			
-		  if(currentTime < loadedSound->sound.sampleCount)
-		    {
-		      r32 loadedSoundSample0 = loadedSound->sound.samples[channelIndex][soundReadIndex];
-		      r32 loadedSoundSample1 = loadedSound->sound.samples[channelIndex][soundReadIndex + 1];
-		      r32 loadedSoundSample = lerp(loadedSoundSample0, loadedSoundSample1, soundReadFrac);
-
-		      mixedVal += 0.5f*loadedSoundSample;
-		    }
-		  else
-		    {		      
-		      pluginSetBooleanParameter(&pluginState->soundIsPlaying, false);
-		      loadedSound->samplesPlayed = 0;// + pluginState->start_pos);
-		    }		  
-		}
-
-	      switch(audioBuffer->inputFormat)
+	      u32 parameterValueQueueReadIndex = audioBuffer->parameterValueQueueReadIndex;
+	      for(u32 entryIndex = 0; entryIndex < queuedCount; ++entryIndex)
 		{
-		case AudioFormat_s16:
-		  {
-		    s16 *inputFrames = (s16 *)genericInputFrames[channelIndex];
-		    r32 inputSample = (r32)*inputFrames/(r32)S16_MAX;		    
-		    //ASSERT(isInRange(inputSample, -1.f, 1.f));
-		    inputSample = clampToRange(inputSample, -1.f, 1.f);
-		    mixedVal += 0.5f*inputSample;
+		  ParameterValueQueueEntry *entry =
+		    audioBuffer->parameterValueQueueEntries + parameterValueQueueReadIndex;
 
-		    genericInputFrames[channelIndex] = (u8 *)inputFrames + audioBuffer->inputStride;
-		  } break;
-
-		case AudioFormat_r32:
-		  {
-		    r32 *inputFrames = (r32 *)genericInputFrames[channelIndex];
-		    r32 inputSample = *inputFrames;
-		    //ASSERT(isInRange(inputSample, -1.f, 1.f));
-		    inputSample = clampToRange(inputSample, -1.f, 1.f);
-		    mixedVal += 0.5f*inputSample;		    
-
-		    genericInputFrames[channelIndex] = (u8 *)inputFrames + audioBuffer->inputStride;
-		  } break;
-
-		  // default: {ASSERT(!"invalid input format");} break;
-		default: {} break;
+		  PluginFloatParameter *parameter = pluginState->parameters + entry->index;
+		  //r32 parameterRangeLen = getLength(parameter->range);
+		  //r32 newVal = entry->value.asFloat*parameterRangeLen + parameter->range.min;
+		  r32 newVal = mapToRange(entry->value.asFloat, parameter->range);
+		  pluginSetFloatParameter(parameter, newVal);
 		}
-	      
-	      inputMixBuffers[channelIndex][frameIndex] = mixedVal;		   
+
+	      audioBuffer->parameterValueQueueReadIndex =
+		(parameterValueQueueReadIndex + queuedCount) % ARRAY_COUNT(audioBuffer->parameterValueQueueEntries);
+
+	      u32 entriesRead = queuedCount;
+	      while(globalPlatform.atomicCompareAndSwap(&audioBuffer->queuedCount,
+							queuedCount, queuedCount - entriesRead) != queuedCount)
+		{
+		  queuedCount = globalPlatform.atomicLoad(&audioBuffer->queuedCount);
+		}
 	    }
-	}
       
-      bool soundIsPlaying = pluginReadBooleanParameter(&pluginState->soundIsPlaying);
-      if(soundIsPlaying)
-	{
-	  loadedSound->samplesPlayed += scaledFramesToRead;
-	}
-
-      writeSamplesToAudioRingBuffer(gbuff, inputMixBuffers[0], inputMixBuffers[1], framesToRead);
-      //arenaEndTemporaryMemory(&inputMixerMemory);
-
-      // NOTE: grain playback
-      GrainManager* gManager = &pluginState->grainManager;
-      u32 framesToWrite = audioBuffer->framesToWrite;
-            
-      TemporaryMemory grainMixerMemory = arenaBeginTemporaryMemory(&pluginState->permanentArena, KILOBYTES(128));
-      r32 *grainMixBuffers[2] = {};
-      grainMixBuffers[0] = arenaPushArray((Arena *)&grainMixerMemory, framesToWrite, r32,
-					  arenaFlagsZeroNoAlign());
-      grainMixBuffers[1] = arenaPushArray((Arena *)&grainMixerMemory, framesToWrite, r32,
-					  arenaFlagsZeroNoAlign());
-      synthesize(grainMixBuffers[0], grainMixBuffers[1],
-		 gManager, pluginState,
-		 framesToWrite);
-
-      // NOTE: audio output
-      r32 formatVolumeFactor = 1.f;      
-      switch(audioBuffer->outputFormat)
-	{
-	case AudioFormat_s16:
-	  {
-	    formatVolumeFactor = 32000.f;
-	  } break;
-	case AudioFormat_r32: break;
-	default: { ASSERT(!"invalid audio format"); } break;
-	}
+	  // NOTE: copy plugin input audio to the grain buffer
+	  u32 framesToRead = audioBuffer->framesToWrite;      
+	  r32 inputBufferReadSpeed = ((audioBuffer->inputSampleRate != 0) ?
+				      (r32)INTERNAL_SAMPLE_RATE/(r32)audioBuffer->inputSampleRate : 1.f);
+	  r32 scaledFramesToRead = inputBufferReadSpeed*framesToRead;
       
-      void *genericOutputFrames[2] = {};
-      genericOutputFrames[0] = audioBuffer->outputBuffer[0];
-      genericOutputFrames[1] = audioBuffer->outputBuffer[1];     
+	  AudioRingBuffer *gbuff = &pluginState->grainBuffer;
+	  PlayingSound *loadedSound = &pluginState->loadedSound;
 
-      u8 *atMidiBuffer = audioBuffer->midiBuffer;
+	  r32 *inputMixBuffers[2] = {};
+	  //TemporaryMemory inputMixerMemory = arenaBeginTemporaryMemory(&pluginState->permanentArena, KILOBYTES(32));      
+	  inputMixBuffers[0] = arenaPushArray(scratch.arena, framesToRead, r32,
+					      arenaFlagsZeroAlign(4*sizeof(r32)));
+	  inputMixBuffers[1] = arenaPushArray(scratch.arena, framesToRead, r32,
+					      arenaFlagsZeroAlign(4*sizeof(r32)));
 
-      for(u32 frameIndex = 0; frameIndex < audioBuffer->framesToWrite; ++frameIndex)
-	{
-	  atMidiBuffer = midi::parseMidiMessage(atMidiBuffer, pluginState,
-						audioBuffer->midiMessageCount, frameIndex);
+	  const void *genericInputFrames[2] = {};
+	  genericInputFrames[0] = audioBuffer->inputBuffer[0];
+	  genericInputFrames[1] = audioBuffer->inputBuffer[1];
 
-	  PluginFloatParameter *volumeParameter = pluginState->parameters + PluginParameter_volume;
-	  r32 volumeRaw = pluginReadFloatParameter(volumeParameter);
-	  r32 volume =  formatVolumeFactor*volumeParameter->processingTransform(volumeRaw);
+	  for(u32 frameIndex = 0; frameIndex < framesToRead; ++frameIndex)
+	    {		
+	      bool soundIsPlaying = pluginReadBooleanParameter(&pluginState->soundIsPlaying);       
+	      r32 currentTime = (r32)loadedSound->samplesPlayed + inputBufferReadSpeed*(r32)frameIndex;
+	      u32 soundReadIndex = (u32)currentTime;
+	      r32 soundReadFrac = currentTime - (r32)soundReadIndex;		
 
-	  r32 mixParam = pluginReadFloatParameter(&pluginState->parameters[PluginParameter_mix]);
+	      for(u32 channelIndex = 0; channelIndex < audioBuffer->inputChannels; ++channelIndex)
+		{
+		  r32 mixedVal = 0.f;		   
+		  if(soundIsPlaying)		       
+		    {			
+		      if(currentTime < loadedSound->sound.sampleCount)
+			{
+			  r32 loadedSoundSample0 = loadedSound->sound.samples[channelIndex][soundReadIndex];
+			  r32 loadedSoundSample1 = loadedSound->sound.samples[channelIndex][soundReadIndex + 1];
+			  r32 loadedSoundSample = lerp(loadedSoundSample0, loadedSoundSample1, soundReadFrac);
 
-	  for(u32 channelIndex = 0; channelIndex < audioBuffer->outputChannels; ++channelIndex)
+			  mixedVal += 0.5f*loadedSoundSample;
+			}
+		      else
+			{		      
+			  pluginSetBooleanParameter(&pluginState->soundIsPlaying, false);
+			  loadedSound->samplesPlayed = 0;// + pluginState->start_pos);
+			}		  
+		    }
+
+		  switch(audioBuffer->inputFormat)
+		    {
+		    case AudioFormat_s16:
+		      {
+			s16 *inputFrames = (s16 *)genericInputFrames[channelIndex];
+			r32 inputSample = (r32)*inputFrames/(r32)S16_MAX;		    
+			//ASSERT(isInRange(inputSample, -1.f, 1.f));
+			inputSample = clampToRange(inputSample, -1.f, 1.f);
+			mixedVal += 0.5f*inputSample;
+
+			genericInputFrames[channelIndex] = (u8 *)inputFrames + audioBuffer->inputStride;
+		      } break;
+
+		    case AudioFormat_r32:
+		      {
+			r32 *inputFrames = (r32 *)genericInputFrames[channelIndex];
+			r32 inputSample = *inputFrames;
+			//ASSERT(isInRange(inputSample, -1.f, 1.f));
+			inputSample = clampToRange(inputSample, -1.f, 1.f);
+			mixedVal += 0.5f*inputSample;		    
+
+			genericInputFrames[channelIndex] = (u8 *)inputFrames + audioBuffer->inputStride;
+		      } break;
+
+		      // default: {ASSERT(!"invalid input format");} break;
+		    default: {} break;
+		    }
+	      
+		  inputMixBuffers[channelIndex][frameIndex] = mixedVal;		   
+		}
+	    }
+      
+	  bool soundIsPlaying = pluginReadBooleanParameter(&pluginState->soundIsPlaying);
+	  if(soundIsPlaying)
 	    {
-	      r32 mixedVal = 0.f;
+	      loadedSound->samplesPlayed += scaledFramesToRead;
+	    }
+
+	  writeSamplesToAudioRingBuffer(gbuff, inputMixBuffers[0], inputMixBuffers[1], framesToRead);
+	  //arenaEndTemporaryMemory(&inputMixerMemory);
+
+	  // NOTE: grain playback
+	  GrainManager* gManager = &pluginState->grainManager;
+	  u32 framesToWrite = audioBuffer->framesToWrite;
+            
+	  //TemporaryMemory grainMixerMemory = arenaBeginTemporaryMemory(&pluginState->permanentArena, KILOBYTES(128));
+	  r32 *grainMixBuffers[2] = {};
+	  grainMixBuffers[0] = arenaPushArray(scratch.arena, framesToWrite, r32,
+					      arenaFlagsZeroNoAlign());
+	  grainMixBuffers[1] = arenaPushArray(scratch.arena, framesToWrite, r32,
+					      arenaFlagsZeroNoAlign());
+	  synthesize(grainMixBuffers[0], grainMixBuffers[1],
+		     gManager, pluginState,
+		     framesToWrite);
+
+	  // NOTE: audio output
+	  r32 formatVolumeFactor = 1.f;      
+	  switch(audioBuffer->outputFormat)
+	    {
+	    case AudioFormat_s16:
+	      {
+		formatVolumeFactor = 32000.f;
+	      } break;
+	    case AudioFormat_r32: break;
+	    default: { ASSERT(!"invalid audio format"); } break;
+	    }
+      
+	  void *genericOutputFrames[2] = {};
+	  genericOutputFrames[0] = audioBuffer->outputBuffer[0];
+	  genericOutputFrames[1] = audioBuffer->outputBuffer[1];     
+
+	  u8 *atMidiBuffer = audioBuffer->midiBuffer;
+
+	  for(u32 frameIndex = 0; frameIndex < audioBuffer->framesToWrite; ++frameIndex)
+	    {
+	      atMidiBuffer = midi::parseMidiMessage(atMidiBuffer, pluginState,
+						    audioBuffer->midiMessageCount, frameIndex);
+
+	      PluginFloatParameter *volumeParameter = pluginState->parameters + PluginParameter_volume;
+	      r32 volumeRaw = pluginReadFloatParameter(volumeParameter);
+	      r32 volume =  formatVolumeFactor*volumeParameter->processingTransform(volumeRaw);
+
+	      r32 mixParam = pluginReadFloatParameter(&pluginState->parameters[PluginParameter_mix]);
+
+	      for(u32 channelIndex = 0; channelIndex < audioBuffer->outputChannels; ++channelIndex)
+		{
+		  r32 mixedVal = 0.f;
 	      
 #if 0
-	      // TODO: reading from the grain buffer does not have to do interpolation since it runs at the internal sample rate
-	      r32 grainReadPosition = sampleRateRatio*frameIndex;
-	      u32 grainReadIndex = (u32)grainReadPosition;
-	      r32 grainReadFrac = grainReadPosition - grainReadIndex;
+		  // TODO: reading from the grain buffer does not have to do interpolation since it runs at the internal sample rate
+		  r32 grainReadPosition = sampleRateRatio*frameIndex;
+		  u32 grainReadIndex = (u32)grainReadPosition;
+		  r32 grainReadFrac = grainReadPosition - grainReadIndex;
 
-	      ASSERT(grainReadIndex + 1 < scaledFramesToWrite);
-	      r32 firstGrainVal = grainMixBuffers[channelIndex][grainReadIndex];
-	      r32 nextGrainVal = grainMixBuffers[channelIndex][grainReadIndex + 1];
-	      r32 grainVal = lerp(firstGrainVal, nextGrainVal, grainReadFrac);
+		  ASSERT(grainReadIndex + 1 < scaledFramesToWrite);
+		  r32 firstGrainVal = grainMixBuffers[channelIndex][grainReadIndex];
+		  r32 nextGrainVal = grainMixBuffers[channelIndex][grainReadIndex + 1];
+		  r32 grainVal = lerp(firstGrainVal, nextGrainVal, grainReadFrac);
 #else
-	      r32 grainVal = grainMixBuffers[channelIndex][frameIndex];
-	      r32 leftGrainVal = grainMixBuffers[0][frameIndex];
-	      r32 rightGrainVal = grainMixBuffers[1][frameIndex];
-	      r32 stereoWidth = pluginReadFloatParameter(&pluginState->parameters[PluginParameter_spread]);
+		  r32 grainVal = grainMixBuffers[channelIndex][frameIndex];
+		  r32 leftGrainVal = grainMixBuffers[0][frameIndex];
+		  r32 rightGrainVal = grainMixBuffers[1][frameIndex];
+		  r32 stereoWidth = pluginReadFloatParameter(&pluginState->parameters[PluginParameter_spread]);
 		  r32 panner = pluginReadFloatParameter(&pluginState->parameters[PluginParameter_pan]);
-	      if (channelIndex < 2) { // Make sure we only process left and right channels
-		//r32 widthVal = stereoWidth * 0.5f;
-			r32 tmp = 1.0f / fmaxf(1.0f + stereoWidth, 2.0f);
-			r32 coef_M = 1.0f * tmp;
-			r32 coef_S = stereoWidth * tmp;
+		  if (channelIndex < 2) { // Make sure we only process left and right channels
+		    //r32 widthVal = stereoWidth * 0.5f;
+		    r32 tmp = 1.0f / fmaxf(1.0f + stereoWidth, 2.0f);
+		    r32 coef_M = 1.0f * tmp;
+		    r32 coef_S = stereoWidth * tmp;
 
-			r32 mid = (leftGrainVal + rightGrainVal) * coef_M;
-			r32 sides = (rightGrainVal - leftGrainVal) * coef_S;
+		    r32 mid = (leftGrainVal + rightGrainVal) * coef_M;
+		    r32 sides = (rightGrainVal - leftGrainVal) * coef_S;
 
-			// Update grain value based on channel
-			if (channelIndex == 0) {
-			  grainVal = mid - sides; // Left channel
-			  grainVal = grainVal * (1 - panner);
-			}
-			else {
-			  grainVal = mid + sides; // Right channel
-			  grainVal = grainVal * (1 + panner);
-			}
-	      }
+		    // Update grain value based on channel
+		    if (channelIndex == 0) {
+		      grainVal = mid - sides; // Left channel
+		      grainVal = grainVal * (1 - panner);
+		    }
+		    else {
+		      grainVal = mid + sides; // Right channel
+		      grainVal = grainVal * (1 + panner);
+		    }
+		  }
 #endif
 	      	      
-	      mixedVal += lerp(inputMixBuffers[channelIndex][frameIndex], grainVal, mixParam);
-	      //logFormatString("mixedVal: %.2f", mixedVal);
+		  mixedVal += lerp(inputMixBuffers[channelIndex][frameIndex], grainVal, mixParam);
+		  //logFormatString("mixedVal: %.2f", mixedVal);
 	     
-	      switch(audioBuffer->outputFormat)
-		{
-		case AudioFormat_r32:
-		  {
-		    r32 *audioFrames = (r32 *)genericOutputFrames[channelIndex];
-		    *audioFrames = volume*mixedVal;
-		    genericOutputFrames[channelIndex] = (u8 *)audioFrames + audioBuffer->outputStride;
-		  } break;
-		case AudioFormat_s16:
-		  {
-		    s16 *audioFrames = (s16 *)genericOutputFrames[channelIndex];
-		    *audioFrames = (s16)(volume*mixedVal);
-		    genericOutputFrames[channelIndex] = (u8 *)audioFrames + audioBuffer->outputStride;
-		  } break;
+		  switch(audioBuffer->outputFormat)
+		    {
+		    case AudioFormat_r32:
+		      {
+			r32 *audioFrames = (r32 *)genericOutputFrames[channelIndex];
+			*audioFrames = volume*mixedVal;
+			genericOutputFrames[channelIndex] = (u8 *)audioFrames + audioBuffer->outputStride;
+		      } break;
+		    case AudioFormat_s16:
+		      {
+			s16 *audioFrames = (s16 *)genericOutputFrames[channelIndex];
+			*audioFrames = (s16)(volume*mixedVal);
+			genericOutputFrames[channelIndex] = (u8 *)audioFrames + audioBuffer->outputStride;
+		      } break;
 
-		default: ASSERT(!"ERROR: invalid audio output format");
+		    default: ASSERT(!"ERROR: invalid audio output format");
+		    }
 		}
+
+	      pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_volume]);
+	      pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_density]);
+	      pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_window]);
+	      pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_size]);
+	      pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_spread]);
+	      pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_mix]);
+	      pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_pan]);
+	      pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_offset]);
 	    }
 
-	  pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_volume]);
-	  pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_density]);
-	  pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_window]);
-	  pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_size]);
-	  pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_spread]);
-	  pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_mix]);
-	  pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_pan]);
-	  pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_offset]);
+	  //arenaEndTemporaryMemory(&inputMixerMemory);
+	  //arenaEndTemporaryMemory(&grainMixerMemory);
+	  arenaReleaseScratch(scratch);
 	}
-
-      arenaEndTemporaryMemory(&inputMixerMemory);
-      arenaEndTemporaryMemory(&grainMixerMemory);      
     }
 }

@@ -7,13 +7,16 @@ struct Arena
   usz capacity;
   usz used;
 #else
-  Arena *prev;
   Arena *current;
-  u8 *base;
+  Arena *prev;
+  usz base;
   usz capacity;
-  usz used;
+  usz pos;
 #endif
 };
+
+#define ARENA_HEADER_SIZE 64
+STATIC_ASSERT(sizeof(Arena) <= ARENA_HEADER_SIZE, ARENA_HEADER_CHECK);
 
 struct TemporaryMemory
 {
@@ -112,23 +115,24 @@ arenaPushSize_(Arena *arena, usz size, ArenaPushFlags flags = defaultArenaPushFl
   u8 *result = 0;
 
   Arena *current = arena->current;
-  usz alignedPos = flags.alignment ? ALIGN_POW_2(current->used, flags.alignment) : current->used;
+  usz alignedPos = flags.alignment ? ALIGN_POW_2(current->pos, flags.alignment) : current->pos;
   usz newPos = alignedPos + size;
   if(newPos > current->capacity)
   {
-    usz allocSize = MAX(size, current->capacity);
+    usz allocSize = MAX(size + ARENA_HEADER_SIZE, current->capacity);
     Arena *newBlock = gs_arenaAcquire(allocSize);
+    newBlock->base = current->base + current->pos;
     newBlock->prev = current;
     arena->current = newBlock;
     
     current = arena->current;
-    alignedPos = flags.alignment ? ALIGN_POW_2(current->used, flags.alignment) : current->used;
+    alignedPos = flags.alignment ? ALIGN_POW_2(current->pos, flags.alignment) : current->pos;
     newPos = alignedPos + size;
   }
 
   ASSERT(newPos <= current->capacity);
-  result = current->base + alignedPos;
-  current->used = newPos;
+  result = (u8*)current + alignedPos;
+  current->pos = newPos;
 #endif
 
   if(flags.clearToZero)
@@ -157,56 +161,47 @@ arenaPushString(Arena *arena, char *string)
 }
 #endif
 
+#if OLD_ARENA
+#else
+static inline usz
+arenaGetPos(Arena *arena)
+{
+  Arena *current = arena->current;
+  usz result = current->base + current->pos;
+  return(result);
+}
+
+static inline void
+arenaPopTo(Arena *arena, usz pos)
+{
+  pos = MAX(pos, ARENA_HEADER_SIZE);
+  Arena *current = arena->current;
+  
+  for(Arena *prev = 0; current->base >= pos; current = prev)
+    {
+      prev = current->prev;
+      gs_arenaDiscard(current);
+    }
+
+  arena->current = current;
+  usz newPos = pos - current->base;
+  ASSERT(newPos <= current->pos);
+  current->pos = newPos;
+}
+#endif
+
 static inline void
 arenaPopSize(Arena *arena, usz size)
 {
 #if OLD_ARENA
   arena->used -= size;
 #else
-  Arena *current = arena->current;
-  usz sizeToPop = size;
-  while(sizeToPop > current->used)
-    {
-      sizeToPop -= current->used;
-      arena->current = current->prev;
-      gs_arenaDiscard(current);
-    
-      current = arena->current;
-    }
-
-  current->used -= sizeToPop;
+  usz pos = arenaGetPos(arena);
+  ASSERT(size <= pos);
+  usz newPos = pos - size;
+  arenaPopTo(arena, newPos);
 #endif
 }
-
-#if OLD_ARENA
-#else
-static inline usz
-arenaGetPos(Arena *arena)
-{
-  usz pos = INT_FROM_PTR(arena->current->base) + arena->current->used;
-  return(pos);
-}
-
-static inline void
-arenaPopTo(Arena *arena, usz pos)
-{
-  Arena *current = arena->current;
-  usz base = INT_FROM_PTR(current->base);
-  usz max = base + current->used;
-  while(pos < base || pos > max)
-    {
-      arena->current = current->prev;
-      gs_arenaDiscard(current);
-      
-      current = arena->current;
-      base = INT_FROM_PTR(current->base);
-      max = base + current->used;
-    }
-
-  ASSERT(pos >= base && pos <= max);
-  current->used = pos - base;
-}
-#endif
 
 #if OLD_ARENA
 static inline Arena
