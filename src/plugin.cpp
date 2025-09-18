@@ -59,6 +59,21 @@
      - allocate hardware ring buffer?
 */
 
+/*
+  NEW ISSUES: WEB PORT:
+  - knob alignment values seem to be slightly off. they are not quite rotating about the center
+  - the volume fader is not moving along the whole range
+  - the ui system sucks ass
+  - it would be nice if the arena system allowed usage code to create new
+    arenas from a global pool of reserved virtual address space, rather than
+    requiring upstream code pass backing memory. This would simplify a bunch of
+    code in all translation units (including WASM), and lead to less memory
+    allocation overall
+  - it would also be nice if temporary memory worked better, with checkpoints
+    instead of pushing the temporary size, and if you could just get a scratch
+    arena whenever
+ */
+
 #include "plugin.h"
 
 #include "fft_test.cpp"

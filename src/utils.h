@@ -10,6 +10,14 @@
 #  define C_LINKAGE
 #endif
 
+#if COMPILER_MSVC
+#  define thread_var __declspec(thread)
+#elif COMPILER_CLANG || COMPILER_GCC
+#  define thread_var __thread
+#else
+#  error thread_var not supported on this compiler
+#endif
+
 #if BUILD_DEBUG
 #  if COMPILER_MSVC
 #    define ASSERT(cond) if(!(cond)) { __debugbreak(); *(int*)0 = 0; }
