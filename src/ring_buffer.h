@@ -27,6 +27,7 @@ struct SharedRingBuffer
   volatile u32 queuedCount;
 };
 
+#if 0
 inline void
 copyFloatArrayWide(r32 *destInit, r32 *srcInit, u32 count)
 {
@@ -64,6 +65,7 @@ copyFloatArrayWide(r32 *destInit, r32 *srcInit, u32 count)
       src += simdWidth;
     }
 }
+#endif
 
 inline void
 writeSamplesToAudioRingBuffer(AudioRingBuffer *rb, r32 *srcL, r32 *srcR, u32 count, bool increment = true)

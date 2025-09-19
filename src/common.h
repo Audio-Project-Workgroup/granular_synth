@@ -114,6 +114,7 @@ struct PlatformAPI
 
   PlatformGetCurrentTimestamp *getCurrentTimestamp;
 
+  // TODO: we could implement these ourselves
   PlatformAbs	*abs;
   PlatformSqrt	*sqrt;
   PlatformSin	*sin;

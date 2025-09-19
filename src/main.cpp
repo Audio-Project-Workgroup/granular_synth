@@ -33,14 +33,18 @@ r32 gs_powf(r32 base, r32 exp)	{ return(powf(base, exp)); }
 #define GLFW_INCLUDE_GLEXT
 #include <GLFW/glfw3.h>
 
-#define GL_PRINT_ERROR(msg, ...) do {		\
+#if BUILD_DEBUG
+#  define GL_PRINT_ERROR(msg, ...) do {		\
     GLenum err = glGetError();			\
     if(err) {					\
       fprintf(stderr, msg, err, ##__VA_ARGS__);	\
     }						\
   } while(0)
-
-#define GL_CATCH_ERROR() do { GLenum err = glGetError(); if(err != GL_NO_ERROR) ASSERT(0); } while(0)
+#  define GL_CATCH_ERROR() do { GLenum err = glGetError(); if(err != GL_NO_ERROR) ASSERT(0); } while(0)
+#else
+#  define GL_PRINT_ERROR(msg, ...)
+#  define GL_CATCH_ERROR()
+#endif
 
 #include "miniaudio.h"
 

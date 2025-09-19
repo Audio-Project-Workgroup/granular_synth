@@ -63,20 +63,14 @@
   NEW ISSUES: WEB PORT:
   - knob alignment values seem to be slightly off. they are not quite rotating about the center
   - the volume fader is not moving along the whole range
+  - we need to change how functions declared as shared between host and plugin
+    to allow for the possibility that both are compiled in the same translation unit
   - the ui system sucks ass
-  - it would be nice if the arena system allowed usage code to create new
-    arenas from a global pool of reserved virtual address space, rather than
-    requiring upstream code pass backing memory. This would simplify a bunch of
-    code in all translation units (including WASM), and lead to less memory
-    allocation overall
-  - it would also be nice if temporary memory worked better, with checkpoints
-    instead of pushing the temporary size, and if you could just get a scratch
-    arena whenever
  */
 
 #include "plugin.h"
 
-#include "fft_test.cpp"
+//#include "fft_test.cpp"
 #include "midi.cpp"
 #include "ui_layout.cpp"
 //#include "file_granulator.cpp"
@@ -103,26 +97,10 @@ void   gs_arenaDiscard(Arena *arena) { return(globalPlatform.arenaDiscard(arena)
 inline void
 printButtonState(ButtonState button, char *name)
 {
-  // printf("%s: %s, %s\n", name,
-  // 	 wasPressed(button) ? "pressed" : "not pressed",
-  // 	 isDown(button) ? "down" : "up");
   logFormatString("%s: %s, %s\n", name,
 		  wasPressed(button) ? "pressed" : "not pressed",
 		  isDown(button) ? "down" : "up");
 }
-
-// static PluginState *
-// getPluginState(PluginMemory *memoryBlock)
-// {
-//   void *memory = memoryBlock->memory;
-//   PluginState *pluginState = 0;
-//   if(memory)
-//     {      
-//       pluginState = (PluginState *)memory;
-//     }
-
-//   return(pluginState);
-// }
 
 static PluginState *globalPluginState = 0;
 
@@ -145,15 +123,10 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
       pluginState->pluginHost = memoryBlock->host;
       pluginState->pluginMode = PluginMode_editor;
 
-      //pluginState->permanentArena = gs_arenaAcquire(0);
+      // TODO: maybe these initial sizes can be tuned for fewer allocation calls
       pluginState->frameArena = gs_arenaAcquire(0);
       pluginState->framePermanentArena = gs_arenaAcquire(0);
       pluginState->grainArena = gs_arenaAcquire(0);
-      // pluginState->permanentArena = arenaBegin((u8 *)memory + sizeof(PluginState), MEGABYTES(512));
-      // pluginState->frameArena = arenaSubArena(&pluginState->permanentArena, MEGABYTES(64));
-      // pluginState->framePermanentArena = arenaSubArena(&pluginState->permanentArena, MEGABYTES(64));
-      // pluginState->loadArena = arenaSubArena(&pluginState->permanentArena, MEGABYTES(128));
-      // pluginState->grainArena = arenaSubArena(&pluginState->permanentArena, KILOBYTES(32));
 
       pluginState->pathToPlugin =
 	globalPlatform.getPathToModule(memoryBlock->pluginHandle, (void *)initializePluginState,

@@ -2,7 +2,6 @@ static inline void
 renderPushQuad(RenderCommands *commands, Rect2 rect, LoadedBitmap *texture, r32 angle,
 	       r32 level, v4 color = V4(1, 1, 1, 1))
 {
-#if 1
   if(!texture)
     {
       texture = commands->whiteTexture;
@@ -55,47 +54,6 @@ renderPushQuad(RenderCommands *commands, Rect2 rect, LoadedBitmap *texture, r32 
   quad->level = (r32)level;
 
   ++commands->totalQuadCount;
-
-#else
-  if(texture)
-    {
-      ASSERT(commands->texturedQuadCount < commands->texturedQuadCapacity);
-      TexturedQuad *quad = commands->texturedQuads + commands->texturedQuadCount++;
-
-      v2 dim = getDim(rect);
-      v2 center = getCenter(rect);
-      v2 bottomLeft = rect.min;
-      bottomLeft -= V2(texture->alignPercentage.x*dim.x, texture->alignPercentage.y*dim.y);
-  
-      quad->vertices[0] = makeTexturedVertex(bottomLeft, V2(0, 0), color);
-      quad->vertices[1] = makeTexturedVertex(bottomLeft + V2(dim.x, 0), V2(1, 0), color);
-      quad->vertices[2] = makeTexturedVertex(bottomLeft + V2(0, dim.y), V2(0, 1), color);
-      quad->vertices[3] = makeTexturedVertex(bottomLeft + dim, V2(1, 1), color);      
-
-      quad->texture = texture;
-      quad->angle = angle;
-      quad->matrix = transpose(makeRotationMatrixXY(center, angle));
-      quad->level = level;
-    }
-  else
-    {
-      ASSERT(commands->quadCount < commands->quadCapacity);
-      Quad *quad = commands->quads + commands->quadCount++;
-
-      v2 dim = getDim(rect);
-      v2 center = getCenter(rect);
-      v2 bottomLeft = rect.min;
-  
-      quad->vertices[0] = makeVertex(bottomLeft, color);
-      quad->vertices[1] = makeVertex(bottomLeft + V2(dim.x, 0), color);
-      quad->vertices[2] = makeVertex(bottomLeft + V2(0, dim.y), color);
-      quad->vertices[3] = makeVertex(bottomLeft + dim, color);
-  
-      quad->angle = angle;
-      quad->matrix = transpose(makeRotationMatrixXY(center, angle));
-      quad->level = level;
-    }
-#endif
 }
 
 static inline void
@@ -116,20 +74,6 @@ renderPushRectOutline(RenderCommands *commands, Rect2 rect, r32 thickness, r32 l
   renderPushQuad(commands, rectCenterDim(bottomMiddle, hDim), 0, 0, level, color);
   renderPushQuad(commands, rectCenterDim(topMiddle, hDim), 0, 0, level, color);
 }
-
-/* static inline void */
-/* renderPushTriangle(RenderCommands *commands, TexturedVertex v1, TexturedVertex v2, TexturedVertex v3, */
-/* 		   LoadedBitmap *texture = 0) */
-/* { */
-/*   ASSERT(commands->triangleCount < commands->triangleCapacity); */
-/*   TexturedTriangle *triangle = commands->triangles + commands->triangleCount++; */
-  
-/*   triangle->vertices[0] = v1; */
-/*   triangle->vertices[1] = v2; */
-/*   triangle->vertices[2] = v3; */
-
-/*   triangle->texture = texture; */
-/* } */
 
 static inline v2
 renderPushText(RenderCommands *commands, LoadedFont *font, String8 string,

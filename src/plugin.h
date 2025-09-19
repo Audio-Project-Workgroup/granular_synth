@@ -57,8 +57,8 @@ logFormatString(char *format, ...)
 #endif
 }
 
-#include "simd_intrinsics.h"
-#include "fft.h"
+//#include "simd_intrinsics.h"
+//#include "fft.h"
 #include "plugin_parameters.h"
 #include "file_granulator.h"
 #include "file_formats.h"
@@ -90,7 +90,6 @@ struct PluginState
   Arena *permanentArena;
   Arena *frameArena;
   Arena *framePermanentArena;
-  //Arena loadArena;
 
   PluginHost pluginHost;
   PluginMode pluginMode;
