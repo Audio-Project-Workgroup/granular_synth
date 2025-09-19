@@ -17,8 +17,8 @@ struct TemporaryMemory
   usz pos;
 };
 
-extern Arena* gs_arenaAcquire(usz capacity);
-extern void   gs_arenaDiscard(Arena *arena);
+/* extern Arena* gs_arenaAcquire(usz capacity); */
+/* extern void   gs_arenaDiscard(Arena *arena); */
 //extern void*  gs_acquireMemory(usz size);
 //extern void   gs_discardMemory(void *mem, usz size);
 
@@ -82,7 +82,7 @@ arenaPushSize_(Arena *arena, usz size, ArenaPushFlags flags = defaultArenaPushFl
   if(newPos > current->capacity)
   {
     usz allocSize = MAX(size + ARENA_HEADER_SIZE, current->capacity);
-    Arena *newBlock = gs_arenaAcquire(allocSize);
+    Arena *newBlock = globalPlatform.gsArenaAcquire(allocSize);
     newBlock->base = current->base + current->pos;
     newBlock->prev = current;
     arena->current = newBlock;
@@ -121,7 +121,7 @@ arenaPopTo(Arena *arena, usz pos)
   for(Arena *prev = 0; current->base >= pos; current = prev)
     {
       prev = current->prev;
-      gs_arenaDiscard(current);
+      globalPlatform.gsArenaDiscard(current);
     }
 
   arena->current = current;
@@ -170,7 +170,7 @@ arenaGetScratch(Arena **conflicts, usz conflictsCount)
       Arena **scratchSlot = m__scratchPool;
       for(usz scratchIdx = 0; scratchIdx < ARENA_SCRATCH_POOL_COUNT; ++scratchIdx, ++scratchSlot)
 	{
-	  *scratchSlot = gs_arenaAcquire(0);
+	  *scratchSlot = globalPlatform.gsArenaAcquire(0);
 	}
     }
 

@@ -6,25 +6,6 @@
 
 #include <stdarg.h>
 
-// base string types
-struct String8
-{
-  u8 *str;
-  u64 size;
-};
-
-struct String16
-{
-  u16 *str;
-  u64 size;
-};
-
-struct String32
-{
-  u32 *str;
-  u64 size;
-};
-
 // many-string structures
 struct String8Node
 {

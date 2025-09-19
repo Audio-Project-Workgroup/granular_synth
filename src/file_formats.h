@@ -95,7 +95,7 @@ loadWav(Arena *permanentAllocator, String8 filename)
 
   TemporaryMemory scratch = arenaGetScratch(&permanentAllocator, 1);
 
-  ReadFileResult readResult = globalPlatform.readEntireFile((char*)filename.str, scratch.arena);
+  Buffer readResult = globalPlatform.gsReadEntireFile((char*)filename.str, scratch.arena);
   if(readResult.contents)
     {
       WavHeader *header = (WavHeader *)readResult.contents;
@@ -396,12 +396,12 @@ loadBitmap(char *filename, Arena *allocator, v2 alignment = V2(0, 0))
 {
   LoadedBitmap result = {};
 
-  ReadFileResult readResult = globalPlatform.readEntireFile(filename, allocator);
+  Buffer readResult = globalPlatform.gsReadEntireFile(filename, allocator);
   if(readResult.contents)
     {
       BitmapHeader *header = (BitmapHeader *)readResult.contents;
       ASSERT(header->signature == (u16)RIFF_CODE('B', 'M', ' ', ' '));
-      ASSERT(header->fileSize == readResult.contentsSize - 1);
+      ASSERT(header->fileSize == readResult.size - 1);
       result.pixels = (u32 *)(readResult.contents + header->dataOffset);
       result.width = header->width;
       result.height = header->height;
@@ -479,7 +479,7 @@ loadFont(Arena *permanentAllocator, String8 filename, RangeU32 characterRange, r
 
   TemporaryMemory scratch = arenaGetScratch(&permanentAllocator, 1);
 
-  ReadFileResult readResult = globalPlatform.readEntireFile((char*)filename.str, scratch.arena);
+  Buffer readResult = globalPlatform.gsReadEntireFile((char*)filename.str, scratch.arena);
   if(readResult.contents)
     {
       stbtt_fontinfo stbFontInfo;

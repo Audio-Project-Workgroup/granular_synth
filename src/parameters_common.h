@@ -83,16 +83,14 @@ static PARAMETER_TRANSFORM(defaultTransform)
 
 static PARAMETER_TRANSFORM(decibelsToAmplitude)
 {
-  //r32 amplitude = powf(10.f, val/20.f);
-  r32 amplitude = Pow(10.f, val/20.f);
+  r32 amplitude = globalPlatform.gsPow(10.f, val/20.f);
 
   return(amplitude);
 }
 
 static PARAMETER_TRANSFORM(densityTransform)
 {
-  //r32 grainsPlaying = powf(10.f, val/10.f);
-  r32 grainsPlaying = Pow(10.f, val/10.f);
+  r32 grainsPlaying = globalPlatform.gsPow(10.f, val/10.f);
 
   return(grainsPlaying);
 }

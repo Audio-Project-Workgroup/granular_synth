@@ -220,7 +220,7 @@ renderPushUIElement(RenderCommands *commands, UIElement *element)
 	      r32 paramValue = pluginReadFloatParameter(element->fParam);
 	      r32 paramPercentage = (paramValue - element->fParam->range.min)/(element->fParam->range.max - element->fParam->range.min);
 	      //logFormatString("paramPercentage: %.2f", paramPercentage);
-	      r32 paramAngle = -(paramPercentage - 0.5f)*1.5f*M_PI;
+	      r32 paramAngle = -(paramPercentage - 0.5f)*1.5f*GS_PI;
 	      //r32 paramAngle = -paramPercentage*M_PI;
 
 	      renderPushQuad(commands,

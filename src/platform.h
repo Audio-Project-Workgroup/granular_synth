@@ -195,13 +195,16 @@ threadDestroy(OSThread *thread)
 // memory
 //
 
-static PLATFORM_ALLOCATE_MEMORY(platformAllocateMemory)
+//static PLATFORM_ALLOCATE_MEMORY(platformAllocateMemory)
+static void*
+platformAllocateMemory(usz size)
 {
   void *result = VirtualAlloc(0, size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
   return(result);
 }
 
-static PLATFORM_FREE_MEMORY(platformFreeMemory)
+static void
+platformFreeMemory(void *memory, usz size)
 {
   VirtualFree(memory, size, MEM_RELEASE);
 }
@@ -333,9 +336,11 @@ unloadPluginCode(PluginCode *code)
 // file operations
 //
 
-static PLATFORM_READ_ENTIRE_FILE(platformReadEntireFile)
+//static PLATFORM_READ_ENTIRE_FILE(platformReadEntireFile)
+static Buffer
+platformReadEntireFile(char *filename, Arena *allocator)
 {
-  ReadFileResult result = {};
+  Buffer result = {};
   
   HANDLE fileHandle = CreateFileA(filename, GENERIC_READ, FILE_SHARE_READ, 0,
 				  OPEN_EXISTING, 0, 0);
@@ -346,11 +351,11 @@ static PLATFORM_READ_ENTIRE_FILE(platformReadEntireFile)
 	{
 	  s64 fileSizeInt = s64FromLARGE_INTEGER(fileSize);
 	  ASSERT(fileSizeInt > 0);
-	  result.contentsSize = fileSizeInt;
-	  result.contents = arenaPushSize(allocator, result.contentsSize + 1);
+	  result.size = fileSizeInt;
+	  result.contents = arenaPushSize(allocator, result.size + 1);
 	  
 	  u8 *dest = result.contents;
-	  usz totalBytesToRead = result.contentsSize;
+	  usz totalBytesToRead = result.size;
 	  u32 bytesToRead = safeTruncateU64(totalBytesToRead);
 	  while(totalBytesToRead)
 	    {
@@ -368,13 +373,13 @@ static PLATFORM_READ_ENTIRE_FILE(platformReadEntireFile)
 		  fprintf(stderr, "ERROR: ReadFile failed: %s\n", errorMessage);
 		  
 		  result.contents = 0;
-		  result.contentsSize = 0;
+		  result.size = 0;
 		  break;
 		}
 
 	      if(result.contents)
 		{
-		  result.contents[result.contentsSize++] = 0; // NOTE: null termination
+		  result.contents[result.size++] = 0; // NOTE: null termination
 		}
 	    }
 	}
@@ -399,13 +404,16 @@ static PLATFORM_READ_ENTIRE_FILE(platformReadEntireFile)
   return(result);
 }
 
-static PLATFORM_WRITE_ENTIRE_FILE(platformWriteEntireFile)
+//static PLATFORM_WRITE_ENTIRE_FILE(platformWriteEntireFile)
+static void
+platformWriteEntireFile(char *filename, Buffer file)
 {
   HANDLE fileHandle = CreateFileA(filename, GENERIC_WRITE, FILE_SHARE_WRITE, 0,
 				  CREATE_ALWAYS, 0, 0);
   if(fileHandle != INVALID_HANDLE_VALUE)
     {
-      usz bytesRemaining = fileSize;      
+      void *fileMemory = file.contents;
+      usz bytesRemaining = file.size;      
       while(bytesRemaining)
 	{
 	  u32 bytesToWrite = safeTruncateU64(bytesRemaining);
@@ -427,7 +435,9 @@ static PLATFORM_WRITE_ENTIRE_FILE(platformWriteEntireFile)
     }
 }
 
-static PLATFORM_GET_PATH_TO_MODULE(platformGetPathToModule)
+//static PLATFORM_GET_PATH_TO_MODULE(platformGetPathToModule)
+static String8
+platformGetPathToModule(void *handleToModule, void *functionInModule, Arena *allocator)
 {
   String8 result = {};
   
@@ -826,12 +836,16 @@ static PLATFORM_GET_PATH_TO_MODULE(platformGetPathToModule)
 #error ERROR: unsupported OS
 #endif 
 
-static PLATFORM_FREE_FILE_MEMORY(platformFreeFileMemory)
+//static PLATFORM_FREE_FILE_MEMORY(platformFreeFileMemory)
+static void
+platformFreeFileMemory(Buffer file, Arena *allocator)
 {
-  arenaPopSize(allocator, file.contentsSize);
+  arenaPopSize(allocator, file.size);
 }
 
-static PLATFORM_GET_CURRENT_TIMESTAMP(platformGetCurrentTimestamp)
+//static PLATFORM_GET_CURRENT_TIMESTAMP(platformGetCurrentTimestamp)
+static u64
+platformGetCurrentTimestamp(void)
 {
   return(readOSTimer());
 }

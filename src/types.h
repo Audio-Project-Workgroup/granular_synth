@@ -46,6 +46,30 @@ typedef double   r64;
 #define S32_MIN (0x80000000)
 #define S64_MIN (0x8000000000000000)
 
+struct Buffer
+{
+  usz size;
+  u8 *contents;
+};
+
+struct String8
+{
+  u8 *str;
+  u64 size;
+};
+
+struct String16
+{
+  u16 *str;
+  u64 size;
+};
+
+struct String32
+{
+  u32 *str;
+  u64 size;
+};
+
 struct c64
 {
   r32 re, im;

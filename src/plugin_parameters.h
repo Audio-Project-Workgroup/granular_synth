@@ -23,7 +23,7 @@ inline r32
 pluginReadFloatParameter(PluginFloatParameter *param)
 {
   ParameterValue currentValue = {};
-  currentValue.asInt = globalPlatform.atomicLoad(&param->currentValue.asInt);
+  currentValue.asInt = globalPlatform.gsAtomicLoad(&param->currentValue.asInt);
 
   return(currentValue.asFloat);
 }
@@ -33,31 +33,31 @@ pluginSetFloatParameter(PluginFloatParameter *param, r32 value, r32 changeTimeMS
 {
   ParameterValue targetValue = {};
   targetValue.asFloat = clampToRange(value, param->range);
-  globalPlatform.atomicStore(&param->targetValue.asInt, targetValue.asInt);
+  globalPlatform.gsAtomicStore(&param->targetValue.asInt, targetValue.asInt);
 
   ParameterValue currentValue = {};
-  currentValue.asInt = globalPlatform.atomicLoad(&param->currentValue.asInt);   
+  currentValue.asInt = globalPlatform.gsAtomicLoad(&param->currentValue.asInt);   
 
   ParameterValue dValue = {};
   r32 changeTimeSamples = 0.001f*changeTimeMS*(r32)INTERNAL_SAMPLE_RATE;
   dValue.asFloat = (targetValue.asFloat - currentValue.asFloat)/changeTimeSamples;  
-  globalPlatform.atomicStore(&param->dValue.asInt, dValue.asInt);
+  globalPlatform.gsAtomicStore(&param->dValue.asInt, dValue.asInt);
 }
 
 inline void
 pluginOffsetFloatParameter(PluginFloatParameter *param, r32 inc, r32 changeTimeMS = 10)
 {
   ParameterValue currentValue = {};
-  currentValue.asInt = globalPlatform.atomicLoad(&param->currentValue.asInt);   
+  currentValue.asInt = globalPlatform.gsAtomicLoad(&param->currentValue.asInt);   
 
   ParameterValue targetValue = {};
   targetValue.asFloat = clampToRange(currentValue.asFloat + inc, param->range);
-  globalPlatform.atomicStore(&param->targetValue.asInt, targetValue.asInt);
+  globalPlatform.gsAtomicStore(&param->targetValue.asInt, targetValue.asInt);
 
   ParameterValue dValue = {};
   r32 changeTimeSamples = 0.001f*changeTimeMS*(r32)INTERNAL_SAMPLE_RATE;
   dValue.asFloat = (targetValue.asFloat - currentValue.asFloat)/changeTimeSamples;  
-  globalPlatform.atomicStore(&param->dValue.asInt, dValue.asInt);
+  globalPlatform.gsAtomicStore(&param->dValue.asInt, dValue.asInt);
 }
 
 inline void
@@ -69,21 +69,21 @@ pluginUpdateFloatParameter(PluginFloatParameter *param)
 
   ParameterValue targetValue = {};
   ParameterValue currentValue = {};
-  targetValue.asInt = globalPlatform.atomicLoad(&param->targetValue.asInt);
-  currentValue.asInt = globalPlatform.atomicLoad(&param->currentValue.asInt);
+  targetValue.asInt = globalPlatform.gsAtomicLoad(&param->targetValue.asInt);
+  currentValue.asInt = globalPlatform.gsAtomicLoad(&param->currentValue.asInt);
 
-  if(Abs(targetValue.asFloat - currentValue.asFloat)/rangeLen > err)
+  if(globalPlatform.gsAbs(targetValue.asFloat - currentValue.asFloat)/rangeLen > err)
     {
       ParameterValue dValue = {};
-      dValue.asInt = globalPlatform.atomicLoad(&param->dValue.asInt);
+      dValue.asInt = globalPlatform.gsAtomicLoad(&param->dValue.asInt);
 
       ParameterValue newValue = {};      
       newValue.asFloat = currentValue.asFloat + dValue.asFloat;
       
-      if(globalPlatform.atomicCompareAndSwap(&param->currentValue.asInt, currentValue.asInt, newValue.asInt) !=
+      if(globalPlatform.gsAtomicCompareAndSwap(&param->currentValue.asInt, currentValue.asInt, newValue.asInt) !=
 	 currentValue.asInt)
 	{
-	  logString("WARNING: atomicCAS failed to modify parameter!");
+	  logString("WARNING: Atomic CAS failed to modify parameter!");
 	}
     }
 }

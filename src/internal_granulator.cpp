@@ -25,9 +25,9 @@ initializeWindows(GrainManager* grainManager)
   r32 *rectangularBuffer = grainManager->windowBuffer[WindowShape_rectangle];
   for(u32 sample = 0; sample < WINDOW_LENGTH; ++sample)
     {
-      *hannBuffer++ = 0.5f * (1.f - Cos(GS_TAU * sample * windowLengthInv));
-      *sineBuffer++ = Sin(M_PI * sample * windowLengthInv);
-      *triangleBuffer++ = (1.f - Abs((sample - (windowLengthF - 1.f) / 2.f) / ((windowLengthF - 1.f) / 2.f)));
+      *hannBuffer++ = 0.5f * (1.f - globalPlatform.gsCos(GS_TAU * sample * windowLengthInv));
+      *sineBuffer++ = globalPlatform.gsSin(GS_PI * sample * windowLengthInv);
+      *triangleBuffer++ = (1.f - globalPlatform.gsAbs((sample - (windowLengthF - 1.f) / 2.f) / ((windowLengthF - 1.f) / 2.f)));
       *rectangularBuffer++ = 1.f;
     }
 }
@@ -167,7 +167,7 @@ synthesize(r32* destBufferLInit, r32* destBufferRInit,
 
   // NOTE: queue a new view and fill out its data
   u32 viewWriteIndex = (grainStateView->viewWriteIndex + 1) % ARRAY_COUNT(grainStateView->views);  
-  u32 entriesQueued = globalPlatform.atomicLoad(&grainStateView->entriesQueued);
+  u32 entriesQueued = globalPlatform.gsAtomicLoad(&grainStateView->entriesQueued);
   GrainBufferViewEntry *newView = grainStateView->views + viewWriteIndex;  
   newView->grainCount = 0;
   ASSERT(samplesToWrite < newView->sampleCapacity);
@@ -301,10 +301,9 @@ synthesize(r32* destBufferLInit, r32* destBufferRInit,
     }
 
   grainStateView->viewWriteIndex = viewWriteIndex;
-  while(globalPlatform.atomicCompareAndSwap(&grainStateView->entriesQueued, entriesQueued, entriesQueued + 1) !=
-	entriesQueued)
+  while(globalPlatform.gsAtomicCompareAndSwap(&grainStateView->entriesQueued, entriesQueued, entriesQueued + 1) != entriesQueued)
     {
-      entriesQueued = globalPlatform.atomicLoad(&grainStateView->entriesQueued);
+      entriesQueued = globalPlatform.gsAtomicLoad(&grainStateView->entriesQueued);
     }
 }
 

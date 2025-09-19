@@ -85,14 +85,14 @@ PlatformAPI globalPlatform;
 PluginLogger *globalLogger;
 #endif
 
-r32 gs_fabsf(r32 num)		{ return(globalPlatform.abs(num)); }
-r32 gs_sqrtf(r32 num)		{ return(globalPlatform.sqrt(num)); }
-r32 gs_sinf(r32 num)		{ return(globalPlatform.sin(num)); }
-r32 gs_cosf(r32 num)		{ return(globalPlatform.cos(num)); }
-r32 gs_powf(r32 base, r32 exp)	{ return(globalPlatform.pow(base, exp)); }
+// r32 gs_fabsf(r32 num)		{ return(globalPlatform.gsAbs(num)); }
+// r32 gs_sqrtf(r32 num)		{ return(globalPlatform.gsSqrt(num)); }
+// r32 gs_sinf(r32 num)		{ return(globalPlatform.gsSin(num)); }
+// r32 gs_cosf(r32 num)		{ return(globalPlatform.gsCos(num)); }
+// r32 gs_powf(r32 base, r32 exp)	{ return(globalPlatform.gsPow(base, exp)); }
 
-Arena* gs_arenaAcquire(usz size)     { return(globalPlatform.arenaAcquire(size)); }
-void   gs_arenaDiscard(Arena *arena) { return(globalPlatform.arenaDiscard(arena)); }
+// Arena* gs_arenaAcquire(usz size)     { return(globalPlatform.gsArenaAcquire(size)); }
+// void   gs_arenaDiscard(Arena *arena) { return(globalPlatform.gsArenaDiscard(arena)); }
 
 inline void
 printButtonState(ButtonState button, char *name)
@@ -115,7 +115,7 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
       globalLogger = memoryBlock->logger;
 #endif
 
-      Arena *permanentArena = gs_arenaAcquire(MEGABYTES(1));
+      Arena *permanentArena = globalPlatform.gsArenaAcquire(MEGABYTES(1));
       pluginState = arenaPushStruct(permanentArena, PluginState);  
       pluginState->permanentArena = permanentArena;
 
@@ -124,13 +124,13 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
       pluginState->pluginMode = PluginMode_editor;
 
       // TODO: maybe these initial sizes can be tuned for fewer allocation calls
-      pluginState->frameArena = gs_arenaAcquire(0);
-      pluginState->framePermanentArena = gs_arenaAcquire(0);
-      pluginState->grainArena = gs_arenaAcquire(0);
+      pluginState->frameArena = globalPlatform.gsArenaAcquire(0);
+      pluginState->framePermanentArena = globalPlatform.gsArenaAcquire(0);
+      pluginState->grainArena = globalPlatform.gsArenaAcquire(0);
 
       pluginState->pathToPlugin =
-	globalPlatform.getPathToModule(memoryBlock->pluginHandle, (void *)initializePluginState,
-				       pluginState->permanentArena);
+	globalPlatform.gsGetPathToModule(memoryBlock->pluginHandle, (void *)initializePluginState,
+					 pluginState->permanentArena);
 
       // NOTE: parameter initialization
       // pluginState->phasor = 0.f;
@@ -588,7 +588,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 		      
 		  if(volume.flags & UICommFlag_dragging)
 		    {
-		      globalPlatform.atomicStore(&volume.element->fParam->interacting, 1);
+		      globalPlatform.gsAtomicStore(&volume.element->fParam->interacting, 1);
 		      
 		      if(volume.flags & UICommFlag_leftDragging)
 			{	
@@ -617,7 +617,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 		    }
 		  else
 		    {
-		      globalPlatform.atomicStore(&volume.element->fParam->interacting, 0);
+		      globalPlatform.gsAtomicStore(&volume.element->fParam->interacting, 0);
 		    }		  
 
 		  // NOTE: density
@@ -640,7 +640,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 
 		    if(density.flags & UICommFlag_dragging)
 		      {
-			globalPlatform.atomicStore(&density.element->fParam->interacting, 1);
+			globalPlatform.gsAtomicStore(&density.element->fParam->interacting, 1);
 
 			if(density.flags & UICommFlag_leftDragging)
 			  {
@@ -667,7 +667,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 		      }
 		    else
 		      {
-			globalPlatform.atomicStore(&density.element->fParam->interacting, 0);
+			globalPlatform.gsAtomicStore(&density.element->fParam->interacting, 0);
 		      }
 		  }
 
@@ -685,7 +685,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 					       V4(1, 1, 1, 1));
 		    if(spread.flags & UICommFlag_dragging)
 		      {
-			globalPlatform.atomicStore(&spread.element->fParam->interacting, 1);
+			globalPlatform.gsAtomicStore(&spread.element->fParam->interacting, 1);
 
 			if(spread.flags & UICommFlag_leftDragging)
 			  {
@@ -712,7 +712,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 		      }
 		    else
 		      {
-			globalPlatform.atomicStore(&spread.element->fParam->interacting, 0);
+			globalPlatform.gsAtomicStore(&spread.element->fParam->interacting, 0);
 		      }
 		  }
 
@@ -731,7 +731,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 
 		    if(offset.flags & UICommFlag_dragging)
 		      {
-			globalPlatform.atomicStore(&offset.element->fParam->interacting, 1);
+			globalPlatform.gsAtomicStore(&offset.element->fParam->interacting, 1);
 
 			if(offset.flags & UICommFlag_leftDragging)
 			  {
@@ -758,7 +758,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 		      }
 		    else
 		      {
-			globalPlatform.atomicStore(&offset.element->fParam->interacting, 0);
+			globalPlatform.gsAtomicStore(&offset.element->fParam->interacting, 0);
 		      }
 		  }
 
@@ -776,7 +776,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 			       V4(1, 1, 1, 1));
 		  if(size.flags & UICommFlag_dragging)
 		    {
-		      globalPlatform.atomicStore(&size.element->fParam->interacting, 1);
+		      globalPlatform.gsAtomicStore(&size.element->fParam->interacting, 1);
 		      
 		      if(size.flags & UICommFlag_leftDragging)
 			{			
@@ -808,7 +808,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 		    }
 		  else
 		    {
-		      globalPlatform.atomicStore(&size.element->fParam->interacting, 0);
+		      globalPlatform.gsAtomicStore(&size.element->fParam->interacting, 0);
 		    }
 
 		  // NOTE: mix
@@ -829,7 +829,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 
 		    if(mix.flags & UICommFlag_dragging)
 		      {
-			globalPlatform.atomicStore(&mix.element->fParam->interacting, 1);
+			globalPlatform.gsAtomicStore(&mix.element->fParam->interacting, 1);
 
 			if(mix.flags & UICommFlag_leftDragging)
 			  {
@@ -856,7 +856,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 		      }
 		    else
 		      {
-			globalPlatform.atomicStore(&mix.element->fParam->interacting, 0);
+			globalPlatform.gsAtomicStore(&mix.element->fParam->interacting, 0);
 		      }
 		  }
 		  
@@ -878,7 +878,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 
 		    if(pan.flags & UICommFlag_dragging)
 		      {
-			globalPlatform.atomicStore(&pan.element->fParam->interacting, 1);
+			globalPlatform.gsAtomicStore(&pan.element->fParam->interacting, 1);
 
 			if(pan.flags & UICommFlag_leftDragging)
 			  {
@@ -905,7 +905,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 		      }
 		    else
 		      {
-			globalPlatform.atomicStore(&pan.element->fParam->interacting, 0);
+			globalPlatform.gsAtomicStore(&pan.element->fParam->interacting, 0);
 		      }
 		  }
 		  
@@ -927,7 +927,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 		    
 		    if(window.flags & UICommFlag_dragging)
 		      {
-			globalPlatform.atomicStore(&window.element->fParam->interacting, 1);
+			globalPlatform.gsAtomicStore(&window.element->fParam->interacting, 1);
 
 			if(window.flags & UICommFlag_leftDragging)
 			  {
@@ -954,7 +954,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 		      }
 		    else
 		      {
-			globalPlatform.atomicStore(&window.element->fParam->interacting, 0);
+			globalPlatform.gsAtomicStore(&window.element->fParam->interacting, 0);
 		      }
 		  }
 		  		  		  
@@ -996,7 +996,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 		  AudioRingBuffer *grainViewBuffer = &grainStateView->viewBuffer;
 		  
 		  u32 viewEntryReadIndex = grainStateView->viewReadIndex;
-		  u32 entriesQueued = globalPlatform.atomicLoad(&grainStateView->entriesQueued);
+		  u32 entriesQueued = globalPlatform.gsAtomicLoad(&grainStateView->entriesQueued);
 		  logFormatString("entriesQueued: %u", entriesQueued);
 		  
 		  for(u32 entryIndex = 0; entryIndex < entriesQueued; ++entryIndex)
@@ -1119,11 +1119,11 @@ RENDER_NEW_FRAME(renderNewFrame)
 		  grainStateView->viewReadIndex =
 		    (viewEntryReadIndex + entriesQueued) % ARRAY_COUNT(grainStateView->views);
 		  u32 oldEntriesQueued = entriesQueued;
-		  while(globalPlatform.atomicCompareAndSwap(&grainStateView->entriesQueued,
+		  while(globalPlatform.gsAtomicCompareAndSwap(&grainStateView->entriesQueued,
 							    entriesQueued,
 							    entriesQueued - oldEntriesQueued) != entriesQueued)
 		    {
-		      entriesQueued = globalPlatform.atomicLoad(&grainStateView->entriesQueued);
+		      entriesQueued = globalPlatform.gsAtomicLoad(&grainStateView->entriesQueued);
 		    }		    
 	      
 		  renderPushUILayout(renderCommands, panelLayout);
@@ -1154,7 +1154,7 @@ AUDIO_PROCESS(audioProcess)
 	  TemporaryMemory scratch = arenaGetScratch(0, 0);
 
 	  // NOTE: dequeue host-driven parameter value changes
-	  u32 queuedCount = globalPlatform.atomicLoad(&audioBuffer->queuedCount);
+	  u32 queuedCount = globalPlatform.gsAtomicLoad(&audioBuffer->queuedCount);
 	  if(queuedCount)
 	    {
 	      u32 parameterValueQueueReadIndex = audioBuffer->parameterValueQueueReadIndex;
@@ -1174,10 +1174,9 @@ AUDIO_PROCESS(audioProcess)
 		(parameterValueQueueReadIndex + queuedCount) % ARRAY_COUNT(audioBuffer->parameterValueQueueEntries);
 
 	      u32 entriesRead = queuedCount;
-	      while(globalPlatform.atomicCompareAndSwap(&audioBuffer->queuedCount,
-							queuedCount, queuedCount - entriesRead) != queuedCount)
+	      while(globalPlatform.gsAtomicCompareAndSwap(&audioBuffer->queuedCount, queuedCount, queuedCount - entriesRead) != queuedCount)
 		{
-		  queuedCount = globalPlatform.atomicLoad(&audioBuffer->queuedCount);
+		  queuedCount = globalPlatform.gsAtomicLoad(&audioBuffer->queuedCount);
 		}
 	    }
       
