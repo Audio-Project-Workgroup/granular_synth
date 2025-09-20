@@ -1,13 +1,13 @@
-/* #ifdef _WIN32 */
-/* #define _USE_MATH_DEFINES */
-/* #endif */
-
-//#include <math.h>
-/* extern r32 gs_fabsf(r32 num); */
-/* extern r32 gs_sqrtf(r32 num); */
-/* extern r32 gs_sinf(r32 num); */
-/* extern r32 gs_cosf(r32 num); */
-/* extern r32 gs_powf(r32 base, r32 exp); */
+// TODO: It's not nice having to do this. Some effort should be made separating
+//       declarations and implementations. Maybe then we can also only compile
+//       shared code once, and link it in both host and plugin
+#if defined(HOST_LAYER)
+extern r32 gsAbs(r32 num);
+extern r32 gsSqrt(r32 num);
+extern r32 gsSin(r32 num);
+extern r32 gsCos(r32 num);
+extern r32 gsPow(r32 base, r32 exp);
+#endif
 
 #define GS_PI 3.141592653589793
 #define GS_TAU (2.0*GS_PI)
@@ -46,41 +46,6 @@ cubicInterp(r32 val0, r32 val1, r32 val2, r32 val3, r32 t0)
 
   return(result);
 }
-
-// TODO: stop using the C runtime library
-/* inline r32 */
-/* Abs(r32 val) */
-/* { */
-/*   //return(fabsf(val)); */
-/*   return(gs_fabsf(val)); */
-/* } */
-
-/* inline r32 */
-/* Sqrt(r32 val) */
-/* { */
-/*   //return(sqrtf(val)); */
-/*   return(gs_sqrtf(val)); */
-/* } */
-
-/* inline r32 */
-/* Sin(r32 angle) */
-/* { */
-/*   //return(sinf(angle)); */
-/*   return(gs_sinf(angle)); */
-/* } */
-
-/* inline r32 */
-/* Cos(r32 angle) */
-/* { */
-/*   //return(cosf(angle)); */
-/*   return(gs_cosf(angle)); */
-/* } */
-
-/* inline r32 */
-/* Pow(r32 base, r32 exp) */
-/* { */
-/*   return(gs_powf(base, exp)); */
-/* } */
 
 inline u32
 log2(u32 num)
@@ -145,7 +110,7 @@ C64(r32 re, r32 im)
 inline c64
 C64Polar(r32 mag, r32 arg)
 {
-  c64 result = C64(mag*globalPlatform.gsCos(arg), mag*globalPlatform.gsSin(arg));
+  c64 result = C64(mag*gsCos(arg), mag*gsSin(arg));
 
   return(result);
 }
@@ -161,7 +126,7 @@ conjugateC64(c64 z)
 inline r32
 lengthC64(c64 z)
 {
-  r32 result = globalPlatform.gsSqrt(z.re*z.re + z.im*z.im);
+  r32 result = gsSqrt(z.re*z.re + z.im*z.im);
 
   return(result);
 }
@@ -550,8 +515,8 @@ inline mat4
 makeRotationMatrixXY(r32 angle)
 {
   mat4 result = {};
-  result.r1 = V4(globalPlatform.gsCos(angle), -globalPlatform.gsSin(angle), 0, 0);
-  result.r2 = V4(globalPlatform.gsSin(angle), globalPlatform.gsCos(angle), 0, 0);
+  result.r1 = V4(gsCos(angle), -gsSin(angle), 0, 0);
+  result.r2 = V4(gsSin(angle), gsCos(angle), 0, 0);
   result.r3 = V4(0, 0, 1, 0);
   result.r4 = V4(0, 0, 0, 1);
 
@@ -562,8 +527,8 @@ inline mat4
 makeRotationMatrixXY(v2 c, r32 a)
 {
   mat4 result = {};
-  r32 ca = globalPlatform.gsCos(a);
-  r32 sa = globalPlatform.gsSin(a);  
+  r32 ca = gsCos(a);
+  r32 sa = gsSin(a);  
   result.r1 = V4(ca, -sa, 0,  c.x*(1.f - ca) + c.y*sa);
   result.r2 = V4(sa,  ca, 0, -c.x*sa + c.y*(1.f - ca));
   result.r3 = V4(0, 0, 1, 0);

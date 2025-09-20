@@ -128,10 +128,10 @@ queueSharedRingBufferEntry_(SharedRingBuffer *rb, void *entry, usz entrySize)
   COPY_SIZE(newEntry, entry, entrySize);
 
   rb->writeIndex = (rb->writeIndex + 1) % rb->capacity;
-  u32 queuedCount = globalPlatform.gsAtomicLoad(&rb->queuedCount);
-  while(globalPlatform.gsAtomicCompareAndSwap(&rb->queuedCount, queuedCount, queuedCount + 1) != queuedCount)
+  u32 queuedCount = gsAtomicLoad(&rb->queuedCount);
+  while(gsAtomicCompareAndSwap(&rb->queuedCount, queuedCount, queuedCount + 1) != queuedCount)
     {
-      queuedCount = globalPlatform.gsAtomicLoad(&rb->queuedCount);
+      queuedCount = gsAtomicLoad(&rb->queuedCount);
     }
 }
 
@@ -144,11 +144,11 @@ dequeueSharedRingBufferEntry_(SharedRingBuffer *rb, usz entrySize)
   u8 *entry = rb->entries + entrySize*rb->readIndex;
 
   rb->readIndex = (rb->readIndex + 1) % rb->capacity;
-  u32 queuedCount = globalPlatform.gsAtomicLoad(&rb->queuedCount);
+  u32 queuedCount = gsAtomicLoad(&rb->queuedCount);
   ASSERT(queuedCount);
-  while(globalPlatform.gsAtomicCompareAndSwap(&rb->queuedCount, queuedCount, queuedCount - 1) != queuedCount)
+  while(gsAtomicCompareAndSwap(&rb->queuedCount, queuedCount, queuedCount - 1) != queuedCount)
     {
-      queuedCount = globalPlatform.gsAtomicLoad(&rb->queuedCount);
+      queuedCount = gsAtomicLoad(&rb->queuedCount);
     }
 
   return(entry);
@@ -158,7 +158,7 @@ inline void
 dequeueAllSharedRingBufferEntries_(void *destInit, SharedRingBuffer *rb, usz entrySize)
 {
   u8 *dest = (u8 *)destInit;
-  u32 queuedCount = globalPlatform.gsAtomicLoad(&rb->queuedCount);
+  u32 queuedCount = gsAtomicLoad(&rb->queuedCount);
   for(u32 entryIndex = 0; entryIndex < queuedCount; ++entryIndex)
     {
       u32 readIndex = (rb->readIndex + entryIndex) % rb->capacity;
@@ -170,9 +170,8 @@ dequeueAllSharedRingBufferEntries_(void *destInit, SharedRingBuffer *rb, usz ent
 
   rb->readIndex = (rb->readIndex + queuedCount) % rb->capacity;
   u32 oldQueuedCount = queuedCount;
-  while(globalPlatform.gsAtomicCompareAndSwap(&rb->queuedCount,
-					     queuedCount, queuedCount - oldQueuedCount) != queuedCount)
+  while(gsAtomicCompareAndSwap(&rb->queuedCount, queuedCount, queuedCount - oldQueuedCount) != queuedCount)
     {
-      queuedCount = globalPlatform.gsAtomicLoad(&rb->queuedCount);
+      queuedCount = gsAtomicLoad(&rb->queuedCount);
     }
 }

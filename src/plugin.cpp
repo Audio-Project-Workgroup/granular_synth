@@ -80,7 +80,7 @@
 //       preventing code that uses these functions (particular parameter reads/writes) from being shared
 //       between the plugin and host. These functions should either be similarly encapsulated in the host layer,
 //       or unencapsulated here.
-PlatformAPI globalPlatform;
+//PlatformAPI globalPlatform;
 #if BUILD_DEBUG
 PluginLogger *globalLogger;
 #endif
@@ -110,12 +110,16 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
   PluginState *pluginState = 0;
   if(!globalPluginState)
     {
-      globalPlatform = memoryBlock->platformAPI;
+      //globalPlatform = memoryBlock->platformAPI;
+#define X(name, ret, args) gs##name = memoryBlock->platformAPI.gs##name;
+      PLATFORM_API_XLIST
+#undef X      
+
 #if BUILD_DEBUG
       globalLogger = memoryBlock->logger;
 #endif
 
-      Arena *permanentArena = globalPlatform.gsArenaAcquire(MEGABYTES(1));
+      Arena *permanentArena = gsArenaAcquire(MEGABYTES(1));
       pluginState = arenaPushStruct(permanentArena, PluginState);  
       pluginState->permanentArena = permanentArena;
 
@@ -124,13 +128,13 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
       pluginState->pluginMode = PluginMode_editor;
 
       // TODO: maybe these initial sizes can be tuned for fewer allocation calls
-      pluginState->frameArena = globalPlatform.gsArenaAcquire(0);
-      pluginState->framePermanentArena = globalPlatform.gsArenaAcquire(0);
-      pluginState->grainArena = globalPlatform.gsArenaAcquire(0);
+      pluginState->frameArena = gsArenaAcquire(0);
+      pluginState->framePermanentArena = gsArenaAcquire(0);
+      pluginState->grainArena = gsArenaAcquire(0);
 
       pluginState->pathToPlugin =
-	globalPlatform.gsGetPathToModule(memoryBlock->pluginHandle, (void *)initializePluginState,
-					 pluginState->permanentArena);
+	gsGetPathToModule(memoryBlock->pluginHandle, (void *)initializePluginState,
+			  pluginState->permanentArena);
 
       // NOTE: parameter initialization
       // pluginState->phasor = 0.f;
@@ -588,7 +592,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 		      
 		  if(volume.flags & UICommFlag_dragging)
 		    {
-		      globalPlatform.gsAtomicStore(&volume.element->fParam->interacting, 1);
+		      gsAtomicStore(&volume.element->fParam->interacting, 1);
 		      
 		      if(volume.flags & UICommFlag_leftDragging)
 			{	
@@ -617,7 +621,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 		    }
 		  else
 		    {
-		      globalPlatform.gsAtomicStore(&volume.element->fParam->interacting, 0);
+		      gsAtomicStore(&volume.element->fParam->interacting, 0);
 		    }		  
 
 		  // NOTE: density
@@ -640,7 +644,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 
 		    if(density.flags & UICommFlag_dragging)
 		      {
-			globalPlatform.gsAtomicStore(&density.element->fParam->interacting, 1);
+			gsAtomicStore(&density.element->fParam->interacting, 1);
 
 			if(density.flags & UICommFlag_leftDragging)
 			  {
@@ -667,7 +671,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 		      }
 		    else
 		      {
-			globalPlatform.gsAtomicStore(&density.element->fParam->interacting, 0);
+			gsAtomicStore(&density.element->fParam->interacting, 0);
 		      }
 		  }
 
@@ -685,7 +689,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 					       V4(1, 1, 1, 1));
 		    if(spread.flags & UICommFlag_dragging)
 		      {
-			globalPlatform.gsAtomicStore(&spread.element->fParam->interacting, 1);
+			gsAtomicStore(&spread.element->fParam->interacting, 1);
 
 			if(spread.flags & UICommFlag_leftDragging)
 			  {
@@ -712,7 +716,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 		      }
 		    else
 		      {
-			globalPlatform.gsAtomicStore(&spread.element->fParam->interacting, 0);
+			gsAtomicStore(&spread.element->fParam->interacting, 0);
 		      }
 		  }
 
@@ -731,7 +735,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 
 		    if(offset.flags & UICommFlag_dragging)
 		      {
-			globalPlatform.gsAtomicStore(&offset.element->fParam->interacting, 1);
+			gsAtomicStore(&offset.element->fParam->interacting, 1);
 
 			if(offset.flags & UICommFlag_leftDragging)
 			  {
@@ -758,7 +762,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 		      }
 		    else
 		      {
-			globalPlatform.gsAtomicStore(&offset.element->fParam->interacting, 0);
+			gsAtomicStore(&offset.element->fParam->interacting, 0);
 		      }
 		  }
 
@@ -776,7 +780,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 			       V4(1, 1, 1, 1));
 		  if(size.flags & UICommFlag_dragging)
 		    {
-		      globalPlatform.gsAtomicStore(&size.element->fParam->interacting, 1);
+		      gsAtomicStore(&size.element->fParam->interacting, 1);
 		      
 		      if(size.flags & UICommFlag_leftDragging)
 			{			
@@ -808,7 +812,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 		    }
 		  else
 		    {
-		      globalPlatform.gsAtomicStore(&size.element->fParam->interacting, 0);
+		      gsAtomicStore(&size.element->fParam->interacting, 0);
 		    }
 
 		  // NOTE: mix
@@ -829,7 +833,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 
 		    if(mix.flags & UICommFlag_dragging)
 		      {
-			globalPlatform.gsAtomicStore(&mix.element->fParam->interacting, 1);
+			gsAtomicStore(&mix.element->fParam->interacting, 1);
 
 			if(mix.flags & UICommFlag_leftDragging)
 			  {
@@ -856,7 +860,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 		      }
 		    else
 		      {
-			globalPlatform.gsAtomicStore(&mix.element->fParam->interacting, 0);
+			gsAtomicStore(&mix.element->fParam->interacting, 0);
 		      }
 		  }
 		  
@@ -878,7 +882,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 
 		    if(pan.flags & UICommFlag_dragging)
 		      {
-			globalPlatform.gsAtomicStore(&pan.element->fParam->interacting, 1);
+			gsAtomicStore(&pan.element->fParam->interacting, 1);
 
 			if(pan.flags & UICommFlag_leftDragging)
 			  {
@@ -905,7 +909,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 		      }
 		    else
 		      {
-			globalPlatform.gsAtomicStore(&pan.element->fParam->interacting, 0);
+			gsAtomicStore(&pan.element->fParam->interacting, 0);
 		      }
 		  }
 		  
@@ -927,7 +931,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 		    
 		    if(window.flags & UICommFlag_dragging)
 		      {
-			globalPlatform.gsAtomicStore(&window.element->fParam->interacting, 1);
+			gsAtomicStore(&window.element->fParam->interacting, 1);
 
 			if(window.flags & UICommFlag_leftDragging)
 			  {
@@ -954,7 +958,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 		      }
 		    else
 		      {
-			globalPlatform.gsAtomicStore(&window.element->fParam->interacting, 0);
+			gsAtomicStore(&window.element->fParam->interacting, 0);
 		      }
 		  }
 		  		  		  
@@ -996,7 +1000,7 @@ RENDER_NEW_FRAME(renderNewFrame)
 		  AudioRingBuffer *grainViewBuffer = &grainStateView->viewBuffer;
 		  
 		  u32 viewEntryReadIndex = grainStateView->viewReadIndex;
-		  u32 entriesQueued = globalPlatform.gsAtomicLoad(&grainStateView->entriesQueued);
+		  u32 entriesQueued = gsAtomicLoad(&grainStateView->entriesQueued);
 		  logFormatString("entriesQueued: %u", entriesQueued);
 		  
 		  for(u32 entryIndex = 0; entryIndex < entriesQueued; ++entryIndex)
@@ -1119,11 +1123,11 @@ RENDER_NEW_FRAME(renderNewFrame)
 		  grainStateView->viewReadIndex =
 		    (viewEntryReadIndex + entriesQueued) % ARRAY_COUNT(grainStateView->views);
 		  u32 oldEntriesQueued = entriesQueued;
-		  while(globalPlatform.gsAtomicCompareAndSwap(&grainStateView->entriesQueued,
+		  while(gsAtomicCompareAndSwap(&grainStateView->entriesQueued,
 							    entriesQueued,
 							    entriesQueued - oldEntriesQueued) != entriesQueued)
 		    {
-		      entriesQueued = globalPlatform.gsAtomicLoad(&grainStateView->entriesQueued);
+		      entriesQueued = gsAtomicLoad(&grainStateView->entriesQueued);
 		    }		    
 	      
 		  renderPushUILayout(renderCommands, panelLayout);
@@ -1154,7 +1158,7 @@ AUDIO_PROCESS(audioProcess)
 	  TemporaryMemory scratch = arenaGetScratch(0, 0);
 
 	  // NOTE: dequeue host-driven parameter value changes
-	  u32 queuedCount = globalPlatform.gsAtomicLoad(&audioBuffer->queuedCount);
+	  u32 queuedCount = gsAtomicLoad(&audioBuffer->queuedCount);
 	  if(queuedCount)
 	    {
 	      u32 parameterValueQueueReadIndex = audioBuffer->parameterValueQueueReadIndex;
@@ -1174,9 +1178,9 @@ AUDIO_PROCESS(audioProcess)
 		(parameterValueQueueReadIndex + queuedCount) % ARRAY_COUNT(audioBuffer->parameterValueQueueEntries);
 
 	      u32 entriesRead = queuedCount;
-	      while(globalPlatform.gsAtomicCompareAndSwap(&audioBuffer->queuedCount, queuedCount, queuedCount - entriesRead) != queuedCount)
+	      while(gsAtomicCompareAndSwap(&audioBuffer->queuedCount, queuedCount, queuedCount - entriesRead) != queuedCount)
 		{
-		  queuedCount = globalPlatform.gsAtomicLoad(&audioBuffer->queuedCount);
+		  queuedCount = gsAtomicLoad(&audioBuffer->queuedCount);
 		}
 	    }
       

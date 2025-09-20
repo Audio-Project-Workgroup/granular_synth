@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define HOST_LAYER
 #include "common.h"
 static String8 executablePath;
 static String8 basePath;
@@ -548,7 +549,7 @@ static HostMemoryState *hostMemoryState = 0;
 #define ARENA_MIN_ALLOCATION_SIZE KILOBYTES(64)
 
 static Arena*
-platformArenaAcquire(usz size)
+gsArenaAcquire(usz size)
 {
   usz allocSize = MAX(size, ARENA_MIN_ALLOCATION_SIZE);
 
@@ -564,12 +565,12 @@ platformArenaAcquire(usz size)
 }
 
 static void
-platformArenaDiscard(Arena *arena)
+gsArenaDiscard(Arena *arena)
 {
   platformFreeMemory(arena, arena->capacity);
 }
 
-PlatformAPI globalPlatform;
+//PlatformAPI globalPlatform;
 
 int
 main(int argc, char **argv)
@@ -577,33 +578,7 @@ main(int argc, char **argv)
 #if BUILD_DEBUG  
   printf("plugin path: %s\n", PLUGIN_PATH);
 #endif
-  int result = 0;
-
-  globalPlatform.gsReadEntireFile  = platformReadEntireFile;
-  globalPlatform.gsFreeFileMemory  = platformFreeFileMemory;
-  globalPlatform.gsWriteEntireFile = platformWriteEntireFile;
-  globalPlatform.gsGetPathToModule = platformGetPathToModule;
-	  
-  //pluginMemory.platformAPI.runModel = platformRunModel;
-	  
-  globalPlatform.gsGetCurrentTimestamp = platformGetCurrentTimestamp;
-
-  globalPlatform.gsAbs  = fabsf;
-  globalPlatform.gsSqrt = sqrtf;
-  globalPlatform.gsSin  = sinf;
-  globalPlatform.gsCos  = cosf;
-  globalPlatform.gsPow  = powf;
-
-  globalPlatform.gsAllocateMemory = platformAllocateMemory;
-  globalPlatform.gsFreeMemory	  = platformFreeMemory;
-  globalPlatform.gsArenaAcquire   = platformArenaAcquire;
-  globalPlatform.gsArenaDiscard   = platformArenaDiscard;
-
-  globalPlatform.gsAtomicLoad			= atomicLoad;
-  globalPlatform.gsAtomicStore			= atomicStore;
-  globalPlatform.gsAtomicAdd			= atomicAdd;
-  globalPlatform.gsAtomicCompareAndSwap		= atomicCompareAndSwap;
-  globalPlatform.gsAtomicCompareAndSwapPointers = atomicCompareAndSwapPointers;
+  int result = 0;  
 
   TemporaryMemory scratch = arenaGetScratch(0, 0);
 
@@ -677,13 +652,37 @@ main(int argc, char **argv)
 	  pluginMemory.osTimerFreq = getOSTimerFreq();
 	  pluginMemory.host = PluginHost_executable;	 	  
 
-	  pluginMemory.platformAPI = globalPlatform;
+	  pluginMemory.platformAPI.gsReadEntireFile  = platformReadEntireFile;
+	  pluginMemory.platformAPI.gsFreeFileMemory  = platformFreeFileMemory;
+	  pluginMemory.platformAPI.gsWriteEntireFile = platformWriteEntireFile;
+	  pluginMemory.platformAPI.gsGetPathToModule = platformGetPathToModule;
+	  
+	  //pluginMemory.platformAPI.runModel = platformRunModel;
+	  
+	  pluginMemory.platformAPI.gsGetCurrentTimestamp = platformGetCurrentTimestamp;
+
+	  pluginMemory.platformAPI.gsAbs  = fabsf;
+	  pluginMemory.platformAPI.gsSqrt = sqrtf;
+	  pluginMemory.platformAPI.gsSin  = sinf;
+	  pluginMemory.platformAPI.gsCos  = cosf;
+	  pluginMemory.platformAPI.gsPow  = powf;
+
+	  pluginMemory.platformAPI.gsAllocateMemory = platformAllocateMemory;
+	  pluginMemory.platformAPI.gsFreeMemory	  = platformFreeMemory;
+	  pluginMemory.platformAPI.gsArenaAcquire   = gsArenaAcquire;
+	  pluginMemory.platformAPI.gsArenaDiscard   = gsArenaDiscard;
+
+	  pluginMemory.platformAPI.gsAtomicLoad			= atomicLoad;
+	  pluginMemory.platformAPI.gsAtomicStore			= atomicStore;
+	  pluginMemory.platformAPI.gsAtomicAdd			= atomicAdd;
+	  pluginMemory.platformAPI.gsAtomicCompareAndSwap		= atomicCompareAndSwap;
+	  pluginMemory.platformAPI.gsAtomicCompareAndSwapPointers = atomicCompareAndSwapPointers;
 
 #if BUILD_DEBUG
 	  // usz loggerMemorySize = KILOBYTES(512);
 	  // void *loggerMemory = calloc(loggerMemorySize, 1);
 	  // Arena loggerArena = arenaBegin(loggerMemory, loggerMemorySize);
-	  Arena *loggerArena = platformArenaAcquire(0);
+	  Arena *loggerArena = gsArenaAcquire(0);
 
 	  PluginLogger logger = {};
 	  logger.logArena = loggerArena;
@@ -695,7 +694,7 @@ main(int argc, char **argv)
 	  // usz renderMemorySize = MEGABYTES(64);
 	  // void *renderMemory = calloc(renderMemorySize, 1);
 	  // Arena renderArena = arenaBegin(renderMemory, renderMemorySize);
-	  Arena *renderArena = platformArenaAcquire(MEGABYTES(2));
+	  Arena *renderArena = gsArenaAcquire(MEGABYTES(2));
 	    
 	  GLState glState = makeGLState();
 	  LoadedBitmap whiteTexture = makeBitmap(renderArena, 16, 16, 0xFFFFFFFF);

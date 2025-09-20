@@ -3,9 +3,9 @@
 #include "common.h"
 
 #define TAKE_LOCK(lock, ...) \
-  while(globalPlatform.gsAtomicCompareAndSwap(lock, 0, 1)) { __VA_ARGS__ }
+  while(gsAtomicCompareAndSwap(lock, 0, 1)) { __VA_ARGS__ }
 #define RELEASE_LOCK(lock, ...) \
-  while(globalPlatform.gsAtomicCompareAndSwap(lock, 1, 0)) { __VA_ARGS__ }
+  while(gsAtomicCompareAndSwap(lock, 1, 0)) { __VA_ARGS__ }
 
 inline void
 logString(char *string)
@@ -13,7 +13,7 @@ logString(char *string)
 #if BUILD_DEBUG
   for(;;)
     {    
-      if(globalPlatform.gsAtomicCompareAndSwap(&globalLogger->mutex, 0, 1) == 0)
+      if(gsAtomicCompareAndSwap(&globalLogger->mutex, 0, 1) == 0)
 	{
 	  stringListPush(globalLogger->logArena, &globalLogger->log, STR8_CSTR(string));
 
@@ -23,7 +23,7 @@ logString(char *string)
 	      arenaEnd(globalLogger->logArena);
 	    }
 
-	  globalPlatform.gsAtomicStore(&globalLogger->mutex, 0);
+	  gsAtomicStore(&globalLogger->mutex, 0);
 	  break;
 	}
     }
@@ -42,7 +42,7 @@ logFormatString(char *format, ...)
 
   for(;;)
     {    
-      if(globalPlatform.gsAtomicCompareAndSwap(&globalLogger->mutex, 0, 1) == 0)
+      if(gsAtomicCompareAndSwap(&globalLogger->mutex, 0, 1) == 0)
 	{   
 	  stringListPushFormatV(globalLogger->logArena, &globalLogger->log, format, vaArgs);
 
@@ -52,7 +52,7 @@ logFormatString(char *format, ...)
 	      arenaEnd(globalLogger->logArena);
 	    }
 
-	  globalPlatform.gsAtomicStore(&globalLogger->mutex, 0);
+	  gsAtomicStore(&globalLogger->mutex, 0);
 	  break;
 	}
     }

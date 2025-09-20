@@ -1,3 +1,12 @@
+// TODO: It's not nice having to do this. Some effort should be made separating
+//       declarations and implementations. Maybe then we can also only compile
+//       shared code once, and link it in both host and plugin
+#if defined(HOST_LAYER)
+extern Arena* gsArenaAcquire(usz capacity);
+extern void   gsArenaDiscard(Arena *arena);
+//extern void*  gs_acquireMemory(usz size);
+//extern void   gs_discardMemory(void *mem, usz size);
+#endif
 
 struct Arena
 {
@@ -16,11 +25,6 @@ struct TemporaryMemory
   Arena *arena;
   usz pos;
 };
-
-/* extern Arena* gs_arenaAcquire(usz capacity); */
-/* extern void   gs_arenaDiscard(Arena *arena); */
-//extern void*  gs_acquireMemory(usz size);
-//extern void   gs_discardMemory(void *mem, usz size);
 
 #define ARENA_SCRATCH_POOL_COUNT 2
 thread_var Arena *m__scratchPool[ARENA_SCRATCH_POOL_COUNT] = {};
@@ -82,7 +86,7 @@ arenaPushSize_(Arena *arena, usz size, ArenaPushFlags flags = defaultArenaPushFl
   if(newPos > current->capacity)
   {
     usz allocSize = MAX(size + ARENA_HEADER_SIZE, current->capacity);
-    Arena *newBlock = globalPlatform.gsArenaAcquire(allocSize);
+    Arena *newBlock = gsArenaAcquire(allocSize);
     newBlock->base = current->base + current->pos;
     newBlock->prev = current;
     arena->current = newBlock;
@@ -121,7 +125,7 @@ arenaPopTo(Arena *arena, usz pos)
   for(Arena *prev = 0; current->base >= pos; current = prev)
     {
       prev = current->prev;
-      globalPlatform.gsArenaDiscard(current);
+      gsArenaDiscard(current);
     }
 
   arena->current = current;
@@ -170,7 +174,7 @@ arenaGetScratch(Arena **conflicts, usz conflictsCount)
       Arena **scratchSlot = m__scratchPool;
       for(usz scratchIdx = 0; scratchIdx < ARENA_SCRATCH_POOL_COUNT; ++scratchIdx, ++scratchSlot)
 	{
-	  *scratchSlot = globalPlatform.gsArenaAcquire(0);
+	  *scratchSlot = gsArenaAcquire(0);
 	}
     }
 
