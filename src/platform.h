@@ -271,9 +271,10 @@ struct PluginCode
   u64 lastWriteTime;
 
   HMODULE pluginCode;
-  RenderNewFrame *renderNewFrame;
-  AudioProcess *audioProcess;
-  InitializePluginState *initializePluginState;
+  /* RenderNewFrame *renderNewFrame; */
+  /* AudioProcess *audioProcess; */
+  /* InitializePluginState *initializePluginState; */
+  PluginAPI pluginAPI;
 };
 
 static PluginCode
@@ -295,10 +296,15 @@ loadPluginCode(char *filename)
       result.pluginCode = LoadLibraryA(tempFilename);
       if(result.pluginCode)
 	{
-	  result.renderNewFrame = (RenderNewFrame *)GetProcAddress(result.pluginCode, "renderNewFrame");
-	  result.audioProcess = (AudioProcess *)GetProcAddress(result.pluginCode, "audioProcess");
-	  result.initializePluginState = (InitializePluginState *)GetProcAddress(result.pluginCode, "initializePluginState");
-	  result.isValid = result.renderNewFrame && result.audioProcess && result.initializePluginState;
+	  result.pluginAPI.gsRenderNewFrame =
+	    (GS_RenderNewFrame *)GetProcAddress(result.pluginCode, "gsRenderNewFrame");
+	  result.pluginAPI.gsAudioProcess =
+	    (GS_AudioProcess *)GetProcAddress(result.pluginCode, "gsAudioProcess");
+	  result.pluginAPI.gsInitializePluginState =
+	    (GS_InitializePluginState *)GetProcAddress(result.pluginCode, "gsInitializePluginState");
+	  result.isValid = (result.pluginAPI.gsRenderNewFrame &&
+			    result.pluginAPI.gsAudioProcess &&
+			    result.pluginAPI.gsInitializePluginState);
 	}
       else
 	{
@@ -310,8 +316,9 @@ loadPluginCode(char *filename)
 
       if(!result.isValid)
 	{
-	  result.renderNewFrame = 0;
-	  result.audioProcess = 0;
+	  result.pluginAPI.gsRenderNewFrame = 0;
+	  result.pluginAPI.gsAudioProcess = 0;
+	  result.pluginAPI.gsInitializePluginState = 0;
 	}
     }
 
@@ -328,8 +335,9 @@ unloadPluginCode(PluginCode *code)
     }
 
   code->isValid = false;
-  code->renderNewFrame = 0;
-  code->audioProcess = 0;
+  code->pluginAPI.gsRenderNewFrame = 0;
+  code->pluginAPI.gsAudioProcess = 0;
+  code->pluginAPI.gsInitializePluginState = 0;
 }
 
 //

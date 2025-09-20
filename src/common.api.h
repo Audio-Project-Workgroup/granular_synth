@@ -33,10 +33,6 @@ struct PlatformAPI
 #undef X
 };
 
-// TODO: get rid of this, and set function pointers in plugin layer when it is
-//       not being included in the host translation unit
-//extern PlatformAPI globalPlatform;
-
 #if !defined(HOST_LAYER)
 #define X(name, ret, args) static GS_##name *gs##name = 0;
 PLATFORM_API_XLIST

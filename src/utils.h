@@ -11,6 +11,16 @@
 #endif
 
 #if COMPILER_MSVC
+#  define PUBLIC_SYMBOL __declspec(dllexport)
+#elif COMPILER_CLANG || COMPILER_GCC
+#  define PUBLIC_SYMBOL __attribute__((visibility("default")))
+#else
+#  error PUBLIC_SYMBOL not supported on this compiler
+#endif
+
+#define EXPORT_FUNCTION C_LINKAGE PUBLIC_SYMBOL
+
+#if COMPILER_MSVC
 #  define thread_var __declspec(thread)
 #elif COMPILER_CLANG || COMPILER_GCC
 #  define thread_var __thread

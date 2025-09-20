@@ -14,6 +14,7 @@
 #include <string.h>
 
 #define HOST_LAYER
+#define PLUGIN_DYNAMIC
 #include "common.h"
 static String8 executablePath;
 static String8 basePath;
@@ -358,7 +359,7 @@ static BASE_THREAD_PROC(audioThreadProc)
 		    {
 		      atomicStore(audioData->lock, 0);
 		    }		  
-		  if(plugin->audioProcess)
+		  if(gsAudioProcess)
 		    {
 		      // u64 audioProcessCallTime = readOSTimer();
 		      // audioBuffer.millisecondsElapsedSinceLastCall =
@@ -371,7 +372,7 @@ static BASE_THREAD_PROC(audioThreadProc)
 		      audioBuffer->inputBuffer[1] = readPtr;
 		      audioBuffer->framesToWrite = framesToWrite;
 		      //fprintf(stderr, "calling audioProcess(). frameToWrite: %u\n", framesToWrite);
-		      plugin->audioProcess(pluginMemory, audioBuffer);
+		      gsAudioProcess(pluginMemory, audioBuffer);
 		    }
 
 		  maResult = ma_pcm_rb_commit_write(outputRingBuffer, framesToWrite);		  
@@ -710,8 +711,14 @@ main(int argc, char **argv)
 #else
 	  String8 pluginPath = STR8_LIT(PLUGIN_PATH);
 #endif
+	  
+#if defined(PLUGIN_DYNAMIC)
 	  PluginCode plugin = loadPluginCode((char *)pluginPath.str);
 	  pluginMemory.pluginHandle = plugin.pluginCode;
+#define X(name, ret, args) gs##name = plugin.pluginAPI.gs##name;
+	  PLUGIN_API_XLIST
+#undef X
+#endif
 
 	  // model setup
 
@@ -964,9 +971,9 @@ main(int argc, char **argv)
 				  newInput->mouseState.position = (V2(mouseX, (r64)framebufferHeight - mouseY) -
 								   viewportMin);
 
-				  if(plugin.renderNewFrame)
+				  if(gsRenderNewFrame)
 				    {
-				      plugin.renderNewFrame(&pluginMemory, oldInput, &commands);
+				      gsRenderNewFrame(&pluginMemory, oldInput, &commands);
 				      glfwSetCursorState(window, commands.cursorState);				      
 				      renderCommands(&commands);
 				      GL_CATCH_ERROR();

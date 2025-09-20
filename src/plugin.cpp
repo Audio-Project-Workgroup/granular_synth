@@ -76,23 +76,9 @@
 //#include "file_granulator.cpp"
 #include "internal_granulator.cpp"
 
-// TODO: interfacing with host layer functions through a global variable like this introduces an unpleasant asymmetry,
-//       preventing code that uses these functions (particular parameter reads/writes) from being shared
-//       between the plugin and host. These functions should either be similarly encapsulated in the host layer,
-//       or unencapsulated here.
-//PlatformAPI globalPlatform;
 #if BUILD_DEBUG
 PluginLogger *globalLogger;
 #endif
-
-// r32 gs_fabsf(r32 num)		{ return(globalPlatform.gsAbs(num)); }
-// r32 gs_sqrtf(r32 num)		{ return(globalPlatform.gsSqrt(num)); }
-// r32 gs_sinf(r32 num)		{ return(globalPlatform.gsSin(num)); }
-// r32 gs_cosf(r32 num)		{ return(globalPlatform.gsCos(num)); }
-// r32 gs_powf(r32 base, r32 exp)	{ return(globalPlatform.gsPow(base, exp)); }
-
-// Arena* gs_arenaAcquire(usz size)     { return(globalPlatform.gsArenaAcquire(size)); }
-// void   gs_arenaDiscard(Arena *arena) { return(globalPlatform.gsArenaDiscard(arena)); }
 
 inline void
 printButtonState(ButtonState button, char *name)
@@ -104,8 +90,8 @@ printButtonState(ButtonState button, char *name)
 
 static PluginState *globalPluginState = 0;
 
-extern "C"
-INITIALIZE_PLUGIN_STATE(initializePluginState)
+EXPORT_FUNCTION PluginState*
+gsInitializePluginState(PluginMemory *memoryBlock)
 {
   PluginState *pluginState = 0;
   if(!globalPluginState)
@@ -133,7 +119,7 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
       pluginState->grainArena = gsArenaAcquire(0);
 
       pluginState->pathToPlugin =
-	gsGetPathToModule(memoryBlock->pluginHandle, (void *)initializePluginState,
+	gsGetPathToModule(memoryBlock->pluginHandle, (void *)gsInitializePluginState,
 			  pluginState->permanentArena);
 
       // NOTE: parameter initialization
@@ -328,10 +314,10 @@ INITIALIZE_PLUGIN_STATE(initializePluginState)
   return(pluginState);
 }
 
-extern "C"
-RENDER_NEW_FRAME(renderNewFrame)
+EXPORT_FUNCTION void
+gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *renderCommands) 
 { 
-  initializePluginState(memory);
+  gsInitializePluginState(memory);
   if(globalPluginState)
     {
       PluginState *pluginState = globalPluginState;
@@ -1146,8 +1132,8 @@ RENDER_NEW_FRAME(renderNewFrame)
     }  
 }
 
-extern "C"
-AUDIO_PROCESS(audioProcess)
+EXPORT_FUNCTION void
+gsAudioProcess(PluginMemory *memory, PluginAudioBuffer *audioBuffer)
 {  
   //PluginState *pluginState = getPluginState(memory);  
   if(globalPluginState)

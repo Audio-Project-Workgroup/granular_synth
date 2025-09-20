@@ -37,7 +37,8 @@ REM preprocessor
 ::pushd ..\build
 
 REM compile plugin and host
-cl %CFLAGS% -D"DATA_PATH=\"../data/\"" ..\src\plugin.cpp -Fmplugin.map -LD /link %LFLAGS% -PDB:plugin_%random%.pdb -EXPORT:renderNewFrame -EXPORT:audioProcess -EXPORT:initializePluginState
+cl %CFLAGS% -D"DATA_PATH=\"../data/\"" ..\src\plugin.cpp -Fmplugin.map -LD /link %LFLAGS% -PDB:plugin_%random%.pdb
+REM -EXPORT:renderNewFrame -EXPORT:audioProcess -EXPORT:initializePluginState
 
 set PLUGIN_STATUS=%ERRORLEVEL%
 
