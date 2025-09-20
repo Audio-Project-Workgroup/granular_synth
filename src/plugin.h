@@ -1,6 +1,8 @@
 #define INTERNAL_SAMPLE_RATE (48000)
 
+#if !defined(HOST_LAYER)
 #include "common.h"
+#endif
 
 #define TAKE_LOCK(lock, ...) \
   while(gsAtomicCompareAndSwap(lock, 0, 1)) { __VA_ARGS__ }

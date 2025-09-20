@@ -1,5 +1,11 @@
-//#include "types.h"
+#define HOST_LAYER
 #include "common.h"
+
+/*
+  TODO:
+  - implement platform fucntions
+  - remove file_formats.h from the plugin, and instead do asset preprocessing
+*/
 
 #define proc_import(name, ret, args) __attribute__((import_module("env"), import_name(#name))) ret name args
 #define proc_export C_LINKAGE
@@ -8,6 +14,94 @@
 proc_import(platformLog, void, (const char *msg));
 proc_import(platformSin, r32, (r32 val));
 proc_import(platformCos, r32, (r32 val));
+
+// TODO: implement
+Arena*
+gsArenaAcquire(usz capacity)
+{
+  UNUSED(capacity);
+  return(0);
+}
+
+void
+gsArenaDiscard(Arena *arena)
+{
+  UNUSED(arena);
+  return;
+}
+
+u32
+gsAtomicLoad(volatile u32 *src)
+{
+  UNUSED(src);
+  return(0);
+}
+
+void*
+gsAtomicLoadPtr(volatile void **src)
+{
+  UNUSED(src);
+  return(0);
+}
+
+u32
+gsAtomicStore(volatile u32 *dest, u32 value)
+{
+  UNUSED(dest);
+  UNUSED(value);  
+  return(0);
+}
+
+u32
+gsAtomicAdd(volatile u32 *addend, u32 value)
+{
+  UNUSED(addend);
+  UNUSED(value);  
+  return(0);
+}
+
+u32
+gsAtomicCompareAndSwap(volatile u32 *value, u32 oldVal, u32 newVal)
+{
+  UNUSED(value);
+  UNUSED(oldVal);
+  UNUSED(newVal);  
+  return(0);
+}
+
+void*
+gsAtomicCompareAndSwapPointers(volatile void **value, void *oldVal, void *newVal)
+{
+  UNUSED(value);
+  UNUSED(oldVal);
+  UNUSED(newVal);  
+  return(0);
+}
+
+Buffer
+gsReadEntireFile(char *filename, Arena *allocator)
+{
+  Buffer result = {};
+  UNUSED(filename);
+  UNUSED(allocator);
+  return(result);
+}
+
+void
+gsFreeFileMemory(Buffer file, Arena *allocator)
+{
+  UNUSED(file);
+  UNUSED(allocator);
+  return;
+}
+
+void
+gsWriteEntireFile(char *filename, Buffer file)
+{
+  UNUSED(filename);
+  UNUSED(file);
+  return;
+}
 
 r32
 gs_sinf(r32 num)
@@ -20,6 +114,8 @@ gs_cosf(r32 num)
 {
   return(platformCos(num));
 }
+
+#include "plugin.cpp"
 
 // internal and exported functions
 static void
@@ -42,15 +138,15 @@ fmadd(int a, int b, int c) {
 
 extern u8 __heap_base;
 
-struct R_Quad
-{
-  v2 min;
-  v2 max;
+// struct R_Quad
+// {
+//   v2 min;
+//   v2 max;
 
-  u32 color;
-  r32 angle;
-  r32 level;
-};
+//   u32 color;
+//   r32 angle;
+//   r32 level;
+// };
 
 struct WasmState
 {
@@ -76,15 +172,17 @@ static WasmState *wasmState = 0;
 proc_export WasmState*
 wasmInit(usz memorySize)
 {
-  Arena *arena = (Arena*)&__heap_base;
-  arena->base = &__heap_base;
-  arena->capacity = memorySize;
-  arena->used = sizeof(Arena);
+  // Arena *arena = (Arena*)&__heap_base;
+  // arena->base = &__heap_base;
+  // arena->capacity = memorySize;
+  // arena->used = sizeof(Arena);
+  UNUSED(memorySize);
+  Arena *arena = gsArenaAcquire(0);
   
   WasmState *result = 0;
   if(arena) {
-    platformLogf("arena: %X\n  base=%u\n  capacity=%u\n  used=%u\n",
-		 arena, arena->base, arena->capacity, arena->used);
+    platformLogf("arena: %u\n  base=%u\n  capacity=%u\n  used=%u\n",
+		 arena, arena->base, arena->capacity, arena->pos);
     result = arenaPushStruct(arena, WasmState, arenaFlagsZeroAlign(sizeof(void*)));
     if(result) {
       result->arena = arena;
