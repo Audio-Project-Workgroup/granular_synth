@@ -2,6 +2,7 @@
 //       declarations and implementations. Maybe then we can also only compile
 //       shared code once, and link it in both host and plugin
 #if defined(HOST_LAYER)
+struct Arena;
 extern Arena* gsArenaAcquire(usz capacity);
 extern void   gsArenaDiscard(Arena *arena);
 //extern void*  gs_acquireMemory(usz size);

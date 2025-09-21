@@ -1,0 +1,420 @@
+#define HOST_LAYER
+#include "context.h"
+#include "types.h"
+#include "utils.h"
+#include "arena.h"
+#include "strings.h"
+#include "math.h"
+
+// PLATFORM IMPLEMENATIONS
+#include <math.h>
+
+static r32
+gsSqrt(r32 num)
+{
+  return(sqrtf(num));
+}
+
+static r32
+gsCos(r32 num)
+{
+  return(cosf(num));
+}
+
+static r32
+gsSin(r32 num)
+{
+  return(sinf(num));
+}
+
+#define ARENA_MIN_ALLOCATION_SIZE KILOBYTES(64)
+
+// FILE LOADERS
+#if OS_WINDOWS
+#include <windows.h>
+
+static Arena*
+gsArenaAcquire(usz size)
+{
+  usz allocSize = MAX(size, ARENA_MIN_ALLOCATION_SIZE);
+  void *base = VirtualAlloc(0, allocSize, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+  Arena *result = (Arena*)base;
+  result->current = result;
+  result->prev = 0;
+  result->base = 0;
+  result->capacity = allocSize;
+  result->pos = ARENA_HEADER_SIZE;
+
+  return(result);
+}
+
+static void
+gsArenaDiscard(Arena *arena)
+{
+  usz size = arena->capacity;
+  VirtualFree((void*)arena, 0, MEM_RELEASE);
+}
+
+static Buffer
+readEntireFile(Arena *arena, String8 path)
+{
+  usz fileSize = 0;
+  u8 *fileContents = 0;
+
+  HANDLE handle = CreateFileA((char*)path.str, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, 0, 0);
+  if(handle != INVALID_HANDLE_VALUE)
+    {
+      LARGE_INTEGER size;
+      if(GetFileSizeEx(handle, &size))
+	{
+	  fileSize = size.QuadPart;
+	  fileContents = arenaPushArray(arena, fileSize + 1, u8);
+
+	  u8 *dest = fileContents;
+	  usz totalBytesToRead = fileSize;	  
+	  while(totalBytesToRead)
+	    {
+	      u32 bytesToRead = (u32)totalBytesToRead;
+	      DWORD bytesRead;
+	      if(ReadFile(handle, dest, bytesToRead, &bytesRead, 0))
+		{
+		  dest += bytesRead;
+		  totalBytesToRead -= bytesRead;
+		}
+	      else
+		{
+		  fileSize = 0;
+		  fileContents = 0;
+		  arenaPopSize(arena, fileSize + 1);
+		  break;
+		}
+	    }
+	  fileContents[fileSize] = 0; // NOTE: null termination
+	}
+      CloseHandle(handle);
+    }
+  
+  Buffer result = {};
+  result.size = fileSize;
+  result.contents = fileContents;
+  return(result);
+}
+
+static void
+writeEntireFile(String8 path, Buffer file)
+{
+  HANDLE handle = CreateFileA((char*)path.str, GENERIC_WRITE, FILE_SHARE_WRITE, 0, CREATE_ALWAYS, 0, 0);
+  if(handle != INVALID_HANDLE_VALUE)
+    {
+      void *fileMemory = file.contents;
+      usz bytesRemaining = file.size;
+      while(bytesRemaining)
+	{
+	  u32 bytesToWrite = (u32)bytesRemaining;
+	  if(WriteFile(handle, fileMemory, bytesToWrite, 0, 0))
+	    {
+	      bytesRemaining -= bytesToWrite;
+	      fileMemory = (u8*)fileMemory + bytesToWrite;
+	    }
+	  else
+	    {
+	      ASSERT(0);
+	      break;
+	    }
+	}
+      CloseHandle(handle);
+    }
+}
+
+#elif OS_LINUX || OS_MAC
+
+#else
+#  error unsupported OS
+#endif
+
+#define FOURCC(str) ((u32)((str[0] << 0*8) | (str[1] << 1*8) | (str[2] << 2*8) | (str[3] << 3*8)))
+
+#pragma pack(push, 1)
+
+struct BitmapHeader
+{
+  u16 signature;
+  u32 fileSize;
+  u32 reserved;
+  u32 dataOffset;
+
+  u32 headerSize;
+  u32 width;
+  u32 height;
+  u16 planes;
+  u16 bitsPerPixel;
+  u32 compression;
+  u32 imageSize;
+  u32 xPixelsPerM;
+  u32 yPixelsPerM;
+  u32 colorsUsed;
+  u32 colorsImportant;
+};
+
+struct BitmapHeaderWithMasks
+{
+  u16 signature;
+  u32 fileSize;
+  u32 reserved;
+  u32 dataOffset;
+
+  u32 headerSize;
+  u32 width;
+  u32 height;
+  u16 planes;
+  u16 bitsPerPixel;
+  u32 compression;
+  u32 imageSize;
+  u32 xPixelsPerM;
+  u32 yPixelsPerM;
+  u32 colorsUsed;
+  u32 colorsImportant;
+
+  u32 redMask;
+  u32 greenMask;
+  u32 blueMask;
+};
+
+#pragma pack(pop)
+
+static LoadedBitmap*
+loadBitmap(Arena *arena, String8 path)
+{
+  LoadedBitmap *result = 0;
+  TemporaryMemory scratch = arenaGetScratch(&arena, 1);
+
+  Buffer file = readEntireFile(scratch.arena, path);
+  if(file.contents)
+    {
+      BitmapHeaderWithMasks *header = (BitmapHeaderWithMasks*)file.contents;
+      u32 redMask = header->redMask;
+      u32 greenMask = header->greenMask;
+      u32 blueMask = header->blueMask;
+      u32 alphaMask = ~(redMask | greenMask | blueMask);
+
+      u32 alphaShiftDown = alphaMask ? lowestOrderBit(alphaMask) : 24;
+      u32 redShiftDown = redMask ? lowestOrderBit(redMask) : 16;
+      u32 greenShiftDown = greenMask ? lowestOrderBit(greenMask) : 8;
+      u32 blueShiftDown = blueMask ? lowestOrderBit(blueMask) : 0;
+  
+      u32 width = header->width;
+      u32 height = header->height;
+      u32 *srcPixels = (u32*)(file.contents + header->dataOffset);
+      u32 *destPixels = arenaPushArray(arena, width * height, u32);
+      {
+	u32 *src = srcPixels;
+	u32 *dest = destPixels;
+	for(u32 j = 0; j < height; ++j)
+	  {
+	    for(u32 i = 0; i < width; ++i)
+	      {
+		u32	srcPixel = *src++;
+		u32	red	 = (srcPixel & redMask) >> redShiftDown;
+		u32	green	 = (srcPixel & greenMask) >> greenShiftDown;
+		u32	blue	 = (srcPixel & blueMask) >> blueShiftDown;
+		u32	alpha	 = (srcPixel & alphaMask) >> alphaShiftDown;
+	    
+		*dest++ = ((alpha << 24) |
+			   (red   << 16) |
+			   (green <<  8) |
+			   (blue  <<  0));
+	      }
+	  }
+      }
+      
+      result = arenaPushStruct(arena, LoadedBitmap);
+      result->width = width;
+      result->height = height;
+      result->stride = result->width * sizeof(u32);
+      result->alignPercentage = V2(0, 0);
+      result->pixels = destPixels;
+    }
+  
+  arenaReleaseScratch(scratch);
+  return(result);
+}
+
+// ASSETS HELPERS
+struct LooseBitmap
+{
+  LooseBitmap *next;
+
+  // NOTE: specified at load
+  LoadedBitmap *bitmap;
+  String8 name;
+
+  // NOTE: calculated
+  s32 atlasOffsetX;
+  s32 atlasOffsetY;
+};
+
+struct LooseAssets
+{
+  Arena *arena;
+
+  LooseBitmap *first;
+  LooseBitmap *last;
+  u64 count;
+};
+
+static void
+looseAssetPushBitmap(LooseAssets *looseAssets, String8 path, String8 name)
+{
+  LooseBitmap *looseBitmap = arenaPushStruct(looseAssets->arena, LooseBitmap);
+  LoadedBitmap *bitmap = loadBitmap(looseAssets->arena, path);
+  looseBitmap->bitmap = bitmap;
+  looseBitmap->name = arenaPushString(looseAssets->arena, name);
+
+  QUEUE_PUSH(looseAssets->first, looseAssets->last, looseBitmap);
+  ++looseAssets->count;
+}
+
+#define BITMAP_XLIST\
+  X(editorSkin, "BMP/TREE.bmp")\
+  X(pomegranateKnob, "BMP/POMEGRANATE_BUTTON.bmp")\
+  X(pomegranateKnobLabel, "BMP/POMEGRANATE_BUTTON_WHITEMARKERS.bmp")\
+  X(halfPomegranateKnob, "BMP/HALFPOMEGRANATE_BUTTON.bmp")\
+  X(halfPomegranateKnobLabel, "BMP/HALFPOMEGRANATE_BUTTON_WHITEMARKERS.bmp")\
+  X(densityKnob, "BMP/DENSITYPOMEGRANATE_BUTTON.bmp")\
+  X(densityKnobShadow, "BMP/DENSITYPOMEGRANATE_BUTTON_SHADOW.bmp")\
+  X(densityKnobLabel, "BMP/DENSITYPOMEGRANATE_BUTTON_WHITEMARKERS.bmp")\
+  X(levelBar, "BMP/LEVELBAR.bmp")\
+  X(levelFader, "BMP/LEVELBAR_SLIDINGLEVER.bmp")\
+  X(grainViewBackground, "BMP/GREENFRAME_RECTANGLE.bmp")\
+  X(grainViewOutline, "BMP/GREENFRAME.bmp") 
+  
+int
+main(int argc, char **argv)
+{
+  TemporaryMemory scratch = arenaGetScratch(0, 0);
+
+  Arena *arena = gsArenaAcquire(MEGABYTES(256));
+  LooseAssets *looseAssets = arenaPushStruct(arena, LooseAssets);
+  looseAssets->arena = arena;
+
+  HANDLE test = CreateFileA("../data/BMP/DENSITYPOMEGRANATE_BUTTON.bmp", GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, 0, 0);
+
+#define DATA_PATH "../data/"
+#define X(name, path) looseAssetPushBitmap(looseAssets, STR8_LIT(DATA_PATH##path), STR8_LIT(#name));
+  BITMAP_XLIST;
+#undef X    
+
+  // NOTE: compute positions in the atlas
+  s32 atlasWidth = 8192;
+  s32 atlasHeight = 4096;
+  s32 layoutX = 0;
+  s32 layoutY = 0;
+  s32 rowMaxHeight = 0;
+  s32 spaceX = 0;
+  u32 growCount = 0;
+  u32 maxGrowCount = 10;
+  for(LooseBitmap *bitmap = looseAssets->first; bitmap; bitmap = bitmap->next)
+    {
+      b32 inserted = 0;
+      while(!inserted)
+	{
+	  ASSERT(growCount <= maxGrowCount);
+
+	  s32 maxX = layoutX + bitmap->bitmap->width;
+	  s32 maxY = layoutY + bitmap->bitmap->height;
+	  b32 fits = (maxX <= atlasWidth && maxY <= atlasHeight);
+	  if(fits)
+	    {
+	      bitmap->atlasOffsetX = layoutX;
+	      bitmap->atlasOffsetY = layoutY;
+
+	      layoutX += bitmap->bitmap->width;
+	      rowMaxHeight = MAX(rowMaxHeight, (s32)bitmap->bitmap->height);
+
+	      inserted = 1;
+	    }
+	  else
+	    {
+	      if(maxY > atlasHeight)
+		{
+		  // NOTE: overflowing y. grow atlas
+		  ++growCount;
+		  if(growCount & 1)
+		    {
+		      // NOTE: grow x
+		      spaceX = atlasWidth;
+		      layoutX = atlasWidth;
+		      layoutY = 0;
+		      rowMaxHeight = 0;
+		      atlasWidth *= 2;
+		    }
+		  else
+		    {
+		      // NOTE: grow y
+		      spaceX = 0;
+		      layoutX = 0;
+		      layoutY = atlasHeight;
+		      rowMaxHeight = 0;
+		      atlasHeight *= 2;
+		    }
+		}
+	      else
+		{
+		  // NOTE: overflowing x. go to next row
+		  layoutY += rowMaxHeight;
+		  layoutX = spaceX;
+		  rowMaxHeight = 0;
+		}
+	    }
+	}
+    }
+
+  // NOTE: copy into the atlas
+  u32 *atlas = arenaPushArray(arena, atlasWidth * atlasHeight, u32);
+  for(LooseBitmap *bitmap = looseAssets->first; bitmap; bitmap = bitmap->next)
+    {
+      u8 *srcRow = (u8*)bitmap->bitmap->pixels;
+      u8 *destRow = (u8*)(atlas + bitmap->atlasOffsetY*atlasWidth + bitmap->atlasOffsetX);
+      for(u32 j = 0; j < bitmap->bitmap->height; ++j)
+	{
+	  u32 *srcPixels = (u32*)srcRow;
+	  u32 *destPixels = (u32*)destRow;
+	  for(u32 i = 0; i < bitmap->bitmap->width; ++i)
+	    {
+	      *destPixels++ = *srcPixels++;
+	    }
+
+	  srcRow += bitmap->bitmap->stride;
+	  destRow += atlasWidth * sizeof(u32);
+	}
+    }
+
+  // DEBUG: write atlas to file
+  Arena *writeArena = gsArenaAcquire(MEGABYTES(256));
+  
+  BitmapHeader *header = arenaPushStruct(writeArena, BitmapHeader);
+  header->signature = FOURCC("BM  ");
+  header->fileSize = sizeof(BitmapHeader) + atlasWidth * atlasHeight * sizeof(u32);
+  header->dataOffset = sizeof(BitmapHeader);
+  header->headerSize = sizeof(BitmapHeader) - 14;
+  header->width = atlasWidth;
+  header->height = atlasHeight;
+  header->planes = 1;
+  header->bitsPerPixel = 8 * sizeof(u32);
+  header->compression = 0;
+  header->imageSize = header->width * header->height * sizeof(u32);
+  
+  u32 *pixels = arenaPushArray(writeArena, atlasWidth * atlasHeight, u32);
+  for(s32 i = 0; i < atlasWidth * atlasHeight; ++i)
+    {
+      pixels[i] = atlas[i];
+    }
+
+  Buffer file = {};
+  file.size = header->fileSize;
+  file.contents = (u8*)header;
+  writeEntireFile(STR8_LIT(DATA_PATH"test_atlas.bmp"), file);
+
+  arenaReleaseScratch(scratch);
+  return(0);
+}

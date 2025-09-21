@@ -5,7 +5,7 @@ set BUILD_DEBUG=1
 set CFLAGS=
 set CFLAGS=%CFLAGS% -nologo -W3 -wd"4244" -wd"4146"
 if %BUILD_DEBUG%==1 (
-   set CFLAGS=%CFLAGS% -Z7
+   set CFLAGS=%CFLAGS% -Zi
 )
 set CFLAGS=%CFLAGS% -I..\src\include
 set CFLAGS=%CFLAGS% -I..\src\include\glad\include
@@ -35,6 +35,9 @@ REM preprocessor
 :: TODO: this is incomprehensibly fucked
 ::..\build\preprocessor.exe plugin.h > generated.cpp 
 ::pushd ..\build
+
+REM asset packer
+cl %CFLAGS% ..\src\asset_packer.cpp /link %LFLAGS% -out:asset_packer.exe
 
 REM compile plugin and host
 cl %CFLAGS% -D"DATA_PATH=\"../data/\"" ..\src\plugin.cpp -Fmplugin.map -LD /link %LFLAGS% -PDB:plugin_%random%.pdb
