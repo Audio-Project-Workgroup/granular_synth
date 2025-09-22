@@ -62,6 +62,43 @@ arenaPushString(Arena *arena, String8 string)
   return(result);
 }
 
+inline String8
+arenaPushStringFormatV(Arena *arena, char *fmt, va_list vaArgs)
+{
+  int bufferCount = 1024;
+  u8 *buffer = arenaPushArray(arena, bufferCount, u8);
+  int count = gs_vsnprintf((char*)buffer, bufferCount, fmt, vaArgs);
+  if(count < bufferCount)
+    {
+      arenaPopSize(arena, bufferCount - count - 1);
+    }
+  else
+    {
+      arenaPopSize(arena, bufferCount);
+      buffer = arenaPushArray(arena, count + 1, u8);
+      count = gs_vsnprintf((char*)buffer, count + 1, fmt, vaArgs);
+    }
+
+  String8 result = {};
+  result.str = buffer;
+  result.size = count;
+
+  return(result);
+}
+
+inline String8
+arenaPushStringFormat(Arena *arena, char *fmt, ...)
+{
+  va_list vaArgs;
+  va_start(vaArgs, fmt);
+
+  String8 result = arenaPushStringFormatV(arena, fmt, vaArgs);
+
+  va_end(vaArgs);
+
+  return(result);
+}
+
 // string list functions
 inline void
 stringListPushNode(String8List *list, String8Node *node)

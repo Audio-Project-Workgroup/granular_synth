@@ -263,15 +263,101 @@ struct LooseAssets
 };
 
 static void
-looseAssetPushBitmap(LooseAssets *looseAssets, String8 path, String8 name)
+looseAssetPushBitmap(LooseAssets *looseAssets, LoadedBitmap *bitmap, String8 name)
 {
   LooseBitmap *looseBitmap = arenaPushStruct(looseAssets->arena, LooseBitmap);
-  LoadedBitmap *bitmap = loadBitmap(looseAssets->arena, path);
   looseBitmap->bitmap = bitmap;
   looseBitmap->name = arenaPushString(looseAssets->arena, name);
 
   QUEUE_PUSH(looseAssets->first, looseAssets->last, looseBitmap);
   ++looseAssets->count;
+}
+
+static void
+looseAssetPushBitmap(LooseAssets *looseAssets, LoadedBitmap *bitmap, char *fmt, ...)
+{
+  va_list vaArgs;
+  va_start(vaArgs, fmt);
+
+  TemporaryMemory scratch = arenaGetScratch(&looseAssets->arena, 1);
+
+  String8 name = arenaPushStringFormatV(scratch.arena, fmt, vaArgs);
+  looseAssetPushBitmap(looseAssets, bitmap, name);
+
+  arenaReleaseScratch(scratch);
+
+  va_end(vaArgs);
+}
+
+static void
+looseAssetPushBitmap(LooseAssets *looseAssets, String8 path, String8 name)
+{  
+  LoadedBitmap *bitmap = loadBitmap(looseAssets->arena, path);
+  looseAssetPushBitmap(looseAssets, bitmap, name);
+}
+
+#define STB_TRUETYPE_IMPLEMENTATION
+#include "stb_truetype.h"
+
+static void
+looseAssetPushFont(LooseAssets *looseAssets, String8 path, RangeU32 cpRange, r32 ptSize)
+{
+  TemporaryMemory scratch = arenaGetScratch(&looseAssets->arena, 1);
+
+  Buffer fontFile = readEntireFile(scratch.arena, path);
+  if(fontFile.contents)
+    {
+      stbtt_fontinfo stbFontInfo;
+      if(stbtt_InitFont(&stbFontInfo, fontFile.contents, stbtt_GetFontOffsetForIndex(fontFile.contents, 0)))
+	{
+	  int ascent, descent, lineGap;
+	  stbtt_GetFontVMetrics(&stbFontInfo, &ascent, &descent, &lineGap);
+
+	  for(u32 charIdx = cpRange.min; charIdx < cpRange.max; ++charIdx)
+	    {
+	      r32 fontScale = stbtt_ScaleForPixelHeight(&stbFontInfo, ptSize);
+
+	      int width, height, xOffset, yOffset;
+	      u8 *glyphSrc = stbtt_GetCodepointBitmap(&stbFontInfo, 0, fontScale, charIdx,
+						      &width, &height, &xOffset, &yOffset);
+
+	      int advanceWidth, leftSideBearing;
+	      stbtt_GetCodepointHMetrics(&stbFontInfo, charIdx, &advanceWidth, &leftSideBearing);
+
+	      LoadedBitmap *bitmap = arenaPushStruct(looseAssets->arena, LoadedBitmap);	      
+	      bitmap->width = width;
+	      bitmap->height = height;
+	      bitmap->stride = bitmap->width * sizeof(u32);
+	      bitmap->pixels = arenaPushArray(looseAssets->arena, bitmap->width * bitmap->height, u32);
+	      {
+		u8 *srcRow = glyphSrc + width * (height - 1);
+		u8 *destRow = (u8*)bitmap->pixels;
+		for(int y = 0; y < height; ++y)
+		  {
+		    u8 *src = srcRow;
+		    u32 *dest = (u32*)destRow;
+		    for(int x = 0; x < width; ++x)
+		      {
+			u8 alpha = *src++;
+			*dest++ = ((alpha << 24) |
+				   (alpha << 16) |
+				   (alpha <<  8) |
+				   (alpha <<  0));
+		      }
+		    
+		    srcRow -= width;
+		    destRow += width * sizeof(u32);
+		  }
+	      }
+
+	      looseAssetPushBitmap(looseAssets, bitmap, "%c", charIdx);
+
+	      stbtt_FreeBitmap(glyphSrc, 0);
+	    }
+	}
+    }
+
+  arenaReleaseScratch(scratch);
 }
 
 #define BITMAP_XLIST\
@@ -297,12 +383,14 @@ main(int argc, char **argv)
   LooseAssets *looseAssets = arenaPushStruct(arena, LooseAssets);
   looseAssets->arena = arena;
 
-  HANDLE test = CreateFileA("../data/BMP/DENSITYPOMEGRANATE_BUTTON.bmp", GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, 0, 0);
-
 #define DATA_PATH "../data/"
 #define X(name, path) looseAssetPushBitmap(looseAssets, STR8_LIT(DATA_PATH##path), STR8_LIT(#name));
   BITMAP_XLIST;
-#undef X    
+#undef X
+
+  RangeU32 cpRange = {32, 127};
+  r32 ptSize = 32.f;
+  looseAssetPushFont(looseAssets, STR8_LIT(DATA_PATH"FONT/AGENCYB.ttf"), cpRange, ptSize);
 
   // NOTE: compute positions in the atlas
   s32 atlasWidth = 8192;
