@@ -68,7 +68,8 @@ logFormatString(char *format, ...)
 //#include "fft.h"
 #include "plugin_parameters.h"
 #include "file_granulator.h"
-#include "file_formats.h"
+//#include "file_formats.h"
+#include "plugin_asset.h"
 #include "ui_layout.h"
 #include "plugin_ui.h"
 #include "plugin_render.h"
@@ -117,24 +118,25 @@ struct PluginState
   r32 freq;
   PluginBooleanParameter soundIsPlaying;
 
-  PlayingSound loadedSound;
+  /* PlayingSound loadedSound; */
 
-  LoadedBitmap nullTexture;
-  LoadedBitmap editorReferenceLayout;
-  LoadedBitmap editorSkin;
-  LoadedBitmap pomegranateKnob;
-  LoadedBitmap pomegranateKnobLabel;
-  LoadedBitmap halfPomegranateKnob;
-  LoadedBitmap halfPomegranateKnobLabel;
-  LoadedBitmap densityKnob;
-  LoadedBitmap densityKnobShadow;
-  LoadedBitmap densityKnobLabel;
-  LoadedBitmap levelBar;
-  LoadedBitmap levelFader;
-  LoadedBitmap grainViewBackground;
-  LoadedBitmap grainViewOutline;
+  PluginAsset *null;
+  //PluginAsset *editorReferenceLayout;
+  PluginAsset *editorSkin;
+  PluginAsset *pomegranateKnob;
+  PluginAsset *pomegranateKnobLabel;
+  PluginAsset *halfPomegranateKnob;
+  PluginAsset *halfPomegranateKnobLabel;
+  PluginAsset *densityKnob;
+  PluginAsset *densityKnobShadow;
+  PluginAsset *densityKnobLabel;
+  PluginAsset *levelBar;
+  PluginAsset *levelFader;
+  PluginAsset *grainViewBackground;
+  PluginAsset *grainViewOutline;
 
   LoadedFont agencyBold;
+  /* PluginAssets assets; */
 
   //UILayout layout;
   UIContext uiContext;

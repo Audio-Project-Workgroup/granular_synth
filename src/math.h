@@ -2,6 +2,7 @@
 //       declarations and implementations. Maybe then we can also only compile
 //       shared code once, and link it in both host and plugin
 #if defined(HOST_LAYER)
+extern r32 gsRand(RangeR32 range);
 extern r32 gsAbs(r32 num);
 extern r32 gsSqrt(r32 num);
 extern r32 gsSin(r32 num);

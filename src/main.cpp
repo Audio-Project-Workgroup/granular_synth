@@ -571,6 +571,15 @@ gsArenaDiscard(Arena *arena)
   platformFreeMemory(arena, arena->capacity);
 }
 
+static r32
+platformRand(RangeR32 range)
+{
+  int randVal = rand();
+  r32 rand01 = (r32)randVal / (r32)RAND_MAX;
+  r32 result = mapToRange(rand01, range);
+  return(result);
+}
+
 //PlatformAPI globalPlatform;
 
 int
@@ -662,6 +671,7 @@ main(int argc, char **argv)
 	  
 	  pluginMemory.platformAPI.gsGetCurrentTimestamp = platformGetCurrentTimestamp;
 
+	  pluginMemory.platformAPI.gsRand = platformRand;
 	  pluginMemory.platformAPI.gsAbs  = fabsf;
 	  pluginMemory.platformAPI.gsSqrt = sqrtf;
 	  pluginMemory.platformAPI.gsSin  = sinf;

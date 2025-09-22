@@ -6,8 +6,10 @@ getRandomStereoPosition(r32 spreadAmount)
 
   // Simple random number between -1 and 1 (using two calls to rand() for better distribution)
   // TODO: replace rand() with custom prng for better performance, uniformity, and consistency across platforms
-  r32 randVal = ((((r32)rand() / (r32)RAND_MAX) * 2.0f - 1.0f) * 0.5f +
-		 (((r32)rand() / (r32)RAND_MAX) * 2.0f - 1.0f)) * 0.5f;
+  // r32 randVal = ((((r32)gsRand() / (r32)RAND_MAX) * 2.0f - 1.0f) * 0.5f +
+  // 		 (((r32)gsRand() / (r32)RAND_MAX) * 2.0f - 1.0f)) * 0.5f;
+  RangeR32 range = {-0.5f, 0.5f};
+  r32 randVal = gsRand(range) + gsRand(range);
 
   // Scale by spread parameter (0 = mono, 1 = full stereo)
   return randVal * spreadAmount;
@@ -244,8 +246,8 @@ synthesize(r32* destBufferLInit, r32* destBufferRInit,
 	      r32 samplesPlayedFrac = (r32)samplesPlayed*c_grain->lengthInv;
 	      r32 windowVal = getWindowVal(grainManager, samplesPlayedFrac, c_grain->windowParam);
 	      
-	      r32 panLeft = 1.0f - fmaxf(0.0f, c_grain->stereoPosition);
-	      r32 panRight = 1.0f + fminf(0.0f, c_grain->stereoPosition);
+	      r32 panLeft = 1.0f - MAX(0.0f, c_grain->stereoPosition);
+	      r32 panRight = 1.0f + MIN(0.0f, c_grain->stereoPosition);
           
 	      outSampleL += windowVal * sampleToWriteL * panLeft;
 	      outSampleR += windowVal * sampleToWriteR * panRight;

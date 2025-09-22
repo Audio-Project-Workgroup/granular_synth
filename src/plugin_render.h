@@ -1,54 +1,33 @@
 static inline void 
-renderPushQuad(RenderCommands *commands, Rect2 rect, LoadedBitmap *texture, r32 angle,
+renderPushQuad(RenderCommands *commands, Rect2 rect, PluginAsset *asset, r32 angle,
 	       r32 level, v4 color = V4(1, 1, 1, 1))
 {
-  if(!texture)
-    {
-      texture = commands->whiteTexture;
-    }
-
   R_Batch *batch = 0;
-  for(R_Batch *b = commands->first; b; b = b->next)
+  if(commands->batchFreelist)
     {
-      // TODO: check if pointers uniquely identify LoadedBitmap textures
-      if(b->texture == texture)
-	{
-	  if(b->quadCount < b->quadCapacity)
-	    {
-	      batch = b;
-	      break;
-	    }
-	}
+      batch = commands->batchFreelist;	  
+      STACK_POP(commands->batchFreelist);
+      batch->next = 0;
     }
-
-  if(!batch)
+  else
     {
-      if(commands->batchFreelist)
-	{
-	  batch = commands->batchFreelist;	  
-	  STACK_POP(commands->batchFreelist);
-	  batch->next = 0;
-	}
-      else
-	{
-	  batch = arenaPushStruct(commands->allocator, R_Batch);
-	  batch->quadCapacity = commands->glState->quadCapacity;
-	  batch->quads = arenaPushArray(commands->allocator, batch->quadCapacity, R_Quad,
-					arenaFlagsZeroNoAlign());
-	}
-      batch->quadCount = 0;
-      batch->texture = texture;
-      QUEUE_PUSH(commands->first, commands->last, batch);
-      ++commands->batchCount;
-    }
+      batch = arenaPushStruct(commands->allocator, R_Batch);
+      batch->quadCapacity = commands->glState->quadCapacity;
+      batch->quads = arenaPushArray(commands->allocator, batch->quadCapacity, R_Quad,
+				    arenaFlagsZeroNoAlign());
+    }      
   ASSERT(batch);
+  batch->quadCount = 0;
+  //batch->texture = texture;
+  QUEUE_PUSH(commands->first, commands->last, batch);
+  ++commands->batchCount;
 
   ASSERT(batch->quadCount < batch->quadCapacity);
   R_Quad *quad = batch->quads + batch->quadCount++;
   quad->min = rect.min;
   quad->max = rect.max;
-  quad->uvMin = V2(0, 0);
-  quad->uvMax = V2(1, 1);
+  quad->uvMin = asset->uv.min;
+  quad->uvMax = asset->uv.max;
   quad->color = colorU32FromV4(color);
   quad->angle = angle;
   quad->level = (r32)level;
@@ -64,15 +43,15 @@ renderPushRectOutline(RenderCommands *commands, Rect2 rect, r32 thickness, r32 l
   v2 vDim = V2(thickness, rectDim.y);
   v2 hDim = V2(rectDim.x, thickness);
 
-  v2 leftMiddle = rect.min + V2(0, 0.5f*rectDim.y);
-  v2 rightMiddle = rect.max - V2(0, 0.5f*rectDim.y);
+  v2 leftMiddle   = rect.min + V2(0,              0.5f*rectDim.y);
+  v2 rightMiddle  = rect.max - V2(0,              0.5f*rectDim.y);
   v2 bottomMiddle = rect.min + V2(0.5f*rectDim.x, 0);
-  v2 topMiddle = rect.max - V2(0.5f*rectDim.x, 0);
-  
-  renderPushQuad(commands, rectCenterDim(leftMiddle, vDim), 0, 0, level, color);
-  renderPushQuad(commands, rectCenterDim(rightMiddle, vDim), 0, 0, level, color);
-  renderPushQuad(commands, rectCenterDim(bottomMiddle, hDim), 0, 0, level, color);
-  renderPushQuad(commands, rectCenterDim(topMiddle, hDim), 0, 0, level, color);
+  v2 topMiddle    = rect.max - V2(0.5f*rectDim.x, 0);
+ 
+  renderPushQuad(commands, rectCenterDim(leftMiddle,   vDim), PLUGIN_ASSET(null), 0, level, color);
+  renderPushQuad(commands, rectCenterDim(rightMiddle,  vDim), PLUGIN_ASSET(null), 0, level, color);
+  renderPushQuad(commands, rectCenterDim(bottomMiddle, hDim), PLUGIN_ASSET(null), 0, level, color);
+  renderPushQuad(commands, rectCenterDim(topMiddle,    hDim), PLUGIN_ASSET(null), 0, level, color);
 }
 
 static inline v2
@@ -88,16 +67,16 @@ renderPushText(RenderCommands *commands, LoadedFont *font, String8 string,
   {
     u8 c;
     Rect2 rect;
-    LoadedBitmap *glyph;
+    PluginAsset *glyph;
   } pastGlyphs[3] = {};
 
   bool overflow = false;
   for(u32 i = 0; i < stringSize; ++i)
     {      	
       u8 c = *at;
-      LoadedBitmap *glyph = getGlyphFromChar(font, c);
+      PluginAsset *glyph = getGlyphFromChar(font, c);
 
-      v2 glyphDim = V2(glyph->width, glyph->height);
+      v2 glyphDim = getGlyphDim(glyph);//V2(glyph->width, glyph->height);
       v2 scaledGlyphDim = hadamard(textScale, glyphDim);
       Rect2 glyphRect = rectMinDim(atPos, scaledGlyphDim);      
 
@@ -138,8 +117,9 @@ renderPushText(RenderCommands *commands, LoadedFont *font, String8 string,
     {
       atPos = pastGlyphs[2].rect.min;
       r32 hAdvance = textScale.x*getHorizontalAdvance(font, '.', '.');	
-      LoadedBitmap *glyph = getGlyphFromChar(font, '.');
-      v2 scaledGlyphDim = hadamard(textScale, V2(glyph->width, glyph->height));      
+      PluginAsset *glyph = getGlyphFromChar(font, '.');
+      v2 glyphDim = getGlyphDim(glyph);
+      v2 scaledGlyphDim = hadamard(textScale, glyphDim);      
       for(u32 i = 0; i < 3; ++i)
 	{
 	  Rect2 glyphRect = rectMinDim(atPos, scaledGlyphDim);

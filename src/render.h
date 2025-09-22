@@ -127,7 +127,7 @@ struct R_Batch
   u32 quadCount;
   R_Quad *quads;
 
-  LoadedBitmap *texture;
+  //LoadedBitmap *texture;
 };
 
 enum RenderCursorState
@@ -154,6 +154,9 @@ struct RenderCommands
   u32 selectedInputAudioDeviceIndex;
 
   GLState *glState;
+
+  LoadedBitmap *atlas;
+  b32 atlasIsBound;
 
   R_Batch *first;
   R_Batch *last;

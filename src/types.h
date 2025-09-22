@@ -198,17 +198,23 @@ struct LoadedBitmap
   u32 stride;
   v2 alignPercentage;
 
+  Rect2 uv;
+
   u32 *pixels;
   u32 glHandle;
 };
 
+struct PluginAsset;
 struct LoadedFont
 {
   RangeU32 characterRange;
 
   r32 verticalAdvance; 
 
-  u32 glyphCount;
-  LoadedBitmap *glyphs;
-  r32 *horizontalAdvance;
+  //r32 horizontalAdvance;
+  PluginAsset *glyphs;
+
+  /* u32 glyphCount; */
+  /* LoadedBitmap *glyphs; */
+  /* r32 *horizontalAdvance;   */
 };

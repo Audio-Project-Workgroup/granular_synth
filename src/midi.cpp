@@ -7,7 +7,7 @@ static inline r32
 hertzFromMidiNoteNumber(u8 noteNumber)
 {
   r32 result = 440.f;
-  result *= powf(powf(2.f, 1.f/12.f), (r32)((s32)noteNumber - 69));
+  result *= gsPow(gsPow(2.f, 1.f/12.f), (r32)((s32)noteNumber - 69));
   
   return(result);
 }
@@ -114,7 +114,7 @@ namespace midi {
   static MIDI_HANDLER(PitchBend)
   {
     //
-    assert(len == 2);
+    ASSERT(len == 2);
     u8 lsb = data[0];
     u8 msb = data[1];
     
@@ -123,7 +123,7 @@ namespace midi {
 
     r32 pitchRange = 2.0f; //Semitones range
     r32 normalizedBend = (r32)pitchbenddata / 8192.0f; // Change made so we work in [-1,1] range
-    r32 pitchFactor = powf(2.0f, normalizedBend * pitchRange / 12.0f); // semitones calculation 2^(ST/12)
+    r32 pitchFactor = gsPow(2.0f, normalizedBend * pitchRange / 12.0f); // semitones calculation 2^(ST/12)
     UNUSED(pitchFactor);
 
     //pluginState->freq[channel] = pluginState->freq[channel] * pitchFactor;

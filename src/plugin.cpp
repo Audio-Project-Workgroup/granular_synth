@@ -200,9 +200,9 @@ gsInitializePluginState(PluginMemory *memoryBlock)
 
       // NOTE: file loading, embedded grain caching
       pluginState->soundIsPlaying.value = false;
-      pluginState->loadedSound.sound =
-	loadWav(pluginState->permanentArena, STR8_LIT("../data/fingertips_44100_PCM_16.wav"));
-      pluginState->loadedSound.samplesPlayed = 0;// + pluginState->start_pos);
+      // pluginState->loadedSound.sound =
+      // 	loadWav(pluginState->permanentArena, STR8_LIT("../data/fingertips_44100_PCM_16.wav"));
+      // pluginState->loadedSound.samplesPlayed = 0;// + pluginState->start_pos);
 #if 0
       char *fingertipsPackfilename = "../data/fingertips.grains";
       TemporaryMemory packfileMemory = arenaBeginTemporaryMemory(&pluginState->loadArena, MEGABYTES(64));
@@ -216,50 +216,60 @@ gsInitializePluginState(PluginMemory *memoryBlock)
       pluginState->silo = initializeFileGrainState(&pluginState->permanentArena);
 #endif
 
-      pluginState->nullTexture =
-	makeBitmap(pluginState->permanentArena, 1920, 1080, 0xFFFFFFFF);
-      // TODO: maybe have some kind of x macro list for the bitmap loading
-      pluginState->editorReferenceLayout =
-	loadBitmap(DATA_PATH"BMP/NEWGRANADE_UI_POSITIONSREFERENCE.bmp", pluginState->permanentArena);
-      pluginState->editorSkin =
-	loadBitmap(DATA_PATH"BMP/TREE.bmp", pluginState->permanentArena);
-      pluginState->pomegranateKnob =
-	loadBitmap(DATA_PATH"BMP/POMEGRANATE_BUTTON.bmp", pluginState->permanentArena,
-		   V2(0, -0.03f));
-      pluginState->pomegranateKnobLabel =
-	loadBitmap(DATA_PATH"BMP/POMEGRANATE_BUTTON_WHITEMARKERS.bmp", pluginState->permanentArena,
-		   V2(0, 0));
-      pluginState->halfPomegranateKnob =
-	loadBitmap(DATA_PATH"BMP/HALFPOMEGRANATE_BUTTON.bmp", pluginState->permanentArena,
-		   V2(-0.005f, -0.035f));
-      pluginState->halfPomegranateKnobLabel =
-	loadBitmap(DATA_PATH"BMP/HALFPOMEGRANATE_BUTTON_WHITEMARKERS.bmp", pluginState->permanentArena,
-		   V2(0, 0));
-      pluginState->densityKnob =
-	loadBitmap(DATA_PATH"BMP/DENSITYPOMEGRANATE_BUTTON.bmp", pluginState->permanentArena,
-		   V2(0.01f, -0.022f));
-      pluginState->densityKnobShadow =
-	loadBitmap(DATA_PATH"BMP/DENSITYPOMEGRANATE_BUTTON_SHADOW.bmp", pluginState->permanentArena);
-      pluginState->densityKnobLabel =
-	loadBitmap(DATA_PATH"BMP/DENSITYPOMEGRANATE_BUTTON_WHITEMARKERS.bmp", pluginState->permanentArena,
-		   V2(0, 0));
-      pluginState->levelBar =
-	loadBitmap(DATA_PATH"BMP/LEVELBAR.bmp", pluginState->permanentArena);
-      pluginState->levelFader =
-	loadBitmap(DATA_PATH"BMP/LEVELBAR_SLIDINGLEVER.bmp", pluginState->permanentArena,
-		   V2(0, -0.416f));
-      pluginState->grainViewBackground =
-	loadBitmap(DATA_PATH"BMP/GREENFRAME_RECTANGLE.bmp", pluginState->permanentArena);
-      pluginState->grainViewOutline =
-	loadBitmap(DATA_PATH"BMP/GREENFRAME.bmp", pluginState->permanentArena);
+#define X(name) pluginState->name = PLUGIN_ASSET(name);
+      PLUGIN_ASSET_XLIST;
+#undef X
+      // pluginState->nullTexture =
+      // 	makeBitmap(pluginState->permanentArena, 1920, 1080, 0xFFFFFFFF);
+      // // TODO: maybe have some kind of x macro list for the bitmap loading
+      // pluginState->editorReferenceLayout =
+      // 	loadBitmap(DATA_PATH"BMP/NEWGRANADE_UI_POSITIONSREFERENCE.bmp", pluginState->permanentArena);
+      // pluginState->editorSkin =
+      // 	loadBitmap(DATA_PATH"BMP/TREE.bmp", pluginState->permanentArena);
+      // pluginState->pomegranateKnob =
+      // 	loadBitmap(DATA_PATH"BMP/POMEGRANATE_BUTTON.bmp", pluginState->permanentArena,
+      // 		   V2(0, -0.03f));
+      // pluginState->pomegranateKnobLabel =
+      // 	loadBitmap(DATA_PATH"BMP/POMEGRANATE_BUTTON_WHITEMARKERS.bmp", pluginState->permanentArena,
+      // 		   V2(0, 0));
+      // pluginState->halfPomegranateKnob =
+      // 	loadBitmap(DATA_PATH"BMP/HALFPOMEGRANATE_BUTTON.bmp", pluginState->permanentArena,
+      // 		   V2(-0.005f, -0.035f));
+      // pluginState->halfPomegranateKnobLabel =
+      // 	loadBitmap(DATA_PATH"BMP/HALFPOMEGRANATE_BUTTON_WHITEMARKERS.bmp", pluginState->permanentArena,
+      // 		   V2(0, 0));
+      // pluginState->densityKnob =
+      // 	loadBitmap(DATA_PATH"BMP/DENSITYPOMEGRANATE_BUTTON.bmp", pluginState->permanentArena,
+      // 		   V2(0.01f, -0.022f));
+      // pluginState->densityKnobShadow =
+      // 	loadBitmap(DATA_PATH"BMP/DENSITYPOMEGRANATE_BUTTON_SHADOW.bmp", pluginState->permanentArena);
+      // pluginState->densityKnobLabel =
+      // 	loadBitmap(DATA_PATH"BMP/DENSITYPOMEGRANATE_BUTTON_WHITEMARKERS.bmp", pluginState->permanentArena,
+      // 		   V2(0, 0));
+      // pluginState->levelBar =
+      // 	loadBitmap(DATA_PATH"BMP/LEVELBAR.bmp", pluginState->permanentArena);
+      // pluginState->levelFader =
+      // 	loadBitmap(DATA_PATH"BMP/LEVELBAR_SLIDINGLEVER.bmp", pluginState->permanentArena,
+      // 		   V2(0, -0.416f));
+      // pluginState->grainViewBackground =
+      // 	loadBitmap(DATA_PATH"BMP/GREENFRAME_RECTANGLE.bmp", pluginState->permanentArena);
+      // pluginState->grainViewOutline =
+      // 	loadBitmap(DATA_PATH"BMP/GREENFRAME.bmp", pluginState->permanentArena);
 
-      RangeU32 characterRange = {32, 127}; // NOTE: from SPACE up to (but not including) DEL
-      pluginState->agencyBold =
-	loadFont(pluginState->permanentArena, STR8_LIT(DATA_PATH"FONT/AGENCYB.ttf"),
-		 characterRange, 36.f);
+      // RangeU32 characterRange = {32, 127}; // NOTE: from SPACE up to (but not including) DEL
+      // pluginState->agencyBold =
+      // 	loadFont(pluginState->permanentArena, STR8_LIT(DATA_PATH"FONT/AGENCYB.ttf"),
+      // 		 characterRange, 36.f);
+      
+      // TODO: get this data from asset packing/codegen
+      pluginState->agencyBold.characterRange = {32, 127};
+      pluginState->agencyBold.verticalAdvance = 0.f;
+      pluginState->agencyBold.glyphs = PLUGIN_ASSET(AgencyBold_32);
 
       // NOTE: ui initialization
       pluginState->uiContext =
+	// uiInitializeContext(pluginState->frameArena, pluginState->framePermanentArena,
+	// 		    &pluginState->agencyBold);
 	uiInitializeContext(pluginState->frameArena, pluginState->framePermanentArena,
 			    &pluginState->agencyBold);
 
@@ -272,7 +282,7 @@ gsInitializePluginState(PluginMemory *memoryBlock)
       pluginState->rootPanel->splitAxis = UIAxis_y;
       pluginState->rootPanel->name = STR8_LIT("editor");
       pluginState->rootPanel->color = V4(1, 1, 1, 1);
-      pluginState->rootPanel->texture = &pluginState->editorSkin;
+      pluginState->rootPanel->texture = pluginState->editorSkin;
       //pluginState->rootPanel->texture = &pluginState->editorReferenceLayout;
 
       pluginState->menuPanel = arenaPushStruct(pluginState->permanentArena, UIPanel,
@@ -284,10 +294,10 @@ gsInitializePluginState(PluginMemory *memoryBlock)
       UIPanel *currentParentPanel = pluginState->menuPanel;
       UIPanel *menuLeft = makeUIPanel(currentParentPanel, pluginState->permanentArena,
 				      UIAxis_x, 0.5f, STR8_LIT("menu left"),
-				      &pluginState->nullTexture, menuBackgroundColor);
+				      pluginState->null, menuBackgroundColor);
       UIPanel *menuRight = makeUIPanel(currentParentPanel, pluginState->permanentArena,
 				       UIAxis_x, 0.5f, STR8_LIT("menu right"),
-				       &pluginState->nullTexture, menuBackgroundColor);
+				       pluginState->null, menuBackgroundColor);
       UNUSED(menuLeft);
       UNUSED(menuRight);
 	      
@@ -563,11 +573,12 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 		  v2 volumeClickableOffset = V2(0.3f, 0);
 		  v2 volumeClickableDim = V2(0.4f, 1.f);
 		  v2 volumeTextOffset = hadamard(V2(0.001f, -0.045f), panelDim);
-		  UIComm volume = uiMakeSlider(panelLayout, STR8_LIT("LEVEL"), volumeOffsetPOP, volumeDimPOP, 0.5f,
+		  UIComm volume = uiMakeSlider(panelLayout, STR8_LIT("LEVEL"),
+					       volumeOffsetPOP, volumeDimPOP, 0.5f,
 					       &pluginState->parameters[PluginParameter_volume],
 					       volumeClickableOffset, volumeClickableDim,
 					       volumeTextOffset, elementTextScale,
-					       &pluginState->levelBar, &pluginState->levelFader, 0,
+					       pluginState->levelBar, pluginState->levelFader, 0,
 					       V4(1, 1, 1, 1));
 #if 0
 		  if(volume.flags & UICommFlag_hovering)
@@ -625,7 +636,7 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 						V2(-0.02f, 0.02f), V2(1.02f, 1),
 						densityClickableOffset, densityClickableDim,
 						densityTextOffset, elementTextScale,
-						&pluginState->densityKnob, &pluginState->densityKnobLabel,
+						pluginState->densityKnob, pluginState->densityKnobLabel,
 						V4(1, 1, 1, 1));
 
 		    if(density.flags & UICommFlag_dragging)
@@ -666,12 +677,13 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 		    v2 spreadOffsetPOP = V2(-0.001f, 0.067f);
 		    v2 spreadSizePOP = knobDimPOP*V2(1, 1);
 		    v2 spreadTextOffset = hadamard(V2(0, 0.038f), panelDim);
-		    UIComm spread = uiMakeKnob(panelLayout, STR8_LIT("SPREAD"), spreadOffsetPOP, spreadSizePOP, 1.f,
+		    UIComm spread = uiMakeKnob(panelLayout, STR8_LIT("SPREAD"),
+					       spreadOffsetPOP, spreadSizePOP, 1.f,
 					       &pluginState->parameters[PluginParameter_spread],
 					       knobLabelOffset, knobLabelDim,
 					       knobClickableOffset, knobClickableDim,
 					       spreadTextOffset, elementTextScale,
-					       &pluginState->pomegranateKnob, &pluginState->pomegranateKnobLabel,
+					       pluginState->pomegranateKnob, pluginState->pomegranateKnobLabel,
 					       V4(1, 1, 1, 1));
 		    if(spread.flags & UICommFlag_dragging)
 		      {
@@ -711,12 +723,13 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 		    v2 offsetOffsetPOP = V2(0.1285f, 0.004f);
 		    v2 offsetSizePOP = knobDimPOP*V2(1, 1);
 		    v2 offsetTextOffset = hadamard(V2(0.002f, 0.038f), panelDim);
-		    UIComm offset = uiMakeKnob(panelLayout, STR8_LIT("OFFSET"), offsetOffsetPOP, offsetSizePOP, 1.f,
+		    UIComm offset = uiMakeKnob(panelLayout, STR8_LIT("OFFSET"),
+					       offsetOffsetPOP, offsetSizePOP, 1.f,
 					       &pluginState->parameters[PluginParameter_offset],
 					       knobLabelOffset, knobLabelDim,
 					       knobClickableOffset, knobClickableDim,
 					       offsetTextOffset, elementTextScale,
-					       &pluginState->pomegranateKnob, &pluginState->pomegranateKnobLabel,
+					       pluginState->pomegranateKnob, pluginState->pomegranateKnobLabel,
 					       V4(1, 1, 1, 1));
 
 		    if(offset.flags & UICommFlag_dragging)
@@ -762,7 +775,7 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 			       knobLabelOffset, knobLabelDim,
 			       knobClickableOffset, knobClickableDim,
 			       sizeTextOffset, elementTextScale,
-			       &pluginState->pomegranateKnob, &pluginState->pomegranateKnobLabel,
+			       pluginState->pomegranateKnob, pluginState->pomegranateKnobLabel,
 			       V4(1, 1, 1, 1));
 		  if(size.flags & UICommFlag_dragging)
 		    {
@@ -814,7 +827,7 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 				 mixLabelOffset, knobLabelDim,
 				 knobClickableOffset, knobClickableDim,
 				 mixTextOffset, elementTextScale,
-				 &pluginState->halfPomegranateKnob, &pluginState->halfPomegranateKnobLabel,
+				 pluginState->halfPomegranateKnob, pluginState->halfPomegranateKnobLabel,
 				 V4(1, 1, 1, 1));
 
 		    if(mix.flags & UICommFlag_dragging)
@@ -863,7 +876,7 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 				 panLabelOffset, knobLabelDim,
 				 knobClickableOffset, knobClickableDim,
 				 panTextOffset, elementTextScale,
-				 &pluginState->halfPomegranateKnob, &pluginState->halfPomegranateKnobLabel,
+				 pluginState->halfPomegranateKnob, pluginState->halfPomegranateKnobLabel,
 				 V4(1, 1, 1, 1));
 
 		    if(pan.flags & UICommFlag_dragging)
@@ -912,7 +925,7 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 				 windowLabelOffset, knobLabelDim,
 				 knobClickableOffset, knobClickableDim,
 				 windowTextOffset, elementTextScale,
-				 &pluginState->halfPomegranateKnob, &pluginState->halfPomegranateKnobLabel,
+				 pluginState->halfPomegranateKnob, pluginState->halfPomegranateKnobLabel,
 				 V4(1, 1, 1, 1));
 		    
 		    if(window.flags & UICommFlag_dragging)
@@ -958,9 +971,9 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 		  
 		  renderPushRectOutline(renderCommands, viewRect, 2.f,
 					RENDER_LEVEL(front), V4(1, 1, 1, 1));
-		  renderPushQuad(renderCommands, viewRect, &pluginState->grainViewBackground, 0,
+		  renderPushQuad(renderCommands, viewRect, pluginState->grainViewBackground, 0,
 				 RENDER_LEVEL(grainViewBackground));
-		  renderPushQuad(renderCommands, viewRect, &pluginState->grainViewOutline, 0,
+		  renderPushQuad(renderCommands, viewRect, pluginState->grainViewOutline, 0,
 				 RENDER_LEVEL(front));
 
 		  v2 dim = hadamard(V2(0.843f, 0.62f), viewDim);
@@ -1177,7 +1190,7 @@ gsAudioProcess(PluginMemory *memory, PluginAudioBuffer *audioBuffer)
 	  r32 scaledFramesToRead = inputBufferReadSpeed*framesToRead;
       
 	  AudioRingBuffer *gbuff = &pluginState->grainBuffer;
-	  PlayingSound *loadedSound = &pluginState->loadedSound;
+	  //PlayingSound *loadedSound = &pluginState->loadedSound;
 
 	  r32 *inputMixBuffers[2] = {};
 	  //TemporaryMemory inputMixerMemory = arenaBeginTemporaryMemory(&pluginState->permanentArena, KILOBYTES(32));      
@@ -1193,28 +1206,28 @@ gsAudioProcess(PluginMemory *memory, PluginAudioBuffer *audioBuffer)
 	  for(u32 frameIndex = 0; frameIndex < framesToRead; ++frameIndex)
 	    {		
 	      bool soundIsPlaying = pluginReadBooleanParameter(&pluginState->soundIsPlaying);       
-	      r32 currentTime = (r32)loadedSound->samplesPlayed + inputBufferReadSpeed*(r32)frameIndex;
-	      u32 soundReadIndex = (u32)currentTime;
-	      r32 soundReadFrac = currentTime - (r32)soundReadIndex;		
+	      // r32 currentTime = (r32)loadedSound->samplesPlayed + inputBufferReadSpeed*(r32)frameIndex;
+	      // u32 soundReadIndex = (u32)currentTime;
+	      // r32 soundReadFrac = currentTime - (r32)soundReadIndex;		
 
 	      for(u32 channelIndex = 0; channelIndex < audioBuffer->inputChannels; ++channelIndex)
 		{
 		  r32 mixedVal = 0.f;		   
 		  if(soundIsPlaying)		       
 		    {			
-		      if(currentTime < loadedSound->sound.sampleCount)
-			{
-			  r32 loadedSoundSample0 = loadedSound->sound.samples[channelIndex][soundReadIndex];
-			  r32 loadedSoundSample1 = loadedSound->sound.samples[channelIndex][soundReadIndex + 1];
-			  r32 loadedSoundSample = lerp(loadedSoundSample0, loadedSoundSample1, soundReadFrac);
+		      // if(currentTime < loadedSound->sound.sampleCount)
+		      // 	{
+		      // 	  r32 loadedSoundSample0 = loadedSound->sound.samples[channelIndex][soundReadIndex];
+		      // 	  r32 loadedSoundSample1 = loadedSound->sound.samples[channelIndex][soundReadIndex + 1];
+		      // 	  r32 loadedSoundSample = lerp(loadedSoundSample0, loadedSoundSample1, soundReadFrac);
 
-			  mixedVal += 0.5f*loadedSoundSample;
-			}
-		      else
-			{		      
-			  pluginSetBooleanParameter(&pluginState->soundIsPlaying, false);
-			  loadedSound->samplesPlayed = 0;// + pluginState->start_pos);
-			}		  
+		      // 	  mixedVal += 0.5f*loadedSoundSample;
+		      // 	}
+		      // else
+		      // 	{		      
+		      // 	  pluginSetBooleanParameter(&pluginState->soundIsPlaying, false);
+		      // 	  loadedSound->samplesPlayed = 0;// + pluginState->start_pos);
+		      // 	}		  
 		    }
 
 		  switch(audioBuffer->inputFormat)
@@ -1252,7 +1265,7 @@ gsAudioProcess(PluginMemory *memory, PluginAudioBuffer *audioBuffer)
 	  bool soundIsPlaying = pluginReadBooleanParameter(&pluginState->soundIsPlaying);
 	  if(soundIsPlaying)
 	    {
-	      loadedSound->samplesPlayed += scaledFramesToRead;
+	      //loadedSound->samplesPlayed += scaledFramesToRead;
 	    }
 
 	  writeSamplesToAudioRingBuffer(gbuff, inputMixBuffers[0], inputMixBuffers[1], framesToRead);
@@ -1323,7 +1336,7 @@ gsAudioProcess(PluginMemory *memory, PluginAudioBuffer *audioBuffer)
 		  r32 panner = pluginReadFloatParameter(&pluginState->parameters[PluginParameter_pan]);
 		  if (channelIndex < 2) { // Make sure we only process left and right channels
 		    //r32 widthVal = stereoWidth * 0.5f;
-		    r32 tmp = 1.0f / fmaxf(1.0f + stereoWidth, 2.0f);
+		    r32 tmp = 1.0f / MAX(1.0f + stereoWidth, 2.0f);
 		    r32 coef_M = 1.0f * tmp;
 		    r32 coef_S = stereoWidth * tmp;
 

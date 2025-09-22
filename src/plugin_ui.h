@@ -19,7 +19,7 @@ struct UIPanel
   
   String8 name;
   v4 color;
-  LoadedBitmap *texture;
+  PluginAsset *texture;
 
   u32 fringeFlags;
   Rect2 region;
@@ -28,8 +28,9 @@ struct UIPanel
 };
 
 inline UIPanel *
-makeUIPanel(UIPanel *currentParent, Arena *permanentArena, UIAxis splitAxis, r32 sizePercentOfParent, String8 name,
-	    LoadedBitmap *texture = 0, v4 color = V4(0, 0, 0, 1))
+makeUIPanel(UIPanel *currentParent, Arena *permanentArena, UIAxis splitAxis,
+	    r32 sizePercentOfParent, String8 name,
+	    PluginAsset *texture = 0, v4 color = V4(0, 0, 0, 1))
 {
   UIPanel *newPanel = arenaPushStruct(permanentArena, UIPanel, arenaFlagsZeroNoAlign());
   newPanel->splitAxis = splitAxis;

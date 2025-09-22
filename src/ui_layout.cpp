@@ -15,7 +15,7 @@ uiPopParentElement(UILayout *layout)
 }
 
 inline UIElement *
-uiAllocateElement(UILayout *layout, String8 name, u32 flags, v4 color, LoadedBitmap *texture)
+uiAllocateElement(UILayout *layout, String8 name, u32 flags, v4 color, PluginAsset *texture)
 {
   UIContext *context = layout->context;
   UIElement *result = arenaPushStruct(context->frameArena, UIElement, arenaFlagsZeroNoAlign());
@@ -63,7 +63,7 @@ uiHashKeysAreEqual(UIHashKey key1, UIHashKey key2)
 }
 
 inline UIElement *
-uiMakeElement(UILayout *layout, String8 name, u32 flags, v4 color, LoadedBitmap *texture)	      
+uiMakeElement(UILayout *layout, String8 name, u32 flags, v4 color, PluginAsset *texture)	      
 {  
   UIElement *result = uiAllocateElement(layout, name, flags, color, texture);
   result->hashKey = uiHashKeyFromString(result->name);
@@ -260,7 +260,7 @@ uiContextEndFrame(UIContext *context)
 
 inline void
 uiBeginLayout(UILayout *layout, UIContext *context, Rect2 parentRect,
-	      v4 color = V4(1, 1, 1, 1), LoadedBitmap *texture = 0)
+	      v4 color = V4(1, 1, 1, 1), PluginAsset *texture = 0)
 {
   ASSERT(layout->elementCount == 0);
   layout->context = context;
@@ -598,7 +598,7 @@ uiMakeSelectableTextElement(UILayout *layout, String8 message, r32 scale, v4 col
 
 inline UIComm
 uiMakeBox(UILayout *layout, String8 name, Rect2 rect,
-	  u32 flags = 0, v4 color = V4(1, 1, 1, 1), LoadedBitmap *texture = 0)
+	  u32 flags = 0, v4 color = V4(1, 1, 1, 1), PluginAsset *texture = 0)
 {
   UIElement *box = uiMakeElement(layout, name, flags, color, texture);
   box->region = rect;
@@ -609,8 +609,8 @@ uiMakeBox(UILayout *layout, String8 name, Rect2 rect,
 }
 
 inline UIComm
-uiMakeButton(UILayout *layout, String8 name, v2 offset, v2 dim, r32 aspectRatio, PluginBooleanParameter *param,
-	     LoadedBitmap *texture = 0, v4 color = V4(1, 1, 1, 1))
+uiMakeButton(UILayout *layout, String8 name, v2 offset, v2 dim, r32 aspectRatio,
+	     PluginBooleanParameter *param, PluginAsset *texture = 0, v4 color = V4(1, 1, 1, 1))
 {
   u32 flags = UIElementFlag_clickable | UIElementFlag_drawBackground | UIElementFlag_drawBorder;
   UIElement *button = uiMakeElement(layout, name, flags, color, texture);
@@ -630,8 +630,8 @@ uiMakeSlider(UILayout *layout, String8 name,
 	     v2 offset, v2 dim, r32 aspectRatio, PluginFloatParameter *param,
 	     v2 clickableOffset, v2 clickableDim,
 	     v2 textOffset, v2 textScale,
-	     LoadedBitmap *backgroundTexture = 0, LoadedBitmap *clickableTexture = 0, LoadedBitmap *labelTexture = 0,
-	     v4 color = V4(1, 1, 1, 1))
+	     PluginAsset *backgroundTexture = 0, PluginAsset *clickableTexture = 0,
+	     PluginAsset *labelTexture = 0, v4 color = V4(1, 1, 1, 1))
 {
   u32 flags = (UIElementFlag_clickable | UIElementFlag_draggable | UIElementFlag_drawLabelBelow);
   UIElement *slider = uiMakeElement(layout, name, flags, color, backgroundTexture);
@@ -652,11 +652,12 @@ uiMakeSlider(UILayout *layout, String8 name,
 }
 
 inline UIComm
-uiMakeKnob(UILayout *layout, String8 name, v2 offset, v2 dim, r32 aspectRatio, PluginFloatParameter *param,	   
+uiMakeKnob(UILayout *layout, String8 name, v2 offset, v2 dim, r32 aspectRatio,
+	   PluginFloatParameter *param,	   
 	   v2 labelOffset, v2 labelDim,
 	   v2 clickableOffset, v2 clickableDim,
 	   v2 textOffset, v2 textScale,
-	   LoadedBitmap *texture = 0, LoadedBitmap *labelTexture = 0, v4 color = V4(1, 1, 1, 1))
+	   PluginAsset *texture = 0, PluginAsset *labelTexture = 0, v4 color = V4(1, 1, 1, 1))
 {
   u32 flags = (UIElementFlag_clickable | UIElementFlag_turnable | UIElementFlag_drawLabelBelow);
   UIElement *knob = uiMakeElement(layout, name, flags, color, texture);

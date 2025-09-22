@@ -239,6 +239,29 @@ loadBitmap(Arena *arena, String8 path)
   return(result);
 }
 
+static LoadedBitmap*
+makeWhiteBitmap(Arena *arena, u32 width, u32 height)
+{
+  LoadedBitmap *result = arenaPushStruct(arena, LoadedBitmap);
+  result->width = width;
+  result->height = height;
+  result->stride = result->width * sizeof(u32);
+  result->pixels = arenaPushArray(arena, result->width * result->height, u32);
+
+  u8 *destRow = (u8*)result->pixels;
+  for(u32 y = 0; y < height; ++y)
+    {
+      u32 *dest = (u32*)destRow;
+      for(u32 x = 0; x < width; ++x)
+	{
+	  *dest++ = 0xFFFFFFFF;
+	}
+      destRow += result->stride;
+    }
+
+  return(result);
+}
+
 // ASSETS HELPERS
 struct LooseBitmap
 {
@@ -300,7 +323,7 @@ looseAssetPushBitmap(LooseAssets *looseAssets, String8 path, String8 name)
 #include "stb_truetype.h"
 
 static void
-looseAssetPushFont(LooseAssets *looseAssets, String8 path, RangeU32 cpRange, r32 ptSize)
+looseAssetPushFont(LooseAssets *looseAssets, String8 path, String8 name, RangeU32 cpRange, r32 ptSize)
 {
   TemporaryMemory scratch = arenaGetScratch(&looseAssets->arena, 1);
 
@@ -350,7 +373,8 @@ looseAssetPushFont(LooseAssets *looseAssets, String8 path, RangeU32 cpRange, r32
 		  }
 	      }
 
-	      looseAssetPushBitmap(looseAssets, bitmap, "%c", charIdx);
+	      looseAssetPushBitmap(looseAssets, bitmap, "%.*s_%u",
+				   (int)name.size, name.str, charIdx);
 
 	      stbtt_FreeBitmap(glyphSrc, 0);
 	    }
@@ -384,13 +408,27 @@ main(int argc, char **argv)
   looseAssets->arena = arena;
 
 #define DATA_PATH "../data/"
-#define X(name, path) looseAssetPushBitmap(looseAssets, STR8_LIT(DATA_PATH##path), STR8_LIT(#name));
+#define SRC_PATH "../src/"
+
+  String8List pluginAssetXList = {0};
+  stringListPush(looseAssets->arena, &pluginAssetXList,
+		 STR8_LIT("#define PLUGIN_ASSET_XLIST\\\n"));
+
+
+  LoadedBitmap *whiteBitmap = makeWhiteBitmap(looseAssets->arena, 16, 16);
+  looseAssetPushBitmap(looseAssets, whiteBitmap, STR8_LIT("null"));
+  stringListPush(looseAssets->arena, &pluginAssetXList, STR8_LIT("  X(null)\\\n"));
+
+#define X(name, path)\
+  looseAssetPushBitmap(looseAssets, STR8_LIT(DATA_PATH##path), STR8_LIT(#name));\
+  stringListPushFormat(looseAssets->arena, &pluginAssetXList, "  X(%s)\\\n", #name);
   BITMAP_XLIST;
 #undef X
 
   RangeU32 cpRange = {32, 127};
   r32 ptSize = 32.f;
-  looseAssetPushFont(looseAssets, STR8_LIT(DATA_PATH"FONT/AGENCYB.ttf"), cpRange, ptSize);
+  looseAssetPushFont(looseAssets, STR8_LIT(DATA_PATH"FONT/AGENCYB.ttf"),
+		     STR8_LIT("AgencyBold"), cpRange, ptSize);
 
   // NOTE: compute positions in the atlas
   s32 atlasWidth = 8192;
@@ -477,9 +515,50 @@ main(int argc, char **argv)
 	}
     }
 
-  // DEBUG: write atlas to file
   Arena *writeArena = gsArenaAcquire(MEGABYTES(256));
+
+  // NOTE: generate code for asset names and associated uv rects
+  String8List assetEnumList = {};
+  String8List assetRectList = {};
+
+  stringListPush(writeArena, &assetEnumList, STR8_LIT("\nenum PluginAssets\n{\n"));
+  stringListPush(writeArena, &assetRectList,
+		 STR8_LIT("\nstatic PluginAsset globalPluginAssets[PluginAsset_Count] =\n{\n"));
+  for(LooseBitmap *bitmap = looseAssets->first; bitmap; bitmap = bitmap->next)
+    {
+      stringListPushFormat(writeArena, &assetEnumList, "  PluginAsset_%.*s,\n",
+			   (int)bitmap->name.size, bitmap->name.str);
+
+      r32 uvMinX = (r32)bitmap->atlasOffsetX/(r32)atlasWidth;
+      r32 uvMinY = (r32)bitmap->atlasOffsetY/(r32)atlasHeight;
+      r32 uvMaxX = (r32)(bitmap->atlasOffsetX + bitmap->bitmap->width)/(r32)atlasWidth;
+      r32 uvMaxY = (r32)(bitmap->atlasOffsetY + bitmap->bitmap->height)/(r32)atlasHeight;
+      stringListPushFormat(writeArena, &assetRectList,
+			   "  {{%ff, %ff, %ff, %ff},\n   {%ff, %ff, %ff, %ff},\n   %ff},  // %.*s\n",
+			   0.f, 0.f, (r32)bitmap->bitmap->width, (r32)bitmap->bitmap->height,
+			   uvMinX, uvMinY, uvMaxX, uvMaxY,
+			   0.f,
+			   (int)bitmap->name.size, bitmap->name.str);
+    }
+  stringListPush(writeArena, &assetEnumList, STR8_LIT("  PluginAsset_Count,\n};\n"));
+  stringListPush(writeArena, &assetRectList, STR8_LIT("};"));
+
+  String8 pluginAssetXListString = stringListJoin(writeArena, &pluginAssetXList);
+  String8 assetEnumString = stringListJoin(writeArena, &assetEnumList);
+  String8 assetRectString = stringListJoin(writeArena, &assetRectList);
+  String8 generatedCodeString =
+    concatenateStrings(writeArena, pluginAssetXListString,
+		       concatenateStrings(writeArena, assetEnumString, assetRectString));
   
+  Buffer generatedCode = {};
+  generatedCode.contents = generatedCodeString.str;
+  generatedCode.size = generatedCodeString.size;
+
+  writeEntireFile(STR8_LIT(SRC_PATH"plugin_assets.generated.h"), generatedCode);
+
+  arenaEnd(writeArena);
+
+  // DEBUG: write atlas to file
   BitmapHeader *header = arenaPushStruct(writeArena, BitmapHeader);
   header->signature = FOURCC("BM  ");
   header->fileSize = sizeof(BitmapHeader) + atlasWidth * atlasHeight * sizeof(u32);
@@ -501,7 +580,7 @@ main(int argc, char **argv)
   Buffer file = {};
   file.size = header->fileSize;
   file.contents = (u8*)header;
-  writeEntireFile(STR8_LIT(DATA_PATH"test_atlas.bmp"), file);
+  writeEntireFile(STR8_LIT(DATA_PATH"test_atlas.bmp"), file);  
 
   arenaReleaseScratch(scratch);
   return(0);

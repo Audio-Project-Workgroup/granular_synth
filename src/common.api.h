@@ -5,6 +5,7 @@
   X(GetPathToModule, String8, (void *handleToModule, void *functionInModule, Arena *allocator))\
   X(GetCurrentTimestamp, u64, (void))\
   X(RunModel, void*, (r32 *inputData, s64 inputLength))\
+  X(Rand, r32, (RangeR32 range))\
   X(Abs, r32, (r32 num))\
   X(Sqrt, r32, (r32 num))\
   X(Sin, r32, (r32 num))\

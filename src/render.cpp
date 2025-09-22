@@ -285,6 +285,13 @@ renderCommands(RenderCommands *commands)
 {
   GL_CATCH_ERROR();
 
+  if(!commands->atlasIsBound)
+    {
+      glActiveTexture(GL_TEXTURE0);
+      renderBindTexture(commands->atlas, commands->generateNewTextures);
+      commands->atlasIsBound = 1;
+    }
+
   glEnableVertexAttribArray(commands->glState->patternPosition);
   glVertexAttribDivisor(commands->glState->patternPosition, 0);
   glVertexAttribPointer(commands->glState->patternPosition, 4, GL_FLOAT, 0, 0, 0);
@@ -322,12 +329,10 @@ renderCommands(RenderCommands *commands)
   GL_CATCH_ERROR();
 
   for(R_Batch *batch = commands->first; batch; batch = batch->next)
-    {
-      glActiveTexture(GL_TEXTURE0);
-      
+    {            
       GL_CATCH_ERROR();
       
-      renderBindTexture(batch->texture, commands->generateNewTextures);
+      //renderBindTexture(batch->texture, commands->generateNewTextures);
       
       glBufferSubData(GL_ARRAY_BUFFER,
 		      commands->glState->quadDataOffset, batch->quadCount*sizeof(R_Quad), batch->quads);

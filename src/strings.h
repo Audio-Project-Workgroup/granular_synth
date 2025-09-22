@@ -157,6 +157,24 @@ stringListPushFormatV(Arena *arena, String8List *list, char *fmt, va_list vaArgs
   stringListPush(arena, list, string);
 }
 
+inline String8
+stringListJoin(Arena *arena, String8List *list)
+{
+  String8 result = {};
+  result.str = arenaPushArray(arena, list->totalSize, u8);
+  result.size = list->totalSize;
+
+  u8 *stringAt = result.str;
+  for(String8Node *node = list->first; node; node = node->next)
+    {
+      usz nodeStringSize = node->string.size;
+      COPY_ARRAY(stringAt, node->string.str, nodeStringSize, u8);
+      stringAt += nodeStringSize;
+    }
+
+  return(result);
+}
+
 // string functions
 inline bool
 stringsAreEqual(String8 s0, String8 s1)

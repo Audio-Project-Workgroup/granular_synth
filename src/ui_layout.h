@@ -125,9 +125,10 @@ struct UIElement
   String8 name;
   v2 textScale;
   v4 color;
-  LoadedBitmap *texture;
-  LoadedBitmap *secondaryTexture;
-  LoadedBitmap *labelTexture;
+  PluginAsset *texture;
+  PluginAsset *secondaryTexture;
+  PluginAsset *labelTexture;
+
   v2 labelOffset;
   v2 labelDim;
   v2 textOffset;
