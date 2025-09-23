@@ -80,7 +80,7 @@ renderPushText(RenderCommands *commands, LoadedFont *font, String8 string,
       v2 scaledGlyphDim = hadamard(textScale, glyphDim);
       Rect2 glyphRect = rectMinDim(atPos, scaledGlyphDim);      
 
-      if(i >= 2)
+      if(i > 2)
 	{
 	  GlyphPushData glyphPushData = pastGlyphs[2];
 	  renderPushQuad(commands, glyphPushData.rect, glyphPushData.glyph, 0,

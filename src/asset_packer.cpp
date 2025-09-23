@@ -271,6 +271,8 @@ struct LooseBitmap
   LoadedBitmap *bitmap;
   String8 name;
 
+  r32 advance;
+
   // NOTE: calculated
   s32 atlasOffsetX;
   s32 atlasOffsetY;
@@ -285,7 +287,7 @@ struct LooseAssets
   u64 count;
 };
 
-static void
+static LooseBitmap*
 looseAssetPushBitmap(LooseAssets *looseAssets, LoadedBitmap *bitmap, String8 name)
 {
   LooseBitmap *looseBitmap = arenaPushStruct(looseAssets->arena, LooseBitmap);
@@ -294,9 +296,11 @@ looseAssetPushBitmap(LooseAssets *looseAssets, LoadedBitmap *bitmap, String8 nam
 
   QUEUE_PUSH(looseAssets->first, looseAssets->last, looseBitmap);
   ++looseAssets->count;
+
+  return(looseBitmap);
 }
 
-static void
+static LooseBitmap*
 looseAssetPushBitmap(LooseAssets *looseAssets, LoadedBitmap *bitmap, char *fmt, ...)
 {
   va_list vaArgs;
@@ -305,18 +309,21 @@ looseAssetPushBitmap(LooseAssets *looseAssets, LoadedBitmap *bitmap, char *fmt, 
   TemporaryMemory scratch = arenaGetScratch(&looseAssets->arena, 1);
 
   String8 name = arenaPushStringFormatV(scratch.arena, fmt, vaArgs);
-  looseAssetPushBitmap(looseAssets, bitmap, name);
+  LooseBitmap *result = looseAssetPushBitmap(looseAssets, bitmap, name);
 
   arenaReleaseScratch(scratch);
 
   va_end(vaArgs);
+
+  return(result);
 }
 
-static void
+static LooseBitmap*
 looseAssetPushBitmap(LooseAssets *looseAssets, String8 path, String8 name)
 {  
   LoadedBitmap *bitmap = loadBitmap(looseAssets->arena, path);
-  looseAssetPushBitmap(looseAssets, bitmap, name);
+  LooseBitmap *result = looseAssetPushBitmap(looseAssets, bitmap, name);
+  return(result);
 }
 
 #define STB_TRUETYPE_IMPLEMENTATION
@@ -373,8 +380,10 @@ looseAssetPushFont(LooseAssets *looseAssets, String8 path, String8 name, RangeU3
 		  }
 	      }
 
-	      looseAssetPushBitmap(looseAssets, bitmap, "%.*s_%u",
-				   (int)name.size, name.str, charIdx);
+	      LooseBitmap *looseBitmap =
+		looseAssetPushBitmap(looseAssets, bitmap, "%.*s_%u",
+				     (int)name.size, name.str, charIdx);
+	      looseBitmap->advance = fontScale * (r32)advanceWidth;
 
 	      stbtt_FreeBitmap(glyphSrc, 0);
 	    }
@@ -537,7 +546,7 @@ main(int argc, char **argv)
 			   "  {{%ff, %ff, %ff, %ff},\n   {%ff, %ff, %ff, %ff},\n   %ff},  // %.*s\n",
 			   0.f, 0.f, (r32)bitmap->bitmap->width, (r32)bitmap->bitmap->height,
 			   uvMinX, uvMinY, uvMaxX, uvMaxY,
-			   0.f,
+			   bitmap->advance,
 			   (int)bitmap->name.size, bitmap->name.str);
     }
   stringListPush(writeArena, &assetEnumList, STR8_LIT("  PluginAsset_Count,\n};\n"));

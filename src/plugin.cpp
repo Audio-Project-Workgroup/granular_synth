@@ -63,8 +63,7 @@
   NEW ISSUES: WEB PORT:
   - knob alignment values seem to be slightly off. they are not quite rotating about the center
   - the volume fader is not moving along the whole range
-  - we need to change how functions declared as shared between host and plugin
-    to allow for the possibility that both are compiled in the same translation unit
+  - text rendering is off. there are some black lines, and glyphs are not aligned to the baseline
   - the ui system sucks ass
  */
 
