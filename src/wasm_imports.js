@@ -23,7 +23,21 @@ function makeImportObject(memory) {
 	const msg = cstrFromPtr(msgPtr);
 	console.log(msg);
     }
-    
+
+    function platformRand(min, max) {
+	const rand01 = Math.random();
+	const result = (max - min) * rand01 + min;
+	return result;
+    }
+
+    function platformAbs(val) {
+	return Math.abs(val);
+    }
+
+    function platformSqrt(val) {
+	return Math.sqrt(val);
+    }
+
     function platformSin(val) {
 	return Math.sin(val);
     }
@@ -32,12 +46,20 @@ function makeImportObject(memory) {
 	return Math.cos(val);
     }
 
+    function platformPow(base, exp) {
+	return Math.pow(base, exp);
+    }
+
     const importObject = {
 	env: {
 	    memory: memory,
 	    platformLog,
+	    platformRand,
+	    platformAbs,
+	    platformSqrt,
 	    platformSin,
 	    platformCos,
+	    platformPow,
 	}
     };
     return importObject;

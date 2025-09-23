@@ -4,7 +4,8 @@
 /*
   TODO:
   - implement platform fucntions
-  - remove file_formats.h from the plugin, and instead do asset preprocessing
+  - load the texture atlas
+  - call the plugin functions
 */
 
 #define proc_import(name, ret, args) __attribute__((import_module("env"), import_name(#name))) ret name args
@@ -12,8 +13,23 @@
 
 // imported functions
 proc_import(platformLog, void, (const char *msg));
-proc_import(platformSin, r32, (r32 val));
-proc_import(platformCos, r32, (r32 val));
+proc_import(platformRand, r32, (r32 min, r32 max));
+proc_import(platformAbs,  r32, (r32 val));
+proc_import(platformSqrt, r32, (r32 val));
+proc_import(platformSin,  r32, (r32 val));
+proc_import(platformCos,  r32, (r32 val));
+proc_import(platformPow,  r32, (r32 base, r32 exp));
+
+// NOTE: this should NEVER get called
+String8
+gsGetPathToModule(void *handleToModule, void *functionInModule, Arena *allocator)
+{
+  String8 result = {};
+  UNUSED(handleToModule);
+  UNUSED(functionInModule);
+  UNUSED(allocator);
+  return(result);
+}
 
 // TODO: implement
 Arena*
@@ -104,15 +120,39 @@ gsWriteEntireFile(char *filename, Buffer file)
 }
 
 r32
-gs_sinf(r32 num)
+gsRand(RangeR32 range)
+{
+  return(platformRand(range.min, range.max));
+}
+
+r32
+gsAbs(r32 num)
+{
+  return(platformAbs(num));
+}
+
+r32
+gsSqrt(r32 num)
+{
+  return(platformSqrt(num));
+}
+
+r32
+gsSin(r32 num)
 {
   return(platformSin(num));
 }
 
 r32
-gs_cosf(r32 num)
+gsCos(r32 num)
 {
   return(platformCos(num));
+}
+
+r32
+gsPow(r32 base, r32 exp)
+{
+  return(platformPow(base, exp));
 }
 
 #include "plugin.cpp"

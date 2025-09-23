@@ -96,9 +96,11 @@ gsInitializePluginState(PluginMemory *memoryBlock)
   if(!globalPluginState)
     {
       //globalPlatform = memoryBlock->platformAPI;
+#if !defined(HOST_LAYER)
 #define X(name, ret, args) gs##name = memoryBlock->platformAPI.gs##name;
       PLATFORM_API_XLIST
-#undef X      
+#undef X
+#endif
 
 #if BUILD_DEBUG
       globalLogger = memoryBlock->logger;
@@ -117,10 +119,13 @@ gsInitializePluginState(PluginMemory *memoryBlock)
       pluginState->framePermanentArena = gsArenaAcquire(0);
       pluginState->grainArena = gsArenaAcquire(0);
 
-      pluginState->pathToPlugin =
-	gsGetPathToModule(memoryBlock->pluginHandle, (void *)gsInitializePluginState,
-			  pluginState->permanentArena);
-
+      if(pluginState->pluginHost == PluginHost_executable ||
+	 pluginState->pluginHost == PluginHost_daw)
+	{
+	  pluginState->pathToPlugin =
+	    gsGetPathToModule(memoryBlock->pluginHandle, (void *)gsInitializePluginState,
+			      pluginState->permanentArena);
+	}
       // NOTE: parameter initialization
       // pluginState->phasor = 0.f;
       pluginState->freq = 440.f;

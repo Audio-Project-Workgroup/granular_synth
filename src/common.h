@@ -36,6 +36,7 @@ enum PluginHost
 {
   PluginHost_executable,
   PluginHost_daw,
+  PluginHost_web,
 };
 
 struct PluginMemory
