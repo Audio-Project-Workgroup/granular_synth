@@ -442,7 +442,7 @@ struct BitmapHeader
 #define FOURCC(str) (((u32)((str)[0]) << 0) | ((u32)((str)[1]) << 8) | ((u32)((str)[2]) << 16) | ((u32)((str)[3]) << 24))
 
 static LoadedBitmap
-loadBitmap(Arena *destAllocator, String8 filename)
+loadBitmap(Arena *destAllocator, String8 filename, b32 flip = 1)
 {
   LoadedBitmap result = {};
   LoadedBitmap temp = {};
@@ -479,8 +479,10 @@ loadBitmap(Arena *destAllocator, String8 filename)
 
       temp.stride = result.stride = result.width*bytesPerPixel;
 
-      u8 *srcRow = (u8 *)temp.pixels + temp.stride*(temp.height - 1);
+      u8 *srcRow = flip ? (u8 *)temp.pixels + temp.stride*(temp.height - 1) : (u8 *)temp.pixels;
       u8 *destRow = (u8 *)result.pixels;
+      s32 srcRowAdvance = flip ? -(s32)result.stride : (s32)result.stride;
+      s32 destRowAdvance = (s32)result.stride;
       for(u32 y = 0; y < result.height; ++y)
 	{
 	  u32 *srcPixel = (u32 *)srcRow;
@@ -502,10 +504,12 @@ loadBitmap(Arena *destAllocator, String8 filename)
 			      (red << 0));
 	    }
 
-	  srcRow -= result.stride;
-	  destRow += result.stride;
+	  srcRow += srcRowAdvance;//-result.stride;
+	  destRow += destRowAdvance;//result.stride;
 	}      
     }
+
+  arenaReleaseScratch(scratch);
 
   return(result);
 }
@@ -709,15 +713,17 @@ main(int argc, char **argv)
 	    
 	  GLState glState = makeGLState();
 	  LoadedBitmap whiteTexture = makeBitmap(renderArena, 16, 16, 0xFFFFFFFF);
+	  LoadedBitmap atlas = loadBitmap(scratch.arena, STR8_LIT("../data/test_atlas.bmp"), 0);
 	  RenderCommands commands = {};
 	  commands.allocator = renderArena;
 	  commands.glState = &glState;
-	  commands.whiteTexture = &whiteTexture;	  
+	  commands.whiteTexture = &whiteTexture;
+	  commands.atlas = &atlas;
 
 	  // plugin setup
 	  
 #if OS_MAC || OS_LINUX	  	  
-	  String8 pluginPath = concatenateStrings(&stringArena, basePath, STR8_LIT("/" PLUGIN_PATH));	  	  
+	  String8 pluginPath = concatenateStrings(&stringArena, basePath, STR8_LIT("/" PLUGIN_PATH));
 #else
 	  String8 pluginPath = STR8_LIT(PLUGIN_PATH);
 #endif

@@ -985,7 +985,7 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 		  r32 middleBarThickness = 4.f;
 		  Rect2 middleBar = rectMinDim(min + V2(0, 0.5f*dim.y),
 					       V2(dim.x, middleBarThickness));
-		  renderPushQuad(renderCommands, middleBar, 0, 0.f,
+		  renderPushQuad(renderCommands, middleBar, pluginState->null, 0.f,
 				 RENDER_LEVEL(front), V4(0, 0, 0, 1));
 
 		  v2 upperRegionMin = min + V2(0, 0.5f*(dim.y + middleBarThickness));
@@ -1023,7 +1023,7 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 		      r32 readBarPosition = readPosition*dim.x;
 		      Rect2 readBar = rectMinDim(min + V2(readBarPosition, 0.f),
 						 V2(barThickness, dim.y));
-		      renderPushQuad(renderCommands, readBar, 0, 0.f,
+		      renderPushQuad(renderCommands, readBar, pluginState->null, 0.f,
 				     RENDER_LEVEL(front), V4(1, 0, 0, 1));
 		      
 		      u32 writeIndex = bufferWriteIndex;
@@ -1031,7 +1031,7 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 		      r32 writeBarPosition = writePosition*dim.x;
 		      Rect2 writeBar = rectMinDim(min + V2(writeBarPosition, 0.f),
 						  V2(barThickness, dim.y));
-		      renderPushQuad(renderCommands, writeBar, 0, 0.f,
+		      renderPushQuad(renderCommands, writeBar, pluginState->null, 0.f,
 				     RENDER_LEVEL(front), V4(1, 1, 1, 1));
 
 		      // NOTE: display playing grain start and end positions
@@ -1083,9 +1083,9 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 							 V2(barThickness, dim.y));
 			  
 			  v4 grainWindowColor = grainWindowColors[grainViewIndex];
-			  renderPushQuad(renderCommands, grainStartBar, 0, 0.f,
+			  renderPushQuad(renderCommands, grainStartBar, pluginState->null, 0.f,
 					 RENDER_LEVEL(front), grainWindowColor);
-			  renderPushQuad(renderCommands, grainEndBar, 0, 0.f,
+			  renderPushQuad(renderCommands, grainEndBar, pluginState->null, 0.f,
 					 RENDER_LEVEL(front), grainWindowColor);
 			}
 		    }
@@ -1111,9 +1111,9 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 						    V2(1.f, 0.5f*sampleL*regionDim.y));
 		      Rect2 sampleRBar = rectMinDim(upperRegionMiddle + V2(pixel, 0.f),
 						    V2(1.f, 0.5f*sampleR*regionDim.y));
-		      renderPushQuad(renderCommands, sampleLBar, 0, 0.f,
+		      renderPushQuad(renderCommands, sampleLBar, pluginState->null, 0.f,
 				     RENDER_LEVEL(front), V4(0, 1, 0, 1));
-		      renderPushQuad(renderCommands, sampleRBar, 0, 0.f,
+		      renderPushQuad(renderCommands, sampleRBar, pluginState->null, 0.f,
 				     RENDER_LEVEL(front), V4(0, 1, 0, 1));
 
 		      lastSampleIndex = sampleIndex;

@@ -2,7 +2,7 @@ struct PluginAsset
 {
   Rect2 rect;
   Rect2 uv;
-  r32 advance;  
+  r32 advance;
 };
 
 #define PLUGIN_ASSET(name) (globalPluginAssets + PluginAsset_##name)

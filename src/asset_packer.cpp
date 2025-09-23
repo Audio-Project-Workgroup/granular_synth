@@ -559,10 +559,11 @@ main(int argc, char **argv)
   arenaEnd(writeArena);
 
   // DEBUG: write atlas to file
-  BitmapHeader *header = arenaPushStruct(writeArena, BitmapHeader);
+  // TODO: this header masks business is janky as hell
+  BitmapHeaderWithMasks *header = arenaPushStruct(writeArena, BitmapHeaderWithMasks);
   header->signature = FOURCC("BM  ");
-  header->fileSize = sizeof(BitmapHeader) + atlasWidth * atlasHeight * sizeof(u32);
-  header->dataOffset = sizeof(BitmapHeader);
+  header->fileSize = sizeof(BitmapHeaderWithMasks) + atlasWidth * atlasHeight * sizeof(u32);
+  header->dataOffset = sizeof(BitmapHeaderWithMasks);
   header->headerSize = sizeof(BitmapHeader) - 14;
   header->width = atlasWidth;
   header->height = atlasHeight;
@@ -570,6 +571,9 @@ main(int argc, char **argv)
   header->bitsPerPixel = 8 * sizeof(u32);
   header->compression = 0;
   header->imageSize = header->width * header->height * sizeof(u32);
+  header->redMask = 0xFF;
+  header->greenMask = 0xFF00;
+  header->blueMask = 0xFF0000;
   
   u32 *pixels = arenaPushArray(writeArena, atlasWidth * atlasHeight, u32);
   for(s32 i = 0; i < atlasWidth * atlasHeight; ++i)

@@ -38,6 +38,7 @@ REM preprocessor
 
 REM asset packer
 cl %CFLAGS% ..\src\asset_packer.cpp /link %LFLAGS% -out:asset_packer.exe
+asset_packer.exe
 
 REM compile plugin and host
 cl %CFLAGS% -D"DATA_PATH=\"../data/\"" ..\src\plugin.cpp -Fmplugin.map -LD /link %LFLAGS% -PDB:plugin_%random%.pdb
