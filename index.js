@@ -3,8 +3,9 @@ import { makeImportObject } from './src/wasm_imports.js';
 let sharedMemory = null;
 
 let vsSource = `
-attribute vec2 v_pattern;
+attribute vec4 pattern;
 attribute vec4 v_min_max;
+attribute vec4 v_uv_min_max;
 attribute vec4 v_color;
 attribute float v_angle;
 attribute float v_level;
@@ -12,10 +13,17 @@ attribute float v_level;
 uniform mat4 transform;
 
 varying lowp vec4 f_color;
+varying highp vec2 f_uv;
 
 void main() {
+  vec2 v_pattern = pattern.xy;
+  vec2 uv_pattern = pattern.zw;
+
   vec2 center = (v_min_max.zw + v_min_max.xy)*0.5;
   vec2 half_dim = (v_min_max.zw - v_min_max.xy)*0.5;
+
+  vec2 uv_min = v_uv_min_max.xy;
+  vec2 uv_dim = v_uv_min_max.zw - v_uv_min_max.xy;
 
   float cosa = cos(v_angle);
   float sina = sin(v_angle);
@@ -24,14 +32,19 @@ void main() {
   vec2 pos = center + half_dim*rot_pattern;
   gl_Position = transform * vec4(pos, v_level, 1.0);
   f_color = v_color;
+  f_uv = uv_min + uv_dim*uv_pattern;
 }
 `;
 
 let fsSource = `
 varying lowp vec4 f_color;
+varying highp vec2 f_uv;
+
+uniform sampler2D atlas;
 
 void main() {
-  gl_FragColor = f_color;
+  lowp vec4 sampled = texture2D(atlas, f_uv);
+  gl_FragColor = f_color * sampled;
 }
 `;
 
@@ -40,8 +53,8 @@ async function main() {
     console.log(crossOriginIsolated);    
 
     sharedMemory = new WebAssembly.Memory({
-	initial: 2,
-	maximum: 2,
+	initial: 3,
+	maximum: 3,
 	shared: true,
     });
 
@@ -118,21 +131,46 @@ async function main() {
 
     // vertex attributes
     gl.useProgram(shaderProgram);
-    const vPatternPosition = gl.getAttribLocation(shaderProgram, "v_pattern");
-    const vMinMaxPosition = gl.getAttribLocation(shaderProgram, "v_min_max");
-    const vColorPosition = gl.getAttribLocation(shaderProgram, "v_color");
-    const vAnglePosition = gl.getAttribLocation(shaderProgram, "v_angle");
-    const vLevelPosition = gl.getAttribLocation(shaderProgram, "v_level");
+    const patternPosition   = gl.getAttribLocation(shaderProgram, "pattern");
+    const vMinMaxPosition   = gl.getAttribLocation(shaderProgram, "v_min_max");
+    const vUVMinMaxPosition = gl.getAttribLocation(shaderProgram, "v_uv_min_max");
+    const vColorPosition    = gl.getAttribLocation(shaderProgram, "v_color");
+    const vAnglePosition    = gl.getAttribLocation(shaderProgram, "v_angle");
+    const vLevelPosition    = gl.getAttribLocation(shaderProgram, "v_level");
+
+    // uniforms
     const transformPosition = gl.getUniformLocation(shaderProgram, "transform");
+    const samplerPosition   = gl.getUniformLocation(shaderProgram, "atlas");
+    gl.uniform1i(samplerPosition, 0);
+
+    // textures
+    const whiteTexture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, whiteTexture);
+
+    const whiteTextureLevel = 0;
+    const whiteTextureInternalFormat = gl.RGBA;
+    const whiteTextureWidth = 1;
+    const whiteTextureHeight = 1;
+    const whiteTextureBorder = 0;
+    const whiteTextureSourceFormat = gl.RGBA;
+    const whiteTextureSourceType = gl.UNSIGNED_BYTE;
+    const whiteTexturePixels = new Uint8Array([255, 255, 255, 255]);
+    gl.texImage2D(gl.TEXTURE_2D, whiteTextureLevel, whiteTextureInternalFormat,
+		  whiteTextureWidth, whiteTextureHeight, whiteTextureBorder,
+		  whiteTextureSourceFormat, whiteTextureSourceType, whiteTexturePixels);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
     // init buffer
     const vertexBuffer = gl.createBuffer();
     const vertexBufferSize = 32*1024;
     const positions = [
-	1.0,  1.0,
-	-1.0,  1.0,
-	1.0, -1.0,
-	-1.0, -1.0,
+	 1.0,  1.0, 1.0, 1.0,
+	-1.0,  1.0, 0.0, 1.0,
+	 1.0, -1.0, 1.0, 0.0,
+	-1.0, -1.0, 0.0, 0.0,
     ];
     gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, vertexBufferSize, gl.STATIC_DRAW);
@@ -147,24 +185,24 @@ async function main() {
 	//console.log(now);
 
 	const quadCount = wasm.instance.exports.drawQuads(canvas.width, canvas.height, now);
-	const quadSize = 28;
+	const quadSize = 44;
 	//console.log(`quadCount: ${quadCount}`);
 	const quadFloatCount = quadSize / 4;
 	const quadData = new Float32Array(sharedMemory.buffer, quadsOffset, quadFloatCount*quadCount);
 	//console.log(quadData);
-	gl.bufferSubData(gl.ARRAY_BUFFER, 32, quadData);
+	gl.bufferSubData(gl.ARRAY_BUFFER, 64, quadData);
 
 	let currentOffset = 0;
 
-	const vPatternNumComponents = 2;
-	const vPatternType = gl.FLOAT;
-	const vPatternNormalize = false;
-	const vPatternStride = 0;
-	const vPatternOffset = currentOffset;	
-	gl.enableVertexAttribArray(vPatternPosition);
-	gl.vertexAttribDivisor(vPatternPosition, 0);
-	gl.vertexAttribPointer(vPatternPosition, vPatternNumComponents, vPatternType, vPatternNormalize, vPatternStride, vPatternOffset);
-	currentOffset += 32;
+	const patternNumComponents = 4;
+	const patternType = gl.FLOAT;
+	const patternNormalize = false;
+	const patternStride = 0;
+	const patternOffset = currentOffset;
+	gl.enableVertexAttribArray(patternPosition);
+	gl.vertexAttribDivisor(patternPosition, 0);
+	gl.vertexAttribPointer(patternPosition, patternNumComponents, patternType, patternNormalize, patternStride, patternOffset);
+	currentOffset += 64;
 
 	const vMinMaxNumComponents = 4;
 	const vMinMaxType = gl.FLOAT;
@@ -174,6 +212,16 @@ async function main() {
 	gl.enableVertexAttribArray(vMinMaxPosition);
 	gl.vertexAttribDivisor(vMinMaxPosition, 1);
 	gl.vertexAttribPointer(vMinMaxPosition, vMinMaxNumComponents, vMinMaxType, vMinMaxNormalize, vMinMaxStride, vMinMaxOffset);
+	currentOffset += 16;
+
+	const vUVMinMaxNumComponents = 4;
+	const vUVMinMaxType = gl.FLOAT;
+	const vUVMinMaxNormalize = false;
+	const vUVMinMaxStride = quadSize;
+	const vUVMinMaxOffset = currentOffset;
+	gl.enableVertexAttribArray(vUVMinMaxPosition);
+	gl.vertexAttribDivisor(vUVMinMaxPosition, 1);
+	gl.vertexAttribPointer(vUVMinMaxPosition, vUVMinMaxNumComponents, vUVMinMaxType, vUVMinMaxNormalize, vUVMinMaxStride, vUVMinMaxOffset);
 	currentOffset += 16;
 
 	const vColorNumComponents = 4;

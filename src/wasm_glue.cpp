@@ -20,6 +20,19 @@ proc_import(platformSin,  r32, (r32 val));
 proc_import(platformCos,  r32, (r32 val));
 proc_import(platformPow,  r32, (r32 base, r32 exp));
 
+static void
+platformLogf(const char *fmt, ...)
+{
+  char buf[1024];
+
+  va_list vaArgs;
+  va_start(vaArgs, fmt);
+  gs_vsnprintf(buf, ARRAY_COUNT(buf), fmt, vaArgs);
+  va_end(vaArgs);
+
+  platformLog(buf);
+}
+
 // NOTE: this should NEVER get called
 String8
 gsGetPathToModule(void *handleToModule, void *functionInModule, Arena *allocator)
@@ -31,18 +44,34 @@ gsGetPathToModule(void *handleToModule, void *functionInModule, Arena *allocator
   return(result);
 }
 
-// TODO: implement
+extern u8 __heap_base;
+extern u8 __heap_end;
+static usz __mem_used = 0;
+static usz __mem_capacity = 0;
+#define ARENA_MIN_ALLOCATION_SIZE KILOBYTES(64)
+
 Arena*
-gsArenaAcquire(usz capacity)
+gsArenaAcquire(usz size)
 {
-  UNUSED(capacity);
-  return(0);
+  usz allocSize = MAX(size, ARENA_MIN_ALLOCATION_SIZE);
+  //ASSERT(__mem_used + allocSize <= __mem_capacity);
+
+  void *base = (void*)(&__heap_base + __mem_used);
+  __mem_used += allocSize;
+  Arena *result = (Arena*)base;
+  result->current = result;
+  result->prev = 0;
+  result->base = 0;
+  result->capacity = allocSize;
+  result->pos = ARENA_HEADER_SIZE;
+  return(result);
 }
 
+// TODO: implement
 void
 gsArenaDiscard(Arena *arena)
-{
-  UNUSED(arena);
+{  
+  platformLogf("Discarding arena with capacity of %u bytes\n", arena->capacity);
   return;
 }
 
@@ -157,36 +186,12 @@ gsPow(r32 base, r32 exp)
 
 #include "plugin.cpp"
 
-// internal and exported functions
-static void
-platformLogf(const char *fmt, ...)
-{
-  char buf[1024];
+// internal state/functions
 
-  va_list vaArgs;
-  va_start(vaArgs, fmt);
-  gs_vsnprintf(buf, ARRAY_COUNT(buf), fmt, vaArgs);
-  va_end(vaArgs);
-
-  platformLog(buf);
-}
-
-proc_export int
-fmadd(int a, int b, int c) {
-  return(a * b + c);
-}
-
-extern u8 __heap_base;
-
-// struct R_Quad
-// {
-//   v2 min;
-//   v2 max;
-
-//   u32 color;
-//   r32 angle;
-//   r32 level;
-// };
+// proc_export int
+// fmadd(int a, int b, int c) {
+//   return(a * b + c);
+// }
 
 struct WasmState
 {
@@ -216,6 +221,8 @@ wasmInit(usz memorySize)
   // arena->base = &__heap_base;
   // arena->capacity = memorySize;
   // arena->used = sizeof(Arena);
+  __mem_capacity = INT_FROM_PTR(&__heap_end) - INT_FROM_PTR(&__heap_base);
+  platformLogf("WASM memory capacity: %u\n", __mem_capacity);
   UNUSED(memorySize);
   Arena *arena = gsArenaAcquire(0);
   
@@ -229,6 +236,7 @@ wasmInit(usz memorySize)
       result->quadCapacity = 1024;      
       result->quads = arenaPushArray(arena, result->quadCapacity, R_Quad);
       result->quadsToDraw = 3;
+      platformLogf("arena used post quads push: %u\n", arena->pos);
 
       result->outputSampleCapacity = 2048;
       result->outputSamples[0] = arenaPushArray(arena, result->outputSampleCapacity, r32);
@@ -236,6 +244,7 @@ wasmInit(usz memorySize)
       result->phase = 0.f;
       result->freq = 440.f;
       result->volume = 0.1f;
+      platformLogf("arena used post output samples push: %u\n", arena->pos);
       
       wasmState = result;
       platformLogf("wasmState: %X\n  quads=%X\n  quadCount=%u\n  quadCapacity=%u\n",
@@ -255,6 +264,8 @@ pushQuad(v2 min, v2 max, v4 color, r32 angle, r32 level)
     if(result) {
       result->min = min;
       result->max = max;
+      result->uvMin = V2(0.f, 0.f);
+      result->uvMin = V2(1.f, 1.f);
       result->color = colorU32FromV4(color);
       result->angle = angle;
       result->level = level;
@@ -269,6 +280,21 @@ getQuadsOffset(void)
 {
   R_Quad *result = wasmState->quads;
   return(result);
+}
+
+static void
+logQuad(R_Quad* quad)
+{
+  platformLogf("quad %u:\n"
+	       "  min: (%.2f, %.2f)\n"
+	       "  max: (%.2f, %.2f)\n"
+	       "  uvMin: (%.2f, %.2f)\n"
+	       "  uvMax: (%.2f, %.2f)\n"
+	       "  color: 0x%X\n"
+	       "  angle: %.2f\n"
+	       "  level: %.2f\n",
+	       quad, quad->min, quad->max, quad->uvMin, quad->uvMax,
+	       quad->color, quad->angle, quad->level);
 }
 
 proc_export u32
@@ -290,7 +316,9 @@ drawQuads(s32 width, s32 height, r32 timestamp)
   for(u32 quadIdx = 0; quadIdx < wasmState->quadsToDraw; ++quadIdx) {
     r32 angularVelocity = (r32)(quadIdx + 1);
     r32 angle = timestampSec * angularVelocity;
-    pushQuad(min, max, colors[quadIdx], angle, 0.f);
+    R_Quad *quad = pushQuad(min, max, colors[quadIdx], angle, 0.f);
+    UNUSED(quad);
+    //logQuad(quad);
     min += advance;
     max += advance;
   }
