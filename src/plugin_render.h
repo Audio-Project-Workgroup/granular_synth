@@ -1,29 +1,9 @@
 static inline void 
 renderPushQuad(RenderCommands *commands, Rect2 rect, PluginAsset *asset, r32 angle,
 	       r32 level, v4 color = V4(1, 1, 1, 1))
-{
-  R_Batch *batch = 0;
-  if(commands->batchFreelist)
-    {
-      batch = commands->batchFreelist;	  
-      STACK_POP(commands->batchFreelist);
-      batch->next = 0;
-    }
-  else
-    {
-      batch = arenaPushStruct(commands->allocator, R_Batch);
-      batch->quadCapacity = commands->glState->quadCapacity;
-      batch->quads = arenaPushArray(commands->allocator, batch->quadCapacity, R_Quad,
-				    arenaFlagsZeroNoAlign());
-    }      
-  ASSERT(batch);
-  batch->quadCount = 0;
-  //batch->texture = texture;
-  QUEUE_PUSH(commands->first, commands->last, batch);
-  ++commands->batchCount;
-
-  ASSERT(batch->quadCount < batch->quadCapacity);
-  R_Quad *quad = batch->quads + batch->quadCount++;
+{  
+  ASSERT(commands->quadCount < commands->quadCapacity);
+  R_Quad *quad = commands->quads + commands->quadCount++;
   quad->min = rect.min;
   quad->max = rect.max;
   quad->uvMin = asset->uv.min;
@@ -31,8 +11,6 @@ renderPushQuad(RenderCommands *commands, Rect2 rect, PluginAsset *asset, r32 ang
   quad->color = colorU32FromV4(color);
   quad->angle = angle;
   quad->level = (r32)level;
-
-  ++commands->totalQuadCount;
 }
 
 static inline void

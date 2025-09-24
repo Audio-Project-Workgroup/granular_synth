@@ -110,8 +110,8 @@ makeGLProgram(GLuint vs, GLuint fs)
   return(program);
 }
 
-static inline GLState
-makeGLState(void)
+static inline GLState*
+makeGLState(Arena *arena, usz quadCapacity)
 {
   GLuint vertexShader = makeGLShader(vertexShaderSource, GLShaderKind_vertex);
   GLuint fragmentShader = makeGLShader(fragmentShaderSource, GLShaderKind_fragment);
@@ -137,7 +137,7 @@ makeGLState(void)
   glGenBuffers(1, &vbo);
   glBindBuffer(GL_ARRAY_BUFFER, vbo);
 
-  GLsizei bufferDataSize = KILOBYTES(32);
+  GLsizei bufferDataSize = (GLsizei)quadCapacity * sizeof(R_Quad);
   glBufferData(GL_ARRAY_BUFFER, bufferDataSize, 0, GL_STREAM_DRAW);
   r32 patternData[] = {
     -1.f, -1.f,  0.f, 0.f,
@@ -154,7 +154,6 @@ makeGLState(void)
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
   
   GL_CATCH_ERROR();
-  //GL_PRINT_ERROR("GL ERROR %u: enable alpha blending failed at startup\n");
 
   glEnable(GL_DEPTH_TEST);
   glDepthFunc(GL_LEQUAL);
@@ -165,44 +164,37 @@ makeGLState(void)
 
   GL_CATCH_ERROR();
 
-  GLState result = {};
-  result.patternPosition   = patternPosition;
-  result.vMinMaxPosition   = vMinMaxPosition;
-  result.vUVMinMaxPosition = vUVMinMaxPosition;
-  result.vColorPosition    = vColorPosition;
-  result.vAnglePosition    = vAnglePosition;
-  result.vLevelPosition    = vLevelPosition;
-  result.transformPosition = transformPosition;
-  result.samplerPosition   = samplerPosition;
-  result.vao = vao;
-  result.vbo = vbo;
-  result.vertexShader = vertexShader;
-  result.fragmentShader = fragmentShader;
-  result.program = program;
-  result.quadDataOffset = patternDataSize;
-  result.quadCapacity = (bufferDataSize - patternDataSize) / sizeof(R_Quad);
+  GLState *result = arenaPushStruct(arena, GLState);
+  result->patternPosition   = patternPosition;
+  result->vMinMaxPosition   = vMinMaxPosition;
+  result->vUVMinMaxPosition = vUVMinMaxPosition;
+  result->vColorPosition    = vColorPosition;
+  result->vAnglePosition    = vAnglePosition;
+  result->vLevelPosition    = vLevelPosition;
+  result->transformPosition = transformPosition;
+  result->samplerPosition   = samplerPosition;
+  result->vao = vao;
+  result->vbo = vbo;
+  result->vertexShader = vertexShader;
+  result->fragmentShader = fragmentShader;
+  result->program = program;
+  result->quadDataOffset = patternDataSize;
+  //result->quadCapacity = (bufferDataSize - patternDataSize) / sizeof(R_Quad);
   
   return(result);
 }
 
-#if 0
-static inline void
-renderTexturedVertex(TexturedVertex v)
-{  
-  //glColor4fv(v.color.E);
-  glColor4ubv((const GLubyte *)&v.color);
-  glTexCoord2fv(v.uv.E);
-  glVertex2fv(v.vPos.E);
-}
-
-static inline void
-renderVertex(Vertex v)
+static RenderCommands*
+allocRenderCommands(void)
 {
-  //glColor4fv(v.color.E);
-  glColor4ubv((const GLubyte *)&v.color);
-  glVertex2fv(v.vPos.E);
+  Arena *renderArena = gsArenaAcquire(MEGABYTES(1));
+  RenderCommands *result = arenaPushStruct(renderArena, RenderCommands);
+  result->allocator = renderArena;  
+  result->quadCapacity = 2048;
+  result->quads = arenaPushArray(renderArena, result->quadCapacity, R_Quad);
+  result->glState = makeGLState(renderArena, result->quadCapacity);
+  return(result);
 }
-#endif
 
 static void
 renderBindTexture(LoadedBitmap *texture, bool generateNewTextures)
@@ -229,62 +221,11 @@ renderBindTexture(LoadedBitmap *texture, bool generateNewTextures)
 }
 
 static void
-renderSortTexturedQuads(TexturedQuad *quads, u32 quadCount)
-{
-  // NOTE: bubble sort
-  for(u32 outer = 0; outer < quadCount; ++outer)
-    {
-      bool quadsSorted = true;
-      for(u32 inner = 0; inner < quadCount - 1; ++inner)
-	{
-	  TexturedQuad *q0 = quads + inner;
-	  TexturedQuad *q1 = quads + inner + 1;
-	  
-	  if(q0->level > q1->level)
-	    {
-	      TexturedQuad temp = *q0;
-	      *q0 = *q1;
-	      *q1 = temp;
-
-	      quadsSorted = false;
-	    }
-	}
-
-      if(quadsSorted) break;
-    }
-}
-
-static void
-renderSortQuads(Quad *quads, u32 quadCount)
-{
-  // NOTE: bubble sort
-  for(u32 outer = 0; outer < quadCount; ++outer)
-    {
-      bool quadsSorted = true;
-      for(u32 inner = 0; inner < quadCount - 1; ++inner)
-	{
-	  Quad *q0 = quads + inner;
-	  Quad *q1 = quads + inner + 1;
-
-	  if(q0->level > q1->level)
-	    {
-	      Quad temp = *q0;
-	      *q0 = *q1;
-	      *q1 = temp;
-
-	      quadsSorted = false;
-	    }
-	}
-
-      if(quadsSorted) break;
-    }
-}
-
-static void
 renderCommands(RenderCommands *commands)
-{
+{  
   GL_CATCH_ERROR();
 
+  // NOTE: setup
   if(!commands->atlasIsBound)
     {
       glActiveTexture(GL_TEXTURE0);
@@ -328,19 +269,13 @@ renderCommands(RenderCommands *commands)
 
   GL_CATCH_ERROR();
 
-  for(R_Batch *batch = commands->first; batch; batch = batch->next)
-    {            
-      GL_CATCH_ERROR();
-      
-      //renderBindTexture(batch->texture, commands->generateNewTextures);
-      
-      glBufferSubData(GL_ARRAY_BUFFER,
-		      commands->glState->quadDataOffset, batch->quadCount*sizeof(R_Quad), batch->quads);
-      
-      GL_CATCH_ERROR();
-      
-      glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, batch->quadCount);
-
-      GL_CATCH_ERROR();
-    }
+  // NOTE: draw
+  glBufferSubData(GL_ARRAY_BUFFER,
+		  commands->glState->quadDataOffset,
+		  commands->quadCount*sizeof(R_Quad),
+		  commands->quads);
+  GL_CATCH_ERROR();
+  
+  glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, (GLsizei)commands->quadCount);
+  GL_CATCH_ERROR();
 }

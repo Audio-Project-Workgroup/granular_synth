@@ -584,8 +584,6 @@ platformRand(RangeR32 range)
   return(result);
 }
 
-//PlatformAPI globalPlatform;
-
 int
 main(int argc, char **argv)
 {
@@ -595,10 +593,6 @@ main(int argc, char **argv)
   int result = 0;  
 
   TemporaryMemory scratch = arenaGetScratch(0, 0);
-
-  // usz stringMemorySize = KILOBYTES(1);
-  // void *stringMemory = calloc(stringMemorySize, 1);
-  // Arena stringArena = arenaBegin(stringMemory, stringMemorySize);
 
   executablePath = platformGetPathToModule(0, (void *)main, scratch.arena);
   basePath = stringGetParentPath(executablePath);
@@ -625,12 +619,6 @@ main(int argc, char **argv)
       GLFWwindow *window = glfwCreateWindow(640, 480, "granade", NULL, NULL);
       if(window)	
 	{
-	  // TODO: stop using crt allocation functions - use os allocation functions (VirtualAlloc(), mmap())
-	  // NOTE: set applcation icon
-	  // usz loadMemorySize = MEGABYTES(64);
-	  // void *loadMemory = calloc(loadMemorySize, 1);
-	  // Arena loadArena = arenaBegin(loadMemory, loadMemorySize);
-	  // Arena destArena = arenaSubArena(&loadArena, loadMemorySize/2);
 	  LoadedBitmap iconBitmap =
 	    loadBitmap(scratch.arena, STR8_LIT("../data/BMP/DENSITYPOMEGRANATE_BUTTON.bmp"));
 	  
@@ -683,20 +671,17 @@ main(int argc, char **argv)
 	  pluginMemory.platformAPI.gsPow  = powf;
 
 	  pluginMemory.platformAPI.gsAllocateMemory = platformAllocateMemory;
-	  pluginMemory.platformAPI.gsFreeMemory	  = platformFreeMemory;
+	  pluginMemory.platformAPI.gsFreeMemory     = platformFreeMemory;
 	  pluginMemory.platformAPI.gsArenaAcquire   = gsArenaAcquire;
 	  pluginMemory.platformAPI.gsArenaDiscard   = gsArenaDiscard;
 
-	  pluginMemory.platformAPI.gsAtomicLoad			= atomicLoad;
-	  pluginMemory.platformAPI.gsAtomicStore			= atomicStore;
-	  pluginMemory.platformAPI.gsAtomicAdd			= atomicAdd;
-	  pluginMemory.platformAPI.gsAtomicCompareAndSwap		= atomicCompareAndSwap;
+	  pluginMemory.platformAPI.gsAtomicLoad			  = atomicLoad;
+	  pluginMemory.platformAPI.gsAtomicStore		  = atomicStore;
+	  pluginMemory.platformAPI.gsAtomicAdd			  = atomicAdd;
+	  pluginMemory.platformAPI.gsAtomicCompareAndSwap	  = atomicCompareAndSwap;
 	  pluginMemory.platformAPI.gsAtomicCompareAndSwapPointers = atomicCompareAndSwapPointers;
 
 #if BUILD_DEBUG
-	  // usz loggerMemorySize = KILOBYTES(512);
-	  // void *loggerMemory = calloc(loggerMemorySize, 1);
-	  // Arena loggerArena = arenaBegin(loggerMemory, loggerMemorySize);
 	  Arena *loggerArena = gsArenaAcquire(0);
 
 	  PluginLogger logger = {};
@@ -706,19 +691,10 @@ main(int argc, char **argv)
 	  pluginMemory.logger = &logger;
 #endif
 
-	  // usz renderMemorySize = MEGABYTES(64);
-	  // void *renderMemory = calloc(renderMemorySize, 1);
-	  // Arena renderArena = arenaBegin(renderMemory, renderMemorySize);
-	  Arena *renderArena = gsArenaAcquire(MEGABYTES(2));
-	    
-	  GLState glState = makeGLState();
-	  LoadedBitmap whiteTexture = makeBitmap(renderArena, 16, 16, 0xFFFFFFFF);
+	  // TODO: don't load this at runtime. Try baking it into some object file
 	  LoadedBitmap atlas = loadBitmap(scratch.arena, STR8_LIT("../data/test_atlas.bmp"), 0);
-	  RenderCommands commands = {};
-	  commands.allocator = renderArena;
-	  commands.glState = &glState;
-	  commands.whiteTexture = &whiteTexture;
-	  commands.atlas = &atlas;
+	  RenderCommands *commands = allocRenderCommands();
+	  commands->atlas = &atlas;
 
 	  // plugin setup
 	  
@@ -968,12 +944,8 @@ main(int argc, char **argv)
 				      viewportMin = V2(((r32)framebufferWidth - viewportDim.x)*0.5f, 0);
 				    }
 
-				  renderBeginCommands(&commands, (u32)viewportDim.x, (u32)viewportDim.y);
-				  // commands.windowResized = (commands.widthInPixels != (u32)viewportDim.x ||
-				  // 			    commands.heightInPixels != (u32)viewportDim.y);
-				  // commands.widthInPixels = (u32)viewportDim.x;
-				  // commands.heightInPixels = (u32)viewportDim.y;
-			  
+				  renderBeginCommands(commands, (u32)viewportDim.x, (u32)viewportDim.y);
+				  
 				  glViewport((GLint)viewportMin.x, (GLint)viewportMin.y,
 					     (GLsizei)viewportDim.x, (GLsizei)viewportDim.y);
 				  glScissor((GLint)viewportMin.x, (GLint)viewportMin.y,
@@ -984,16 +956,16 @@ main(int argc, char **argv)
 
 				  double mouseX, mouseY;
 				  glfwGetCursorPos(window, &mouseX, &mouseY);
-				  newInput->mouseState.position = (V2(mouseX, (r64)framebufferHeight - mouseY) -
-								   viewportMin);
+				  newInput->mouseState.position =
+				    V2(mouseX, (r64)framebufferHeight - mouseY) - viewportMin;
 
 				  if(gsRenderNewFrame)
 				    {
-				      gsRenderNewFrame(&pluginMemory, oldInput, &commands);
-				      glfwSetCursorState(window, commands.cursorState);				      
-				      renderCommands(&commands);
+				      gsRenderNewFrame(&pluginMemory, oldInput, commands);
+				      glfwSetCursorState(window, commands->cursorState);
+				      renderCommands(commands);
 				      GL_CATCH_ERROR();
-				      renderEndCommands(&commands);
+				      renderEndCommands(commands);
 #if BUILD_DEBUG
 				      for(String8Node *node = pluginMemory.logger->log.first; node; node = node->next)
 					{
@@ -1009,20 +981,21 @@ main(int argc, char **argv)
 				      arenaEnd(pluginMemory.logger->logArena);
 #endif
 
-				      if(commands.outputAudioDeviceChanged || commands.inputAudioDeviceChanged)
+				      if(commands->outputAudioDeviceChanged ||
+					 commands->inputAudioDeviceChanged)
 					{
 					  ma_device_stop(&maDevice);
 					  ma_device_uninit(&maDevice);
 
-					  if(commands.outputAudioDeviceChanged)
+					  if(commands->outputAudioDeviceChanged)
 					    {
-					      maPlaybackIndex = commands.selectedOutputAudioDeviceIndex;
+					      maPlaybackIndex = commands->selectedOutputAudioDeviceIndex;
 					      maConfig.playback.pDeviceID = &maPlaybackInfos[maPlaybackIndex].id;
 					    }
 
-					  if(commands.inputAudioDeviceChanged)
+					  if(commands->inputAudioDeviceChanged)
 					    {
-					      maCaptureIndex = commands.selectedInputAudioDeviceIndex;
+					      maCaptureIndex = commands->selectedInputAudioDeviceIndex;
 					      maConfig.capture.pDeviceID = &maCaptureInfos[maCaptureIndex].id;
 					    }
 					  
@@ -1072,18 +1045,13 @@ main(int argc, char **argv)
 	  	 	  
 #if BUILD_DEBUG
 	  fprintf(stderr, "freeing loggerMemory\n");
-	  //free(loggerMemory);
 #endif
-	  //free(pluginMemory.memory);	  
-	  //free(loadMemory);
-	  
+
 	  glfwDestroyWindow(window);	  
 	}
 
       glfwTerminate();
     }
-
-  //free(stringMemory);
   
   return(result);
 }
