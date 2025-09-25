@@ -110,6 +110,12 @@ union v3
   r32 E[3];
 };
 
+union v3u32
+{
+  struct { u32 x, y, z; };
+  u32 E[3];
+};
+
 union v4
 {
   struct

@@ -180,6 +180,45 @@ struct BitmapHeaderWithMasks
   u32 blueMask;
 };
 
+struct BitmapHeaderV5
+{
+  u16 signature;
+  u32 fileSize;
+  u32 _reserved;
+  u32 dataOffset;
+
+  u32 headerSize;
+  u32 width;
+  u32 height;
+  u16 planes;
+  u16 bitsPerPixel;
+  u32 compression;
+  u32 imageSize;
+  u32 xPixelsPerM;
+  u32 yPixelsPerM;
+  u32 colorsUsed;
+  u32 colorsImportant;
+
+  u32 redMask;
+  u32 greenMask;
+  u32 blueMask;
+  u32 alphaMask;
+
+  u32 csType;
+  v3u32 cieXYZRed;
+  v3u32 cieXYZGreen;
+  v3u32 cieXYZBlue;
+
+  u32 gammaRed;
+  u32 gammaGreen;
+  u32 gammaBlue;
+
+  u32 intent;
+  u32 profileData;
+  u32 profileSize;
+  u32 _reserved2;
+};
+
 #pragma pack(pop)
 
 static LoadedBitmap*
@@ -569,20 +608,23 @@ main(int argc, char **argv)
 
   // DEBUG: write atlas to file
   // TODO: this header masks business is janky as hell
-  BitmapHeaderWithMasks *header = arenaPushStruct(writeArena, BitmapHeaderWithMasks);
+  BitmapHeaderV5 *header = arenaPushStruct(writeArena, BitmapHeaderV5);
   header->signature = FOURCC("BM  ");
-  header->fileSize = sizeof(BitmapHeaderWithMasks) + atlasWidth * atlasHeight * sizeof(u32);
-  header->dataOffset = sizeof(BitmapHeaderWithMasks);
-  header->headerSize = sizeof(BitmapHeader) - 14;
+  header->fileSize = sizeof(BitmapHeaderV5) + atlasWidth * atlasHeight * sizeof(u32);
+  header->dataOffset = sizeof(BitmapHeaderV5);
+  header->headerSize = sizeof(BitmapHeaderV5) - 14;
   header->width = atlasWidth;
   header->height = atlasHeight;
   header->planes = 1;
   header->bitsPerPixel = 8 * sizeof(u32);
   header->compression = 0;
   header->imageSize = header->width * header->height * sizeof(u32);
-  header->redMask = 0xFF;
+  header->redMask = 0xFF0000;
   header->greenMask = 0xFF00;
-  header->blueMask = 0xFF0000;
+  header->blueMask = 0xFF;
+  header->alphaMask = 0xFF000000;
+  header->csType = FOURCC(" NIW"); // NOTE: "WIN " byte-order swapped
+  header->intent = 2; // NOTE: "graphics"  
   
   u32 *pixels = arenaPushArray(writeArena, atlasWidth * atlasHeight, u32);
   for(s32 i = 0; i < atlasWidth * atlasHeight; ++i)

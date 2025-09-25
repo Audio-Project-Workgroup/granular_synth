@@ -78,49 +78,51 @@ gsArenaDiscard(Arena *arena)
 u32
 gsAtomicLoad(volatile u32 *src)
 {
-  UNUSED(src);
-  return(0);
+  u32 result = __atomic_load_n(src, __ATOMIC_SEQ_CST);
+  return(result);
 }
 
 void*
 gsAtomicLoadPtr(volatile void **src)
 {
-  UNUSED(src);
-  return(0);
+  usz resultInt = __atomic_load_n((volatile usz*)src, __ATOMIC_SEQ_CST);
+  void *result = PTR_FROM_INT(resultInt);
+  return(result);
 }
 
 u32
 gsAtomicStore(volatile u32 *dest, u32 value)
 {
-  UNUSED(dest);
-  UNUSED(value);  
-  return(0);
+  u32 result = gsAtomicLoad(dest);
+  __atomic_store_n(dest, value, __ATOMIC_SEQ_CST);
+  return(result);
 }
 
 u32
 gsAtomicAdd(volatile u32 *addend, u32 value)
 {
-  UNUSED(addend);
-  UNUSED(value);  
-  return(0);
+  u32 result = __atomic_fetch_add(addend, value, __ATOMIC_SEQ_CST);
+  return(result);
 }
 
 u32
 gsAtomicCompareAndSwap(volatile u32 *value, u32 oldVal, u32 newVal)
 {
-  UNUSED(value);
-  UNUSED(oldVal);
-  UNUSED(newVal);  
-  return(0);
+  u32 *expected = &oldVal;
+  b32 success = __atomic_compare_exchange_n(value, expected, newVal,
+					    0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+  u32 result = success ? oldVal : newVal;
+  return(result);
 }
 
 void*
 gsAtomicCompareAndSwapPointers(volatile void **value, void *oldVal, void *newVal)
 {
-  UNUSED(value);
-  UNUSED(oldVal);
-  UNUSED(newVal);  
-  return(0);
+  usz *expected = (usz*)&oldVal;
+  b32 success = __atomic_compare_exchange_n((volatile usz*)value, expected, INT_FROM_PTR(newVal),
+					    0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+  void *result = success ? oldVal : newVal;
+  return(result);
 }
 
 Buffer
@@ -212,6 +214,7 @@ struct WasmState
   PluginMemory pluginMemory;
 
   PluginInput input[2];
+  u32 newInputIndex;
 
   // DEBUG:
   u32 quadsToDraw;
@@ -358,6 +361,23 @@ logQuad(R_Quad* quad)
 proc_export u32
 drawQuads(s32 width, s32 height, r32 timestamp)
 {
+#if 1
+
+  PluginMemory *pluginMemory = &wasmState->pluginMemory;
+  PluginInput *newInput = wasmState->input + wasmState->newInputIndex;
+  RenderCommands *renderCommands = &wasmState->renderCommands;
+
+  renderBeginCommands(renderCommands, width, height);
+
+  gsRenderNewFrame(pluginMemory, newInput, renderCommands);
+
+  u32 result = renderCommands->quadCount;
+
+  renderEndCommands(renderCommands);
+
+  return(result);
+
+#else
   r32 timestampSec = timestamp * 0.001f;
 
   v4 colors[3] = {
@@ -389,6 +409,7 @@ drawQuads(s32 width, s32 height, r32 timestamp)
   u32 result = wasmState->renderCommands.quadCount;
   wasmState->renderCommands.quadCount = 0;
   return(result);
+#endif
 }
 
 proc_export r32*

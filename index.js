@@ -52,7 +52,7 @@ async function main() {
 
     console.log(crossOriginIsolated);    
 
-    const memoryPageCount = 4;
+    const memoryPageCount = 2048;
     sharedMemory = new WebAssembly.Memory({
 	initial: memoryPageCount,
 	maximum: memoryPageCount,
@@ -80,7 +80,22 @@ async function main() {
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     gl.enable(gl.DEPTH_TEST);
     gl.depthFunc(gl.LEQUAL);
-
+    
+    function loadTexture(url) {
+	const texture = gl.createTexture();	
+	const image = new Image();
+	image.onload = () => {
+	    gl.bindTexture(gl.TEXTURE_2D, texture);
+	    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+	    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+	    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+	    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+	    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+	}
+	image.src = url
+	return texture
+    }
+    
     const audioCtx = new AudioContext();
     await audioCtx.audioWorklet.addModule("./src/granade_audio.js");
     const granadeNode = new AudioWorkletNode(audioCtx, "granade-processor", {
@@ -147,24 +162,27 @@ async function main() {
     gl.uniform1i(samplerPosition, 0);
 
     // textures
-    const whiteTexture = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, whiteTexture);
+    // const whiteTexture = gl.createTexture();
+    // gl.bindTexture(gl.TEXTURE_2D, whiteTexture);
 
-    const whiteTextureLevel = 0;
-    const whiteTextureInternalFormat = gl.RGBA;
-    const whiteTextureWidth = 1;
-    const whiteTextureHeight = 1;
-    const whiteTextureBorder = 0;
-    const whiteTextureSourceFormat = gl.RGBA;
-    const whiteTextureSourceType = gl.UNSIGNED_BYTE;
-    const whiteTexturePixels = new Uint8Array([255, 255, 255, 255]);
-    gl.texImage2D(gl.TEXTURE_2D, whiteTextureLevel, whiteTextureInternalFormat,
-		  whiteTextureWidth, whiteTextureHeight, whiteTextureBorder,
-		  whiteTextureSourceFormat, whiteTextureSourceType, whiteTexturePixels);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    // const whiteTextureLevel = 0;
+    // const whiteTextureInternalFormat = gl.RGBA;
+    // const whiteTextureWidth = 1;
+    // const whiteTextureHeight = 1;
+    // const whiteTextureBorder = 0;
+    // const whiteTextureSourceFormat = gl.RGBA;
+    // const whiteTextureSourceType = gl.UNSIGNED_BYTE;
+    // const whiteTexturePixels = new Uint8Array([255, 255, 255, 255]);
+    // gl.texImage2D(gl.TEXTURE_2D, whiteTextureLevel, whiteTextureInternalFormat,
+    // 		  whiteTextureWidth, whiteTextureHeight, whiteTextureBorder,
+    // 		  whiteTextureSourceFormat, whiteTextureSourceType, whiteTexturePixels);
+    // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+    const atlasTexture = loadTexture("data/test_atlas.bmp");
 
     // init buffer
     const vertexBuffer = gl.createBuffer();
@@ -229,7 +247,7 @@ async function main() {
 
 	const vColorNumComponents = 4;
 	const vColorType = gl.UNSIGNED_BYTE;
-	const vColorNormalize = false;
+	const vColorNormalize = true;
 	const vColorStride = quadSize;
 	const vColorOffset = currentOffset;
 	gl.enableVertexAttribArray(vColorPosition);
