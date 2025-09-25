@@ -95,16 +95,36 @@ async function main() {
 	image.src = url
 	return texture
     }
+
+    // DEBUG:
+    navigator.mediaDevices
+	.enumerateDevices()
+	.then((devices) => {
+	    devices.forEach((device) => {
+		console.log(`${device.kind}: ${device.label} id = ${device.id}`);
+	    })
+	})
+	.catch((err) => {
+	    console.error(`${err.name}: ${err.message}`);
+	});
     
     const audioCtx = new AudioContext();
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+	audio: true,
+    });
+    const microphoneStream = audioCtx.createMediaStreamSource(stream);
+
     await audioCtx.audioWorklet.addModule("./src/granade_audio.js");
     const granadeNode = new AudioWorkletNode(audioCtx, "granade-processor", {
 	processorOptions: {
 	    sharedMemory: sharedMemory,
 	    wasmModule: wasmModule,
 	}
-    });
+    });    
     granadeNode.connect(audioCtx.destination);
+    microphoneStream.connect(granadeNode);
+    console.log(microphoneStream);
     console.log(granadeNode);
 
     const playButton = document.querySelector("button");
@@ -162,25 +182,8 @@ async function main() {
     gl.uniform1i(samplerPosition, 0);
 
     // textures
-    // const whiteTexture = gl.createTexture();
-    // gl.bindTexture(gl.TEXTURE_2D, whiteTexture);
-
-    // const whiteTextureLevel = 0;
-    // const whiteTextureInternalFormat = gl.RGBA;
-    // const whiteTextureWidth = 1;
-    // const whiteTextureHeight = 1;
-    // const whiteTextureBorder = 0;
-    // const whiteTextureSourceFormat = gl.RGBA;
-    // const whiteTextureSourceType = gl.UNSIGNED_BYTE;
-    // const whiteTexturePixels = new Uint8Array([255, 255, 255, 255]);
-    // gl.texImage2D(gl.TEXTURE_2D, whiteTextureLevel, whiteTextureInternalFormat,
-    // 		  whiteTextureWidth, whiteTextureHeight, whiteTextureBorder,
-    // 		  whiteTextureSourceFormat, whiteTextureSourceType, whiteTexturePixels);
-    // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-
+    // TODO: do we want to load a generated image from the data folder,
+    //       or embed the atlas into the WASM binary?
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
     const atlasTexture = loadTexture("data/test_atlas.bmp");
 
@@ -205,6 +208,7 @@ async function main() {
 
 	//console.log(now);
 
+	// NOTE: write quad data to vertex buffer
 	const quadCount = wasm.instance.exports.drawQuads(canvas.width, canvas.height, now);
 	const quadSize = 44;
 	//console.log(`quadCount: ${quadCount}`);
@@ -213,6 +217,7 @@ async function main() {
 	//console.log(quadData);
 	gl.bufferSubData(gl.ARRAY_BUFFER, 64, quadData);
 
+	// NOTE: enable vertex attributes
 	let currentOffset = 0;
 
 	const patternNumComponents = 4;
@@ -275,6 +280,7 @@ async function main() {
 	gl.vertexAttribPointer(vLevelPosition, vLevelNumComponents, vLevelType, vLevelNormalized, vLevelStride, vLevelOffset);
 	currentOffset += 4;
 
+	// NOTE: set uniform data
 	const a = 2.0 / canvas.width;
 	const b = 2.0 / canvas.height;
 	const transformMatrix = [
@@ -285,10 +291,10 @@ async function main() {
 	];
 	gl.uniformMatrix4fv(transformPosition, false, new Float32Array(transformMatrix));
 
-	// draw
+	// NOTE: draw
 	gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, quadCount);
 
-	// loop
+	// NOTE: loop
 	requestAnimationFrame(render);
     }
     requestAnimationFrame(render);

@@ -329,17 +329,19 @@ getQuadsOffset(void)
   return(result);
 }
 
-proc_export void**
-getInputSamplesOffset(void)
+proc_export void*
+getInputSamplesOffset(int channelIdx)
 {
-  void **result = (void**)wasmState->audioBuffer.inputBuffer;
+  //ASSERT(channelIdx < wasmState->audioBuffer.inputChannelCount);
+  void *result = (void*)wasmState->audioBuffer.inputBuffer[channelIdx];
   return(result);
 }
 
-proc_export void**
-getOutputSamplesOffset(void)
+proc_export void*
+getOutputSamplesOffset(int channelIdx)
 {
-  void **result = (void**)wasmState->audioBuffer.outputBuffer;
+  //ASSERT(channelIdx < wasmState->audioBuffer.outputChannelCount);
+  void *result = wasmState->audioBuffer.outputBuffer[channelIdx];
   return(result);
 }
 
@@ -412,6 +414,7 @@ drawQuads(s32 width, s32 height, r32 timestamp)
 #endif
 }
 
+#if 0
 proc_export r32*
 outputSamples(u32 channelIdx, u32 sampleCount, r32 samplePeriod)
 {
@@ -428,4 +431,26 @@ outputSamples(u32 channelIdx, u32 sampleCount, r32 samplePeriod)
   }
 
   return(outputSamples);
+}
+#endif
+
+proc_export void
+audioProcess(int sampleRate, int inputChannelCount, int inputSampleCount, int outputChannelCount, int outputSampleCount)
+{
+  PluginMemory *pluginMemory = &wasmState->pluginMemory;
+  PluginAudioBuffer *audioBuffer = &wasmState->audioBuffer;
+
+  audioBuffer->outputFormat = AudioFormat_r32;
+  audioBuffer->outputSampleRate = sampleRate;
+  audioBuffer->outputChannels = outputChannelCount;
+  audioBuffer->outputStride = sizeof(r32);
+
+  audioBuffer->inputFormat = AudioFormat_r32;
+  audioBuffer->inputSampleRate = sampleRate;
+  audioBuffer->inputChannels = inputChannelCount;
+  audioBuffer->inputStride = sizeof(r32);
+
+  audioBuffer->framesToWrite = outputSampleCount;
+
+  gsAudioProcess(pluginMemory, audioBuffer);
 }
