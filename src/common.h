@@ -208,12 +208,14 @@ struct PluginAudioBuffer
   u64 millisecondsElapsedSinceLastCall;
   
   AudioFormat outputFormat;
+  u32 outputBufferCapacity;
   void *outputBuffer[2];
   u32 outputSampleRate;
   u32 outputChannels;
   u32 outputStride;
 
   AudioFormat inputFormat;
+  u32 inputBufferCapacity;
   const void *inputBuffer[2];
   u32 inputSampleRate;
   u32 inputChannels;

@@ -197,15 +197,25 @@ struct WasmState
 {
   Arena *arena;
   
-  R_Quad *quads;
-  u32 quadCount;
-  u32 quadCapacity;
+  // R_Quad *quads;
+  // u32 quadCount;
+  // u32 quadCapacity;
+  RenderCommands renderCommands;
 
+  // r32 *inputSamples[2];
+  // u32 inputSampleCapacity;
+
+  // r32 *outputSamples[2];
+  // u32 outputSampleCapacity;
+  PluginAudioBuffer audioBuffer;
+  
+  PluginMemory pluginMemory;
+
+  PluginInput input[2];
+
+  // DEBUG:
   u32 quadsToDraw;
   b32 calledLog;
-
-  r32 *outputSamples[2];
-  u32 outputSampleCapacity;
 
   r32 phase;
   r32 freq;
@@ -233,22 +243,56 @@ wasmInit(usz memorySize)
     result = arenaPushStruct(arena, WasmState, arenaFlagsZeroAlign(sizeof(void*)));
     if(result) {
       result->arena = arena;
-      result->quadCapacity = 1024;      
-      result->quads = arenaPushArray(arena, result->quadCapacity, R_Quad);
-      result->quadsToDraw = 3;
-      platformLogf("arena used post quads push: %u\n", arena->pos);
 
-      result->outputSampleCapacity = 2048;
-      result->outputSamples[0] = arenaPushArray(arena, result->outputSampleCapacity, r32);
-      result->outputSamples[1] = arenaPushArray(arena, result->outputSampleCapacity, r32);
+      result->pluginMemory.host = PluginHost_web;
+      // result->pluginMemory.platformAPI.gsReadEntireFile		      = 0;
+      // result->pluginMemory.platformAPI.gsFreeFileMemory		      = 0;
+      // result->pluginMemory.platformAPI.gsWriteEntireFile	      = 0;
+      // result->pluginMemory.platformAPI.gsGetPathToModule	      = 0;
+      // result->pluginMemory.platformAPI.gsGetCurrentTimestamp	      = 0;
+      // result->pluginMemory.platformAPI.gsRunModel		      = 0;
+      // result->pluginMemory.platformAPI.gsRand			      = gsRand;
+      // result->pluginMemory.platformAPI.gsAbs			      = gsAbs;
+      // result->pluginMemory.platformAPI.gsSqrt			      = gsSqrt;
+      // result->pluginMemory.platformAPI.gsSin			      = gsCos;
+      // result->pluginMemory.platformAPI.gsCos			      = gsCos;
+      // result->pluginMemory.platformAPI.gsPow			      = gsPow;
+      // result->pluginMemory.platformAPI.gsAllocateMemory		      = 0;
+      // result->pluginMemory.platformAPI.gsFreeMemory		      = 0;
+      // result->pluginMemory.platformAPI.gsArenaAcquire		      = gsArenaAcquire;
+      // result->pluginMemory.platformAPI.gsArenaDiscard		      = gsArenaDiscard;
+      // result->pluginMemory.platformAPI.gsAtomicLoad		      = gsAtomicLoad;
+      // result->pluginMemory.platformAPI.gsAtomicLoadPointer	      = gsAtomicLoadPointer;
+      // result->pluginMemory.platformAPI.gsAtomicStore		      = gsAtomicStore;
+      // result->pluginMemory.platformAPI.gsAtomicAdd		      = gsAtomicAdd;
+      // result->pluginMemory.platformAPI.gsAtomicCompareAndSwap	      = gsAtomicCompareAndSwap;
+      // result->pluginMemory.platformAPI.gsAtomicCompareAndSwapPointers = gsAtomicCompareAndSwapPointers;
+
+      result->renderCommands.quadCapacity = 2048;      
+      result->renderCommands.quads = arenaPushArray(arena, result->renderCommands.quadCapacity, R_Quad);
+      platformLogf("arena used post quads push: %u\n", arenaGetPos(arena));
+
+      result->audioBuffer.inputBufferCapacity = 2048;
+      result->audioBuffer.inputBuffer[0] =
+	arenaPushArray(arena, result->audioBuffer.inputBufferCapacity, r32);
+      result->audioBuffer.inputBuffer[1] =
+	arenaPushArray(arena, result->audioBuffer.inputBufferCapacity, r32);
+      platformLogf("arena used post input samples push: %u\n", arenaGetPos(arena));
+
+      result->audioBuffer.outputBufferCapacity = 2048;
+      result->audioBuffer.outputBuffer[0] =
+	arenaPushArray(arena, result->audioBuffer.outputBufferCapacity, r32);
+      result->audioBuffer.outputBuffer[1] =
+	arenaPushArray(arena, result->audioBuffer.outputBufferCapacity, r32);
+      platformLogf("arena used post output samples push: %u\n", arenaGetPos(arena));      
+
+      result->quadsToDraw = 3;
+
       result->phase = 0.f;
       result->freq = 440.f;
       result->volume = 0.1f;
-      platformLogf("arena used post output samples push: %u\n", arena->pos);
       
-      wasmState = result;
-      platformLogf("wasmState: %X\n  quads=%X\n  quadCount=%u\n  quadCapacity=%u\n",
-		   wasmState, wasmState->quads, wasmState->quadCount, wasmState->quadCapacity);
+      wasmState = result;      
     }
   }
   
@@ -259,8 +303,8 @@ static R_Quad*
 pushQuad(v2 min, v2 max, v4 color, r32 angle, r32 level)
 {
   R_Quad *result = 0;
-  if(wasmState->quadCount < wasmState->quadCapacity) {
-    result = wasmState->quads + wasmState->quadCount++;
+  if(wasmState->renderCommands.quadCount < wasmState->renderCommands.quadCapacity) {
+    result = wasmState->renderCommands.quads + wasmState->renderCommands.quadCount++;
     if(result) {
       result->min = min;
       result->max = max;
@@ -278,7 +322,21 @@ pushQuad(v2 min, v2 max, v4 color, r32 angle, r32 level)
 proc_export R_Quad*
 getQuadsOffset(void)
 {
-  R_Quad *result = wasmState->quads;
+  R_Quad *result = wasmState->renderCommands.quads;
+  return(result);
+}
+
+proc_export void**
+getInputSamplesOffset(void)
+{
+  void **result = (void**)wasmState->audioBuffer.inputBuffer;
+  return(result);
+}
+
+proc_export void**
+getOutputSamplesOffset(void)
+{
+  void **result = (void**)wasmState->audioBuffer.outputBuffer;
   return(result);
 }
 
@@ -328,24 +386,25 @@ drawQuads(s32 width, s32 height, r32 timestamp)
     wasmState->calledLog = 1;
   }
 
-  u32 result = wasmState->quadCount;
-  wasmState->quadCount = 0;
+  u32 result = wasmState->renderCommands.quadCount;
+  wasmState->renderCommands.quadCount = 0;
   return(result);
 }
 
 proc_export r32*
 outputSamples(u32 channelIdx, u32 sampleCount, r32 samplePeriod)
 {
-  ASSERT(sampleCount <= wasmState->outputSampleCapacity);
+  r32 *outputSamples = (r32*)(wasmState->audioBuffer.outputBuffer[channelIdx]);
+
+  ASSERT(sampleCount <= wasmState->audioBuffer.outputBufferCapacity);
   r32 phaseInc = GS_TAU * wasmState->freq * samplePeriod;
   for(u32 sampleIdx = 0; sampleIdx < sampleCount; ++sampleIdx) {
     r32 sineSample = wasmState->volume * platformSin(wasmState->phase);
-    wasmState->outputSamples[channelIdx][sampleIdx] = sineSample;
+    outputSamples[sampleIdx] = sineSample;
 
     wasmState->phase += phaseInc;
     if(wasmState->phase >= GS_TAU) wasmState->phase -= GS_TAU;
   }
 
-  r32 *result = wasmState->outputSamples[channelIdx];
-  return(result);
+  return(outputSamples);
 }

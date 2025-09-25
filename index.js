@@ -52,9 +52,10 @@ async function main() {
 
     console.log(crossOriginIsolated);    
 
+    const memoryPageCount = 4;
     sharedMemory = new WebAssembly.Memory({
-	initial: 3,
-	maximum: 3,
+	initial: memoryPageCount,
+	maximum: memoryPageCount,
 	shared: true,
     });
 
@@ -167,7 +168,7 @@ async function main() {
 
     // init buffer
     const vertexBuffer = gl.createBuffer();
-    const vertexBufferSize = 32*1024;
+    const vertexBufferSize = 90*1024;
     const positions = [
 	 1.0,  1.0, 1.0, 1.0,
 	-1.0,  1.0, 0.0, 1.0,

@@ -269,6 +269,7 @@ gsInitializePluginState(PluginMemory *memoryBlock)
       pluginState->agencyBold.characterRange = {32, 127};
       pluginState->agencyBold.verticalAdvance = 0.f;
       pluginState->agencyBold.glyphs = PLUGIN_ASSET(AgencyBold_32);
+      // TODO: set vertical advance!!!
 
       // NOTE: ui initialization
       pluginState->uiContext =
