@@ -266,9 +266,10 @@ gsInitializePluginState(PluginMemory *memoryBlock)
       // 		 characterRange, 36.f);
       
       // TODO: get this data from asset packing/codegen
-      pluginState->agencyBold.characterRange = {32, 127};
-      pluginState->agencyBold.verticalAdvance = 0.f;
-      pluginState->agencyBold.glyphs = PLUGIN_ASSET(AgencyBold_32);
+      // pluginState->agencyBold.characterRange = {32, 127};
+      // pluginState->agencyBold.verticalAdvance = 0.f;
+      // pluginState->agencyBold.glyphs = PLUGIN_ASSET(AgencyBold_32);
+      pluginState->agencyBold = &fontAgencyBold;
       // TODO: set vertical advance!!!
 
       // NOTE: ui initialization
@@ -276,7 +277,7 @@ gsInitializePluginState(PluginMemory *memoryBlock)
 	// uiInitializeContext(pluginState->frameArena, pluginState->framePermanentArena,
 	// 		    &pluginState->agencyBold);
 	uiInitializeContext(pluginState->frameArena, pluginState->framePermanentArena,
-			    &pluginState->agencyBold);
+			    pluginState->agencyBold);
 
       // TODO: our editor interface doesn't use resizable panels,
       //       so it doesn't make sense to still be using them

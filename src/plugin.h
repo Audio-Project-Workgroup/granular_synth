@@ -135,7 +135,7 @@ struct PluginState
   PluginAsset *grainViewBackground;
   PluginAsset *grainViewOutline;
 
-  LoadedFont agencyBold;
+  LoadedFont *agencyBold;
   /* PluginAssets assets; */
 
   //UILayout layout;

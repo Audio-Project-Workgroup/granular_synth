@@ -210,7 +210,7 @@ renderBindTexture(LoadedBitmap *texture, bool generateNewTextures)
       glBindTexture(GL_TEXTURE_2D, texture->glHandle);      
       glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
 		   texture->width, texture->height, 0,
-		   GL_BGRA, GL_UNSIGNED_BYTE, texture->pixels);
+		   GL_RGBA, GL_UNSIGNED_BYTE, texture->pixels);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);

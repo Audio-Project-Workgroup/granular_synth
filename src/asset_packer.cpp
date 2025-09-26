@@ -308,7 +308,7 @@ struct LooseBitmap
 
   // NOTE: specified at load
   LoadedBitmap *bitmap;
-  String8 name;
+  String8 name;  
 
   r32 advance;
 
@@ -317,13 +317,27 @@ struct LooseBitmap
   s32 atlasOffsetY;
 };
 
+struct LooseFont
+{
+  LooseFont *next;
+
+  String8 name;
+
+  RangeU32 range;
+  r32 verticalAdvance;
+};
+
 struct LooseAssets
 {
   Arena *arena;
 
-  LooseBitmap *first;
-  LooseBitmap *last;
-  u64 count;
+  LooseBitmap *firstBitmap;
+  LooseBitmap *lastBitmap;
+  u64 bitmapCount;
+
+  LooseFont *firstFont;
+  LooseFont *lastFont;
+  u64 fontCount;
 };
 
 static LooseBitmap*
@@ -333,8 +347,8 @@ looseAssetPushBitmap(LooseAssets *looseAssets, LoadedBitmap *bitmap, String8 nam
   looseBitmap->bitmap = bitmap;
   looseBitmap->name = arenaPushString(looseAssets->arena, name);
 
-  QUEUE_PUSH(looseAssets->first, looseAssets->last, looseBitmap);
-  ++looseAssets->count;
+  QUEUE_PUSH(looseAssets->firstBitmap, looseAssets->lastBitmap, looseBitmap);
+  ++looseAssets->bitmapCount;
 
   return(looseBitmap);
 }
@@ -382,10 +396,10 @@ looseAssetPushFont(LooseAssets *looseAssets, String8 path, String8 name, RangeU3
 	  int ascent, descent, lineGap;
 	  stbtt_GetFontVMetrics(&stbFontInfo, &ascent, &descent, &lineGap);
 
-	  for(u32 charIdx = cpRange.min; charIdx < cpRange.max; ++charIdx)
-	    {
-	      r32 fontScale = stbtt_ScaleForPixelHeight(&stbFontInfo, ptSize);
+	  r32 fontScale = stbtt_ScaleForPixelHeight(&stbFontInfo, ptSize);
 
+	  for(u32 charIdx = cpRange.min; charIdx < cpRange.max; ++charIdx)
+	    {	      
 	      int width, height, xOffset, yOffset;
 	      u8 *glyphSrc = stbtt_GetCodepointBitmap(&stbFontInfo, 0, fontScale, charIdx,
 						      &width, &height, &xOffset, &yOffset);
@@ -422,10 +436,17 @@ looseAssetPushFont(LooseAssets *looseAssets, String8 path, String8 name, RangeU3
 	      LooseBitmap *looseBitmap =
 		looseAssetPushBitmap(looseAssets, bitmap, "%.*s_%u",
 				     (int)name.size, name.str, charIdx);
-	      looseBitmap->advance = fontScale * (r32)advanceWidth;
+	      looseBitmap->advance = fontScale * (r32)advanceWidth;	      
 
 	      stbtt_FreeBitmap(glyphSrc, 0);
 	    }
+
+	  LooseFont *looseFont = arenaPushStruct(looseAssets->arena, LooseFont);
+	  looseFont->verticalAdvance = fontScale * (r32)(ascent - descent + lineGap);
+	  looseFont->name = arenaPushString(looseAssets->arena, name);
+	  looseFont->range = cpRange;
+	  QUEUE_PUSH(looseAssets->firstFont, looseAssets->lastFont, looseFont);
+	  ++looseAssets->fontCount;
 	}
     }
 
@@ -487,7 +508,7 @@ main(int argc, char **argv)
   s32 spaceX = 0;
   u32 growCount = 0;
   u32 maxGrowCount = 10;
-  for(LooseBitmap *bitmap = looseAssets->first; bitmap; bitmap = bitmap->next)
+  for(LooseBitmap *bitmap = looseAssets->firstBitmap; bitmap; bitmap = bitmap->next)
     {
       b32 inserted = 0;
       while(!inserted)
@@ -545,7 +566,7 @@ main(int argc, char **argv)
 
   // NOTE: copy into the atlas
   u32 *atlas = arenaPushArray(arena, atlasWidth * atlasHeight, u32);
-  for(LooseBitmap *bitmap = looseAssets->first; bitmap; bitmap = bitmap->next)
+  for(LooseBitmap *bitmap = looseAssets->firstBitmap; bitmap; bitmap = bitmap->next)
     {
       u8 *srcRow = (u8*)bitmap->bitmap->pixels;
       u8 *destRow = (u8*)(atlas + bitmap->atlasOffsetY*atlasWidth + bitmap->atlasOffsetX);
@@ -568,11 +589,12 @@ main(int argc, char **argv)
   // NOTE: generate code for asset names and associated uv rects
   String8List assetEnumList = {};
   String8List assetRectList = {};
+  String8List assetFontList = {};
 
   stringListPush(writeArena, &assetEnumList, STR8_LIT("\nenum PluginAssets\n{\n"));
   stringListPush(writeArena, &assetRectList,
 		 STR8_LIT("\nstatic PluginAsset globalPluginAssets[PluginAsset_Count] =\n{\n"));
-  for(LooseBitmap *bitmap = looseAssets->first; bitmap; bitmap = bitmap->next)
+  for(LooseBitmap *bitmap = looseAssets->firstBitmap; bitmap; bitmap = bitmap->next)
     {
       stringListPushFormat(writeArena, &assetEnumList, "  PluginAsset_%.*s,\n",
 			   (int)bitmap->name.size, bitmap->name.str);
@@ -589,14 +611,29 @@ main(int argc, char **argv)
 			   (int)bitmap->name.size, bitmap->name.str);
     }
   stringListPush(writeArena, &assetEnumList, STR8_LIT("  PluginAsset_Count,\n};\n"));
-  stringListPush(writeArena, &assetRectList, STR8_LIT("};"));
+  stringListPush(writeArena, &assetRectList, STR8_LIT("};\n"));
+  
+  for(LooseFont *font = looseAssets->firstFont; font; font = font->next)
+    {
+      stringListPushFormat(writeArena, &assetFontList, "\nstatic LoadedFont font%.*s = {\n",
+			   (int)font->name.size, font->name.str);
+      stringListPushFormat(writeArena, &assetFontList, "  {%u, %u},\n",
+			   font->range.min, font->range.max);
+      stringListPushFormat(writeArena, &assetFontList, "  %ff,\n",
+			   font->verticalAdvance);
+      stringListPushFormat(writeArena, &assetFontList, "  PLUGIN_ASSET(%.*s_%u),\n",
+			   (int)font->name.size, font->name.str, font->range.min);
+      stringListPush(writeArena, &assetFontList, STR8_LIT("};\n"));      
+    }
 
   String8 pluginAssetXListString = stringListJoin(writeArena, &pluginAssetXList);
   String8 assetEnumString = stringListJoin(writeArena, &assetEnumList);
   String8 assetRectString = stringListJoin(writeArena, &assetRectList);
+  String8 assetFontString = stringListJoin(writeArena, &assetFontList);
   String8 generatedCodeString =
     concatenateStrings(writeArena, pluginAssetXListString,
-		       concatenateStrings(writeArena, assetEnumString, assetRectString));
+		       concatenateStrings(writeArena, assetEnumString,
+					  concatenateStrings(writeArena, assetRectString, assetFontString)));
   
   Buffer generatedCode = {};
   generatedCode.contents = generatedCodeString.str;

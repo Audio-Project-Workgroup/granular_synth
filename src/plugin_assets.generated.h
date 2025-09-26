@@ -453,3 +453,9 @@ static PluginAsset globalPluginAssets[PluginAsset_Count] =
    {0.671875f, 0.527344f, 0.673218f, 0.528809f},
    13.520391f},  // AgencyBold_126
 };
+
+static LoadedFont fontAgencyBold = {
+  {32, 127},
+  32.000000f,
+  PLUGIN_ASSET(AgencyBold_32),
+};
