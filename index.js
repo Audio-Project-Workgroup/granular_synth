@@ -52,6 +52,7 @@ async function main() {
 
     console.log(crossOriginIsolated);    
 
+    // NOTE: WASM setup
     const memoryPageCount = 2048;
     sharedMemory = new WebAssembly.Memory({
 	initial: memoryPageCount,
@@ -74,6 +75,7 @@ async function main() {
     const quadsOffset = wasm.instance.exports.getQuadsOffset();
     console.log(quadsOffset);
 
+    // NOTE: WEBGL setup
     const canvas = document.querySelector("#gl-canvas");
     const gl = canvas.getContext("webgl2");
     gl.enable(gl.BLEND);
@@ -107,7 +109,8 @@ async function main() {
 	.catch((err) => {
 	    console.error(`${err.name}: ${err.message}`);
 	});
-    
+
+    // NOTE: WEBAUDIO setup
     const audioCtx = new AudioContext();
 
     const stream = await navigator.mediaDevices.getUserMedia({
@@ -140,6 +143,35 @@ async function main() {
 	},
 	false
     );
+
+    // NOTE: input handlers
+    function buttonOffsetFromKeyString(str) {
+	// TODO: implement
+	return 0;
+    }
+    function buttonOffsetFromMouseButton(buttonIdx) {
+	// TODO: implement
+	return 0;
+    }
+    document.addEventListener("keydown", (event) => {
+	const keyIdx = buttonOffsetFromKeyString(event.key);
+	wasm.instance.exports.processKeyboardButtonPress(keyIdx, 1);
+    });
+    document.addEventListener("keyup", (event) => {
+	const keyIdx = buttonOffsetFromKeyString(event.key);
+	wasm.instance.exports.processKeyboardButtonPress(keyIdx, 0);
+    });
+    document.addEventListener("mousemove", (event) => {
+	wasm.instance.exports.setMousePosition(event.pageX, event.pageY);
+    });
+    document.addEventListener("mousedown", (event) => {
+	const buttonIdx = buttonOffsetFromKeyString(event.key);
+	wasm.instance.exports.processMouseButtonPress(buttonIdx, 1);
+    });
+    document.addEventListener("mouseup", (event) => {
+	const buttonIdx = buttonOffsetFromMouseButton(event.button);
+	wasm.instance.exports.processMouseButtonPress(buttonIdx, 0);
+    });
 
     // webgl setup
     // init shaders

@@ -65,6 +65,8 @@
   - the volume fader is not moving along the whole range
   - text rendering is off. there are some black lines, and glyphs are not aligned to the baseline
   - the ui system sucks ass
+  - logging system sometimes crashes
+  - sometimes not enough quad capacity
  */
 
 #include "plugin.h"

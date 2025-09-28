@@ -198,7 +198,11 @@ gsPow(r32 base, r32 exp)
 struct WasmState
 {
   Arena *arena;
-  
+
+  usz stringBufferCapacity;
+  usz stringBufferCount;
+  u8 *stringBuffer;
+
   // R_Quad *quads;
   // u32 quadCount;
   // u32 quadCapacity;
@@ -214,7 +218,7 @@ struct WasmState
   PluginMemory pluginMemory;
 
   PluginInput input[2];
-  u32 newInputIndex;
+  u32 newInputIdx;
 
   // DEBUG:
   u32 quadsToDraw;
@@ -345,6 +349,43 @@ getOutputSamplesOffset(int channelIdx)
   return(result);
 }
 
+proc_export u8*
+getStringBufferOffset(void)
+{
+  u8 *result = wasmState->stringBuffer;
+  return(result);
+}
+
+proc_export void
+setMousePosition(r32 x, r32 y)
+{
+  PluginInput *newInput = wasmState->input + wasmState->newInputIdx;
+  newInput->mouseState.position = V2(x, y);
+}
+
+static void
+processButtonPress(ButtonState *button, b32 pressed)
+{
+  button->endedDown = pressed;
+  ++button->halfTransitionCount;
+}
+
+proc_export void
+processMouseButtonPress(u32 buttonIdx, b32 pressed)
+{
+  PluginInput *newInput = wasmState->input + wasmState->newInputIdx;
+  ButtonState *button = newInput->mouseState.buttons + buttonIdx;
+  processButtonPress(button, pressed);
+}
+
+proc_export void
+processKeyboardButtonPress(u32 keyIdx, b32 pressed)
+{
+  PluginInput *newInput = wasmState->input + wasmState->newInputIdx;
+  ButtonState *button = newInput->keyboardState.keys + keyIdx;
+  processButtonPress(button, pressed);
+}
+
 static void
 logQuad(R_Quad* quad)
 {
@@ -366,7 +407,7 @@ drawQuads(s32 width, s32 height, r32 timestamp)
 #if 1
 
   PluginMemory *pluginMemory = &wasmState->pluginMemory;
-  PluginInput *newInput = wasmState->input + wasmState->newInputIndex;
+  PluginInput *newInput = wasmState->input + wasmState->newInputIdx;
   RenderCommands *renderCommands = &wasmState->renderCommands;
 
   renderBeginCommands(renderCommands, width, height);
