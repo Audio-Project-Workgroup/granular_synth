@@ -222,7 +222,7 @@ struct BitmapHeaderV5
 #pragma pack(pop)
 
 static LoadedBitmap*
-loadBitmap(Arena *arena, String8 path)
+loadBitmap(Arena *arena, String8 path, v2 alignment)
 {
   LoadedBitmap *result = 0;
   TemporaryMemory scratch = arenaGetScratch(&arena, 1);
@@ -270,7 +270,7 @@ loadBitmap(Arena *arena, String8 path)
       result->width = width;
       result->height = height;
       result->stride = result->width * sizeof(u32);
-      result->alignPercentage = V2(0, 0);
+      result->alignPercentage = alignment;
       result->pixels = destPixels;
     }
   
@@ -308,7 +308,7 @@ struct LooseBitmap
 
   // NOTE: specified at load
   LoadedBitmap *bitmap;
-  String8 name;  
+  String8 name;
 
   r32 advance;
 
@@ -372,9 +372,9 @@ looseAssetPushBitmap(LooseAssets *looseAssets, LoadedBitmap *bitmap, char *fmt, 
 }
 
 static LooseBitmap*
-looseAssetPushBitmap(LooseAssets *looseAssets, String8 path, String8 name)
+looseAssetPushBitmap(LooseAssets *looseAssets, String8 path, String8 name, v2 alignment = V2(0, 0))
 {  
-  LoadedBitmap *bitmap = loadBitmap(looseAssets->arena, path);
+  LoadedBitmap *bitmap = loadBitmap(looseAssets->arena, path, alignment);
   LooseBitmap *result = looseAssetPushBitmap(looseAssets, bitmap, name);
   return(result);
 }
@@ -411,6 +411,8 @@ looseAssetPushFont(LooseAssets *looseAssets, String8 path, String8 name, RangeU3
 	      bitmap->width = width;
 	      bitmap->height = height;
 	      bitmap->stride = bitmap->width * sizeof(u32);
+	      bitmap->alignPercentage.x = 0.f;
+	      bitmap->alignPercentage.y = height ? (r32)(height + yOffset)/(r32)height : 0.f;
 	      bitmap->pixels = arenaPushArray(looseAssets->arena, bitmap->width * bitmap->height, u32);
 	      {
 		u8 *srcRow = glyphSrc + width * (height - 1);
@@ -436,7 +438,7 @@ looseAssetPushFont(LooseAssets *looseAssets, String8 path, String8 name, RangeU3
 	      LooseBitmap *looseBitmap =
 		looseAssetPushBitmap(looseAssets, bitmap, "%.*s_%u",
 				     (int)name.size, name.str, charIdx);
-	      looseBitmap->advance = fontScale * (r32)advanceWidth;	      
+	      looseBitmap->advance = fontScale * (r32)advanceWidth;
 
 	      stbtt_FreeBitmap(glyphSrc, 0);
 	    }
@@ -604,11 +606,17 @@ main(int argc, char **argv)
       r32 uvMaxX = (r32)(bitmap->atlasOffsetX + bitmap->bitmap->width)/(r32)atlasWidth;
       r32 uvMaxY = (r32)(bitmap->atlasOffsetY + bitmap->bitmap->height)/(r32)atlasHeight;
       stringListPushFormat(writeArena, &assetRectList,
-			   "  {{%ff, %ff, %ff, %ff},\n   {%ff, %ff, %ff, %ff},\n   %ff},  // %.*s\n",
-			   0.f, 0.f, (r32)bitmap->bitmap->width, (r32)bitmap->bitmap->height,
+			   "  { // %.*s\n"
+			   "    {%ff, %ff},\n"
+			   "    {%ff, %ff},\n"
+			   "    {%ff, %ff, %ff, %ff},\n"
+			   "    %ff,\n"
+			   "  },\n",
+			   (int)bitmap->name.size, bitmap->name.str,
+			   bitmap->bitmap->alignPercentage.x, bitmap->bitmap->alignPercentage.y,
+			   (r32)bitmap->bitmap->width, (r32)bitmap->bitmap->height,
 			   uvMinX, uvMinY, uvMaxX, uvMaxY,
-			   bitmap->advance,
-			   (int)bitmap->name.size, bitmap->name.str);
+			   bitmap->advance);
     }
   stringListPush(writeArena, &assetEnumList, STR8_LIT("  PluginAsset_Count,\n};\n"));
   stringListPush(writeArena, &assetRectList, STR8_LIT("};\n"));

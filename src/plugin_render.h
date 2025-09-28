@@ -1,11 +1,14 @@
 static inline void 
 renderPushQuad(RenderCommands *commands, Rect2 rect, PluginAsset *asset, r32 angle,
 	       r32 level, v4 color = V4(1, 1, 1, 1))
-{  
+{
+  v2 rectDim = getDim(rect);
+  v2 alignOffset = hadamard(rectDim, asset->align);
+  
   ASSERT(commands->quadCount < commands->quadCapacity);
   R_Quad *quad = commands->quads + commands->quadCount++;
-  quad->min = rect.min;
-  quad->max = rect.max;
+  quad->min = rect.min - alignOffset;
+  quad->max = rect.max - alignOffset;
   quad->uvMin = asset->uv.min;
   quad->uvMax = asset->uv.max;
   quad->color = colorU32FromV4(color);

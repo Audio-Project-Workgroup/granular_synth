@@ -1,6 +1,8 @@
 struct PluginAsset
 {
-  Rect2 rect;
+  //Rect2 rect;
+  v2 align;
+  v2 dim;
   Rect2 uv;
   r32 advance;
 };
@@ -19,7 +21,8 @@ getGlyphFromChar(LoadedFont *font, u8 c)
 static inline v2
 getGlyphDim(PluginAsset *glyph)
 {
-  v2 result = getDim(glyph->rect);
+  //v2 result = getDim(glyph->rect);
+  v2 result = glyph->dim;
   return(result);
 }
 
