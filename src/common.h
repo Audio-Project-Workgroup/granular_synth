@@ -98,6 +98,7 @@ wasReleased(ButtonState button)
 enum MouseButton
 {
   MouseButton_left,
+  MouseButton_middle,
   MouseButton_right,
 
   MouseButton_COUNT,

@@ -218,7 +218,7 @@ struct WasmState
   PluginMemory pluginMemory;
 
   PluginInput input[2];
-  u32 newInputIdx;
+  u32 currentInputIdx;
 
   // DEBUG:
   u32 quadsToDraw;
@@ -359,8 +359,8 @@ getStringBufferOffset(void)
 proc_export void
 setMousePosition(r32 x, r32 y)
 {
-  PluginInput *newInput = wasmState->input + wasmState->newInputIdx;
-  newInput->mouseState.position = V2(x, y);
+  PluginInput *input = wasmState->input + wasmState->currentInputIdx;
+  input->mouseState.position = V2(x, y);
 }
 
 static void
@@ -373,16 +373,16 @@ processButtonPress(ButtonState *button, b32 pressed)
 proc_export void
 processMouseButtonPress(u32 buttonIdx, b32 pressed)
 {
-  PluginInput *newInput = wasmState->input + wasmState->newInputIdx;
-  ButtonState *button = newInput->mouseState.buttons + buttonIdx;
+  PluginInput *input = wasmState->input + wasmState->currentInputIdx;
+  ButtonState *button = input->mouseState.buttons + buttonIdx;
   processButtonPress(button, pressed);
 }
 
 proc_export void
 processKeyboardButtonPress(u32 keyIdx, b32 pressed)
 {
-  PluginInput *newInput = wasmState->input + wasmState->newInputIdx;
-  ButtonState *button = newInput->keyboardState.keys + keyIdx;
+  PluginInput *input = wasmState->input + wasmState->currentInputIdx;
+  ButtonState *button = input->keyboardState.keys + keyIdx;
   processButtonPress(button, pressed);
 }
 
@@ -404,76 +404,35 @@ logQuad(R_Quad* quad)
 proc_export u32
 drawQuads(s32 width, s32 height, r32 timestamp)
 {
-#if 1
-
   PluginMemory *pluginMemory = &wasmState->pluginMemory;
-  PluginInput *newInput = wasmState->input + wasmState->newInputIdx;
+  PluginInput *input = wasmState->input + wasmState->currentInputIdx;
+  wasmState->currentInputIdx = !wasmState->currentInputIdx;
   RenderCommands *renderCommands = &wasmState->renderCommands;
 
   renderBeginCommands(renderCommands, width, height);
 
-  gsRenderNewFrame(pluginMemory, newInput, renderCommands);
+  gsRenderNewFrame(pluginMemory, input, renderCommands);  
+
+  PluginInput *newInput = wasmState->input + wasmState->currentInputIdx;
+  for(u32 buttonIdx = 0; buttonIdx < MouseButton_COUNT; ++buttonIdx) {
+    newInput->mouseState.buttons[buttonIdx].halfTransitionCount = 0;
+    newInput->mouseState.buttons[buttonIdx].endedDown = input->mouseState.buttons[buttonIdx].endedDown;
+  }
+  for(u32 keyIdx = 0; keyIdx < KeyboardButton_COUNT; ++keyIdx) {
+    newInput->keyboardState.keys[keyIdx].halfTransitionCount = 0;
+    newInput->keyboardState.keys[keyIdx].endedDown = input->keyboardState.keys[keyIdx].endedDown;
+  }
+  for(u32 modIdx = 0; modIdx < KeyboardModifier_COUNT; ++modIdx) {
+    newInput->keyboardState.modifiers[modIdx].halfTransitionCount = 0;
+    newInput->keyboardState.modifiers[modIdx].endedDown = input->keyboardState.modifiers[modIdx].endedDown;
+  }
 
   u32 result = renderCommands->quadCount;
 
-  renderEndCommands(renderCommands);
+  renderEndCommands(renderCommands);   
 
   return(result);
-
-#else
-  r32 timestampSec = timestamp * 0.001f;
-
-  v4 colors[3] = {
-    V4(1, 0, 0, 1),
-    V4(0, 1, 0, 1),
-    V4(0, 0, 1, 1),
-  };
-
-  u32 quadsToDraw = wasmState->quadsToDraw;
-  v2 dim = V2((r32)width/(r32)(quadsToDraw + 1), (r32)height/(r32)(quadsToDraw + 1));
-  v2 advance = V2((r32)width/(r32)quadsToDraw, (r32)height/(r32)quadsToDraw);
-  v2 min = V2(0, 0);
-  v2 max = dim;
-  for(u32 quadIdx = 0; quadIdx < wasmState->quadsToDraw; ++quadIdx) {
-    r32 angularVelocity = (r32)(quadIdx + 1);
-    r32 angle = timestampSec * angularVelocity;
-    R_Quad *quad = pushQuad(min, max, colors[quadIdx], angle, 0.f);
-    UNUSED(quad);
-    //logQuad(quad);
-    min += advance;
-    max += advance;
-  }
-
-  if(!wasmState->calledLog) {
-    platformLog("drew quads");
-    wasmState->calledLog = 1;
-  }
-
-  u32 result = wasmState->renderCommands.quadCount;
-  wasmState->renderCommands.quadCount = 0;
-  return(result);
-#endif
 }
-
-#if 0
-proc_export r32*
-outputSamples(u32 channelIdx, u32 sampleCount, r32 samplePeriod)
-{
-  r32 *outputSamples = (r32*)(wasmState->audioBuffer.outputBuffer[channelIdx]);
-
-  ASSERT(sampleCount <= wasmState->audioBuffer.outputBufferCapacity);
-  r32 phaseInc = GS_TAU * wasmState->freq * samplePeriod;
-  for(u32 sampleIdx = 0; sampleIdx < sampleCount; ++sampleIdx) {
-    r32 sineSample = wasmState->volume * platformSin(wasmState->phase);
-    outputSamples[sampleIdx] = sineSample;
-
-    wasmState->phase += phaseInc;
-    if(wasmState->phase >= GS_TAU) wasmState->phase -= GS_TAU;
-  }
-
-  return(outputSamples);
-}
-#endif
 
 proc_export void
 audioProcess(int sampleRate, int inputChannelCount, int inputSampleCount, int outputChannelCount, int outputSampleCount)

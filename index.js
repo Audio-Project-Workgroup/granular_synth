@@ -145,32 +145,54 @@ async function main() {
     );
 
     // NOTE: input handlers
-    function buttonOffsetFromKeyString(str) {
-	// TODO: implement
-	return 0;
+    const buttonOffsetFromKeystring = new Map();
+    for(let charIdx = 'a'.charCodeAt(0); charIdx < 'z'.charCodeAt(0); ++charIdx) {
+	const offset = charIdx - 'a'.charCodeAt(0);
+	buttonOffsetFromKeystring.set(String.fromCharCode(charIdx), offset);
     }
-    function buttonOffsetFromMouseButton(buttonIdx) {
-	// TODO: implement
-	return 0;
-    }
+    buttonOffsetFromKeystring.set("esc", 27);
+    buttonOffsetFromKeystring.set("tab", 28);
+    buttonOffsetFromKeystring.set("backspace", 29);
+    buttonOffsetFromKeystring.set("minus", 30);
+    buttonOffsetFromKeystring.set("equal", 31);
+    buttonOffsetFromKeystring.set("enter", 32);       
+    
     document.addEventListener("keydown", (event) => {
-	const keyIdx = buttonOffsetFromKeyString(event.key);
-	wasm.instance.exports.processKeyboardButtonPress(keyIdx, 1);
+	const keyIdx = buttonOffsetFromKeystring.get(event.key);
+	if(keyIdx != undefined) {
+	    wasm.instance.exports.processKeyboardButtonPress(keyIdx, 1);
+	}else {
+	    console.log("we don't support that button :(");
+	}
     });
     document.addEventListener("keyup", (event) => {
-	const keyIdx = buttonOffsetFromKeyString(event.key);
-	wasm.instance.exports.processKeyboardButtonPress(keyIdx, 0);
+	const keyIdx = buttonOffsetFromKeystring.get(event.key);
+	if(keyIdx != undefined) {
+	    wasm.instance.exports.processKeyboardButtonPress(keyIdx, 0);
+	}else {
+	    console.log("we don't support that button :(");
+	}
     });
     document.addEventListener("mousemove", (event) => {
-	wasm.instance.exports.setMousePosition(event.pageX, event.pageY);
+	const mouseX = event.pageX;
+	const mouseY = canvas.height - event.pageY;	
+	wasm.instance.exports.setMousePosition(mouseX, mouseY);
     });
     document.addEventListener("mousedown", (event) => {
-	const buttonIdx = buttonOffsetFromKeyString(event.key);
-	wasm.instance.exports.processMouseButtonPress(buttonIdx, 1);
+	const buttonIdx = event.button;
+	if(buttonIdx <= 2) {
+	    wasm.instance.exports.processMouseButtonPress(buttonIdx, 1);
+	}else {
+	    console.log("we don't support that button :(");
+	}
     });
     document.addEventListener("mouseup", (event) => {
-	const buttonIdx = buttonOffsetFromMouseButton(event.button);
-	wasm.instance.exports.processMouseButtonPress(buttonIdx, 0);
+	const buttonIdx = event.button;
+	if(buttonIdx <= 2) {
+	    wasm.instance.exports.processMouseButtonPress(buttonIdx, 0);
+	}else {
+	    console.log("we don't support that button :(");
+	}
     });
 
     // webgl setup
