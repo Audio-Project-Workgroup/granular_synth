@@ -267,7 +267,6 @@ wasmInit(usz memorySize)
       // result->pluginMemory.platformAPI.gsAtomicCompareAndSwap	      = gsAtomicCompareAndSwap;
       // result->pluginMemory.platformAPI.gsAtomicCompareAndSwapPointers = gsAtomicCompareAndSwapPointers;
 
-      // TODO: SET UP LOGGER IN DEBUG MODE!!!!!!!
 #if BUILD_DEBUG
       {
 	Arena *logArena = gsArenaAcquire(0);
@@ -309,26 +308,6 @@ wasmInit(usz memorySize)
   
   return(result);
 }
-
-// static R_Quad*
-// pushQuad(v2 min, v2 max, v4 color, r32 angle, r32 level)
-// {
-//   R_Quad *result = 0;
-//   if(wasmState->renderCommands.quadCount < wasmState->renderCommands.quadCapacity) {
-//     result = wasmState->renderCommands.quads + wasmState->renderCommands.quadCount++;
-//     if(result) {
-//       result->min = min;
-//       result->max = max;
-//       result->uvMin = V2(0.f, 0.f);
-//       result->uvMin = V2(1.f, 1.f);
-//       result->color = colorU32FromV4(color);
-//       result->angle = angle;
-//       result->level = level;
-//     }
-//   }
-  
-//   return(result);
-// }
 
 proc_export R_Quad*
 getQuadsOffset(void)
@@ -453,6 +432,7 @@ drawQuads(s32 width, s32 height, r32 timestamp)
 
     wasmState->currentInputIdx = !wasmState->currentInputIdx;
     PluginInput *newInput = wasmState->input + wasmState->currentInputIdx;
+    newInput->mouseState.position = input->mouseState.position;
     for(u32 buttonIdx = 0; buttonIdx < MouseButton_COUNT; ++buttonIdx) {
       newInput->mouseState.buttons[buttonIdx].halfTransitionCount = 0;
       newInput->mouseState.buttons[buttonIdx].endedDown = input->mouseState.buttons[buttonIdx].endedDown;
