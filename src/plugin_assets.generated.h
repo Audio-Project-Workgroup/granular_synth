@@ -141,7 +141,7 @@ static PluginAsset globalPluginAssets[PluginAsset_Count] =
     0.000000f,
   },
   { // pomegranateKnob
-    {0.000000f, 0.000000f},
+    {0.000000f, -0.030000f},
     {512.000000f, 512.000000f},
     {0.470947f, 0.000000f, 0.533447f, 0.125000f},
     0.000000f,
@@ -153,7 +153,7 @@ static PluginAsset globalPluginAssets[PluginAsset_Count] =
     0.000000f,
   },
   { // halfPomegranateKnob
-    {0.000000f, 0.000000f},
+    {-0.005000f, -0.035000f},
     {512.000000f, 512.000000f},
     {0.596191f, 0.000000f, 0.658691f, 0.125000f},
     0.000000f,
@@ -165,7 +165,7 @@ static PluginAsset globalPluginAssets[PluginAsset_Count] =
     0.000000f,
   },
   { // densityKnob
-    {0.000000f, 0.000000f},
+    {0.010000f, -0.022000f},
     {512.000000f, 512.000000f},
     {0.721436f, 0.000000f, 0.783936f, 0.125000f},
     0.000000f,
@@ -189,7 +189,7 @@ static PluginAsset globalPluginAssets[PluginAsset_Count] =
     0.000000f,
   },
   { // levelFader
-    {0.000000f, 0.000000f},
+    {0.000000f, -0.416000f},
     {512.000000f, 1024.000000f},
     {0.000000f, 0.527588f, 0.062500f, 0.777588f},
     0.000000f,

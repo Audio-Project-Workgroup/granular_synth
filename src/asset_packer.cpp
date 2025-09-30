@@ -456,18 +456,18 @@ looseAssetPushFont(LooseAssets *looseAssets, String8 path, String8 name, RangeU3
 }
 
 #define BITMAP_XLIST\
-  X(editorSkin, "BMP/TREE.bmp")\
-  X(pomegranateKnob, "BMP/POMEGRANATE_BUTTON.bmp")\
-  X(pomegranateKnobLabel, "BMP/POMEGRANATE_BUTTON_WHITEMARKERS.bmp")\
-  X(halfPomegranateKnob, "BMP/HALFPOMEGRANATE_BUTTON.bmp")\
-  X(halfPomegranateKnobLabel, "BMP/HALFPOMEGRANATE_BUTTON_WHITEMARKERS.bmp")\
-  X(densityKnob, "BMP/DENSITYPOMEGRANATE_BUTTON.bmp")\
-  X(densityKnobShadow, "BMP/DENSITYPOMEGRANATE_BUTTON_SHADOW.bmp")\
-  X(densityKnobLabel, "BMP/DENSITYPOMEGRANATE_BUTTON_WHITEMARKERS.bmp")\
-  X(levelBar, "BMP/LEVELBAR.bmp")\
-  X(levelFader, "BMP/LEVELBAR_SLIDINGLEVER.bmp")\
-  X(grainViewBackground, "BMP/GREENFRAME_RECTANGLE.bmp")\
-  X(grainViewOutline, "BMP/GREENFRAME.bmp") 
+  X(editorSkin, "BMP/TREE.bmp", V2(0, 0))					\
+  X(pomegranateKnob, "BMP/POMEGRANATE_BUTTON.bmp", V2(0, -0.03f))		\
+  X(pomegranateKnobLabel, "BMP/POMEGRANATE_BUTTON_WHITEMARKERS.bmp", V2(0, 0)) \
+  X(halfPomegranateKnob, "BMP/HALFPOMEGRANATE_BUTTON.bmp", V2(-0.005f, -0.035f))	\
+  X(halfPomegranateKnobLabel, "BMP/HALFPOMEGRANATE_BUTTON_WHITEMARKERS.bmp", V2(0, 0)) \
+  X(densityKnob, "BMP/DENSITYPOMEGRANATE_BUTTON.bmp", V2(0.01f, -0.022f))	\
+  X(densityKnobShadow, "BMP/DENSITYPOMEGRANATE_BUTTON_SHADOW.bmp", V2(0, 0)) \
+  X(densityKnobLabel, "BMP/DENSITYPOMEGRANATE_BUTTON_WHITEMARKERS.bmp", V2(0, 0)) \
+  X(levelBar, "BMP/LEVELBAR.bmp", V2(0, 0))				\
+  X(levelFader, "BMP/LEVELBAR_SLIDINGLEVER.bmp", V2(0, -0.416f))		\
+  X(grainViewBackground, "BMP/GREENFRAME_RECTANGLE.bmp", V2(0, 0))	\
+  X(grainViewOutline, "BMP/GREENFRAME.bmp", V2(0, 0)) 
   
 int
 main(int argc, char **argv)
@@ -490,8 +490,8 @@ main(int argc, char **argv)
   looseAssetPushBitmap(looseAssets, whiteBitmap, STR8_LIT("null"));
   stringListPush(looseAssets->arena, &pluginAssetXList, STR8_LIT("  X(null)\\\n"));
 
-#define X(name, path)\
-  looseAssetPushBitmap(looseAssets, STR8_LIT(DATA_PATH##path), STR8_LIT(#name));\
+#define X(name, path, alignment)							\
+  looseAssetPushBitmap(looseAssets, STR8_LIT(DATA_PATH##path), STR8_LIT(#name), alignment); \
   stringListPushFormat(looseAssets->arena, &pluginAssetXList, "  X(%s)\\\n", #name);
   BITMAP_XLIST;
 #undef X
