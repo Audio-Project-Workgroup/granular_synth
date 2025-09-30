@@ -151,14 +151,16 @@ async function main() {
 	buttonOffsetFromKeystring.set(String.fromCharCode(charIdx), offset);
     }
     buttonOffsetFromKeystring.set("esc", 27);
-    buttonOffsetFromKeystring.set("tab", 28);
+    buttonOffsetFromKeystring.set("Tab", 28);
     buttonOffsetFromKeystring.set("backspace", 29);
     buttonOffsetFromKeystring.set("minus", 30);
     buttonOffsetFromKeystring.set("equal", 31);
     buttonOffsetFromKeystring.set("enter", 32);       
     
     document.addEventListener("keydown", (event) => {
+	console.log(event.key);
 	const keyIdx = buttonOffsetFromKeystring.get(event.key);
+	console.log(keyIdx);
 	if(keyIdx != undefined) {
 	    wasm.instance.exports.processKeyboardButtonPress(keyIdx, 1);
 	}else {

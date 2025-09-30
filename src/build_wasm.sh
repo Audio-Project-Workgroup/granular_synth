@@ -3,12 +3,17 @@
 SRC_DIR=$PWD
 DATA_DIR=$SRC_DIR/../data
 
+BUILD_DEBUG=1
+
 MEMORY_PAGE_COUNT=2048
 MEMORY_SIZE=$[$MEMORY_PAGE_COUNT*64*1024]
 
-CFLAGS="-Wall -Wextra -Wno-missing-braces -Wno-unused-function -Wno-unused-parameter -Wno-writable-strings -c"
-WASM_CFLAGS="--target=wasm32 -nostdlib -matomics -mbulk-memory -O3"
+CFLAGS="-Wall -Wextra -Wno-missing-braces -Wno-unused-function -Wno-unused-parameter -Wno-writable-strings -O3 -DBUILD_DEBUG=0 -c"
+WASM_CFLAGS="--target=wasm32 -nostdlib -matomics -mbulk-memory"
 WASM_LFLAGS="--no-entry --export-all --import-memory --shared-memory --initial-memory=$MEMORY_SIZE --max-memory=$MEMORY_SIZE"
+if [[ $BUILD_DEBUG == 1 ]]; then
+    CFLAGS+=" -g"
+fi
 
 mkdir -p ../build
 pushd ../build > /dev/null

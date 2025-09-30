@@ -977,18 +977,19 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 		  v2 viewMin = hadamard(V2(0.24f, 0.55f), drawRegionDim);
 		  Rect2 viewRect = rectMinDim(viewMin, viewDim);
 		  
-		  renderPushRectOutline(renderCommands, viewRect, 2.f,
-					RENDER_LEVEL(front), V4(1, 1, 1, 1));
-		  renderPushQuad(renderCommands, viewRect, pluginState->grainViewBackground, 0,
-				 RENDER_LEVEL(grainViewBackground));
+		  // renderPushRectOutline(renderCommands, viewRect, 2.f,
+		  // 			RENDER_LEVEL(front), V4(1, 1, 1, 1));
+		  
+		  // renderPushQuad(renderCommands, viewRect, pluginState->grainViewBackground, 0,
+		  // 		 RENDER_LEVEL(grainViewBackground));
 		  renderPushQuad(renderCommands, viewRect, pluginState->grainViewOutline, 0,
 				 RENDER_LEVEL(front));
 
 		  v2 dim = hadamard(V2(0.843f, 0.62f), viewDim);
 		  v2 min = viewMin + hadamard(V2(0.075f, 0.2f), viewDim);
 		  Rect2 rect = rectMinDim(min, dim);
-		  renderPushRectOutline(renderCommands, rect, 2.f,
-					RENDER_LEVEL(front), V4(1, 1, 1, 1));		  
+		  // renderPushRectOutline(renderCommands, rect, 2.f,
+		  // 			RENDER_LEVEL(front), V4(1, 1, 1, 1));
 
 		  r32 middleBarThickness = 4.f;
 		  Rect2 middleBar = rectMinDim(min + V2(0, 0.5f*dim.y),
@@ -1009,7 +1010,7 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 		  u32 viewEntryReadIndex = grainStateView->viewReadIndex;
 		  u32 entriesQueued = gsAtomicLoad(&grainStateView->entriesQueued);
 		  logFormatString("entriesQueued: %u", entriesQueued);
-		  
+
 		  for(u32 entryIndex = 0; entryIndex < entriesQueued; ++entryIndex)
 		    {		     		  
 		      GrainBufferViewEntry *view = (grainStateView->views +

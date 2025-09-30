@@ -190,11 +190,6 @@ gsPow(r32 base, r32 exp)
 
 // internal state/functions
 
-// proc_export int
-// fmadd(int a, int b, int c) {
-//   return(a * b + c);
-// }
-
 struct WasmState
 {
   Arena *arena;
@@ -203,22 +198,19 @@ struct WasmState
   usz stringBufferCount;
   u8 *stringBuffer;
 
-  // R_Quad *quads;
-  // u32 quadCount;
-  // u32 quadCapacity;
   RenderCommands renderCommands;
 
-  // r32 *inputSamples[2];
-  // u32 inputSampleCapacity;
-
-  // r32 *outputSamples[2];
-  // u32 outputSampleCapacity;
   PluginAudioBuffer audioBuffer;
   
   PluginMemory pluginMemory;
 
   PluginInput input[2];
   u32 currentInputIdx;
+  volatile u32 inputLock;
+
+#if BUILD_DEBUG
+  PluginLogger logger;
+#endif
 
   // DEBUG:
   u32 quadsToDraw;
@@ -275,6 +267,16 @@ wasmInit(usz memorySize)
       // result->pluginMemory.platformAPI.gsAtomicCompareAndSwap	      = gsAtomicCompareAndSwap;
       // result->pluginMemory.platformAPI.gsAtomicCompareAndSwapPointers = gsAtomicCompareAndSwapPointers;
 
+      // TODO: SET UP LOGGER IN DEBUG MODE!!!!!!!
+#if BUILD_DEBUG
+      {
+	Arena *logArena = gsArenaAcquire(0);
+	result->logger.logArena = logArena;
+	result->logger.maxCapacity = logArena->capacity/2;
+	result->pluginMemory.logger = &result->logger;
+      }
+#endif
+
       result->renderCommands.quadCapacity = 2048;      
       result->renderCommands.quads = arenaPushArray(arena, result->renderCommands.quadCapacity, R_Quad);
       platformLogf("arena used post quads push: %u\n", arenaGetPos(arena));
@@ -291,40 +293,42 @@ wasmInit(usz memorySize)
 	arenaPushArray(arena, result->audioBuffer.outputBufferCapacity, r32);
       result->audioBuffer.outputBuffer[1] =
 	arenaPushArray(arena, result->audioBuffer.outputBufferCapacity, r32);
-      platformLogf("arena used post output samples push: %u\n", arenaGetPos(arena));      
+      platformLogf("arena used post output samples push: %u\n", arenaGetPos(arena));            
 
       result->quadsToDraw = 3;
 
       result->phase = 0.f;
       result->freq = 440.f;
       result->volume = 0.1f;
-      
-      wasmState = result;      
+
+      if(gsInitializePluginState(&result->pluginMemory)) {
+	wasmState = result;      
+      }
     }
   }
   
   return(result);
 }
 
-static R_Quad*
-pushQuad(v2 min, v2 max, v4 color, r32 angle, r32 level)
-{
-  R_Quad *result = 0;
-  if(wasmState->renderCommands.quadCount < wasmState->renderCommands.quadCapacity) {
-    result = wasmState->renderCommands.quads + wasmState->renderCommands.quadCount++;
-    if(result) {
-      result->min = min;
-      result->max = max;
-      result->uvMin = V2(0.f, 0.f);
-      result->uvMin = V2(1.f, 1.f);
-      result->color = colorU32FromV4(color);
-      result->angle = angle;
-      result->level = level;
-    }
-  }
+// static R_Quad*
+// pushQuad(v2 min, v2 max, v4 color, r32 angle, r32 level)
+// {
+//   R_Quad *result = 0;
+//   if(wasmState->renderCommands.quadCount < wasmState->renderCommands.quadCapacity) {
+//     result = wasmState->renderCommands.quads + wasmState->renderCommands.quadCount++;
+//     if(result) {
+//       result->min = min;
+//       result->max = max;
+//       result->uvMin = V2(0.f, 0.f);
+//       result->uvMin = V2(1.f, 1.f);
+//       result->color = colorU32FromV4(color);
+//       result->angle = angle;
+//       result->level = level;
+//     }
+//   }
   
-  return(result);
-}
+//   return(result);
+// }
 
 proc_export R_Quad*
 getQuadsOffset(void)
@@ -336,6 +340,9 @@ getQuadsOffset(void)
 proc_export void*
 getInputSamplesOffset(int channelIdx)
 {
+  // TODO: it would be nice to check if the javascript layer is trying to access
+  //       more channels that we have, but the input channel count is set
+  //       _after_ this setter is called for the first time
   //ASSERT(channelIdx < wasmState->audioBuffer.inputChannelCount);
   void *result = (void*)wasmState->audioBuffer.inputBuffer[channelIdx];
   return(result);
@@ -356,9 +363,24 @@ getStringBufferOffset(void)
   return(result);
 }
 
+#define SCOPE_HAS_INPUT_LOCK() ScopedInputLock scopedInputLock__##__FUNCTION__;
+struct ScopedInputLock
+{
+  ScopedInputLock()
+  {
+    while(gsAtomicCompareAndSwap(&wasmState->inputLock, 0, 1)) {}
+  }
+  
+  ~ScopedInputLock()
+  {
+    while(gsAtomicCompareAndSwap(&wasmState->inputLock, 1, 0)) {}
+  }
+};
+
 proc_export void
 setMousePosition(r32 x, r32 y)
 {
+  SCOPE_HAS_INPUT_LOCK();
   PluginInput *input = wasmState->input + wasmState->currentInputIdx;
   input->mouseState.position = V2(x, y);
 }
@@ -373,6 +395,7 @@ processButtonPress(ButtonState *button, b32 pressed)
 proc_export void
 processMouseButtonPress(u32 buttonIdx, b32 pressed)
 {
+  SCOPE_HAS_INPUT_LOCK();
   PluginInput *input = wasmState->input + wasmState->currentInputIdx;
   ButtonState *button = input->mouseState.buttons + buttonIdx;
   processButtonPress(button, pressed);
@@ -381,6 +404,7 @@ processMouseButtonPress(u32 buttonIdx, b32 pressed)
 proc_export void
 processKeyboardButtonPress(u32 keyIdx, b32 pressed)
 {
+  SCOPE_HAS_INPUT_LOCK();
   PluginInput *input = wasmState->input + wasmState->currentInputIdx;
   ButtonState *button = input->keyboardState.keys + keyIdx;
   processButtonPress(button, pressed);
@@ -405,28 +429,44 @@ proc_export u32
 drawQuads(s32 width, s32 height, r32 timestamp)
 {
   PluginMemory *pluginMemory = &wasmState->pluginMemory;
-  PluginInput *input = wasmState->input + wasmState->currentInputIdx;
-  wasmState->currentInputIdx = !wasmState->currentInputIdx;
+  PluginInput *input = wasmState->input + wasmState->currentInputIdx;  
   RenderCommands *renderCommands = &wasmState->renderCommands;
 
   renderBeginCommands(renderCommands, width, height);
+  {
+    SCOPE_HAS_INPUT_LOCK();
+    gsRenderNewFrame(pluginMemory, input, renderCommands);  
 
-  gsRenderNewFrame(pluginMemory, input, renderCommands);  
+#if BUILD_DEBUG
+    for(String8Node *node = wasmState->logger.log.first; node; node = node->next)
+      {
+	String8 string = node->string;
+	if(string.str)
+	  {
+	    platformLog((const char*)string.str);
+	    platformLog("\n");
+	  }
+	ZERO_STRUCT(&wasmState->logger.log);
+	arenaEnd(wasmState->logger.logArena);
+      }
+#endif
 
-  PluginInput *newInput = wasmState->input + wasmState->currentInputIdx;
-  for(u32 buttonIdx = 0; buttonIdx < MouseButton_COUNT; ++buttonIdx) {
-    newInput->mouseState.buttons[buttonIdx].halfTransitionCount = 0;
-    newInput->mouseState.buttons[buttonIdx].endedDown = input->mouseState.buttons[buttonIdx].endedDown;
+    wasmState->currentInputIdx = !wasmState->currentInputIdx;
+    PluginInput *newInput = wasmState->input + wasmState->currentInputIdx;
+    for(u32 buttonIdx = 0; buttonIdx < MouseButton_COUNT; ++buttonIdx) {
+      newInput->mouseState.buttons[buttonIdx].halfTransitionCount = 0;
+      newInput->mouseState.buttons[buttonIdx].endedDown = input->mouseState.buttons[buttonIdx].endedDown;
+    }
+    for(u32 keyIdx = 0; keyIdx < KeyboardButton_COUNT; ++keyIdx) {
+      newInput->keyboardState.keys[keyIdx].halfTransitionCount = 0;
+      newInput->keyboardState.keys[keyIdx].endedDown = input->keyboardState.keys[keyIdx].endedDown;
+    }
+    for(u32 modIdx = 0; modIdx < KeyboardModifier_COUNT; ++modIdx) {
+      newInput->keyboardState.modifiers[modIdx].halfTransitionCount = 0;
+      newInput->keyboardState.modifiers[modIdx].endedDown = input->keyboardState.modifiers[modIdx].endedDown;
+    }
   }
-  for(u32 keyIdx = 0; keyIdx < KeyboardButton_COUNT; ++keyIdx) {
-    newInput->keyboardState.keys[keyIdx].halfTransitionCount = 0;
-    newInput->keyboardState.keys[keyIdx].endedDown = input->keyboardState.keys[keyIdx].endedDown;
-  }
-  for(u32 modIdx = 0; modIdx < KeyboardModifier_COUNT; ++modIdx) {
-    newInput->keyboardState.modifiers[modIdx].halfTransitionCount = 0;
-    newInput->keyboardState.modifiers[modIdx].endedDown = input->keyboardState.modifiers[modIdx].endedDown;
-  }
-
+  
   u32 result = renderCommands->quadCount;
 
   renderEndCommands(renderCommands);   

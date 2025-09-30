@@ -517,16 +517,16 @@ main(int argc, char **argv)
 	{
 	  ASSERT(growCount <= maxGrowCount);
 
-	  s32 maxX = layoutX + bitmap->bitmap->width;
-	  s32 maxY = layoutY + bitmap->bitmap->height;
+	  s32 maxX = layoutX + bitmap->bitmap->width + 1;
+	  s32 maxY = layoutY + bitmap->bitmap->height + 1;
 	  b32 fits = (maxX <= atlasWidth && maxY <= atlasHeight);
 	  if(fits)
 	    {
 	      bitmap->atlasOffsetX = layoutX;
 	      bitmap->atlasOffsetY = layoutY;
 
-	      layoutX += bitmap->bitmap->width;
-	      rowMaxHeight = MAX(rowMaxHeight, (s32)bitmap->bitmap->height);
+	      layoutX += bitmap->bitmap->width + 1;
+	      rowMaxHeight = MAX(rowMaxHeight, (s32)(bitmap->bitmap->height + 1));
 
 	      inserted = 1;
 	    }
