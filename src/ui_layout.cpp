@@ -277,7 +277,7 @@ uiBeginLayout(UILayout *layout, UIContext *context, Rect2 parentRect,
     }
   
   layout->root = uiMakeElement(layout, STR8_LIT("root"), 0, color, texture);
-  layout->root->flags = UIElementFlag_drawBorder | UIElementFlag_drawBackground;
+  //layout->root->flags = UIElementFlag_drawBorder | UIElementFlag_drawBackground;
   layout->root->lastFrameTouched = context->frameIndex;
   //uiSetSemanticSizeAbsolute(layout->root, parentRect.min, getDim(parentRect));
   layout->root->region = parentRect;

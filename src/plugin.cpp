@@ -542,7 +542,10 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 		  uiBeginLayout(panelLayout, uiContext, panelRect, panel->color, panel->texture);
 		  //uiBeginLayout(panelLayout, uiContext, panelRect, V4(0, 0, 0, 1), panel->texture);
 		  uiPushLayoutOffsetSizeType(panelLayout, UISizeType_percentOfParent);
-		  uiPushLayoutDimSizeType(panelLayout, UISizeType_percentOfParent);		  
+		  uiPushLayoutDimSizeType(panelLayout, UISizeType_percentOfParent);
+
+		  renderPushQuad(renderCommands, panelRect, panel->texture, 0,
+				 RENDER_LEVEL(background));
 
 		  v2 panelDim = getDim(panelRect);
 		  v2 elementTextScale = 0.0008f*panelDim.x*V2(1.f, 1.f);
@@ -979,11 +982,6 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 		  
 		  // renderPushRectOutline(renderCommands, viewRect, 2.f,
 		  // 			RENDER_LEVEL(front), V4(1, 1, 1, 1));
-		  
-		  // renderPushQuad(renderCommands, viewRect, pluginState->grainViewBackground, 0,
-		  // 		 RENDER_LEVEL(grainViewBackground));
-		  renderPushQuad(renderCommands, viewRect, pluginState->grainViewOutline, 0,
-				 RENDER_LEVEL(front));
 
 		  v2 dim = hadamard(V2(0.843f, 0.62f), viewDim);
 		  v2 min = viewMin + hadamard(V2(0.075f, 0.2f), viewDim);
@@ -994,9 +992,14 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 		  r32 middleBarThickness = 4.f;
 		  Rect2 middleBar = rectMinDim(min + V2(0, 0.5f*dim.y),
 					       V2(dim.x, middleBarThickness));
-		  renderPushQuad(renderCommands, middleBar, pluginState->null, 0.f,
-				 RENDER_LEVEL(front), V4(0, 0, 0, 1));
 
+		  renderPushQuad(renderCommands, viewRect, pluginState->grainViewBackground, 0,
+				 RENDER_LEVEL(grainViewBackground));
+		  renderPushQuad(renderCommands, middleBar, pluginState->null, 0.f,
+				 RENDER_LEVEL(grainViewMiddleBar), V4(0, 0, 0, 1));
+		  renderPushQuad(renderCommands, viewRect, pluginState->grainViewOutline, 0,
+				 RENDER_LEVEL(grainViewBorder));
+		 
 		  v2 upperRegionMin = min + V2(0, 0.5f*(dim.y + middleBarThickness));
 		  v2 lowerRegionMin = min;
 		  v2 regionDim = V2(dim.x, 0.5f*dim.y - middleBarThickness);

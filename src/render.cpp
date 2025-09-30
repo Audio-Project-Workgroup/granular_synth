@@ -156,7 +156,7 @@ makeGLState(Arena *arena, usz quadCapacity)
   GL_CATCH_ERROR();
 
   glEnable(GL_DEPTH_TEST);
-  glDepthFunc(GL_LEQUAL);
+  glDepthFunc(GL_LESS);
 
   GL_CATCH_ERROR();
 

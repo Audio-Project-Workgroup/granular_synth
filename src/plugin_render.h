@@ -154,7 +154,7 @@ renderPushUIElement(RenderCommands *commands, UIElement *element)
       Rect2 travelRect = rectCenterDim(elementRegionCenter, travelDim);
       
       renderPushQuad(commands, travelRect, element->texture, 0,
-		     RENDER_LEVEL(control), element->color);
+		     RENDER_LEVEL(controlBackground), element->color);
 
       if(element->parameterType == UIParameter_float)
 	{

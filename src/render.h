@@ -6,7 +6,10 @@ enum RenderLevel
   RenderLevel_text,
   RenderLevel_label,
   RenderLevel_control,
+  RenderLevel_controlBackground,
 
+  RenderLevel_grainViewBorder,
+  RenderLevel_grainViewMiddleBar,
   RenderLevel_grainViewBackground,
 
   //RenderLevel_boxBackground,
