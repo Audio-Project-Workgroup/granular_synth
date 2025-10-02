@@ -241,7 +241,8 @@ async function main() {
     // TODO: do we want to load a generated image from the data folder,
     //       or embed the atlas into the WASM binary?
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-    const atlasTexture = loadTexture("data/test_atlas.bmp");
+    //const atlasTexture = loadTexture("data/test_atlas.bmp");
+    const atlasTexture = loadTexture("data/test_atlas.png");
 
     // init buffer
     const vertexBuffer = gl.createBuffer();

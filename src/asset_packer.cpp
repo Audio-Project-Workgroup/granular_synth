@@ -1,3 +1,5 @@
+#define _CRT_SECURE_NO_WARNINGS
+
 #define HOST_LAYER
 #include "context.h"
 #include "types.h"
@@ -278,6 +280,41 @@ loadBitmap(Arena *arena, String8 path, v2 alignment)
   return(result);
 }
 
+#define STB_IMAGE_IMPLEMENTATION
+#define STBI_ONLY_PNG
+#include "stb_image.h"
+static LoadedBitmap*
+loadPNG(Arena *arena, String8 path, v2 alignment)
+{
+  stbi_set_flip_vertically_on_load(1);
+
+  int width, height, nChannels;
+  u8 *data = stbi_load((char*)path.str, &width, &height, &nChannels, 4);
+  ASSERT(nChannels == 4);
+
+  LoadedBitmap *result = arenaPushStruct(arena, LoadedBitmap);
+  result->width = width;
+  result->height = height;
+  result->stride = result->width * sizeof(u32);
+  result->pixels = (u32*)data;
+  result->alignPercentage = alignment;
+  return(result);
+}
+
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
+static void
+writePNG(LoadedBitmap *image, String8 destPath)
+{
+  stbi_flip_vertically_on_write(1);
+
+  int width = image->width;
+  int height = image->height;
+  int stride = image->stride;
+  const void *data = (const void*)image->pixels;
+  int result = stbi_write_png((char*)destPath.str, width, height, 4, data, stride);
+}
+
 static LoadedBitmap*
 makeWhiteBitmap(Arena *arena, u32 width, u32 height)
 {
@@ -374,7 +411,8 @@ looseAssetPushBitmap(LooseAssets *looseAssets, LoadedBitmap *bitmap, char *fmt, 
 static LooseBitmap*
 looseAssetPushBitmap(LooseAssets *looseAssets, String8 path, String8 name, v2 alignment = V2(0, 0))
 {  
-  LoadedBitmap *bitmap = loadBitmap(looseAssets->arena, path, alignment);
+  //LoadedBitmap *bitmap = loadBitmap(looseAssets->arena, path, alignment);
+  LoadedBitmap *bitmap = loadPNG(looseAssets->arena, path, alignment);
   LooseBitmap *result = looseAssetPushBitmap(looseAssets, bitmap, name);
   return(result);
 }
@@ -595,18 +633,18 @@ atlasRegionAlloc(Arena *arena, Atlas *atlas, v2s32 neededDim)
 #endif
 
 #define BITMAP_XLIST\
-  X(editorSkin, "BMP/TREE.bmp", V2(0, 0))\
-  X(grainViewBackground, "BMP/GREENFRAME_RECTANGLE.bmp", V2(0, 0))\
-  X(grainViewOutline, "BMP/GREENFRAME.bmp", V2(0, 0))\
-  X(levelBar, "BMP/LEVELBAR.bmp", V2(0, 0))\
-  X(levelFader, "BMP/LEVELBAR_SLIDINGLEVER.bmp", V2(0, -0.416f))\
-  X(pomegranateKnob, "BMP/POMEGRANATE_BUTTON.bmp", V2(0, -0.03f))\
-  X(pomegranateKnobLabel, "BMP/POMEGRANATE_BUTTON_WHITEMARKERS.bmp", V2(0, 0))\
-  X(halfPomegranateKnob, "BMP/HALFPOMEGRANATE_BUTTON.bmp", V2(-0.005f, -0.035f))\
-  X(halfPomegranateKnobLabel, "BMP/HALFPOMEGRANATE_BUTTON_WHITEMARKERS.bmp", V2(0, 0))\
-  X(densityKnob, "BMP/DENSITYPOMEGRANATE_BUTTON.bmp", V2(0.01f, -0.022f))\
-  X(densityKnobShadow, "BMP/DENSITYPOMEGRANATE_BUTTON_SHADOW.bmp", V2(0, 0))\
-  X(densityKnobLabel, "BMP/DENSITYPOMEGRANATE_BUTTON_WHITEMARKERS.bmp", V2(0, 0))
+  X(editorSkin, "PNG/TREE.png", V2(0, 0))\
+  X(grainViewBackground, "PNG/GREENFRAME_RECTANGLE.png", V2(0, 0))\
+  X(grainViewOutline, "PNG/GREENFRAME.png", V2(0, 0))\
+  X(levelBar, "PNG/LEVELBAR.png", V2(0, 0))\
+  X(levelFader, "PNG/LEVELBAR_SLIDINGLEVER.png", V2(0, -0.416f))\
+  X(pomegranateKnob, "PNG/POMEGRANATE_BUTTON.png", V2(0, -0.03f))\
+  X(pomegranateKnobLabel, "PNG/POMEGRANATE_BUTTON_WHITEMARKERS.png", V2(0, 0))\
+  X(halfPomegranateKnob, "PNG/HALFPOMEGRANATE_BUTTON.png", V2(-0.005f, -0.035f))\
+  X(halfPomegranateKnobLabel, "PNG/HALFPOMEGRANATE_BUTTON_WHITEMARKERS.png", V2(0, 0))\
+  X(densityKnob, "PNG/DENSITYPOMEGRANATE_BUTTON.png", V2(0.01f, -0.022f))\
+  X(densityKnobShadow, "PNG/DENSITYPOMEGRANATE_BUTTON_SHADOW.png", V2(0, 0))\
+  X(densityKnobLabel, "PNG/DENSITYPOMEGRANATE_BUTTON_WHITEMARKERS.png", V2(0, 0))
   
 int
 main(int argc, char **argv)
@@ -906,6 +944,15 @@ main(int argc, char **argv)
   arenaEnd(writeArena);
 
   // DEBUG: write atlas to file
+#if 1
+  LoadedBitmap *atlasImage = arenaPushStruct(writeArena, LoadedBitmap);
+  atlasImage->width = atlasWidth;
+  atlasImage->height = atlasHeight;
+  atlasImage->stride = atlasImage->width * sizeof(u32);
+  atlasImage->pixels = atlasPixels;
+
+  writePNG(atlasImage, STR8_LIT(DATA_PATH"test_atlas.png"));
+#else
   // TODO: this header masks business is janky as hell
   BitmapHeaderV5 *header = arenaPushStruct(writeArena, BitmapHeaderV5);
   header->signature = FOURCC("BM  ");
@@ -934,7 +981,8 @@ main(int argc, char **argv)
   Buffer file = {};
   file.size = header->fileSize;
   file.contents = (u8*)header;
-  writeEntireFile(STR8_LIT(DATA_PATH"test_atlas.bmp"), file);  
+  writeEntireFile(STR8_LIT(DATA_PATH"test_atlas.bmp"), file);
+#endif
 
   arenaReleaseScratch(scratch);
   return(0);

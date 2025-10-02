@@ -535,6 +535,26 @@ makeBitmap(Arena *allocator, s32 width, s32 height, u32 color)
   return(result);
 }
 
+#define STB_IMAGE_IMPLEMENTATION
+#define STBI_ONLY_PNG
+#include "stb_image.h"
+static LoadedBitmap
+loadPNG(String8 path, b32 flip = 1)
+{
+  stbi_set_flip_vertically_on_load(flip);
+
+  int width, height, nChannels;
+  u8 *data = stbi_load((char*)path.str, &width, &height, &nChannels, 4);
+  ASSERT(nChannels == 4);
+
+  LoadedBitmap result = {};
+  result.width = width;
+  result.height = height;
+  result.stride = width * nChannels;
+  result.pixels = (u32*)data;
+  return(result);
+}
+
 struct HostMemoryState
 {
   usz arenaHeaderPoolSize;
@@ -620,7 +640,8 @@ main(int argc, char **argv)
       if(window)	
 	{
 	  LoadedBitmap iconBitmap =
-	    loadBitmap(scratch.arena, STR8_LIT("../data/BMP/DENSITYPOMEGRANATE_BUTTON.bmp"));
+	    //loadBitmap(scratch.arena, STR8_LIT("../data/BMP/DENSITYPOMEGRANATE_BUTTON.bmp"));
+	    loadPNG(STR8_LIT("../data/PNG/DENSITYPOMEGRANATE_BUTTON.png"), 0);
 	  
 	  GLFWimage appIcon[1];
 	  appIcon[0].width = iconBitmap.width;
@@ -692,7 +713,8 @@ main(int argc, char **argv)
 #endif
 
 	  // TODO: don't load this at runtime. Try baking it into some object file
-	  LoadedBitmap atlas = loadBitmap(scratch.arena, STR8_LIT("../data/test_atlas.bmp"), 0);
+	  //LoadedBitmap atlas = loadBitmap(scratch.arena, STR8_LIT("../data/test_atlas.bmp"), 0);
+	  LoadedBitmap atlas = loadPNG(STR8_LIT("../data/test_atlas.png"), 1);
 	  RenderCommands *commands = allocRenderCommands();
 	  commands->atlas = &atlas;
 

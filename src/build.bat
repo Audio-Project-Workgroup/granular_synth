@@ -2,6 +2,9 @@
 
 set BUILD_DEBUG=1
 
+set SRC_DIR=%CD%
+set DATA_DIR=%CD%\..\data
+
 set CFLAGS=
 set CFLAGS=%CFLAGS% -nologo -W3 -wd"4244" -wd"4146"
 if %BUILD_DEBUG%==1 (
@@ -17,6 +20,7 @@ set LFLAGS=-incremental:no -opt:ref
 
 IF NOT EXIST ..\build mkdir ..\build
 pushd ..\build
+set BUILD_DIR=%CD%
 
 :: produce logo icon file
 call rc /nologo /fo logo.res ..\data\logo.rc
@@ -38,7 +42,9 @@ REM preprocessor
 
 REM asset packer
 cl %CFLAGS% ..\src\asset_packer.cpp /link %LFLAGS% -out:asset_packer.exe
-asset_packer.exe
+IF NOT EXIST %DATA_DIR%\test_atlas.png (
+   asset_packer.exe
+)
 
 REM compile plugin and host
 cl %CFLAGS% -D"DATA_PATH=\"../data/\"" ..\src\plugin.cpp -Fmplugin.map -LD /link %LFLAGS% -PDB:plugin_%random%.pdb
