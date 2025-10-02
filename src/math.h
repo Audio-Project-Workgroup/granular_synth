@@ -270,10 +270,26 @@ V2(r32 x, r32 y)
   return(result);
 }
 
+static inline v2s32
+V2S32(s32 x, s32 y)
+{
+  v2s32 result = {x, y};
+
+  return(result);
+}
+
 static inline v2
 operator-(v2 v)
 {
   v2 result = V2(-v.x, -v.y);
+
+  return(result);
+}
+
+static inline v2s32
+operator-(v2s32 v)
+{
+  v2s32 result = V2S32(-v.x, -v.y);
 
   return(result);
 }
@@ -286,8 +302,24 @@ operator+(v2 v, v2 w)
   return(result);
 }
 
+static inline v2s32
+operator+(v2s32 v, v2s32 w)
+{
+  v2s32 result = V2S32(v.x + w.x, v.y + w.y);
+
+  return(result);
+}
+
 static inline v2 &
 operator+=(v2 &v, v2 w)
+{
+  v = v + w;
+
+  return(v);
+}
+
+static inline v2s32 &
+operator+=(v2s32 &v, v2s32 w)
 {
   v = v + w;
 
@@ -302,8 +334,24 @@ operator-(v2 v, v2 w)
   return(result);
 }
 
+static inline v2s32
+operator-(v2s32 v, v2s32 w)
+{
+  v2s32 result = v + (-w);
+
+  return(result);
+}
+
 static inline v2 &
 operator-=(v2 &v, v2 w)
+{
+  v = v - w;
+
+  return(v);
+}
+
+static inline v2s32 &
+operator-=(v2s32 &v, v2s32 w)
 {
   v = v - w;
 
@@ -318,6 +366,14 @@ operator*(r32 a, v2 v)
   return(result);
 }
 
+static inline v2s32
+operator*(s32 a, v2s32 v)
+{
+  v2s32 result = V2S32(a*v.x, a*v.y);
+
+  return(result);
+}
+
 static inline v2
 operator*(v2 v, r32 a)
 {
@@ -326,8 +382,24 @@ operator*(v2 v, r32 a)
   return(result);
 }
 
+static inline v2s32
+operator*(v2s32 v, s32 a)
+{
+  v2s32 result = a*v;
+
+  return(result);
+}
+
 static inline v2 &
 operator*=(v2 &v, r32 a)
+{
+  v = v * a;
+
+  return(v);
+}
+
+static inline v2s32 &
+operator*=(v2s32 &v, s32 a)
 {
   v = v * a;
 
@@ -342,8 +414,24 @@ operator/(v2 v, r32 a)
   return(result);
 }
 
+static inline v2s32
+operator/(v2s32 v, s32 a)
+{
+  v2s32 result = V2S32(v.x / a, v.y / a);
+
+  return(result);
+}
+
 static inline v2 &
 operator/=(v2 &v, r32 a)
+{
+  v = v/a;
+
+  return(v);
+}
+
+static inline v2s32 &
+operator/=(v2s32 &v, s32 a)
 {
   v = v/a;
 
@@ -354,6 +442,30 @@ static inline v2
 hadamard(v2 v, v2 w)
 {
   v2 result = V2(v.x*w.x, v.y*w.y);
+
+  return(result);
+}
+
+static inline v2s32
+hadamard(v2s32 v, v2s32 w)
+{
+  v2s32 result = V2S32(v.x*w.x, v.y*w.y);
+
+  return(result);
+}
+
+static inline v2s32
+vertexFromCorner(Corner corner)
+{
+  v2s32 result = V2S32(-1, -1);
+  switch(corner)
+    {
+    default: break;
+    case Corner_00: { result = V2S32(0, 0); }break;
+    case Corner_01: { result = V2S32(0, 1); }break;
+    case Corner_10: { result = V2S32(1, 0); }break;
+    case Corner_11: { result = V2S32(1, 1); }break;
+    }
 
   return(result);
 }
@@ -749,6 +861,14 @@ static inline v2
 getDim(Rect2 rect)
 {
   v2 result = rect.max - rect.min;
+
+  return(result);
+}
+
+static inline v2s32
+getDim(Rect2S32 rect)
+{
+  v2s32 result = rect.max - rect.min;
 
   return(result);
 }

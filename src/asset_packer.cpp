@@ -455,19 +455,158 @@ looseAssetPushFont(LooseAssets *looseAssets, String8 path, String8 name, RangeU3
   arenaReleaseScratch(scratch);
 }
 
+struct AtlasRegionNode
+{
+  AtlasRegionNode *parent;
+  AtlasRegionNode *children[Corner_Count];  
+  v2s32 maxFreeDim[Corner_Count];
+  // AtlasRegionNode *children[Axis2D_Count];
+  // v2s32 maxFreeDim[Axis2D_Count];
+
+  Axis2D splitAxis;
+  b32 taken;
+  u32 allocatedDescendantCount;
+};
+
+struct Atlas
+{
+  AtlasRegionNode *root;
+  v2s32 rootDim;
+};
+
+#if 0
+static Rect2S32
+atlasRegionAlloc(Arena *arena, Atlas *atlas, v2s32 neededDim)
+{
+  v2s32 regionMin = V2S32(0, 0);
+  v2s32 regionDim = V2S32(0, 0);
+  
+  // NOTE: find node to insert into
+  AtlasRegionNode *node = 0;
+  for(AtlasReginoNode *n = atlas->root, *next = 0; n; n = next, next = 0)
+    {
+      v2s32 availableDim = n->dim;
+      for(Corner corner = (Corner)0; corner < Corner_Count; corner = (Corner)(corner + 1))
+	{
+	  if(!n->children[corner])
+	    {
+	      n->children[corner] = arenaPushStruct(arena, AtlasRegionNode);
+	      n->children[corner]->dim = neededDim;
+	      n->children[corner]->parent = n;
+	    }
+	}
+    }
+  
+  Rect2S32 result = {};
+  result.min = regionMin;
+  result.max = regionMin + regionDim;
+  return(result);
+}
+#else
+static Rect2S32
+atlasRegionAlloc(Arena *arena, Atlas *atlas, v2s32 neededDim)
+{
+  v2s32 regionMin = V2S32(0, 0);
+  v2s32 regionDim = V2S32(0, 0);
+  v2s32 supportedDim = atlas->rootDim;
+  Corner nodeCorner = Corner_invalid;
+  AtlasRegionNode *node = 0;
+  for(AtlasRegionNode *n = atlas->root, *next = 0; n; n = next, next = 0)
+    {
+      if(n->taken) break;
+
+      b32 canBeAllocated = (n->allocatedDescendantCount == 0);
+      if(canBeAllocated) regionDim = supportedDim;
+
+      v2s32 childDim = supportedDim / 2;
+      AtlasRegionNode *bestChild = 0;
+      if(childDim.x >= neededDim.x && childDim.y >= neededDim.y)
+	{
+	  for(Corner corner = (Corner)0; corner < Corner_Count; corner = (Corner)(corner + 1))
+	    {
+	      if(n->children[corner] == 0)
+		{
+		  n->children[corner] = arenaPushStruct(arena, AtlasRegionNode);
+		  n->children[corner]->parent = n;
+		  n->children[corner]->maxFreeDim[0] =
+		    n->children[corner]->maxFreeDim[1] =
+		    n->children[corner]->maxFreeDim[2] =
+		    n->children[corner]->maxFreeDim[3] = childDim / 2;
+		}
+	      if(n->maxFreeDim[corner].x >= neededDim.x && n->maxFreeDim[corner].y >= neededDim.y)
+		{
+		  bestChild = n->children[corner];
+		  nodeCorner = corner;
+		  regionMin += hadamard(vertexFromCorner(corner), childDim);
+		  break;
+		}
+	    }
+	}
+
+      if(canBeAllocated && !bestChild)
+	{
+	  node = n;
+	}
+      else
+	{
+	  next = bestChild;
+	  supportedDim = childDim;
+	}
+    }
+
+  if(node != 0 && nodeCorner != Corner_invalid)
+    {
+      node->taken = 1;
+      if(node->parent)
+	{
+	  node->parent->maxFreeDim[nodeCorner] = V2S32(0, 0);
+	}
+      for(AtlasRegionNode *p = node->parent; p; p = p->parent)
+	{
+	  ++p->allocatedDescendantCount;
+	  
+	  AtlasRegionNode *parent = p->parent;
+	  if(parent)
+	    {
+	      Corner pCorner = (p == parent->children[Corner_00] ? Corner_00 :
+				p == parent->children[Corner_01] ? Corner_01 :
+				p == parent->children[Corner_10] ? Corner_10 :
+				p == parent->children[Corner_11] ? Corner_11 :
+				Corner_invalid);
+	      ASSERT(pCorner != Corner_invalid);
+
+	      parent->maxFreeDim[pCorner].x = MAX(MAX(p->maxFreeDim[Corner_00].x,
+						      p->maxFreeDim[Corner_01].x),
+						  MAX(p->maxFreeDim[Corner_10].x,
+						      p->maxFreeDim[Corner_11].x));
+	      parent->maxFreeDim[pCorner].y = MAX(MAX(p->maxFreeDim[Corner_00].y,
+						      p->maxFreeDim[Corner_01].y),
+						  MAX(p->maxFreeDim[Corner_10].y,
+						      p->maxFreeDim[Corner_11].y));
+	    }
+	}
+    }
+
+  Rect2S32 result = {};
+  result.min = regionMin;
+  result.max = regionMin + regionDim;
+  return(result);
+}
+#endif
+
 #define BITMAP_XLIST\
-  X(editorSkin, "BMP/TREE.bmp", V2(0, 0))					\
-  X(pomegranateKnob, "BMP/POMEGRANATE_BUTTON.bmp", V2(0, -0.03f))		\
-  X(pomegranateKnobLabel, "BMP/POMEGRANATE_BUTTON_WHITEMARKERS.bmp", V2(0, 0)) \
-  X(halfPomegranateKnob, "BMP/HALFPOMEGRANATE_BUTTON.bmp", V2(-0.005f, -0.035f))	\
-  X(halfPomegranateKnobLabel, "BMP/HALFPOMEGRANATE_BUTTON_WHITEMARKERS.bmp", V2(0, 0)) \
-  X(densityKnob, "BMP/DENSITYPOMEGRANATE_BUTTON.bmp", V2(0.01f, -0.022f))	\
-  X(densityKnobShadow, "BMP/DENSITYPOMEGRANATE_BUTTON_SHADOW.bmp", V2(0, 0)) \
-  X(densityKnobLabel, "BMP/DENSITYPOMEGRANATE_BUTTON_WHITEMARKERS.bmp", V2(0, 0)) \
-  X(levelBar, "BMP/LEVELBAR.bmp", V2(0, 0))				\
-  X(levelFader, "BMP/LEVELBAR_SLIDINGLEVER.bmp", V2(0, -0.416f))		\
-  X(grainViewBackground, "BMP/GREENFRAME_RECTANGLE.bmp", V2(0, 0))	\
-  X(grainViewOutline, "BMP/GREENFRAME.bmp", V2(0, 0)) 
+  X(editorSkin, "BMP/TREE.bmp", V2(0, 0))\
+  X(grainViewBackground, "BMP/GREENFRAME_RECTANGLE.bmp", V2(0, 0))\
+  X(grainViewOutline, "BMP/GREENFRAME.bmp", V2(0, 0))\
+  X(levelBar, "BMP/LEVELBAR.bmp", V2(0, 0))\
+  X(levelFader, "BMP/LEVELBAR_SLIDINGLEVER.bmp", V2(0, -0.416f))\
+  X(pomegranateKnob, "BMP/POMEGRANATE_BUTTON.bmp", V2(0, -0.03f))\
+  X(pomegranateKnobLabel, "BMP/POMEGRANATE_BUTTON_WHITEMARKERS.bmp", V2(0, 0))\
+  X(halfPomegranateKnob, "BMP/HALFPOMEGRANATE_BUTTON.bmp", V2(-0.005f, -0.035f))\
+  X(halfPomegranateKnobLabel, "BMP/HALFPOMEGRANATE_BUTTON_WHITEMARKERS.bmp", V2(0, 0))\
+  X(densityKnob, "BMP/DENSITYPOMEGRANATE_BUTTON.bmp", V2(0.01f, -0.022f))\
+  X(densityKnobShadow, "BMP/DENSITYPOMEGRANATE_BUTTON_SHADOW.bmp", V2(0, 0))\
+  X(densityKnobLabel, "BMP/DENSITYPOMEGRANATE_BUTTON_WHITEMARKERS.bmp", V2(0, 0))
   
 int
 main(int argc, char **argv)
@@ -485,9 +624,7 @@ main(int argc, char **argv)
   stringListPush(looseAssets->arena, &pluginAssetXList,
 		 STR8_LIT("#define PLUGIN_ASSET_XLIST\\\n"));
 
-
-  LoadedBitmap *whiteBitmap = makeWhiteBitmap(looseAssets->arena, 16, 16);
-  looseAssetPushBitmap(looseAssets, whiteBitmap, STR8_LIT("null"));
+  LoadedBitmap *whiteBitmap = makeWhiteBitmap(looseAssets->arena, 16, 16);  
   stringListPush(looseAssets->arena, &pluginAssetXList, STR8_LIT("  X(null)\\\n"));
 
 #define X(name, path, alignment)							\
@@ -496,14 +633,128 @@ main(int argc, char **argv)
   BITMAP_XLIST;
 #undef X
 
+  looseAssetPushBitmap(looseAssets, whiteBitmap, STR8_LIT("null"));
+
   RangeU32 cpRange = {32, 127};
   r32 ptSize = 32.f;
   looseAssetPushFont(looseAssets, STR8_LIT(DATA_PATH"FONT/AGENCYB.ttf"),
 		     STR8_LIT("AgencyBold"), cpRange, ptSize);
 
   // NOTE: compute positions in the atlas
-  s32 atlasWidth = 8192;
-  s32 atlasHeight = 4096;
+  // s32 atlasWidth = 8656;//7696;//8704;//7688;
+  // s32 atlasHeight = 4328;
+  s32 atlasWidth = 3842;
+  s32 atlasHeight = 4362;
+#if 0
+  Atlas *atlas = arenaPushStruct(arena, Atlas);
+  atlas->rootDim = V2S32(atlasWidth, atlasHeight);
+  atlas->root = arenaPushStruct(arena, AtlasRegionNode);
+  atlas->root->maxFreeDim[Corner_00] =
+    atlas->root->maxFreeDim[Corner_01] =
+    atlas->root->maxFreeDim[Corner_10] =
+    atlas->root->maxFreeDim[Corner_11] = atlas->rootDim / 2;
+  for(LooseBitmap *bitmap = looseAssets->firstBitmap; bitmap; bitmap = bitmap->next)
+    {
+      v2s32 bitmapDim = V2S32(bitmap->bitmap->width, bitmap->bitmap->height);
+      Rect2S32 region = atlasRegionAlloc(arena, atlas, bitmapDim + V2S32(1, 1));
+      bitmap->atlasOffsetX = region.min.x;
+      bitmap->atlasOffsetY = region.min.y;
+    }
+
+#else
+#  if 1
+
+  struct RegionNode
+  {
+    RegionNode *next;
+    Rect2S32 rect;
+  };
+
+  struct PackAtlas
+  {
+    Arena *arena;
+    RegionNode *first;
+    RegionNode *last;
+
+    RegionNode *firstFree;
+    RegionNode *lastFree;
+    
+    v2s32 dim;
+  };
+
+  Arena *packArena = gsArenaAcquire(MEGABYTES(1));
+  PackAtlas *packAtlas = arenaPushStruct(packArena, PackAtlas);
+  packAtlas->arena = packArena;
+  packAtlas->dim = V2S32(atlasWidth, atlasHeight);
+  
+  RegionNode *atlasRegionNode = arenaPushStruct(packArena, RegionNode);
+  atlasRegionNode->rect.min = V2S32(0, 0);
+  atlasRegionNode->rect.max = packAtlas->dim;
+  QUEUE_PUSH(packAtlas->firstFree, packAtlas->lastFree, atlasRegionNode);
+
+  s32 minDimX = 16;
+  s32 minDimY = 16;
+
+  for(LooseBitmap *bitmap = looseAssets->firstBitmap; bitmap; bitmap = bitmap->next)
+    {
+      v2s32 insertDim = V2S32(bitmap->bitmap->width + 1, bitmap->bitmap->height + 1);
+
+      v2s32 insertPos = V2S32(-1, -1);
+      b32 inserted = 0;
+      while(!inserted)
+	{
+	  RegionNode *freeRegion = packAtlas->firstFree;	  
+	  ASSERT(freeRegion);
+	  QUEUE_POP(packAtlas->firstFree, packAtlas->lastFree);
+	  v2s32 freeRegionDim = getDim(freeRegion->rect);
+
+	  if(freeRegionDim.x >= insertDim.x && freeRegionDim.y >= insertDim.y)
+	    {
+	      RegionNode *newRegion = freeRegion;
+	      newRegion->rect.max = newRegion->rect.min + insertDim;
+	      insertPos = newRegion->rect.min;
+	      QUEUE_PUSH(packAtlas->first, packAtlas->last, newRegion);
+
+	      v2s32 bottomRightDim = V2S32(freeRegionDim.x - insertDim.x, insertDim.y);
+	      if(bottomRightDim.x >= minDimX && bottomRightDim.y >= minDimY)
+		{
+		  RegionNode *bottomRightFree = arenaPushStruct(packAtlas->arena, RegionNode);
+		  bottomRightFree->rect.min = freeRegion->rect.min + V2S32(insertDim.x, 0);
+		  bottomRightFree->rect.max = bottomRightFree->rect.min + bottomRightDim;
+		  QUEUE_PUSH(packAtlas->firstFree, packAtlas->lastFree, bottomRightFree);
+		}
+
+	      v2s32 topLeftDim = V2S32(insertDim.x, freeRegionDim.y - insertDim.y);
+	      if(topLeftDim.x >= insertDim.x && topLeftDim.y >= insertDim.y)
+		{
+		  RegionNode *topLeftFree = arenaPushStruct(packAtlas->arena, RegionNode);
+		  topLeftFree->rect.min = freeRegion->rect.min + V2S32(0, insertDim.y);
+		  topLeftFree->rect.max = topLeftFree->rect.min + topLeftDim;
+		  QUEUE_PUSH(packAtlas->firstFree, packAtlas->lastFree, topLeftFree);
+		}
+
+	      v2s32 topRightDim = freeRegionDim - insertDim;
+	      if(topRightDim.x >= minDimX && topRightDim.y >= minDimY)
+		{
+		  RegionNode *topRightFree = arenaPushStruct(packAtlas->arena, RegionNode);
+		  topRightFree->rect.min = freeRegion->rect.min + insertDim;
+		  topRightFree->rect.max = topRightFree->rect.min + topRightDim;	      	      
+		  QUEUE_PUSH(packAtlas->firstFree, packAtlas->lastFree, topRightFree);
+		}
+	      
+	      inserted = 1;
+	    }
+	  else
+	    {
+	      QUEUE_PUSH(packAtlas->firstFree, packAtlas->lastFree, freeRegion);
+	    }
+	}
+
+      bitmap->atlasOffsetX = insertPos.x;
+      bitmap->atlasOffsetY = insertPos.y;
+    }
+    
+#  else
   s32 layoutX = 0;
   s32 layoutY = 0;
   s32 rowMaxHeight = 0;
@@ -565,13 +816,16 @@ main(int argc, char **argv)
 	    }
 	}
     }
+  //atlasHeight = layoutY + rowMaxHeight + 1;
+#  endif
+#endif
 
   // NOTE: copy into the atlas
-  u32 *atlas = arenaPushArray(arena, atlasWidth * atlasHeight, u32);
+  u32 *atlasPixels = arenaPushArray(arena, atlasWidth * atlasHeight, u32);
   for(LooseBitmap *bitmap = looseAssets->firstBitmap; bitmap; bitmap = bitmap->next)
     {
       u8 *srcRow = (u8*)bitmap->bitmap->pixels;
-      u8 *destRow = (u8*)(atlas + bitmap->atlasOffsetY*atlasWidth + bitmap->atlasOffsetX);
+      u8 *destRow = (u8*)(atlasPixels + bitmap->atlasOffsetY*atlasWidth + bitmap->atlasOffsetX);
       for(u32 j = 0; j < bitmap->bitmap->height; ++j)
 	{
 	  u32 *srcPixels = (u32*)srcRow;
@@ -586,7 +840,7 @@ main(int argc, char **argv)
 	}
     }
 
-  Arena *writeArena = gsArenaAcquire(MEGABYTES(256));
+  Arena *writeArena = gsArenaAcquire(MEGABYTES(512));
 
   // NOTE: generate code for asset names and associated uv rects
   String8List assetEnumList = {};
@@ -674,7 +928,7 @@ main(int argc, char **argv)
   u32 *pixels = arenaPushArray(writeArena, atlasWidth * atlasHeight, u32);
   for(s32 i = 0; i < atlasWidth * atlasHeight; ++i)
     {
-      pixels[i] = atlas[i];
+      pixels[i] = atlasPixels[i];
     }
 
   Buffer file = {};

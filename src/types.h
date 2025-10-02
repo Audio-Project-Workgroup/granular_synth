@@ -85,6 +85,21 @@ union v2
   r32 E[2];
 };
 
+union v2s32
+{
+  struct
+  {
+    s32 x, y;
+  };
+  
+  struct
+  {
+    s32 width, height;
+  };
+
+  s32 E[2];
+};
+
 union v3
 {
   struct
@@ -187,6 +202,31 @@ struct Rect2
 {
   v2 min;
   v2 max;
+};
+
+struct Rect2S32
+{
+  v2s32 min;
+  v2s32 max;
+};
+
+enum Corner
+{  
+  Corner_00,
+  Corner_01,
+  Corner_10,
+  Corner_11,
+  Corner_Count,
+  
+  Corner_invalid,
+};
+
+enum Axis2D
+{
+  Axis2D_x,
+  Axis2D_y,
+  Axis2D_Count,
+  Axis2D_invalid,
 };
 
 struct LoadedSound
