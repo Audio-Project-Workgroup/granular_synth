@@ -151,17 +151,17 @@ getWindowVal(GrainManager* grainManager, r32 samplesPlayedFrac, r32 windowParam)
 
 static void
 synthesize(r32* destBufferLInit, r32* destBufferRInit,
-	   GrainManager* grainManager, PluginState *pluginState,
+	   GrainManager* grainManager, GrainStateView *grainStateView,//PluginState *pluginState,
+	   r32 *densityParamVals, r32 *sizeParamVals, r32 *windowParamVals, r32 *spreadParamVals,
+	   u32 targetOffset,
 	   u32 samplesToWrite)
 {
   logString("\nsynthesize called\n");
   logFormatString("samplesToWrite: %lu", samplesToWrite);
 
   AudioRingBuffer *buffer = grainManager->grainBuffer;
-  GrainStateView *grainStateView = &pluginState->grainStateView;
 
   u32 currentOffset = getAudioRingBufferOffset(buffer);
-  u32 targetOffset = (u32)pluginReadFloatParameter(&pluginState->parameters[PluginParameter_offset]);
   r32 readPositionIncrement = ((r32)currentOffset - (r32)targetOffset)/(r32)samplesToWrite;
   logFormatString("currentOffset: %.2f", currentOffset);
   logFormatString("targetOffset: %.2f", targetOffset);
@@ -179,13 +179,12 @@ synthesize(r32* destBufferLInit, r32* destBufferRInit,
   ZERO_ARRAY(newView->bufferSamples[1], newView->sampleCapacity, r32);
 
   readSamplesFromAudioRingBuffer(buffer, newView->bufferSamples[0], newView->bufferSamples[1], samplesToWrite, false);
-  grainStateView->viewBuffer.readIndex = ((grainStateView->viewBuffer.readIndex + newView->sampleCount) %
-					  grainStateView->viewBuffer.capacity);
+  grainStateView->viewBuffer.readIndex =
+    ((grainStateView->viewBuffer.readIndex + newView->sampleCount) %
+     grainStateView->viewBuffer.capacity);
 
   newView->bufferReadIndex = buffer->readIndex;
   newView->bufferWriteIndex = buffer->writeIndex;
-
-  PluginFloatParameter *densityParam = pluginState->parameters + PluginParameter_density;
 
   for(Grain *grain = grainManager->grainPlayList->next;
       grain && grain != grainManager->grainPlayList;
@@ -208,12 +207,10 @@ synthesize(r32* destBufferLInit, r32* destBufferRInit,
   for (u32 sampleIndex = 0; sampleIndex < samplesToWrite; ++sampleIndex)
     {     
 #if 1
-      // TODO: update these parameters in this loop?
-      u32 grainSize = (u32)pluginReadFloatParameter(&pluginState->parameters[PluginParameter_size]);      
-      r32 windowParam = pluginReadFloatParameter(&pluginState->parameters[PluginParameter_window]);
-      r32 densityRaw = pluginReadFloatParameter(densityParam);
-      r32 density = densityParam->processingTransform(densityRaw);
-      r32 spread = pluginReadFloatParameter(&pluginState->parameters[PluginParameter_spread]);      
+      r32 windowParam = windowParamVals[sampleIndex];
+      u32 grainSize = (u32)sizeParamVals[sampleIndex];
+      r32 density = densityParamVals[sampleIndex];
+      r32 spread = spreadParamVals[sampleIndex];
 
       r32 iot = (r32)grainSize/density;
       r32 volume = MAX(1.f/density, 1.f); // TODO: how to adapt volume to prevent clipping?     

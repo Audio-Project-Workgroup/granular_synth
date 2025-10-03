@@ -60,7 +60,7 @@ pluginOffsetFloatParameter(PluginFloatParameter *param, r32 inc, r32 changeTimeM
   gsAtomicStore(&param->dValue.asInt, dValue.asInt);
 }
 
-inline void
+inline r32
 pluginUpdateFloatParameter(PluginFloatParameter *param)
 {
   // NOTE: should be called once per sample, per parameter
@@ -72,6 +72,8 @@ pluginUpdateFloatParameter(PluginFloatParameter *param)
   targetValue.asInt = gsAtomicLoad(&param->targetValue.asInt);
   currentValue.asInt = gsAtomicLoad(&param->currentValue.asInt);
 
+  r32 resultRaw = currentValue.asFloat;
+
   if(gsAbs(targetValue.asFloat - currentValue.asFloat)/rangeLen > err)
     {
       ParameterValue dValue = {};
@@ -79,6 +81,7 @@ pluginUpdateFloatParameter(PluginFloatParameter *param)
 
       ParameterValue newValue = {};      
       newValue.asFloat = currentValue.asFloat + dValue.asFloat;
+      resultRaw = newValue.asFloat;
       
       if(gsAtomicCompareAndSwap(&param->currentValue.asInt, currentValue.asInt, newValue.asInt) !=
 	 currentValue.asInt)
@@ -86,6 +89,9 @@ pluginUpdateFloatParameter(PluginFloatParameter *param)
 	  logString("WARNING: Atomic CAS failed to modify parameter!");
 	}
     }
+
+  r32 result = param->processingTransform(resultRaw);
+  return(result);
 }
 
 enum PluginParameterType

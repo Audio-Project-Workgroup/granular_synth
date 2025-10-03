@@ -1204,12 +1204,11 @@ gsAudioProcess(PluginMemory *memory, PluginAudioBuffer *audioBuffer)
 	  AudioRingBuffer *gbuff = &pluginState->grainBuffer;
 	  //PlayingSound *loadedSound = &pluginState->loadedSound;
 
+	  r32 *inputMixBuffersArray = arenaPushArray(scratch.arena, 2*framesToRead, r32,
+						     arenaFlagsZeroAlign(4*sizeof(r32)));
 	  r32 *inputMixBuffers[2] = {};
-	  //TemporaryMemory inputMixerMemory = arenaBeginTemporaryMemory(&pluginState->permanentArena, KILOBYTES(32));      
-	  inputMixBuffers[0] = arenaPushArray(scratch.arena, framesToRead, r32,
-					      arenaFlagsZeroAlign(4*sizeof(r32)));
-	  inputMixBuffers[1] = arenaPushArray(scratch.arena, framesToRead, r32,
-					      arenaFlagsZeroAlign(4*sizeof(r32)));
+	  inputMixBuffers[0] = inputMixBuffersArray + (0 * framesToRead);
+	  inputMixBuffers[1] = inputMixBuffersArray + (1 * framesToRead);
 
 	  const void *genericInputFrames[2] = {};
 	  genericInputFrames[0] = audioBuffer->inputBuffer[0];
@@ -1286,15 +1285,48 @@ gsAudioProcess(PluginMemory *memory, PluginAudioBuffer *audioBuffer)
 	  // NOTE: grain playback
 	  GrainManager* gManager = &pluginState->grainManager;
 	  u32 framesToWrite = audioBuffer->framesToWrite;
-            
-	  //TemporaryMemory grainMixerMemory = arenaBeginTemporaryMemory(&pluginState->permanentArena, KILOBYTES(128));
+
+	  // NOTE: parameter updates
+	  r32 *paramValsArray = arenaPushArray(scratch.arena, 8 * framesToWrite, r32,
+					       arenaFlagsZeroNoAlign());
+	  r32 *volumeParamVals	= paramValsArray + (0 * framesToWrite);
+	  r32 *densityParamVals = paramValsArray + (1 * framesToWrite);
+	  r32 *panParamVals	= paramValsArray + (2 * framesToWrite);
+	  r32 *sizeParamVals	= paramValsArray + (3 * framesToWrite);
+	  r32 *windowParamVals	= paramValsArray + (4 * framesToWrite);
+	  r32 *spreadParamVals	= paramValsArray + (5 * framesToWrite);
+	  r32 *mixParamVals	= paramValsArray + (6 * framesToWrite);
+	  r32 *offsetParamVals  = paramValsArray + (7 * framesToWrite);
+	  for(u32 frameIdx = 0; frameIdx < framesToWrite; ++frameIdx)
+	    {
+	      volumeParamVals[frameIdx] =
+		pluginUpdateFloatParameter(pluginState->parameters + PluginParameter_volume);
+	      densityParamVals[frameIdx] =
+		pluginUpdateFloatParameter(pluginState->parameters + PluginParameter_density);
+	      panParamVals[frameIdx] =
+		pluginUpdateFloatParameter(pluginState->parameters + PluginParameter_pan);
+	      sizeParamVals[frameIdx] =
+		pluginUpdateFloatParameter(pluginState->parameters + PluginParameter_size);
+	      windowParamVals[frameIdx] =
+		pluginUpdateFloatParameter(pluginState->parameters + PluginParameter_window);
+	      spreadParamVals[frameIdx] =
+		pluginUpdateFloatParameter(pluginState->parameters + PluginParameter_spread);
+	      mixParamVals[frameIdx] =
+		pluginUpdateFloatParameter(pluginState->parameters + PluginParameter_mix);
+	      offsetParamVals[frameIdx] =
+		pluginUpdateFloatParameter(pluginState->parameters + PluginParameter_offset);
+	    }     
+
+	  u32 targetOffset = (u32)offsetParamVals[0];
+	  r32 *grainMixBuffersArray = arenaPushArray(scratch.arena, 2 * framesToWrite, r32,
+						     arenaFlagsZeroNoAlign());
 	  r32 *grainMixBuffers[2] = {};
-	  grainMixBuffers[0] = arenaPushArray(scratch.arena, framesToWrite, r32,
-					      arenaFlagsZeroNoAlign());
-	  grainMixBuffers[1] = arenaPushArray(scratch.arena, framesToWrite, r32,
-					      arenaFlagsZeroNoAlign());
+	  grainMixBuffers[0] = grainMixBuffersArray + (0 * framesToWrite);
+	  grainMixBuffers[1] = grainMixBuffersArray + (1 * framesToWrite);
 	  synthesize(grainMixBuffers[0], grainMixBuffers[1],
-		     gManager, pluginState,
+		     gManager, &pluginState->grainStateView,
+		     densityParamVals, sizeParamVals, windowParamVals, spreadParamVals,
+		     targetOffset,
 		     framesToWrite);
 
 	  // NOTE: audio output
@@ -1320,12 +1352,9 @@ gsAudioProcess(PluginMemory *memory, PluginAudioBuffer *audioBuffer)
 	      atMidiBuffer = midi::parseMidiMessage(atMidiBuffer, pluginState,
 						    audioBuffer->midiMessageCount, frameIndex);
 
-	      PluginFloatParameter *volumeParameter = pluginState->parameters + PluginParameter_volume;
-	      r32 volumeRaw = pluginReadFloatParameter(volumeParameter);
-	      r32 volume =  formatVolumeFactor*volumeParameter->processingTransform(volumeRaw);
-
-	      r32 mixParam = pluginReadFloatParameter(&pluginState->parameters[PluginParameter_mix]);
-
+	      r32 volume = formatVolumeFactor * volumeParamVals[frameIndex];
+	      r32 mixParam = mixParamVals[frameIndex];
+	      r32 panner = panParamVals[frameIndex];
 	      for(u32 channelIndex = 0; channelIndex < audioBuffer->outputChannels; ++channelIndex)
 		{
 		  r32 mixedVal = 0.f;
@@ -1344,8 +1373,7 @@ gsAudioProcess(PluginMemory *memory, PluginAudioBuffer *audioBuffer)
 		  r32 grainVal = grainMixBuffers[channelIndex][frameIndex];
 		  r32 leftGrainVal = grainMixBuffers[0][frameIndex];
 		  r32 rightGrainVal = grainMixBuffers[1][frameIndex];
-		  r32 stereoWidth = pluginReadFloatParameter(&pluginState->parameters[PluginParameter_spread]);
-		  r32 panner = pluginReadFloatParameter(&pluginState->parameters[PluginParameter_pan]);
+		  r32 stereoWidth = spreadParamVals[frameIndex];
 		  if (channelIndex < 2) { // Make sure we only process left and right channels
 		    //r32 widthVal = stereoWidth * 0.5f;
 		    r32 tmp = 1.0f / MAX(1.0f + stereoWidth, 2.0f);
@@ -1388,19 +1416,8 @@ gsAudioProcess(PluginMemory *memory, PluginAudioBuffer *audioBuffer)
 		    default: ASSERT(!"ERROR: invalid audio output format");
 		    }
 		}
-
-	      pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_volume]);
-	      pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_density]);
-	      pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_window]);
-	      pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_size]);
-	      pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_spread]);
-	      pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_mix]);
-	      pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_pan]);
-	      pluginUpdateFloatParameter(&pluginState->parameters[PluginParameter_offset]);
 	    }
 
-	  //arenaEndTemporaryMemory(&inputMixerMemory);
-	  //arenaEndTemporaryMemory(&grainMixerMemory);
 	  arenaReleaseScratch(scratch);
 	}
     }
