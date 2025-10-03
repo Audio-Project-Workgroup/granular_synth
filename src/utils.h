@@ -97,26 +97,16 @@
     (dead)->next->prev = (dead)->prev;			\
   } while(0)
 
-#define ZERO_SIZE(ptr, size) do {		\
-    u8 *p = (u8 *)(ptr);				\
-    for(u32 i = 0; i < (size); ++i) *p++ = 0;		\
-  } while(0)
+#if defined(HOST_LAYER)
+extern void gsSetMemory(void *dest, int value, usz size);
+extern void gsCopyMemory(void *dest, void *src, usz size);
+#endif
 
-/* #define ZERO_STRUCT(s) do {					\ */
-/*     usz size = sizeof(s);					\ */
-/*     u8 *data = (u8 *)&(s);					\ */
-/*     for(u32 byte = 0; byte < (size); ++byte) data[byte] = 0;	\ */
-/*   } while(0) */
+#define ZERO_SIZE(ptr, size) gsSetMemory(ptr, 0, size);
 #define ZERO_STRUCT(s) ZERO_SIZE((s), sizeof(*s))
-
 #define ZERO_ARRAY(ptr, count, type) ZERO_SIZE((ptr), (count)*sizeof(type))
 
-#define COPY_SIZE(dest, src, size) do {			\
-    u8 *destP = (u8 *)(dest);				\
-    u8 *srcP = (u8 *)(src);				\
-    for(u32 i = 0; i < (size); ++i) *destP++ = *srcP++;	\
-  } while(0)
-
+#define COPY_SIZE(dest, src, size) gsCopyMemory(dest, src, size)
 #define COPY_ARRAY(dest, src, count, type) COPY_SIZE(dest, src, (count)*sizeof(type))
 
 inline u32

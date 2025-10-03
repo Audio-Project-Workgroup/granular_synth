@@ -13,6 +13,8 @@
   X(Pow, r32, (r32 base, r32 exp))\
   X(AllocateMemory, void*, (usz size))\
   X(FreeMemory, void, (void *memory, usz size))\
+  X(CopyMemory, void, (void *dest, void *src, usz size))\
+  X(SetMemory, void, (void *dest, int value, usz size))\
   X(ArenaAcquire, Arena*, (usz size))\
   X(ArenaDiscard, void, (Arena *arena))\
   X(AtomicLoad, u32, (volatile u32 *src))\

@@ -555,6 +555,18 @@ loadPNG(String8 path, b32 flip = 1)
   return(result);
 }
 
+static void
+gsCopyMemory(void *dest, void *src, usz size)
+{
+  memcpy(dest, src, size);
+}
+
+static void
+gsSetMemory(void *dest, int value, usz size)
+{
+  memset(dest, value, size);
+}
+
 struct HostMemoryState
 {
   usz arenaHeaderPoolSize;
@@ -693,6 +705,8 @@ main(int argc, char **argv)
 
 	  pluginMemory.platformAPI.gsAllocateMemory = platformAllocateMemory;
 	  pluginMemory.platformAPI.gsFreeMemory     = platformFreeMemory;
+	  pluginMemory.platformAPI.gsCopyMemory	    = gsCopyMemory;
+	  pluginMemory.platformAPI.gsSetMemory	    = gsSetMemory;
 	  pluginMemory.platformAPI.gsArenaAcquire   = gsArenaAcquire;
 	  pluginMemory.platformAPI.gsArenaDiscard   = gsArenaDiscard;
 

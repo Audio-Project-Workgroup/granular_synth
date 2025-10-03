@@ -10,6 +10,7 @@
 
 // PLATFORM IMPLEMENATIONS
 #include <math.h>
+#include <string.h>
 
 static r32
 gsSqrt(r32 num)
@@ -27,6 +28,18 @@ static r32
 gsSin(r32 num)
 {
   return(sinf(num));
+}
+
+static void
+gsCopyMemory(void *dest, void *src, usz size)
+{
+  memcpy(dest, src, size);
+}
+
+static void
+gsSetMemory(void *dest, int value, usz size)
+{
+  memset(dest, value, size);
 }
 
 #define ARENA_MIN_ALLOCATION_SIZE KILOBYTES(64)

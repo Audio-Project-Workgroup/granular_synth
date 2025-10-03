@@ -44,6 +44,18 @@ gsGetPathToModule(void *handleToModule, void *functionInModule, Arena *allocator
   return(result);
 }
 
+void
+gsCopyMemory(void *dest, void *src, usz size)
+{
+  __builtin_memcpy(dest, src, size);
+}
+
+void
+gsSetMemory(void *dest, int value, usz size)
+{
+  __builtin_memset(dest, value, size);
+}
+
 extern u8 __heap_base;
 extern u8 __heap_end;
 static usz __mem_used = 0;
