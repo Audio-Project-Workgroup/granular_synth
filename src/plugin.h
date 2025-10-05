@@ -94,10 +94,11 @@ struct PluginState
   PluginFloatParameter parameters[PluginParameter_count];
 
   u64 osTimerFreq;
-  Arena *grainArena;
+  //Arena *grainArena;
   Arena *permanentArena;
+  Arena *audioArena;
   Arena *frameArena;
-  Arena *framePermanentArena;
+  //Arena *framePermanentArena;
 
   PluginHost pluginHost;
   PluginMode pluginMode;

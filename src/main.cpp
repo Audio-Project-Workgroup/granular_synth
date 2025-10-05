@@ -584,6 +584,7 @@ struct HostMemoryState
 static HostMemoryState *hostMemoryState = 0;
 
 #define ARENA_MIN_ALLOCATION_SIZE KILOBYTES(64)
+//#define ARENA_MIN_ALLOCATION_SIZE MEGABYTES(1)
 
 static Arena*
 gsArenaAcquire(usz size)

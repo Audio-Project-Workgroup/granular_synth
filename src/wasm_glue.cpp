@@ -20,18 +20,7 @@ proc_import(platformSin,  r32, (r32 val));
 proc_import(platformCos,  r32, (r32 val));
 proc_import(platformPow,  r32, (r32 base, r32 exp));
 
-static void
-platformLogf(const char *fmt, ...)
-{
-  char buf[1024];
-
-  va_list vaArgs;
-  va_start(vaArgs, fmt);
-  gs_vsnprintf(buf, ARRAY_COUNT(buf), fmt, vaArgs);
-  va_end(vaArgs);
-
-  platformLog(buf);
-}
+static void platformLogf(char *fmt, ...);
 
 // NOTE: this should NEVER get called
 String8
@@ -54,37 +43,6 @@ void
 gsSetMemory(void *dest, int value, usz size)
 {
   __builtin_memset(dest, value, size);
-}
-
-extern u8 __heap_base;
-extern u8 __heap_end;
-static usz __mem_used = 0;
-static usz __mem_capacity = 0;
-#define ARENA_MIN_ALLOCATION_SIZE KILOBYTES(64)
-
-Arena*
-gsArenaAcquire(usz size)
-{
-  usz allocSize = MAX(size, ARENA_MIN_ALLOCATION_SIZE);
-  //ASSERT(__mem_used + allocSize <= __mem_capacity);
-
-  void *base = (void*)(&__heap_base + __mem_used);
-  __mem_used += allocSize;
-  Arena *result = (Arena*)base;
-  result->current = result;
-  result->prev = 0;
-  result->base = 0;
-  result->capacity = allocSize;
-  result->pos = ARENA_HEADER_SIZE;
-  return(result);
-}
-
-// TODO: implement
-void
-gsArenaDiscard(Arena *arena)
-{  
-  platformLogf("Discarding arena with capacity of %u bytes\n", arena->capacity);
-  return;
 }
 
 u32
@@ -198,10 +156,120 @@ gsPow(r32 base, r32 exp)
   return(platformPow(base, exp));
 }
 
+// BEHOLD: the most C++ code in the codebase
+#define SCOPE_HAS_LOCK(lock) ScopedLock<&lock> scopedLock__##__FUNCTION__##__LINE__;
+template<volatile u32 *lock>
+struct ScopedLock
+{
+  ScopedLock()
+  {
+    while(gsAtomicCompareAndSwap(lock, 0, 1)) {}
+  }
+  
+  ~ScopedLock()
+  {
+    while(gsAtomicCompareAndSwap(lock, 1, 0)) {}
+  }
+};
+
+// struct MemoryBlock
+// {
+//   MemoryBlock *next;
+//   MemoryBlock *prev;
+//   RangeU32 range;
+// };
+
+struct ThreadState
+{
+  b32 initialized;
+  char nameStorage[8];
+  String8 name;
+};
+thread_var ThreadState threadState;
+
+extern u8 __heap_base;
+extern u8 __heap_end;
+static volatile u32 memoryLock;
+static usz __mem_used = 0;
+static usz __mem_capacity = 0;
+//static Arena *arenaFreelist = 0;
+static Arena *firstFreeArena;
+static Arena *lastFreeArena;
+
+#define ARENA_MIN_ALLOCATION_SIZE KILOBYTES(64)
+
+Arena*
+gsArenaAcquire(usz size)
+{
+  usz allocSize = MAX(size, ARENA_MIN_ALLOCATION_SIZE);
+  //ASSERT(__mem_used + allocSize <= __mem_capacity);
+
+#if 0
+  Arena *result = 0;
+  {
+    SCOPE_HAS_LOCK(memoryLock);
+    if(firstFreeArena)
+      {
+	// NOTE: pop off of freelist
+	// TODO: use some kind of tree/heap to accelerate search
+	Arena *toRemove = 0;
+	for(Arena *free = lastFreeArena; free; free = free->prev)
+	  {
+	    usz freeBase = INT_FROM_PTR(free);
+	    usz freeSize = free->capacity - freeBase;
+	    if(allocSize <= freeSize)
+	      {
+		result = free;
+		allocSize = freeSize;
+		toRemove = free;
+		break;
+	      }
+	  }
+	if(toRemove)
+	  {
+	    ASSERT(result != 0);
+	    DLL_REMOVE__NP(firstFreeArena, lastFreeArena, toRemove, current, prev);
+	  }
+      }
+    if(result == 0)
+      {
+	void *base = (void*)(&__heap_base + __mem_used);
+	__mem_used += allocSize;
+	result = (Arena*)base;
+      }
+  }
+#else
+  void *base = (void*)(&__heap_base + __mem_used);
+  __mem_used += allocSize;
+  Arena *result = (Arena*)base;
+#endif
+  if(result)
+    {
+      result->current = result;
+      result->prev = 0;
+      result->base = 0;
+      result->capacity = allocSize;
+      result->pos = ARENA_HEADER_SIZE; 
+    }
+  return(result);
+}
+
+// TODO: implement
+void
+gsArenaDiscard(Arena *arena)
+{
+  //platformLogf("Discarding arena with capacity of %u bytes\n", arena->capacity);
+  // NOTE: push onto freelist
+  // TODO: merge contiguous blocks
+  //DLL_PUSH_BACK__NP(firstFreeArena, lastFreeArena, arena, current, prev);
+  return;
+}
+
 #include "plugin.cpp"
 
 // internal state/functions
 
+static volatile u32 inputLock;
 struct WasmState
 {
   Arena *arena;
@@ -217,12 +285,13 @@ struct WasmState
   PluginMemory pluginMemory;
 
   PluginInput input[2];
-  u32 currentInputIdx;
-  volatile u32 inputLock;
+  u32 currentInputIdx;  
 
 #if BUILD_DEBUG
-  PluginLogger logger;
+  PluginLogger logger;  
 #endif
+  // Arena *platformLogArena;
+  // String8List platformLogStringList;
 
   // DEBUG:
   u32 quadsToDraw;
@@ -243,42 +312,21 @@ wasmInit(usz memorySize)
   // arena->capacity = memorySize;
   // arena->used = sizeof(Arena);
   __mem_capacity = INT_FROM_PTR(&__heap_end) - INT_FROM_PTR(&__heap_base);
-  platformLogf("WASM memory capacity: %u\n", __mem_capacity);
+   platformLogf("WASM memory capacity: %u\n", __mem_capacity);
   UNUSED(memorySize);
   Arena *arena = gsArenaAcquire(0);
+  //Arena *logArena = gsArenaAcquire(0);
   
   WasmState *result = 0;
-  if(arena) {
+  if(arena != 0) {
     platformLogf("arena: %u\n  base=%u\n  capacity=%u\n  used=%u\n",
 		 arena, arena->base, arena->capacity, arena->pos);
     result = arenaPushStruct(arena, WasmState, arenaFlagsZeroAlign(sizeof(void*)));
     if(result) {
       result->arena = arena;
-
+      
       result->pluginMemory.host = PluginHost_web;
-      // result->pluginMemory.platformAPI.gsReadEntireFile		      = 0;
-      // result->pluginMemory.platformAPI.gsFreeFileMemory		      = 0;
-      // result->pluginMemory.platformAPI.gsWriteEntireFile	      = 0;
-      // result->pluginMemory.platformAPI.gsGetPathToModule	      = 0;
-      // result->pluginMemory.platformAPI.gsGetCurrentTimestamp	      = 0;
-      // result->pluginMemory.platformAPI.gsRunModel		      = 0;
-      // result->pluginMemory.platformAPI.gsRand			      = gsRand;
-      // result->pluginMemory.platformAPI.gsAbs			      = gsAbs;
-      // result->pluginMemory.platformAPI.gsSqrt			      = gsSqrt;
-      // result->pluginMemory.platformAPI.gsSin			      = gsCos;
-      // result->pluginMemory.platformAPI.gsCos			      = gsCos;
-      // result->pluginMemory.platformAPI.gsPow			      = gsPow;
-      // result->pluginMemory.platformAPI.gsAllocateMemory		      = 0;
-      // result->pluginMemory.platformAPI.gsFreeMemory		      = 0;
-      // result->pluginMemory.platformAPI.gsArenaAcquire		      = gsArenaAcquire;
-      // result->pluginMemory.platformAPI.gsArenaDiscard		      = gsArenaDiscard;
-      // result->pluginMemory.platformAPI.gsAtomicLoad		      = gsAtomicLoad;
-      // result->pluginMemory.platformAPI.gsAtomicLoadPointer	      = gsAtomicLoadPointer;
-      // result->pluginMemory.platformAPI.gsAtomicStore		      = gsAtomicStore;
-      // result->pluginMemory.platformAPI.gsAtomicAdd		      = gsAtomicAdd;
-      // result->pluginMemory.platformAPI.gsAtomicCompareAndSwap	      = gsAtomicCompareAndSwap;
-      // result->pluginMemory.platformAPI.gsAtomicCompareAndSwapPointers = gsAtomicCompareAndSwapPointers;
-
+      
 #if BUILD_DEBUG
       {
 	Arena *logArena = gsArenaAcquire(0);
@@ -287,6 +335,7 @@ wasmInit(usz memorySize)
 	result->pluginMemory.logger = &result->logger;
       }
 #endif
+      //result->platformLogArena = logArena;      
 
       result->renderCommands.quadCapacity = 2048;      
       result->renderCommands.quads = arenaPushArray(arena, result->renderCommands.quadCapacity, R_Quad);
@@ -304,7 +353,8 @@ wasmInit(usz memorySize)
 	arenaPushArray(arena, result->audioBuffer.outputBufferCapacity, r32);
       result->audioBuffer.outputBuffer[1] =
 	arenaPushArray(arena, result->audioBuffer.outputBufferCapacity, r32);
-      platformLogf("arena used post output samples push: %u\n", arenaGetPos(arena));            
+      platformLogf("arena used post output samples push: %u\n", arenaGetPos(arena));
+      //platformFlushLog();
 
       result->quadsToDraw = 3;
 
@@ -320,6 +370,36 @@ wasmInit(usz memorySize)
   
   return(result);
 }
+
+static void
+platformLogf(char *fmt, ...)
+{
+  char buf[1024];
+
+  va_list vaArgs;
+  va_start(vaArgs, fmt);
+  gs_vsnprintf(buf, ARRAY_COUNT(buf), fmt, vaArgs);
+  va_end(vaArgs);
+
+  platformLog(buf);
+  // va_list vaArgs;
+  // va_start(vaArgs, fmt);
+  // stringListPushFormatV(wasmState->platformLogArena, &wasmState->platformLogStringList, fmt, vaArgs);
+  // va_end(vaArgs);
+}
+#if 0
+static void
+platformFlushLog(void)
+{
+  for(String8Node *node = wasmState->platformLogStringList.first; node; node = node->next)
+    {
+      platformLog((const char*)node->string.str);
+      platformLog("\n");
+    }
+  wasmState->platformLogStringList.first = wasmState->platformLogStringList.last = 0;
+  arenaEnd(wasmState->platformLogArena);  
+}
+#endif
 
 proc_export R_Quad*
 getQuadsOffset(void)
@@ -354,24 +434,10 @@ getStringBufferOffset(void)
   return(result);
 }
 
-#define SCOPE_HAS_INPUT_LOCK() ScopedInputLock scopedInputLock__##__FUNCTION__;
-struct ScopedInputLock
-{
-  ScopedInputLock()
-  {
-    while(gsAtomicCompareAndSwap(&wasmState->inputLock, 0, 1)) {}
-  }
-  
-  ~ScopedInputLock()
-  {
-    while(gsAtomicCompareAndSwap(&wasmState->inputLock, 1, 0)) {}
-  }
-};
-
 proc_export void
 setMousePosition(r32 x, r32 y)
 {
-  SCOPE_HAS_INPUT_LOCK();
+  SCOPE_HAS_LOCK(inputLock);
   PluginInput *input = wasmState->input + wasmState->currentInputIdx;
   input->mouseState.position = V2(x, y);
 }
@@ -386,7 +452,7 @@ processButtonPress(ButtonState *button, b32 pressed)
 proc_export void
 processMouseButtonPress(u32 buttonIdx, b32 pressed)
 {
-  SCOPE_HAS_INPUT_LOCK();
+  SCOPE_HAS_LOCK(inputLock);
   PluginInput *input = wasmState->input + wasmState->currentInputIdx;
   ButtonState *button = input->mouseState.buttons + buttonIdx;
   processButtonPress(button, pressed);
@@ -395,7 +461,7 @@ processMouseButtonPress(u32 buttonIdx, b32 pressed)
 proc_export void
 processKeyboardButtonPress(u32 keyIdx, b32 pressed)
 {
-  SCOPE_HAS_INPUT_LOCK();
+  SCOPE_HAS_LOCK(inputLock);
   PluginInput *input = wasmState->input + wasmState->currentInputIdx;
   ButtonState *button = input->keyboardState.keys + keyIdx;
   processButtonPress(button, pressed);
@@ -419,13 +485,22 @@ logQuad(R_Quad* quad)
 proc_export u32
 drawQuads(s32 width, s32 height, r32 timestamp)
 {
+  if(!threadState.initialized)
+    {
+      u8 temp[] = "render";
+      COPY_ARRAY(threadState.nameStorage, temp, ARRAY_COUNT(temp), u8);
+      threadState.name = STR8_CSTR(threadState.nameStorage);
+      threadState.initialized = 1;
+    }
+  platformLogf("memory used = %u\n", __mem_used);
+
   PluginMemory *pluginMemory = &wasmState->pluginMemory;
   PluginInput *input = wasmState->input + wasmState->currentInputIdx;  
   RenderCommands *renderCommands = &wasmState->renderCommands;
 
   renderBeginCommands(renderCommands, width, height);
   {
-    SCOPE_HAS_INPUT_LOCK();
+    SCOPE_HAS_LOCK(inputLock);
     gsRenderNewFrame(pluginMemory, input, renderCommands);  
 
 #if BUILD_DEBUG
@@ -461,7 +536,8 @@ drawQuads(s32 width, s32 height, r32 timestamp)
   
   u32 result = renderCommands->quadCount;
 
-  renderEndCommands(renderCommands);   
+  renderEndCommands(renderCommands);
+  //platformFlushLog();
 
   return(result);
 }
@@ -469,6 +545,14 @@ drawQuads(s32 width, s32 height, r32 timestamp)
 proc_export void
 audioProcess(int sampleRate, int inputChannelCount, int inputSampleCount, int outputChannelCount, int outputSampleCount)
 {
+  if(!threadState.initialized)
+    {
+      u8 temp[] = "audio";
+      COPY_ARRAY(threadState.nameStorage, temp, ARRAY_COUNT(temp), u8);
+      threadState.name = STR8_CSTR(threadState.nameStorage);
+      threadState.initialized = 1;
+    }
+
   PluginMemory *pluginMemory = &wasmState->pluginMemory;
   PluginAudioBuffer *audioBuffer = &wasmState->audioBuffer;
 

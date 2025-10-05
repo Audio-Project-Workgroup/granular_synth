@@ -15,6 +15,7 @@ set CFLAGS=%CFLAGS% -I..\src\include\glad\include
 set CFLAGS=%CFLAGS% -MT -EHa- -GR-
 rem set CFLAGS=-DBUILD_DEBUG=0 -I..\src\include -nologo -Zi -W4 -wd"4201" -wd"4100" -wd"4146" -wd"4310" -wd"4244" -wd"4505" -MT -EHa- -GR-
 set CFLAGS=%CFLAGS% -DBUILD_DEBUG=%BUILD_DEBUG%
+rem set CFLAGS=%CFLAGS% -DBUILD_DEBUG=0
 
 set LFLAGS=-incremental:no -opt:ref
 

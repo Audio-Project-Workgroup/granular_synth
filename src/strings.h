@@ -135,26 +135,25 @@ stringListPushFront(Arena *arena, String8List *list, String8 str)
 }
 
 inline void
+stringListPushFormatV(Arena *arena, String8List *list, char *fmt, va_list vaArgs)
+{
+  char buffer[1024] = {};
+  int len = gs_vsnprintf(buffer, ARRAY_COUNT(buffer), fmt, vaArgs);
+  String8 string = makeString8((u8 *)buffer, len); 
+  stringListPush(arena, list, string);
+}
+
+inline void
 stringListPushFormat(Arena *arena, String8List *list, char *fmt, ...)
 {
   va_list varArgs;
   va_start(varArgs, fmt);
 
-  char buffer[256] = {};
-  int len = gs_vsnprintf(buffer, ARRAY_COUNT(buffer), fmt, varArgs);
-
-  String8 string = makeString8((u8 *)buffer, len);
-  stringListPush(arena, list, string);
-}
-
-inline void
-stringListPushFormatV(Arena *arena, String8List *list, char *fmt, va_list vaArgs)
-{
-  char buffer[256] = {};
-  int len = gs_vsnprintf(buffer, ARRAY_COUNT(buffer), fmt, vaArgs);
-
-  String8 string = makeString8((u8 *)buffer, len);
-  stringListPush(arena, list, string);
+  /* char buffer[256] = {}; */
+  /* int len = gs_vsnprintf(buffer, ARRAY_COUNT(buffer), fmt, varArgs); */
+  /* String8 string = makeString8((u8 *)buffer, len); */
+  stringListPushFormatV(arena, list, fmt, varArgs);
+  va_end(varArgs);
 }
 
 inline String8

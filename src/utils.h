@@ -77,8 +77,11 @@
 #define QUEUE_PUSH_FRONT(f, l, n) do {(f) ? ((n)->next=(f),(f)=(n)) : ((f)=(l)=(n),(n)->next=0);} while(0)
 #define QUEUE_POP(f, l) do {(((f)==(l)) ? ((f)=0, (l)=0) : ((f)=(f)->next));} while(0)
 
-#define DLL_PUSH_BACK(f, l, n) do {((f)==0) ? ((f)=(l)=(n), (n)->next=(n)->prev=0):((n)->prev=(l), (l)->next=(n), (l)=(n), (n)->next=0);} while(0)
-#define DLL_REMOVE(f, l, d) do {((f)==(d) ? ((f)==(l) ? ((f)=(l)=(0)) : ((f)=(f)->next, (f)->prev=0)) : (l)==(d) ? ((l)=(l)->prev, (l)->next=0) : ((d)->next->prev=(d)->prev, (d)->prev->next=(d)->next));} while(0)
+#define DLL_PUSH_BACK__NP(f, l, n, next, prev) do {((f)==0) ? ((f)=(l)=(n), (n)->next=(n)->prev=0):((n)->prev=(l), (l)->next=(n), (l)=(n), (n)->next=0);} while(0)
+#define DLL_PUSH_BACK(f, l, n) DLL_PUSH_BACK__NP(f, l, n, next, prev)
+
+#define DLL_REMOVE__NP(f, l, d, next, prev) do {((f)==(d) ? ((f)==(l) ? ((f)=(l)=(0)) : ((f)=(f)->next, (f)->prev=0)) : (l)==(d) ? ((l)=(l)->prev, (l)->next=0) : ((d)->next->prev=(d)->prev, (d)->prev->next=(d)->next));} while(0)
+#define DLL_REMOVE(f, l, d) DLL_REMOVE__NP(f, l, d, next, prev)
 
 #define LINKED_LIST_APPEND(head, new) do {	\
     new->next = head;				\

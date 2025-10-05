@@ -117,9 +117,9 @@ gsInitializePluginState(PluginMemory *memoryBlock)
       pluginState->pluginMode = PluginMode_editor;
 
       // TODO: maybe these initial sizes can be tuned for fewer allocation calls
-      pluginState->frameArena = gsArenaAcquire(0);
-      pluginState->framePermanentArena = gsArenaAcquire(0);
-      pluginState->grainArena = gsArenaAcquire(0);
+      pluginState->frameArena = gsArenaAcquire(MEGABYTES(1));
+      //pluginState->framePermanentArena = gsArenaAcquire(0);
+      pluginState->audioArena = gsArenaAcquire(MEGABYTES(1));
 
       if(pluginState->pluginHost == PluginHost_executable ||
 	 pluginState->pluginHost == PluginHost_daw)
@@ -278,7 +278,7 @@ gsInitializePluginState(PluginMemory *memoryBlock)
       pluginState->uiContext =
 	// uiInitializeContext(pluginState->frameArena, pluginState->framePermanentArena,
 	// 		    &pluginState->agencyBold);
-	uiInitializeContext(pluginState->frameArena, pluginState->framePermanentArena,
+	uiInitializeContext(pluginState->frameArena, pluginState->permanentArena,
 			    pluginState->agencyBold);
 
       // TODO: our editor interface doesn't use resizable panels,

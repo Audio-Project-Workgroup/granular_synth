@@ -71,7 +71,7 @@ initializeGrainManager(PluginState *pluginState)
 					  arenaFlagsNoZeroAlign(4*sizeof(r32)));
   initializeWindows(&result);
   
-  result.grainAllocator = pluginState->grainArena;
+  result.grainAllocator = pluginState->audioArena;
   result.grainPlayList = arenaPushStruct(result.grainAllocator, Grain);
   result.grainPlayList->next = result.grainPlayList;
   result.grainPlayList->prev = result.grainPlayList;
