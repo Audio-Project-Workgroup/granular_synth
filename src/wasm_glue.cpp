@@ -163,12 +163,12 @@ struct ScopedLock
 {
   ScopedLock()
   {
-    while(gsAtomicCompareAndSwap(lock, 0, 1)) {}
+    while(gsAtomicCompareAndSwap(lock, 0, 1) != 0) {}
   }
   
   ~ScopedLock()
   {
-    while(gsAtomicCompareAndSwap(lock, 1, 0)) {}
+    while(gsAtomicCompareAndSwap(lock, 1, 0) != 1) {}
   }
 };
 
@@ -190,7 +190,7 @@ thread_var ThreadState threadState;
 extern u8 __heap_base;
 extern u8 __heap_end;
 static volatile u32 memoryLock;
-static usz __mem_used = 0;
+static volatile usz __mem_used = 0;
 static usz __mem_capacity = 0;
 //static Arena *arenaFreelist = 0;
 static Arena *firstFreeArena;
@@ -239,8 +239,10 @@ gsArenaAcquire(usz size)
       }
   }
 #else
-  void *base = (void*)(&__heap_base + __mem_used);
-  __mem_used += allocSize;
+  usz mem_pos = gsAtomicAdd((volatile u32*)&__mem_used, allocSize);
+  void *base = (void*)(&__heap_base + mem_pos);
+  // void *base = (void*)(&__heap_base + __mem_used);
+  // __mem_used += allocSize;
   Arena *result = (Arena*)base;
 #endif
   if(result)

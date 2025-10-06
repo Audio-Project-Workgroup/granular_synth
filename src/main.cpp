@@ -1004,18 +1004,23 @@ main(int argc, char **argv)
 				      GL_CATCH_ERROR();
 				      renderEndCommands(commands);
 #if BUILD_DEBUG
-				      for(String8Node *node = pluginMemory.logger->log.first; node; node = node->next)
+				      while(atomicCompareAndSwap(&pluginMemory.logger->mutex, 0, 1) != 0) {}
+				      for(String8Node *node = pluginMemory.logger->log.first;
+					  node;
+					  node = node->next)
 					{
 					  String8 string = node->string;
 					  if(string.str)
 					    {  
-					      fwrite(string.str, sizeof(*string.str), string.size, stdout);
+					      fwrite(string.str, sizeof(*string.str), string.size,
+						     stdout);
 					      fprintf(stdout, "\n");
 					    }
 					}
 				     
 				      ZERO_STRUCT(&pluginMemory.logger->log);
 				      arenaEnd(pluginMemory.logger->logArena);
+				      while(atomicCompareAndSwap(&pluginMemory.logger->mutex, 1, 0) != 1) {}
 #endif
 
 				      if(commands->outputAudioDeviceChanged ||

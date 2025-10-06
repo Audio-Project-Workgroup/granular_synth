@@ -3,9 +3,6 @@ import { makeImportObject } from './wasm_imports.js';
 class GranadeProcessor extends AudioWorkletProcessor {
     constructor(options) {
 	super(options);
-	//this.phase = 0;
-	//this.freq = 440.0;
-	//this.volume = 0.1;
 	this.sharedMemory = options.processorOptions.sharedMemory;
 	this.wasmModule = options.processorOptions.wasmModule;
 	this.importObject = makeImportObject(this.sharedMemory);
@@ -18,12 +15,9 @@ class GranadeProcessor extends AudioWorkletProcessor {
     }
 
     process(inputs, outputs, parameters) {
+
 	const input = inputs[0];
 	const output = outputs[0];
-
-	// const tau = 2.0 * Math.PI;
-	// const phaseInc = tau * this.freq * samplePeriod;
-	// const samplePeriod = 1.0 / sampleRate;
 
 	const inputChannelCount = input.length;
 	// console.log(input);
@@ -47,8 +41,7 @@ class GranadeProcessor extends AudioWorkletProcessor {
 
 	// NOTE: read output samples from WASM
 	for(let channelIdx = 0; channelIdx < outputChannelCount; ++channelIdx) {
-	    //const samplesOffset = this.wasmInstance.exports.outputSamples(channelIdx, outputSampleCount, samplePeriod);	    
-	    //const samples = new Float32Array(this.sharedMemory.buffer, samplesOffset, outputSampleCount);
+
 	    const outputSamplesOffset = this.wasmInstance.exports.getOutputSamplesOffset(channelIdx);
 	    const outputSamples = new Float32Array(this.sharedMemory.buffer, outputSamplesOffset, outputSampleCount);
 

@@ -175,7 +175,7 @@ arenaGetScratch(Arena **conflicts, usz conflictsCount)
       Arena **scratchSlot = m__scratchPool;
       for(usz scratchIdx = 0; scratchIdx < ARENA_SCRATCH_POOL_COUNT; ++scratchIdx, ++scratchSlot)
 	{
-	  *scratchSlot = gsArenaAcquire(0);
+	  *scratchSlot = gsArenaAcquire(KILOBYTES(128));
 	}
     }
 

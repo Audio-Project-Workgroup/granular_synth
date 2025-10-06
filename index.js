@@ -53,7 +53,7 @@ async function main() {
     console.log(crossOriginIsolated);    
 
     // NOTE: WASM setup
-    const memoryPageCount = 2048;
+    const memoryPageCount = 256;
     sharedMemory = new WebAssembly.Memory({
 	initial: memoryPageCount,
 	maximum: memoryPageCount,
@@ -112,6 +112,7 @@ async function main() {
 
     // NOTE: WEBAUDIO setup
     const audioCtx = new AudioContext();
+    audioCtx.suspend();
 
     const stream = await navigator.mediaDevices.getUserMedia({
 	audio: true,
@@ -259,6 +260,7 @@ async function main() {
 
     // render loop
     function render(now) {
+
 	gl.clearColor(0.0, 0.0, 0.0, 1.0);
 	gl.clearDepth(1.0);
 	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);

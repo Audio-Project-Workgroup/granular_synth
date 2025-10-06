@@ -5,14 +5,22 @@
 #endif
 
 #define TAKE_LOCK(lock, ...) \
-  while(gsAtomicCompareAndSwap(lock, 0, 1)) { __VA_ARGS__ }
+  do { __VA_ARGS__ } while(gsAtomicCompareAndSwap(lock, 0, 1) != 0)
 #define RELEASE_LOCK(lock, ...) \
-  while(gsAtomicCompareAndSwap(lock, 1, 0)) { __VA_ARGS__ }
+  do { __VA_ARGS__ } while(gsAtomicCompareAndSwap(lock, 1, 0) != 1)
 
 inline void
 logString(char *string)
 {
 #if BUILD_DEBUG
+#if 1
+  TAKE_LOCK(&globalLogger->mutex);
+
+  String8 pushed = stringListPush(globalLogger->logArena, &globalLogger->log, STR8_CSTR(string));
+  ASSERT(pushed.size < KILOBYTES(1));
+
+  RELEASE_LOCK(&globalLogger->mutex);
+#else
   for(;;)
     {    
       if(gsAtomicCompareAndSwap(&globalLogger->mutex, 0, 1) == 0)
@@ -29,6 +37,7 @@ logString(char *string)
 	  break;
 	}
     }
+#endif
 #else
   UNUSED(string);
   return;
@@ -42,6 +51,14 @@ logFormatString(char *format, ...)
   va_list vaArgs;
   va_start(vaArgs, format);
 
+#if 1
+  TAKE_LOCK(&globalLogger->mutex);
+
+  String8 string = stringListPushFormatV(globalLogger->logArena, &globalLogger->log, format, vaArgs);
+  ASSERT(string.size < KILOBYTES(1));
+
+  RELEASE_LOCK(&globalLogger->mutex);
+#else
   for(;;)
     {    
       if(gsAtomicCompareAndSwap(&globalLogger->mutex, 0, 1) == 0)
@@ -58,6 +75,7 @@ logFormatString(char *format, ...)
 	  break;
 	}
     }
+#endif
 #else
   UNUSED(format);
   return;
