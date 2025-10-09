@@ -19,6 +19,62 @@
        application, and introduce some unusual and undesirable behavior otherwise.
 */
 
+/**
+   TODO FOR DEMO 11/12-NOV-2025
+   ORDERED FROM HIGHEST PRIORITY TO LOWEST PRIORITY
+ 
+ * FIX FUNCTIONALITY BUGS:
+   -(web) `gsAudioProcess()` sometimes crashes
+          (bad memory access on ouput or grain mix buffer)
+   -(web) a few hundred bytes read-only data is occasionaly overwritten around
+          address 0x500. symptoms include control labels and log strings being
+          garbage, and sometimes the size knob has the wrong texture.
+   -(web) the `__memory_used` value sometimes drops from its stable value of
+          around 5 MB to ~ 200 KB for a single frame, and then goes back to normal
+   -(web) the audio process appears to occasionally underflow
+   -(web) microphone audio input sometimes sounds choppy
+   -(web) test on firefox/safari/mobile
+	   
+ * FIX GRAPHICAL BUGS:
+   -(web) editor should render at a constant aspect ratio of 16:9, adding
+          black bars if necessary (as in native/vst targets)
+   -(web) fix sort order so that knobs aren't cut off
+   -(all) align knobs to center
+
+ * INFO (MERGE PULL REQUEST):
+   -(web) put relevant readme info in the web page (description, controls, etc.)
+
+   -----------------------------------------------------------------------------
+   |                             LINE OF NECESSITY                             |
+   -----------------------------------------------------------------------------
+
+ * PERFORMANCE OPTIMIZATION:
+   -(all) profile
+   -(all) vectorize copying to output/from input
+   -(all) transpose loop order in grain process ()
+   -(all) check for false-sharing on cache lines with contended locks
+   -(web) implement simple math functions, to avoid a round-trip to javascript
+
+ * NEW FEATURES:
+   -(all) pitch-shift/time-stretch controls
+   -(all) parameter modulation
+   -(all) input level control
+   -(all) control tooltips
+   -(all) double-click control to reset to default value
+   -(web) reselect input device
+   -(web) keyboard driven ui
+   
+ * TECH DEBT:
+   -(vst/exe) resurrect vst target, make sure all platforms still work
+   -(all) merge build scripts into a single `build.bat` and `build.sh`, with
+          a CLI for selecting targets and options, e.g.
+	  ```build --target=vst --debug```
+   -(all) split function declarations and definitions into separate .h and .cpp
+          files, compile the common implementation once, and link into each
+	  target, to hopefully speed up compilation time
+   -(all) simplify/optimize ui system
+ */
+
 /* TODO:
    - UI:
      - improve font rendering

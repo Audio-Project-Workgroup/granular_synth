@@ -260,7 +260,7 @@ gsArenaAcquire(usz size)
 void
 gsArenaDiscard(Arena *arena)
 {
-  //platformLogf("Discarding arena with capacity of %u bytes\n", arena->capacity);
+  platformLogf("Discarding arena with capacity of %u bytes\n", arena->capacity);
   // NOTE: push onto freelist
   // TODO: merge contiguous blocks
   //DLL_PUSH_BACK__NP(firstFreeArena, lastFreeArena, arena, current, prev);
@@ -376,11 +376,15 @@ wasmInit(usz memorySize)
 static void
 platformLogf(char *fmt, ...)
 {
-  char buf[1024];
+  //char buf[1024];
+  TemporaryMemory scratch = arenaGetScratch(0, 0);
+  usz bufCount = 1024;
+  char *buf = arenaPushArray(scratch.arena, bufCount, char, arenaFlagsZeroNoAlign());
 
   va_list vaArgs;
   va_start(vaArgs, fmt);
-  gs_vsnprintf(buf, ARRAY_COUNT(buf), fmt, vaArgs);
+  usz actualSize = gs_vsnprintf(buf, bufCount, fmt, vaArgs);
+  ASSERT(actualSize < bufCount);
   va_end(vaArgs);
 
   platformLog(buf);
@@ -388,6 +392,7 @@ platformLogf(char *fmt, ...)
   // va_start(vaArgs, fmt);
   // stringListPushFormatV(wasmState->platformLogArena, &wasmState->platformLogStringList, fmt, vaArgs);
   // va_end(vaArgs);
+  arenaReleaseScratch(scratch);
 }
 #if 0
 static void
@@ -553,6 +558,7 @@ audioProcess(int sampleRate, int inputChannelCount, int inputSampleCount, int ou
       COPY_ARRAY(threadState.nameStorage, temp, ARRAY_COUNT(temp), u8);
       threadState.name = STR8_CSTR(threadState.nameStorage);
       threadState.initialized = 1;
+      platformLog("audioProcess() test\n");
     }
 
   PluginMemory *pluginMemory = &wasmState->pluginMemory;

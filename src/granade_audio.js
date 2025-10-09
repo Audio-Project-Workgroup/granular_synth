@@ -3,10 +3,9 @@ import { makeImportObject } from './wasm_imports.js';
 class GranadeProcessor extends AudioWorkletProcessor {
     constructor(options) {
 	super(options);
-	this.sharedMemory = options.processorOptions.sharedMemory;
+	this.sharedMemory = options.processorOptions.sharedMemory;	
 	this.wasmModule = options.processorOptions.wasmModule;
-	this.importObject = makeImportObject(this.sharedMemory);
-	// NOTE: `platformLog` can't be called from the audio worker
+	this.importObject = makeImportObject(this.sharedMemory, this.port);
 	WebAssembly.instantiate(this.wasmModule, this.importObject)
 	    .then(instance => {
 		this.wasmInstance = instance;

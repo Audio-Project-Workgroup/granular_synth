@@ -1,4 +1,4 @@
-function makeImportObject(memory) {
+function makeImportObject(memory, port = null) {
 
     function cstrGetLen(ptr) {
 	const mem = new Uint8Array(memory.buffer);
@@ -19,9 +19,24 @@ function makeImportObject(memory) {
 	return new TextDecoder().decode(tempView);
     }
 
-    function platformLog(msgPtr) {	
-	const msg = cstrFromPtr(msgPtr);
-	console.log(msg);
+    function platformLog(msgPtr) {
+	if(port === null) {
+	    const msg = cstrFromPtr(msgPtr);
+	    console.log(msg);
+	}else {
+	    const msgLen = cstrGetLen(msgPtr);
+	    const msgBytes = new Uint8Array(memory.buffer, msgPtr, msgLen);
+	    const msgDataBuffer = new ArrayBuffer(msgLen);
+	    const msgData = new Uint8Array(msgDataBuffer);
+	    msgData.set(msgBytes);
+	    port.postMessage(
+		{
+		    type: "log",
+		    data: msgDataBuffer,
+		},
+		[msgDataBuffer],
+	    );
+	}
     }
 
     function platformRand(min, max) {

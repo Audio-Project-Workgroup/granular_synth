@@ -122,10 +122,18 @@ async function main() {
     await audioCtx.audioWorklet.addModule("./src/granade_audio.js");
     const granadeNode = new AudioWorkletNode(audioCtx, "granade-processor", {
 	processorOptions: {
-	    sharedMemory: sharedMemory,
+	    sharedMemory: sharedMemory,	 
 	    wasmModule: wasmModule,
 	}
-    });    
+    });
+    granadeNode.port.onmessage = (msg) => {
+	console.log("HELLO??");
+	console.log(msg);
+	if(msg.data.type === "log") {
+	    const str = new TextDecoder().decode(msg.data.data);
+	    console.log(`[AUDIO]: ${str}`);
+	}
+    };
     granadeNode.connect(audioCtx.destination);
     microphoneStream.connect(granadeNode);
     console.log(microphoneStream);
