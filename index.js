@@ -127,8 +127,6 @@ async function main() {
 	}
     });
     granadeNode.port.onmessage = (msg) => {
-	console.log("HELLO??");
-	console.log(msg);
 	if(msg.data.type === "log") {
 	    const str = new TextDecoder().decode(msg.data.data);
 	    console.log(`[AUDIO]: ${str}`);

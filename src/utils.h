@@ -28,6 +28,11 @@
 #  error thread_var not supported on this compiler
 #endif
 
+#define STATEMENT(a) do { a } while(0)
+#define STRINGIFY(a) #a
+#define GLUE_(a, b) a##b
+#define GLUE(a, b) GLUE_(a, b)
+
 #if BUILD_DEBUG
 #  if COMPILER_MSVC
 #    define ASSERT(cond) if(!(cond)) { __debugbreak(); *(int*)0 = 0; }

@@ -157,33 +157,39 @@ gsPow(r32 base, r32 exp)
 }
 
 // BEHOLD: the most C++ code in the codebase
-#define SCOPE_HAS_LOCK(lock) ScopedLock<&lock> scopedLock__##__FUNCTION__##__LINE__;
-template<volatile u32 *lock>
+#define SCOPE_HAS_LOCK(lock) ScopedLock GLUE(GLUE(scopedLock__, __FUNCTION__), __LINE__)(&lock);
 struct ScopedLock
 {
-  ScopedLock()
+  explicit ScopedLock(volatile u32 *lock)
   {
-    while(gsAtomicCompareAndSwap(lock, 0, 1) != 0) {}
+    _lock = lock;
+    while(gsAtomicCompareAndSwap(_lock, 0, 1) != 0) {}
   }
   
   ~ScopedLock()
   {
-    while(gsAtomicCompareAndSwap(lock, 1, 0) != 1) {}
+    while(gsAtomicCompareAndSwap(_lock, 1, 0) != 1) {}
   }
+
+  volatile u32 *_lock;
 };
 
-// struct MemoryBlock
-// {
-//   MemoryBlock *next;
-//   MemoryBlock *prev;
-//   RangeU32 range;
-// };
+enum ThreadID
+{
+  ThreadID_render,
+  ThreadID_audio,
+  ThreadID_Count,
+};
+
+static const char *threadIDNames[ThreadID_Count] = {
+  "render",
+  "audio",
+};
 
 struct ThreadState
 {
   b32 initialized;
-  char nameStorage[8];
-  String8 name;
+  ThreadID id;
 };
 thread_var ThreadState threadState;
 
@@ -203,6 +209,18 @@ gsArenaAcquire(usz size)
 {
   usz allocSize = MAX(size, ARENA_MIN_ALLOCATION_SIZE);
   //ASSERT(__mem_used + allocSize <= __mem_capacity);
+
+  if(threadState.initialized)
+    {
+      ASSERT(threadState.id < ThreadID_Count);
+      platformLogf("[%s] acquiring arena with capacity of %u bytes\n",
+		   threadIDNames[threadState.id], allocSize);
+    }
+  else
+    {
+      platformLogf("[UNKNOWN] acquiring arena with capacity of %u bytes\n",
+		   allocSize);
+    }
 
 #if 0
   Arena *result = 0;
@@ -260,7 +278,17 @@ gsArenaAcquire(usz size)
 void
 gsArenaDiscard(Arena *arena)
 {
-  platformLogf("Discarding arena with capacity of %u bytes\n", arena->capacity);
+  if(threadState.initialized)
+    {
+      ASSERT(threadState.id < ThreadID_Count);
+      platformLogf("[%s] discarding arena with capacity of %u bytes\n",
+		   threadIDNames[threadState.id], arena->capacity);
+    }
+  else
+    {
+      platformLogf("[UNKNOWN] discarding arena with capacity of %u bytes\n",
+		   arena->capacity);
+    }
   // NOTE: push onto freelist
   // TODO: merge contiguous blocks
   //DLL_PUSH_BACK__NP(firstFreeArena, lastFreeArena, arena, current, prev);
@@ -276,10 +304,6 @@ struct WasmState
 {
   Arena *arena;
 
-  usz stringBufferCapacity;
-  usz stringBufferCount;
-  u8 *stringBuffer;
-
   RenderCommands renderCommands;
 
   PluginAudioBuffer audioBuffer;
@@ -292,16 +316,6 @@ struct WasmState
 #if BUILD_DEBUG
   PluginLogger logger;  
 #endif
-  // Arena *platformLogArena;
-  // String8List platformLogStringList;
-
-  // DEBUG:
-  u32 quadsToDraw;
-  b32 calledLog;
-
-  r32 phase;
-  r32 freq;
-  r32 volume;
 };
 
 static WasmState *wasmState = 0;
@@ -309,15 +323,10 @@ static WasmState *wasmState = 0;
 proc_export WasmState*
 wasmInit(usz memorySize)
 {
-  // Arena *arena = (Arena*)&__heap_base;
-  // arena->base = &__heap_base;
-  // arena->capacity = memorySize;
-  // arena->used = sizeof(Arena);
   __mem_capacity = INT_FROM_PTR(&__heap_end) - INT_FROM_PTR(&__heap_base);
    platformLogf("WASM memory capacity: %u\n", __mem_capacity);
   UNUSED(memorySize);
-  Arena *arena = gsArenaAcquire(0);
-  //Arena *logArena = gsArenaAcquire(0);
+  Arena *arena = gsArenaAcquire(KILOBYTES(144));
   
   WasmState *result = 0;
   if(arena != 0) {
@@ -337,32 +346,24 @@ wasmInit(usz memorySize)
 	result->pluginMemory.logger = &result->logger;
       }
 #endif
-      //result->platformLogArena = logArena;      
 
       result->renderCommands.quadCapacity = 2048;      
       result->renderCommands.quads = arenaPushArray(arena, result->renderCommands.quadCapacity, R_Quad);
       platformLogf("arena used post quads push: %u\n", arenaGetPos(arena));
 
-      result->audioBuffer.inputBufferCapacity = 2048;
+      result->audioBuffer.inputBufferCapacity = 512;
       result->audioBuffer.inputBuffer[0] =
 	arenaPushArray(arena, result->audioBuffer.inputBufferCapacity, r32);
       result->audioBuffer.inputBuffer[1] =
 	arenaPushArray(arena, result->audioBuffer.inputBufferCapacity, r32);
       platformLogf("arena used post input samples push: %u\n", arenaGetPos(arena));
 
-      result->audioBuffer.outputBufferCapacity = 2048;
+      result->audioBuffer.outputBufferCapacity = 512;
       result->audioBuffer.outputBuffer[0] =
 	arenaPushArray(arena, result->audioBuffer.outputBufferCapacity, r32);
       result->audioBuffer.outputBuffer[1] =
 	arenaPushArray(arena, result->audioBuffer.outputBufferCapacity, r32);
       platformLogf("arena used post output samples push: %u\n", arenaGetPos(arena));
-      //platformFlushLog();
-
-      result->quadsToDraw = 3;
-
-      result->phase = 0.f;
-      result->freq = 440.f;
-      result->volume = 0.1f;
 
       if(gsInitializePluginState(&result->pluginMemory)) {
 	wasmState = result;      
@@ -376,10 +377,11 @@ wasmInit(usz memorySize)
 static void
 platformLogf(char *fmt, ...)
 {
-  //char buf[1024];
-  TemporaryMemory scratch = arenaGetScratch(0, 0);
-  usz bufCount = 1024;
-  char *buf = arenaPushArray(scratch.arena, bufCount, char, arenaFlagsZeroNoAlign());
+  char buf[1024];
+  usz bufCount = ARRAY_COUNT(buf);
+  // TemporaryMemory scratch = arenaGetScratch(0, 0);
+  // usz bufCount = 1024;
+  // char *buf = arenaPushArray(scratch.arena, bufCount, char, arenaFlagsZeroNoAlign());
 
   va_list vaArgs;
   va_start(vaArgs, fmt);
@@ -388,25 +390,9 @@ platformLogf(char *fmt, ...)
   va_end(vaArgs);
 
   platformLog(buf);
-  // va_list vaArgs;
-  // va_start(vaArgs, fmt);
-  // stringListPushFormatV(wasmState->platformLogArena, &wasmState->platformLogStringList, fmt, vaArgs);
-  // va_end(vaArgs);
-  arenaReleaseScratch(scratch);
+  
+  //arenaReleaseScratch(scratch);
 }
-#if 0
-static void
-platformFlushLog(void)
-{
-  for(String8Node *node = wasmState->platformLogStringList.first; node; node = node->next)
-    {
-      platformLog((const char*)node->string.str);
-      platformLog("\n");
-    }
-  wasmState->platformLogStringList.first = wasmState->platformLogStringList.last = 0;
-  arenaEnd(wasmState->platformLogArena);  
-}
-#endif
 
 proc_export R_Quad*
 getQuadsOffset(void)
@@ -431,13 +417,6 @@ getOutputSamplesOffset(int channelIdx)
 {
   //ASSERT(channelIdx < wasmState->audioBuffer.outputChannelCount);
   void *result = wasmState->audioBuffer.outputBuffer[channelIdx];
-  return(result);
-}
-
-proc_export u8*
-getStringBufferOffset(void)
-{
-  u8 *result = wasmState->stringBuffer;
   return(result);
 }
 
@@ -494,9 +473,7 @@ drawQuads(s32 width, s32 height, r32 timestamp)
 {
   if(!threadState.initialized)
     {
-      u8 temp[] = "render";
-      COPY_ARRAY(threadState.nameStorage, temp, ARRAY_COUNT(temp), u8);
-      threadState.name = STR8_CSTR(threadState.nameStorage);
+      threadState.id = ThreadID_render;
       threadState.initialized = 1;
     }
   platformLogf("memory used = %u\n", __mem_used);
@@ -511,17 +488,19 @@ drawQuads(s32 width, s32 height, r32 timestamp)
     gsRenderNewFrame(pluginMemory, input, renderCommands);  
 
 #if BUILD_DEBUG
-    for(String8Node *node = wasmState->logger.log.first; node; node = node->next)
-      {
-	String8 string = node->string;
-	if(string.str)
-	  {
-	    platformLog((const char*)string.str);
-	    platformLog("\n");
-	  }
-	ZERO_STRUCT(&wasmState->logger.log);
-	arenaEnd(wasmState->logger.logArena);
-      }
+    {
+      SCOPE_HAS_LOCK(wasmState->logger.mutex);
+      for(String8Node *node = wasmState->logger.log.first; node; node = node->next)
+	{
+	  String8 string = node->string;
+	  if(string.str)
+	    {
+	      platformLog((const char*)string.str);
+	    }
+	  ZERO_STRUCT(&wasmState->logger.log);
+	  arenaEnd(wasmState->logger.logArena);
+	}
+    }
 #endif
 
     wasmState->currentInputIdx = !wasmState->currentInputIdx;
@@ -544,8 +523,7 @@ drawQuads(s32 width, s32 height, r32 timestamp)
   u32 result = renderCommands->quadCount;
 
   renderEndCommands(renderCommands);
-  //platformFlushLog();
-
+  
   return(result);
 }
 
@@ -554,11 +532,9 @@ audioProcess(int sampleRate, int inputChannelCount, int inputSampleCount, int ou
 {
   if(!threadState.initialized)
     {
-      u8 temp[] = "audio";
-      COPY_ARRAY(threadState.nameStorage, temp, ARRAY_COUNT(temp), u8);
-      threadState.name = STR8_CSTR(threadState.nameStorage);
+      threadState.id = ThreadID_audio;
       threadState.initialized = 1;
-      platformLog("audioProcess() test\n");
+      //platformLog("audioProcess() test\n");
     }
 
   PluginMemory *pluginMemory = &wasmState->pluginMemory;

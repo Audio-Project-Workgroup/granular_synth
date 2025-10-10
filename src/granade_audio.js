@@ -11,10 +11,18 @@ class GranadeProcessor extends AudioWorkletProcessor {
 		this.wasmInstance = instance;
 	    })
 	    .catch(error => console.log("error instantiating wasm in audio processor: ", error));
+	this.lastProcessTimestamp = undefined;
     }
 
     process(inputs, outputs, parameters) {
 
+	// const processTimestamp = Date.now();
+	// if(this.lastProcessTimestamp) {	    
+	//     const msElapsedSinceLastCall = processTimestamp - this.lastProcessTimestamp;
+	//     console.log(`time since last audio process call: ${msElapsedSinceLastCall}(ms)`);
+	// }
+	// this.lastProcessTimestamp = processTimestamp;
+	
 	const input = inputs[0];
 	const output = outputs[0];
 
