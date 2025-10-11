@@ -12,7 +12,7 @@
 inline void
 logString(char *string)
 {
-#if BUILD_DEBUG
+#if BUILD_LOGGING
 #if 1
   TAKE_LOCK(&globalLogger->mutex);
 
@@ -47,7 +47,7 @@ logString(char *string)
 inline void
 logFormatString(char *format, ...)
 {
-#if BUILD_DEBUG
+#if BUILD_LOGGING
   va_list vaArgs;
   va_start(vaArgs, format);
 

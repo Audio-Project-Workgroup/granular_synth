@@ -155,17 +155,17 @@ synthesize(r32* destBufferLInit, r32* destBufferRInit,
 	   r32 *densityParamVals, r32 *sizeParamVals, r32 *windowParamVals, r32 *spreadParamVals,
 	   u32 targetOffset,
 	   u32 samplesToWrite)
-{
-  logString("\nsynthesize called\n");
-  logFormatString("samplesToWrite: %lu", samplesToWrite);
+{    
 
   AudioRingBuffer *buffer = grainManager->grainBuffer;
 
   u32 currentOffset = getAudioRingBufferOffset(buffer);
   r32 readPositionIncrement = ((r32)currentOffset - (r32)targetOffset)/(r32)samplesToWrite;
+#if 0
   logFormatString("currentOffset: %.2f", currentOffset);
   logFormatString("targetOffset: %.2f", targetOffset);
   logFormatString("readPositionIncrement: %.2f", readPositionIncrement);
+#endif
 
   // NOTE: queue a new view and fill out its data
   u32 viewWriteIndex = (grainStateView->viewWriteIndex + 1) % ARRAY_COUNT(grainStateView->views);  

@@ -19,7 +19,7 @@
 
 #include "meta.h"
 
-#if BUILD_DEBUG
+#if BUILD_LOGGING
 struct PluginLogger
 {
   Arena *logArena;  
@@ -56,7 +56,7 @@ struct PluginMemory
   
   PlatformAPI platformAPI;
 
-#if BUILD_DEBUG
+#if BUILD_LOGGING
   PluginLogger *logger;
 #endif
 };

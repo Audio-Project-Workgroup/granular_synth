@@ -193,6 +193,7 @@ struct ThreadState
 };
 thread_var ThreadState threadState;
 
+extern u8 __global_base;
 extern u8 __heap_base;
 extern u8 __heap_end;
 static volatile u32 memoryLock;
@@ -313,7 +314,7 @@ struct WasmState
   PluginInput input[2];
   u32 currentInputIdx;  
 
-#if BUILD_DEBUG
+#if BUILD_LOGGING
   PluginLogger logger;  
 #endif
 };
@@ -338,7 +339,7 @@ wasmInit(usz memorySize)
       
       result->pluginMemory.host = PluginHost_web;
       
-#if BUILD_DEBUG
+#if BUILD_LOGGING
       {
 	Arena *logArena = gsArenaAcquire(0);
 	result->logger.logArena = logArena;
@@ -487,7 +488,7 @@ drawQuads(s32 width, s32 height, r32 timestamp)
     SCOPE_HAS_LOCK(inputLock);
     gsRenderNewFrame(pluginMemory, input, renderCommands);  
 
-#if BUILD_DEBUG
+#if BUILD_LOGGING
     {
       SCOPE_HAS_LOCK(wasmState->logger.mutex);
       for(String8Node *node = wasmState->logger.log.first; node; node = node->next)

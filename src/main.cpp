@@ -717,7 +717,7 @@ main(int argc, char **argv)
 	  pluginMemory.platformAPI.gsAtomicCompareAndSwap	  = atomicCompareAndSwap;
 	  pluginMemory.platformAPI.gsAtomicCompareAndSwapPointers = atomicCompareAndSwapPointers;
 
-#if BUILD_DEBUG
+#if BUILD_LOGGING
 	  Arena *loggerArena = gsArenaAcquire(0);
 
 	  PluginLogger logger = {};
@@ -1003,7 +1003,7 @@ main(int argc, char **argv)
 				      renderCommands(commands);
 				      GL_CATCH_ERROR();
 				      renderEndCommands(commands);
-#if BUILD_DEBUG
+#if BUILD_LOGGING
 				      while(atomicCompareAndSwap(&pluginMemory.logger->mutex, 0, 1) != 0) {}
 				      for(String8Node *node = pluginMemory.logger->log.first;
 					  node;

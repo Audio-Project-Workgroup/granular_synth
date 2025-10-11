@@ -102,6 +102,9 @@
 #if !defined(OS_MAC)
 # define OS_MAC 0
 #endif
+#if !defined(OS_WASM)
+# define OS_WASM 0
+#endif
 
 #if !defined(ARCH_X64)
 # define ARCH_X64 0

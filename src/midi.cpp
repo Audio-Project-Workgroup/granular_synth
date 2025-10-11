@@ -1,13 +1,10 @@
 #define MIDI_VERBOSE // ERASE WHEN DONE
 
-// TODO: for whatever reason, my debugger doesn't show the printf logs when loading with the vst :(
-//       maybe i'll add a system for displaying debug logs (and some actual string processing too) -Ry
-
 static inline r32
 hertzFromMidiNoteNumber(u8 noteNumber)
 {
   r32 result = 440.f;
-  result *= gsPow(gsPow(2.f, 1.f/12.f), (r32)((s32)noteNumber - 69));
+  result *= gsPow(gsPow(2.f, 1.f/12.f), (r32)((s32)noteNumber - 69)); // TODO: optimize
   
   return(result);
 }
@@ -20,39 +17,30 @@ namespace midi {
   // Functions for each MIDI command  
   static MIDI_HANDLER(NoteOff)
   {
-    //     assert(len == 2);
     u8 key = data[0];
     u8 velocity = data[1];
     UNUSED(velocity);
 
     pluginState->freq = hertzFromMidiNoteNumber(key);
     pluginSetFloatParameter(&pluginState->parameters[PluginParameter_volume], 0.0);
-    
-#if BUILD_DEBUG
-    stringListPushFormat(globalLogger->logArena, &globalLogger->log,
-			 "Note Off: Channel %u Key %u Velocity %u\n", channel, key, velocity);
-#endif
+
+    logFormatString("Note Off: Channel %u Key %u Velocity %u\n", channel, key, velocity);
   }
   
   static MIDI_HANDLER(NoteOn)
   {
-    //     assert(len == 2);
     u8 key = data[0];
     u8 velocity = data[1];
 
     pluginState->freq = hertzFromMidiNoteNumber(key);
     // TODO: it would be more "correct" to check the volume range here
     pluginSetFloatParameter(&pluginState->parameters[PluginParameter_volume], (r32)velocity / 127.f);
-    
-#if BUILD_DEBUG
-    stringListPushFormat(globalLogger->logArena, &globalLogger->log,
-			 "Note On: Channel %u Key %u Velocity %u\n", channel, key, velocity);
-#endif
+
+    logFormatString("Note On: Channel %u Key %u Velocity %u\n", channel, key, velocity);
   }
 
   static MIDI_HANDLER(Aftertouch)
   {
-    //     assert(len == 2);
     u8 key = data[0];
     u8 touch = data[1];
     
@@ -60,15 +48,11 @@ namespace midi {
     // TODO: it would be more "correct" to check the volume range here
     pluginSetFloatParameter(&pluginState->parameters[PluginParameter_volume], (r32)touch / 127.f);
 
-#if BUILD_DEBUG
-    stringListPushFormat(globalLogger->logArena, &globalLogger->log,
-			 "Aftertouch: Channel %u Key %u Touch %u\n", channel, key, touch);
-#endif
+    logFormatString("Aftertouch: Channel %u Key %u Touch %u\n", channel, key, touch);
   }
   
   static MIDI_HANDLER(ContinuousController)
   {
-    //     assert(len == 2);
     u8 controller = data[0]; 
     u8 value = data[1];
     
@@ -79,38 +63,25 @@ namespace midi {
 
     pluginSetFloatParameter(&pluginState->parameters[paramIndex], normalizedValue);
 
-#if BUILD_DEBUG
-    stringListPushFormat(globalLogger->logArena, &globalLogger->log,
-			 "Continuous Controller: Channel %u Controller %u Value %u the normalized value is: %.2f\n", channel, controller, value, normalizedValue);
-#endif			 
+    logFormatString("Continuous Controller: Channel %u Controller %u Value %u the normalized value is: %.2f\n", channel, controller, value, normalizedValue);
   }
 
   static MIDI_HANDLER(PatchChange)
   {
-    //     assert(len == 1);
     u8 instrument = data[0];
     UNUSED(instrument);
-    
-#if BUILD_DEBUG
-    stringListPushFormat(globalLogger->logArena, &globalLogger->log,
-			 "Patch Change: Channel %u instrument %u\n", channel, instrument);
-#endif
+
+    logFormatString("Patch Change: Channel %u instrument %u\n", channel, instrument);
   }
 
-  //void ChannelPressure(u8 channel, u8* data, u8 len, PluginState *pluginState) {
   static MIDI_HANDLER(ChannelPressure)
   {
-    //     assert(len == 1);
     u8 pressure = data[0];  // Controller number (data[1])
     UNUSED(pressure);
 
-#if BUILD_DEBUG
-    stringListPushFormat(globalLogger->logArena, &globalLogger->log,
-			 "Channel Pressure: Channel %u pressure %u\n", channel, pressure);
-#endif
+    logFormatString("Channel Pressure: Channel %u pressure %u\n", channel, pressure);
   }
 
-  //void PitchBend(u8 channel, u8* data, u8 len, PluginState* pluginState) {
   static MIDI_HANDLER(PitchBend)
   {
     //
@@ -127,18 +98,12 @@ namespace midi {
     UNUSED(pitchFactor);
 
     //pluginState->freq[channel] = pluginState->freq[channel] * pitchFactor;
-#if BUILD_DEBUG
-    stringListPushFormat(globalLogger->logArena, &globalLogger->log,
-			 "Pitch Bend: Channel %u pitchFactor %.2f\n", channel, pitchFactor);
-#endif
+    logFormatString("Pitch Bend: Channel %u pitchFactor %.2f\n", channel, pitchFactor);
   }
 
-  //void SystemMessages(u8 channel, u8* data, u8 len, PluginState *pluginState) {
   static MIDI_HANDLER(SystemMessages)
   {
-#if BUILD_DEBUG
-    stringListPush(globalLogger->logArena, &globalLogger->log, STR8_LIT("System Messages"));
-#endif			 
+    logString("System Messages");
   }
 
   // Define the MIDI command table as an array of function pointers
@@ -164,7 +129,6 @@ namespace midi {
 
     // TODO: this can't happen
     if (midiCommandTable[commandTableIndex] == nullptr) {
-      //printf("Unknown MIDI command\n");
       logString("Unknown MIDI command\n");
       return;
     }
@@ -181,14 +145,11 @@ namespace midi {
         
     if(midiMessageCount){
 #ifdef MIDI_VERBOSE
-      //printf("ALL BYTES : ");
       logString("ALL BYTES : ");
       size_t numberOfBytesAheadToPrint = 15;
       for (size_t i = 0; i < numberOfBytesAheadToPrint; ++i) {
-	//printf("0x%02x ", (unsigned char)atMidiBuffer[i]);
 	logFormatString("0x%02x ", (unsigned char)atMidiBuffer[i]);
       }
-      //printf("\n");
       logString("\n");
 #endif
       
@@ -217,25 +178,16 @@ namespace midi {
 	  processMidiCommand(commandByte, data, bytesToRead, pluginState);
 
 #ifdef MIDI_VERBOSE
-	  //printf("AFTER PARSING : 0x%x | %" PRIu64  " timeStamp(ms passed) | %d bytes to read | data points to 0x%x | midiBuffer ptr points to 0x%x\n",
-	  // printf("AFTER PARSING : 0x%x | %llu timeStamp(ms passed) | %d bytes to read | data points to 0x%x | midiBuffer ptr points to 0x%x\n", 
-	  // 	 (int)commandByte,
-	  // 	 timestamp, 
-	  // 	 (int)bytesToRead, 
-	  // 	 (int)data[0], 
-	  // 	 (int)atMidiBuffer[0]);
 	  logFormatString("AFTER PARSING : 0x%x | %llu timeStamp(ms passed) | %d bytes to read | data points to 0x%x | midiBuffer ptr points to 0x%x\n", 
 		 (int)commandByte,
 		 timestamp, 
 		 (int)bytesToRead, 
 		 (int)data[0], 
 		 (int)atMidiBuffer[0]);
-	  //printf("\n\n");
 	  logString("\n\n");
 #endif
       
 	  --midiMessageCount;
-	  //*atMidiBufferPtrInOut = atMidiBuffer;    
 	}
     }
 

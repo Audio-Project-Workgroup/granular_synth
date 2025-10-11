@@ -26,6 +26,7 @@
  * FIX FUNCTIONALITY BUGS:
    -(web) `gsAudioProcess()` sometimes crashes
           (bad memory access on ouput or grain mix buffer)
+   -(web) LOUD SCREECH WHEN COMPILING IN NON DEBUG MODE (fixed?)
    -(web) a few hundred bytes read-only data is occasionaly overwritten around
           address 0x500. symptoms include control labels and log strings being
           garbage, and sometimes the size knob has the wrong texture.
@@ -133,7 +134,7 @@
 //#include "file_granulator.cpp"
 #include "internal_granulator.cpp"
 
-#if BUILD_DEBUG
+#if BUILD_LOGGING
 PluginLogger *globalLogger;
 #endif
 
@@ -160,7 +161,7 @@ gsInitializePluginState(PluginMemory *memoryBlock)
 #undef X
 #endif
 
-#if BUILD_DEBUG
+#if BUILD_LOGGING
       globalLogger = memoryBlock->logger;
 #endif
 
@@ -397,7 +398,8 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
       PluginState *pluginState = globalPluginState;
       //renderBeginCommands(renderCommands, &pluginState->frameArena);
       TemporaryMemory scratch = arenaGetScratch(0, 0);
-     
+
+#if 0
       logFormatString("mouseP: (%.2f, %.2f)", input->mouseState.position.x, input->mouseState.position.y);
       logFormatString("mouseLeft: %s, %s",
 		      wasPressed(input->mouseState.buttons[MouseButton_left]) ? "pressed" : "not pressed",
@@ -406,7 +408,6 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 		      wasPressed(input->mouseState.buttons[MouseButton_right]) ? "pressed" : "not pressed",
 		      isDown(input->mouseState.buttons[MouseButton_right]) ? "down" : "up");
       
-#if 0
       printButtonState(input->keyboardState.keys[KeyboardButton_tab], "tab");
       printButtonState(input->keyboardState.keys[KeyboardButton_backspace], "backspace");
 #endif
@@ -1028,9 +1029,7 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 		      }
 		  }
 		  		  		  
-		  // NOTE: grain view		  
-		  logString("\ndisplaying grain buffer\n");
-
+		  // NOTE: grain view
 		  v2 drawRegionDim = getDim(panelLayout->regionRemaining);
 		  v2 viewDim = hadamard(V2(0.53f, 0.25f), drawRegionDim);
 		  v2 viewMin = hadamard(V2(0.24f, 0.55f), drawRegionDim);
@@ -1209,19 +1208,26 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
       
       arenaEnd(pluginState->frameArena);
 
-      logFormatString("permanent arena used %zu bytes", pluginState->permanentArena->pos);
+      //logFormatString("permanent arena used %zu bytes", pluginState->permanentArena->pos);
     }  
 }
 
 EXPORT_FUNCTION void
 gsAudioProcess(PluginMemory *memory, PluginAudioBuffer *audioBuffer)
-{  
+{
   //PluginState *pluginState = getPluginState(memory);  
   if(globalPluginState)
     {
       PluginState *pluginState = globalPluginState;
       if(pluginState->initialized)
 	{
+#if OS_WASM
+	  {
+	    ASSERT(*(char*)PTR_FROM_INT(0x50D) == 'M');	    
+	    //logFormatString("looking at the memory: %s", (char*)PTR_FROM_INT(0x527));
+	  }
+#endif
+
 	  TemporaryMemory scratch = arenaGetScratch(0, 0);
 
 	  // NOTE: dequeue host-driven parameter value changes
@@ -1249,8 +1255,8 @@ gsAudioProcess(PluginMemory *memory, PluginAudioBuffer *audioBuffer)
 		{
 		  queuedCount = gsAtomicLoad(&audioBuffer->queuedCount);
 		}
-	    }
-      
+	    }	  
+
 	  // NOTE: copy plugin input audio to the grain buffer
 	  u32 framesToRead = audioBuffer->framesToWrite;      
 	  r32 inputBufferReadSpeed = ((audioBuffer->inputSampleRate != 0) ?
@@ -1259,6 +1265,7 @@ gsAudioProcess(PluginMemory *memory, PluginAudioBuffer *audioBuffer)
       
 	  AudioRingBuffer *gbuff = &pluginState->grainBuffer;
 	  //PlayingSound *loadedSound = &pluginState->loadedSound;
+	  logFormatString("samples to read: %lu", framesToRead);
 
 	  r32 *inputMixBuffersArray = arenaPushArray(scratch.arena, 2*framesToRead, r32,
 						     arenaFlagsZeroAlign(4*sizeof(r32)));
@@ -1384,6 +1391,11 @@ gsAudioProcess(PluginMemory *memory, PluginAudioBuffer *audioBuffer)
 		     densityParamVals, sizeParamVals, windowParamVals, spreadParamVals,
 		     targetOffset,
 		     framesToWrite);
+	  logFormatString("grainMixBuffers = %p, %p",
+			  grainMixBuffers[0], grainMixBuffers[1]);
+	  // NOTE: DEBUG
+	  usz grainMixBuffersIntL = INT_FROM_PTR(grainMixBuffers[0]);
+	  usz grainMixBuffersIntR = INT_FROM_PTR(grainMixBuffers[1]);
 
 	  // NOTE: audio output
 	  r32 formatVolumeFactor = 1.f;      
@@ -1400,9 +1412,15 @@ gsAudioProcess(PluginMemory *memory, PluginAudioBuffer *audioBuffer)
 	  void *genericOutputFrames[2] = {};
 	  genericOutputFrames[0] = audioBuffer->outputBuffer[0];
 	  genericOutputFrames[1] = audioBuffer->outputBuffer[1];     
+	  logFormatString("genericOutputFrames = %p, %p",
+			  genericOutputFrames[0], genericOutputFrames[1]);
+	  // NOTE: DEBUG
+	  usz genericOutputFramesIntL = INT_FROM_PTR(genericOutputFrames[0]);
+	  usz genericOutputFramesIntR = INT_FROM_PTR(genericOutputFrames[1]);
 
 	  u8 *atMidiBuffer = audioBuffer->midiBuffer;
 
+	  logFormatString("samples to write: %lu", audioBuffer->framesToWrite);
 	  for(u32 frameIndex = 0; frameIndex < audioBuffer->framesToWrite; ++frameIndex)
 	    {
 	      atMidiBuffer = midi::parseMidiMessage(atMidiBuffer, pluginState,
@@ -1426,6 +1444,15 @@ gsAudioProcess(PluginMemory *memory, PluginAudioBuffer *audioBuffer)
 		  r32 nextGrainVal = grainMixBuffers[channelIndex][grainReadIndex + 1];
 		  r32 grainVal = lerp(firstGrainVal, nextGrainVal, grainReadFrac);
 #else
+		  if(grainMixBuffersIntL != INT_FROM_PTR(grainMixBuffers[0]) ||
+		     grainMixBuffersIntR != INT_FROM_PTR(grainMixBuffers[1]))
+		    {
+		      logFormatString("grain mix buffers (%p, %p) got fucked up "
+				      "at sample %u, channel %u",
+				      grainMixBuffers[0], grainMixBuffers[1],
+				      frameIndex, channelIndex);
+		    }
+
 		  r32 grainVal = grainMixBuffers[channelIndex][frameIndex];
 		  r32 leftGrainVal = grainMixBuffers[0][frameIndex];
 		  r32 rightGrainVal = grainMixBuffers[1][frameIndex];
@@ -1453,7 +1480,19 @@ gsAudioProcess(PluginMemory *memory, PluginAudioBuffer *audioBuffer)
 	      	      
 		  mixedVal += lerp(inputMixBuffers[channelIndex][frameIndex], grainVal, mixParam);
 		  //logFormatString("mixedVal: %.2f", mixedVal);
-	     
+
+		  // NOTE: we can't quite do the same thing here as we do for
+		  //       the grain mix buffers because these pointers are
+		  //       incremented each sample
+		  // if(genericOutputFramesIntL != INT_FROM_PTR(genericOutputFrames[0]) ||
+		  //    genericOutputFramesIntR != INT_FROM_PTR(genericOutputFrames[1]))
+		  //   {
+		  //     logFormatString("generic output frames (%p, %p) got fucked up "
+		  // 		      "at sample %u, channel %u",
+		  // 		      genericOutputFrames[0], genericOutputFrames[1],
+		  // 		      frameIndex, channelIndex);
+		  //   }
+
 		  switch(audioBuffer->outputFormat)
 		    {
 		    case AudioFormat_r32:
