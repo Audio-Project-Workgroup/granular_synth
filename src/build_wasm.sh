@@ -8,11 +8,12 @@ SRC_DIR=$PWD
 DATA_DIR=$SRC_DIR/../data
 
 MEMORY_PAGE_COUNT=256
-MEMORY_SIZE=$[$MEMORY_PAGE_COUNT*64*1024]
+MEMORY_SIZE=$[$MEMORY_PAGE_COUNT*64*1024] # NOTE: 16 MB
+STACK_SIZE=$[4 * 1024 * 1024] # NOTE: 4 MB (per thread)
 
-CFLAGS="-Wall -Wextra -Wno-missing-braces -Wno-unused-function -Wno-unused-parameter -Wno-writable-strings -fPIC -DBUILD_DEBUG=$BUILD_DEBUG -DBUILD_LOGGING=$BUILD_LOGGING -c"
+CFLAGS="-Wall -Wextra -Wno-missing-braces -Wno-unused-function -Wno-unused-parameter -Wno-writable-strings -fPIC -DSTACK_SIZE=$STACK_SIZE -DBUILD_DEBUG=$BUILD_DEBUG -DBUILD_LOGGING=$BUILD_LOGGING -c"
 WASM_CFLAGS="--target=wasm32 -nostdlib -matomics -mbulk-memory"
-WASM_LFLAGS="--no-entry --export-all --export-table --import-memory --shared-memory --initial-memory=$MEMORY_SIZE --max-memory=$MEMORY_SIZE -z stack-size=$[8 * 1024 * 1024]"
+WASM_LFLAGS="--no-entry --export-all --export-table --import-memory --shared-memory --initial-memory=$MEMORY_SIZE --max-memory=$MEMORY_SIZE -z stack-size=$STACK_SIZE"
 if [[ $BUILD_DEBUG == 1 ]]; then
     CFLAGS+=" -g -Og"
 else

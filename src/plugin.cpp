@@ -24,17 +24,20 @@
    ORDERED FROM HIGHEST PRIORITY TO LOWEST PRIORITY
  
  * FIX FUNCTIONALITY BUGS:
-   -(web) `gsAudioProcess()` sometimes crashes
-          (bad memory access on ouput or grain mix buffer)
-   -(web) LOUD SCREECH WHEN COMPILING IN NON DEBUG MODE (fixed?)
-   -(web) a few hundred bytes read-only data is occasionaly overwritten around
-          address 0x500. symptoms include control labels and log strings being
-          garbage, and sometimes the size knob has the wrong texture.
-   -(web) the `__memory_used` value sometimes drops from its stable value of
-          around 5 MB to ~ 200 KB for a single frame, and then goes back to normal
-   -(web) the audio process appears to occasionally underflow
-   -(web) microphone audio input sometimes sounds choppy
-   -(web) test on firefox/safari/mobile
+   -(FIXED) `gsAudioProcess()` sometimes crashes
+            (bad memory access on ouput or grain mix buffer)
+   -(FIXED) LOUD SCREECH WHEN COMPILING IN NON DEBUG MODE
+   -(FIXED) a few hundred bytes read-only data is occasionaly overwritten around
+            address 0x500. symptoms include control labels and log strings being
+            garbage, and sometimes the size knob has the wrong texture.
+   -(FIXED) the `__memory_used` value sometimes drops from its stable value of
+            around 5 MB to ~ 200 KB for a single frame, and then goes back to normal
+   -(FIXED?) the audio process appears to occasionally underflow
+   -(web)   microphone audio input sometimes sounds choppy
+   -(web)   test on firefox/safari/mobile
+   -(all)   prevent too much grain view data from being queued up, overflowing the render buffer
+            (can happen when device selection menu is open, plugin editor window is closed, or
+	    user is in a different browser tab).
 	   
  * FIX GRAPHICAL BUGS:
    -(web) editor should render at a constant aspect ratio of 16:9, adding
@@ -51,7 +54,7 @@
 
  * PERFORMANCE OPTIMIZATION:
    -(all) profile
-   -(all) vectorize copying to output/from input
+   -(all) vectorize copying audio samples to output/from input
    -(all) transpose loop order in grain process ()
    -(all) check for false-sharing on cache lines with contended locks
    -(web) implement simple math functions, to avoid a round-trip to javascript
@@ -396,7 +399,7 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
   if(globalPluginState)
     {
       // NOTE: DEBUG
-#if 0
+#if OS_WASM && BUILD_LOGGING
       {
 #define X(name) DEBUG_POINTER_CHECK(name);
 	DEBUG_POINTER_XLIST
@@ -1232,7 +1235,7 @@ gsAudioProcess(PluginMemory *memory, PluginAudioBuffer *audioBuffer)
 	{
 #if OS_WASM
 	  {
-	    ASSERT(*(char*)PTR_FROM_INT(0x50D) == 'M');	    
+	    //ASSERT(*(char*)PTR_FROM_INT(0x50D) == 'M');	    
 	    //logFormatString("looking at the memory: %s", (char*)PTR_FROM_INT(0x527));
 	  }
 #endif
@@ -1405,7 +1408,7 @@ gsAudioProcess(PluginMemory *memory, PluginAudioBuffer *audioBuffer)
 	  // NOTE: DEBUG
 	  usz grainMixBuffersIntL = INT_FROM_PTR(grainMixBuffers[0]);
 	  usz grainMixBuffersIntR = INT_FROM_PTR(grainMixBuffers[1]);
-#if 0
+#if OS_WASM
 	  DEBUG_POINTER_INITIALIZE(audio__grainMixBuffersL, grainMixBuffers[0]);
 	  DEBUG_POINTER_INITIALIZE(audio__grainMixBuffersR, grainMixBuffers[1]);
 #endif

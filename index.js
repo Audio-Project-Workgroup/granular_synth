@@ -70,7 +70,9 @@ async function main() {
     console.log(wasm.module);
     console.log(wasm.instance);
 
-    const wasmStateOffset = wasmInstance.exports.wasmInit(64*1024); // TODO: real heap size
+    const audioThreadStackOffset = wasmInstance.exports.wasmAllocateStack();
+
+    const wasmStateOffset = wasmInstance.exports.wasmInit();
     console.log(wasmStateOffset);
     const quadsOffset = wasm.instance.exports.getQuadsOffset();
     console.log(quadsOffset);
@@ -124,6 +126,7 @@ async function main() {
 	processorOptions: {
 	    sharedMemory: sharedMemory,	 
 	    wasmModule: wasmModule,
+	    audioThreadStackOffset: audioThreadStackOffset,
 	}
     });
     granadeNode.port.onmessage = (msg) => {

@@ -5,10 +5,12 @@ class GranadeProcessor extends AudioWorkletProcessor {
 	super(options);
 	this.sharedMemory = options.processorOptions.sharedMemory;	
 	this.wasmModule = options.processorOptions.wasmModule;
+	this.audioThreadStackOffset = options.processorOptions.audioThreadStackOffset;
 	this.importObject = makeImportObject(this.sharedMemory, this.port);
 	WebAssembly.instantiate(this.wasmModule, this.importObject)
 	    .then(instance => {
 		this.wasmInstance = instance;
+		this.wasmInstance.exports.wasmSetStack(this.audioThreadStackOffset);
 	    })
 	    .catch(error => console.log("error instantiating wasm in audio processor: ", error));
 	this.lastProcessTimestamp = undefined;

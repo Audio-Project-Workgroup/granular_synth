@@ -255,6 +255,25 @@ static usz __mem_capacity = 0;
 static Arena *firstFreeArena;
 static Arena *lastFreeArena;
 
+void*
+gsAllocateMemory(usz size)
+{
+#if BUILD_DEBUG
+  {
+    if(__mem_capacity == 0)
+      {
+	__mem_capacity = INT_FROM_PTR(&__heap_end) - INT_FROM_PTR(&__heap_base);      
+      }
+    u32 memUsed = gsAtomicLoad((volatile u32*)&__mem_used);
+    ASSERT(memUsed + size < __mem_capacity);
+  }
+#endif
+  
+  usz memPos = gsAtomicAdd((volatile u32*)&__mem_used, size);
+  void *result = (void*)(&__heap_base + memPos);
+  return(result);
+}
+
 #define ARENA_MIN_ALLOCATION_SIZE KILOBYTES(64)
 
 Arena*
@@ -310,10 +329,9 @@ gsArenaAcquire(usz size)
       }
   }
 #else
-  usz mem_pos = gsAtomicAdd((volatile u32*)&__mem_used, allocSize);
-  void *base = (void*)(&__heap_base + mem_pos);
-  // void *base = (void*)(&__heap_base + __mem_used);
-  // __mem_used += allocSize;
+  // usz mem_pos = gsAtomicAdd((volatile u32*)&__mem_used, allocSize);
+  // void *base = (void*)(&__heap_base + mem_pos);
+  void *base =  gsAllocateMemory(allocSize);
   Arena *result = (Arena*)base;
 #endif
   if(result)
@@ -348,6 +366,31 @@ gsArenaDiscard(Arena *arena)
   return;
 }
 
+proc_export void*
+wasmAllocateStack(void)
+{
+#if BUILD_DEBUG
+  extern u8 __stack_low;
+  extern u8 __stack_high;
+  usz stackSize = &__stack_high - &__stack_low;
+  ASSERT(stackSize == STACK_SIZE);
+#endif
+
+  void *stackLow = gsAllocateMemory(STACK_SIZE);
+  void *stackHigh = (void*)((u8*)stackLow + STACK_SIZE);
+  return(stackHigh);
+}  
+
+proc_export void
+wasmSetStack(void *stack)
+{
+  __asm__ __volatile__(
+    "local.get %0\n"
+    "global.set __stack_pointer\n"
+    : : "r"(stack)
+  );
+}
+
 #include "plugin.cpp"
 
 // internal state/functions
@@ -374,21 +417,24 @@ struct WasmState
 static WasmState *wasmState = 0;
 
 proc_export WasmState*
-wasmInit(usz memorySize)
+wasmInit(void)
 {
-  __mem_capacity = INT_FROM_PTR(&__heap_end) - INT_FROM_PTR(&__heap_base);
-   platformLogf("WASM memory capacity: %u\n", __mem_capacity);
-  UNUSED(memorySize);
+  // __mem_capacity = INT_FROM_PTR(&__heap_end) - INT_FROM_PTR(&__heap_base);
+  //  platformLogf("WASM memory capacity: %u\n", __mem_capacity);
+  // UNUSED(memorySize);
+
   Arena *arena = gsArenaAcquire(KILOBYTES(144));
   
   WasmState *result = 0;
-  if(arena != 0) {
+  if(arena != 0)
+    {
     platformLogf("arena: %u\n  base=%u\n  capacity=%u\n  used=%u\n",
 		 arena, arena->base, arena->capacity, arena->pos);
     result = arenaPushStruct(arena, WasmState, arenaFlagsZeroAlign(sizeof(void*)));
-    if(result) {
+    if(result)
+      {
       result->arena = arena;
-      
+
       result->pluginMemory.host = PluginHost_web;
       
 #if BUILD_LOGGING
