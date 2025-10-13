@@ -29,7 +29,8 @@
 #endif
 
 #define STATEMENT(a) do { a } while(0)
-#define STRINGIFY(a) #a
+#define STRINGIFY_(a) #a
+#define STRINGIFY(a) STRINGIFY_(a)
 #define GLUE_(a, b) a##b
 #define GLUE(a, b) GLUE_(a, b)
 

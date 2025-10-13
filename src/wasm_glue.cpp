@@ -193,6 +193,58 @@ struct ThreadState
 };
 thread_var ThreadState threadState;
 
+#define DEBUG_POINTER_XLIST\
+  X(render__quads)\
+  X(audio__grainMixBuffersL)	   \
+  X(audio__grainMixBuffersR)	   \
+  X(audio__genericOutputFramesL)   \
+  X(audio__genericOutputFramesR)    
+
+enum DebugPointer
+{
+#define X(name) GLUE(DebugPointer_, name),
+  DEBUG_POINTER_XLIST
+#undef X
+  DebugPointer_Count,
+};
+
+struct DebugPointerData
+{
+  void *addr;
+  void *value;
+  char *name;
+  b32 initialized;
+  b32 printedIfShit;
+};
+
+#define DEBUG_POINTER(name) (debugPointers + GLUE(DebugPointer_, name))
+static DebugPointerData debugPointers[DebugPointer_Count] = {};
+
+#define DEBUG_POINTER_INITIALIZE(name_, p) do {	\
+  DebugPointerData *data = DEBUG_POINTER(name_);\
+  if(!data->initialized) {\
+    data->addr = &p;\
+    data->value = (void*)p;				\
+    data->name = STRINGIFY(GLUE(DebugPointer_, name_));	\
+    data->initialized = 1;\
+  }\
+} while(0)
+
+#define DEBUG_POINTER_CHECK(name_) do {\
+  DebugPointerData *data = DEBUG_POINTER(name_);\
+  if(data->initialized) {\
+    uintptr_t valueAtAddr = *(uintptr_t*)data->addr;\
+    uintptr_t initializedValue = (uintptr_t)data->value;\
+    if(valueAtAddr != initializedValue) {\
+      logFormatString("%s(%p) fucked up at %s:%s:\n"\
+		      "  expected: 0x%x, got: 0x%x",\
+		      data->name, data->addr, STRINGIFY(__FILE__), STRINGIFY(__LINE__), \
+		      initializedValue, valueAtAddr);\
+      data->printedIfShit = 1;\
+    }\
+  }\
+} while(0)
+
 extern u8 __global_base;
 extern u8 __heap_base;
 extern u8 __heap_end;
@@ -351,6 +403,7 @@ wasmInit(usz memorySize)
       result->renderCommands.quadCapacity = 2048;      
       result->renderCommands.quads = arenaPushArray(arena, result->renderCommands.quadCapacity, R_Quad);
       platformLogf("arena used post quads push: %u\n", arenaGetPos(arena));
+      DEBUG_POINTER_INITIALIZE(render__quads, result->renderCommands.quads);
 
       result->audioBuffer.inputBufferCapacity = 512;
       result->audioBuffer.inputBuffer[0] =
@@ -365,6 +418,8 @@ wasmInit(usz memorySize)
       result->audioBuffer.outputBuffer[1] =
 	arenaPushArray(arena, result->audioBuffer.outputBufferCapacity, r32);
       platformLogf("arena used post output samples push: %u\n", arenaGetPos(arena));
+      DEBUG_POINTER_INITIALIZE(audio__genericOutputFramesL, result->audioBuffer.outputBuffer[0]);
+      DEBUG_POINTER_INITIALIZE(audio__genericOutputFramesR, result->audioBuffer.outputBuffer[1]);
 
       if(gsInitializePluginState(&result->pluginMemory)) {
 	wasmState = result;      
@@ -417,7 +472,7 @@ proc_export void*
 getOutputSamplesOffset(int channelIdx)
 {
   //ASSERT(channelIdx < wasmState->audioBuffer.outputChannelCount);
-  void *result = wasmState->audioBuffer.outputBuffer[channelIdx];
+  void *result = (void*)wasmState->audioBuffer.outputBuffer[channelIdx];
   return(result);
 }
 

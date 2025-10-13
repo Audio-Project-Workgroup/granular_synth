@@ -210,7 +210,7 @@ struct PluginAudioBuffer
   
   AudioFormat outputFormat;
   u32 outputBufferCapacity;
-  void *outputBuffer[2];
+  const void *outputBuffer[2];
   u32 outputSampleRate;
   u32 outputChannels;
   u32 outputStride;

@@ -395,6 +395,15 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
   gsInitializePluginState(memory);
   if(globalPluginState)
     {
+      // NOTE: DEBUG
+#if 0
+      {
+#define X(name) DEBUG_POINTER_CHECK(name);
+	DEBUG_POINTER_XLIST
+#undef X
+      }
+#endif
+
       PluginState *pluginState = globalPluginState;
       //renderBeginCommands(renderCommands, &pluginState->frameArena);
       TemporaryMemory scratch = arenaGetScratch(0, 0);
@@ -1396,6 +1405,10 @@ gsAudioProcess(PluginMemory *memory, PluginAudioBuffer *audioBuffer)
 	  // NOTE: DEBUG
 	  usz grainMixBuffersIntL = INT_FROM_PTR(grainMixBuffers[0]);
 	  usz grainMixBuffersIntR = INT_FROM_PTR(grainMixBuffers[1]);
+#if 0
+	  DEBUG_POINTER_INITIALIZE(audio__grainMixBuffersL, grainMixBuffers[0]);
+	  DEBUG_POINTER_INITIALIZE(audio__grainMixBuffersR, grainMixBuffers[1]);
+#endif
 
 	  // NOTE: audio output
 	  r32 formatVolumeFactor = 1.f;      
@@ -1410,8 +1423,8 @@ gsAudioProcess(PluginMemory *memory, PluginAudioBuffer *audioBuffer)
 	    }
       
 	  void *genericOutputFrames[2] = {};
-	  genericOutputFrames[0] = audioBuffer->outputBuffer[0];
-	  genericOutputFrames[1] = audioBuffer->outputBuffer[1];     
+	  genericOutputFrames[0] = (void*)audioBuffer->outputBuffer[0];
+	  genericOutputFrames[1] = (void*)audioBuffer->outputBuffer[1];     
 	  logFormatString("genericOutputFrames = %p, %p",
 			  genericOutputFrames[0], genericOutputFrames[1]);
 	  // NOTE: DEBUG
