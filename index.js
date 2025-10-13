@@ -80,10 +80,14 @@ async function main() {
     // NOTE: WEBGL setup
     const canvas = document.querySelector("#gl-canvas");
     const gl = canvas.getContext("webgl2");
+
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
     gl.enable(gl.DEPTH_TEST);
     gl.depthFunc(gl.LEQUAL);
+
+    gl.enable(gl.SCISSOR_TEST)
     
     function loadTexture(url) {
 	const texture = gl.createTexture();	
@@ -155,6 +159,9 @@ async function main() {
     );
 
     // NOTE: input handlers
+    let viewportMinX = 0;
+    let viewportMinY = 0;
+
     const buttonOffsetFromKeystring = new Map();
     for(let charIdx = 'a'.charCodeAt(0); charIdx < 'z'.charCodeAt(0); ++charIdx) {
 	const offset = charIdx - 'a'.charCodeAt(0);
@@ -186,8 +193,8 @@ async function main() {
 	}
     });
     document.addEventListener("mousemove", (event) => {
-	const mouseX = event.pageX;
-	const mouseY = canvas.height - event.pageY;	
+	const mouseX = event.pageX - viewportMinX;
+	const mouseY = canvas.height - event.pageY - viewportMinY;	
 	wasm.instance.exports.setMousePosition(mouseX, mouseY);
     });
     document.addEventListener("mousedown", (event) => {
@@ -267,17 +274,40 @@ async function main() {
     gl.bufferData(gl.ARRAY_BUFFER, vertexBufferSize, gl.STATIC_DRAW);
     gl.bufferSubData(gl.ARRAY_BUFFER, 0, new Float32Array(positions));
 
+    const targetAspectRatio = 16.0 / 9.0;
+
     // render loop
     function render(now) {
 
-	gl.clearColor(0.0, 0.0, 0.0, 1.0);
+	gl.viewport(0, 0, canvas.width, canvas.height);
+	gl.scissor(0, 0, canvas.width, canvas.height);
+
+	gl.clearColor(0.2, 0.2, 0.2, 1.0);
 	gl.clearDepth(1.0);
 	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+	const windowAspectRatio = canvas.width / canvas.height;
+	let viewportDimX = canvas.width;
+	let viewportDimY = canvas.height;
+	if(windowAspectRatio < targetAspectRatio) {
+	    viewportDimY = viewportDimX / targetAspectRatio;
+	    viewportMinY = (canvas.height - viewportDimY) * 0.5;
+	}else {
+	    viewportDimX = viewportDimY * targetAspectRatio;
+	    viewportMinX = (canvas.width - viewportDimX) * 0.5;
+	}
+
+	const viewportDimXInt = Math.floor(viewportDimX);
+	const viewportDimYInt = Math.floor(viewportDimY);
+	gl.viewport(Math.floor(viewportMinX), Math.floor(viewportMinY),
+		    viewportDimXInt, viewportDimYInt);
+	gl.scissor(Math.floor(viewportMinX), Math.floor(viewportMinY),
+		   viewportDimXInt, viewportDimYInt);
 
 	//console.log(now);
 
 	// NOTE: write quad data to vertex buffer
-	const quadCount = wasm.instance.exports.drawQuads(canvas.width, canvas.height, now);
+	const quadCount = wasm.instance.exports.drawQuads(viewportDimXInt, viewportDimYInt, now);
 	const quadSize = 44;
 	//console.log(`quadCount: ${quadCount}`);
 	const quadFloatCount = quadSize / 4;
@@ -349,8 +379,8 @@ async function main() {
 	currentOffset += 4;
 
 	// NOTE: set uniform data
-	const a = 2.0 / canvas.width;
-	const b = 2.0 / canvas.height;
+	const a = 2.0 / viewportDimX;
+	const b = 2.0 / viewportDimY;
 	const transformMatrix = [
 	    a,    0.0, 0.0, 0.0,
 	    0.0,  b,   0.0, 0.0,
