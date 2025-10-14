@@ -1,13 +1,194 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <title>Granade</title>
-    <script src="index.js" type="module"></script>
-  </head>
+<head>
+  <meta charset="utf-8" />
+  <title>Granade</title>
+  <script src="index.js" type="module"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
 
-  <body>
+    body {
+      background-color: #121212;
+      color: #f0f0f0;
+      font-family: Arial, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2em;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 2em;
+    }
+
+    header h1 {
+      font-size: 3rem;
+    }
+
+    header h2 {
+      font-size: 1.5rem;
+      font-weight: normal;
+      color: #aaaaaa;
+      margin-top: 0.5em;
+    }
+
+    #app {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-bottom: 2em;
+    }
+
+    canvas {
+      border: 2px solid #ffffff22;
+      border-radius: 8px;
+      margin-bottom: 1em;
+    }
+
+    button {
+      padding: 0.6em 1.2em;
+      font-size: 1rem;
+      background-color: #1e88e5;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+    }
+
+    button:hover {
+      background-color: #1565c0;
+    }
+
+    details {
+      max-width: 700px;
+      width: 100%;
+      background-color: #1e1e1e;
+      border-radius: 5px;
+      padding: 1em;
+      margin-bottom: 1em;
+    }
+
+    summary {
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 1.1rem;
+      margin-bottom: 0.5em;
+    }
+
+    p, ul, table {
+      margin-top: 1em;
+      padding-left: 1.5em;
+      line-height: 1.6;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1em;
+    }
+
+    th, td {
+      border: 1px solid #444;
+      padding: 0.6em;
+      text-align: left;
+    }
+
+    th {
+      background-color: #2a2a2a;
+    }
+
+    a {
+      color: #64b5f6;
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    footer {
+      margin-top: 2em;
+      font-size: 1rem;
+    }
+  </style>
+</head>
+
+<body>
+
+  <header>
+    <h1>Granade</h1>
+    <h2>An Open Source Granular Synth.</h2>
+  </header>
+
+  <section id="app">
     <canvas id="gl-canvas" width="640" height="480"></canvas>
-    <button type="button">Play/Pause</button>
-  </body>
+    <button id="play-pause-btn">Play/Pause</button>
+  </section>
+
+  <section id="info-sections">
+
+    <details id="description-section" open>
+      <summary>📖 Description</summary>
+      <p>
+        Granade is a real-time granular synthesizer, available as a VST3 plugin and as a standalone application for macOS, Windows, and Linux. 
+        It records audio input into a buffer and deconstructs the sound into multiple overlapping delayed, enveloped, and panned segments 
+        called grains, creating complex textures and new sonic landscapes. Interactive parameters such as grain size, density, spread, and 
+        windowing allow for dynamic manipulation of grain playback in real time.
+      </p>
+    </details>
+
+    <details id="features-section">
+      <summary>🛠️ Key Features</summary>
+      <ul>
+        <li>Real-time granular synthesis</li>
+        <li>Advanced grain control: size, density, spread, windowing, panning, and mix controls</li>
+        <li>Cross-platform support (Windows, macOS, Linux)</li>
+      </ul>
+    </details>
+
+    <details id="controls-section">
+      <summary>🎚️ Controls Table</summary>
+      <table>
+        <thead>
+          <tr>
+            <th>Parameter</th>
+            <th>Description</th>
+            <th>How to Use</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Density</td><td>Controls the number of playing grains</td><td>Turn left for fewer grains, right for more.</td></tr>
+          <tr><td>Spread</td><td>Random stereo widening applied to each grain</td><td>Left = dual mono, middle = unmodified, right = wider.</td></tr>
+          <tr><td>Offset</td><td>Space between read/write heads in buffer</td><td>Left = less delay, right = more.</td></tr>
+          <tr><td>Size</td><td>Controls grain size</td><td>Left = shorter, right = longer.</td></tr>
+          <tr><td>Mix</td><td>Dry/wet mix</td><td>Left = dry, right = wet.</td></tr>
+          <tr><td>Pan</td><td>Pan of the wet signal</td><td>Left = left, right = right.</td></tr>
+          <tr><td>Window</td><td>Amplitude window shape</td><td>Left = smoother ramp, right = choppier.</td></tr>
+          <tr><td>Level</td><td>Overall output amplitude</td><td>Up = louder, down = quieter.</td></tr>
+        </tbody>
+      </table>
+    </details>
+
+    <details id="acknowledgments-section">
+      <summary>🙏 Acknowledgments</summary>
+      <p>
+        Born from connections made at <a href="https://audio.dev/archive/adc24-bristol/" target="_blank">ADC 24</a>, Granade exists thanks to the <a href="https://github.com/Audio-Project-Workgroup" target="_blank">Audio-Project-Workgroup's</a> initiative to unite developers 
+        with shared interests under the scope of music and IT. Special appreciation to all the people who contributed their time to it.
+      </p>
+    </details>
+
+  </section>
+
+  <footer>
+    🔗 <a href="https://github.com/Audio-Project-Workgroup/granular_synth" target="_blank">View the Granade Repository on GitHub</a>
+  </footer>
+
+</body>
 </html>
