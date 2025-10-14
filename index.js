@@ -158,7 +158,7 @@ async function main() {
 	false
     );
 
-    // NOTE: input handlers
+    // NOTE: input handlers    
     let viewportMinX = 0;
     let viewportMinY = 0;
 
@@ -193,8 +193,8 @@ async function main() {
 	}
     });
     document.addEventListener("mousemove", (event) => {
-	const mouseX = event.pageX - viewportMinX;
-	const mouseY = canvas.height - event.pageY - viewportMinY;	
+	const mouseX = event.pageX - canvas.offsetLeft - viewportMinX;
+	const mouseY = canvas.height + canvas.offsetTop - event.pageY - viewportMinY;
 	wasm.instance.exports.setMousePosition(mouseX, mouseY);
     });
     document.addEventListener("mousedown", (event) => {
@@ -271,7 +271,7 @@ async function main() {
 	-1.0, -1.0, 0.0, 0.0,
     ];
     gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, vertexBufferSize, gl.STATIC_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, vertexBufferSize, gl.STATIC_DRAW); // TODO: stream draw?
     gl.bufferSubData(gl.ARRAY_BUFFER, 0, new Float32Array(positions));
 
     const targetAspectRatio = 16.0 / 9.0;
