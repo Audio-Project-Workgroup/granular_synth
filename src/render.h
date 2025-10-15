@@ -21,6 +21,7 @@ struct GLState
 {
   u32 patternPosition;
   u32 vMinMaxPosition;
+  u32 vAlignmentPosition;
   u32 vUVMinMaxPosition;
   u32 vColorPosition;
   u32 vAnglePosition;
@@ -43,6 +44,7 @@ struct R_Quad
 {
   v2 min;
   v2 max;
+  v2 alignment;
 
   v2 uvMin;
   v2 uvMax;

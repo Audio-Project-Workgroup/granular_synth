@@ -20,6 +20,7 @@ static char vertexShaderSource[] = R"VSRC(
  
 in vec4 pattern;
 in vec4 v_min_max;
+in vec2 v_alignment;
 in vec4 v_uv_min_max;
 in vec4 v_color;
 in float v_angle;
@@ -31,7 +32,7 @@ out vec4 f_color;
 out vec2 f_uv;
 
 void main() {
-  vec2 v_pattern = pattern.xy;
+  vec2 v_pattern = pattern.xy - 2.0*v_alignment;
   vec2 uv_pattern = pattern.zw;
 
   vec2 center = (v_min_max.zw + v_min_max.xy)*0.5;
@@ -118,15 +119,16 @@ makeGLState(Arena *arena, usz quadCapacity)
   GLuint program = makeGLProgram(vertexShader, fragmentShader);
   glUseProgram(program);
   
-  GLuint patternPosition   = glGetAttribLocation(program, "pattern");
-  GLuint vMinMaxPosition   = glGetAttribLocation(program, "v_min_max");
-  GLuint vUVMinMaxPosition = glGetAttribLocation(program, "v_uv_min_max");
-  GLuint vColorPosition    = glGetAttribLocation(program, "v_color");
-  GLuint vAnglePosition    = glGetAttribLocation(program, "v_angle");
-  GLuint vLevelPosition    = glGetAttribLocation(program, "v_level");
+  GLuint patternPosition    = glGetAttribLocation(program, "pattern");
+  GLuint vMinMaxPosition    = glGetAttribLocation(program, "v_min_max");
+  GLuint vAlignmentPosition = glGetAttribLocation(program, "v_alignment");
+  GLuint vUVMinMaxPosition  = glGetAttribLocation(program, "v_uv_min_max");
+  GLuint vColorPosition     = glGetAttribLocation(program, "v_color");
+  GLuint vAnglePosition     = glGetAttribLocation(program, "v_angle");
+  GLuint vLevelPosition     = glGetAttribLocation(program, "v_level");
 
-  GLuint transformPosition = glGetUniformLocation(program, "transform");
-  GLuint samplerPosition   = glGetUniformLocation(program, "atlas");
+  GLuint transformPosition  = glGetUniformLocation(program, "transform");
+  GLuint samplerPosition    = glGetUniformLocation(program, "atlas");
   glUniform1i(samplerPosition, 0);
 
   GLuint vao;
@@ -165,14 +167,15 @@ makeGLState(Arena *arena, usz quadCapacity)
   GL_CATCH_ERROR();
 
   GLState *result = arenaPushStruct(arena, GLState);
-  result->patternPosition   = patternPosition;
-  result->vMinMaxPosition   = vMinMaxPosition;
-  result->vUVMinMaxPosition = vUVMinMaxPosition;
-  result->vColorPosition    = vColorPosition;
-  result->vAnglePosition    = vAnglePosition;
-  result->vLevelPosition    = vLevelPosition;
-  result->transformPosition = transformPosition;
-  result->samplerPosition   = samplerPosition;
+  result->patternPosition    = patternPosition;
+  result->vMinMaxPosition    = vMinMaxPosition;
+  result->vAlignmentPosition = vAlignmentPosition;
+  result->vUVMinMaxPosition  = vUVMinMaxPosition;
+  result->vColorPosition     = vColorPosition;
+  result->vAnglePosition     = vAnglePosition;
+  result->vLevelPosition     = vLevelPosition;
+  result->transformPosition  = transformPosition;
+  result->samplerPosition    = samplerPosition;
   result->vao = vao;
   result->vbo = vbo;
   result->vertexShader = vertexShader;
@@ -241,6 +244,11 @@ renderCommands(RenderCommands *commands)
   glVertexAttribDivisor(commands->glState->vMinMaxPosition, 1);
   glVertexAttribPointer(commands->glState->vMinMaxPosition, 4, GL_FLOAT, 0, sizeof(R_Quad),
 			PTR_FROM_INT(commands->glState->quadDataOffset + OFFSET_OF(R_Quad, min)));
+
+  glEnableVertexAttribArray(commands->glState->vAlignmentPosition);
+  glVertexAttribDivisor(commands->glState->vAlignmentPosition, 1);
+  glVertexAttribPointer(commands->glState->vAlignmentPosition, 2, GL_FLOAT, 0, sizeof(R_Quad),
+			PTR_FROM_INT(commands->glState->quadDataOffset + OFFSET_OF(R_Quad, alignment)));
 
   glEnableVertexAttribArray(commands->glState->vUVMinMaxPosition);
   glVertexAttribDivisor(commands->glState->vUVMinMaxPosition, 1);

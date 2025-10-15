@@ -496,6 +496,12 @@ platformLogf(char *fmt, ...)
   //arenaReleaseScratch(scratch);
 }
 
+proc_export usz
+getQuadSize(void)
+{
+  return(sizeof(R_Quad));
+}
+
 proc_export R_Quad*
 getQuadsOffset(void)
 {

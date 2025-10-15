@@ -5,6 +5,7 @@ let sharedMemory = null;
 let vsSource = `
 attribute vec4 pattern;
 attribute vec4 v_min_max;
+attribute vec2 v_alignment;
 attribute vec4 v_uv_min_max;
 attribute vec4 v_color;
 attribute float v_angle;
@@ -16,7 +17,7 @@ varying lowp vec4 f_color;
 varying highp vec2 f_uv;
 
 void main() {
-  vec2 v_pattern = pattern.xy;
+  vec2 v_pattern = pattern.xy - 2.0*v_alignment;
   vec2 uv_pattern = pattern.zw;
 
   vec2 center = (v_min_max.zw + v_min_max.xy)*0.5;
@@ -242,12 +243,13 @@ async function main() {
 
     // vertex attributes
     gl.useProgram(shaderProgram);
-    const patternPosition   = gl.getAttribLocation(shaderProgram, "pattern");
-    const vMinMaxPosition   = gl.getAttribLocation(shaderProgram, "v_min_max");
-    const vUVMinMaxPosition = gl.getAttribLocation(shaderProgram, "v_uv_min_max");
-    const vColorPosition    = gl.getAttribLocation(shaderProgram, "v_color");
-    const vAnglePosition    = gl.getAttribLocation(shaderProgram, "v_angle");
-    const vLevelPosition    = gl.getAttribLocation(shaderProgram, "v_level");
+    const patternPosition    = gl.getAttribLocation(shaderProgram, "pattern");
+    const vMinMaxPosition    = gl.getAttribLocation(shaderProgram, "v_min_max");
+    const vAlignmentPosition = gl.getAttribLocation(shaderProgram, "v_alignment");
+    const vUVMinMaxPosition  = gl.getAttribLocation(shaderProgram, "v_uv_min_max");
+    const vColorPosition     = gl.getAttribLocation(shaderProgram, "v_color");
+    const vAnglePosition     = gl.getAttribLocation(shaderProgram, "v_angle");
+    const vLevelPosition     = gl.getAttribLocation(shaderProgram, "v_level");
 
     // uniforms
     const transformPosition = gl.getUniformLocation(shaderProgram, "transform");
@@ -273,6 +275,9 @@ async function main() {
     gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, vertexBufferSize, gl.STATIC_DRAW); // TODO: stream draw?
     gl.bufferSubData(gl.ARRAY_BUFFER, 0, new Float32Array(positions));
+
+    const quadSize = wasm.instance.exports.getQuadSize();
+    const quadSizeInFloats = quadSize / 4;
 
     const targetAspectRatio = 16.0 / 9.0;
 
@@ -308,10 +313,8 @@ async function main() {
 
 	// NOTE: write quad data to vertex buffer
 	const quadCount = wasm.instance.exports.drawQuads(viewportDimXInt, viewportDimYInt, now);
-	const quadSize = 44;
 	//console.log(`quadCount: ${quadCount}`);
-	const quadFloatCount = quadSize / 4;
-	const quadData = new Float32Array(sharedMemory.buffer, quadsOffset, quadFloatCount*quadCount);
+	const quadData = new Float32Array(sharedMemory.buffer, quadsOffset, quadSizeInFloats*quadCount);
 	//console.log(quadData);
 	gl.bufferSubData(gl.ARRAY_BUFFER, 64, quadData);
 
@@ -337,6 +340,16 @@ async function main() {
 	gl.vertexAttribDivisor(vMinMaxPosition, 1);
 	gl.vertexAttribPointer(vMinMaxPosition, vMinMaxNumComponents, vMinMaxType, vMinMaxNormalize, vMinMaxStride, vMinMaxOffset);
 	currentOffset += 16;
+
+	const vAlignmentNumComponents = 2;
+	const vAlignmentType = gl.FLOAT;
+	const vAlignmentNormalize = false;
+	const vAlignmentStride = quadSize;
+	const vAlignmentOffset = currentOffset;
+	gl.enableVertexAttribArray(vAlignmentPosition);
+	gl.vertexAttribDivisor(vAlignmentPosition, 1);
+	gl.vertexAttribPointer(vAlignmentPosition, vAlignmentNumComponents, vAlignmentType, vAlignmentNormalize, vAlignmentStride, vAlignmentOffset);
+	currentOffset += 8;
 
 	const vUVMinMaxNumComponents = 4;
 	const vUVMinMaxType = gl.FLOAT;

@@ -1,14 +1,12 @@
 static inline void 
 renderPushQuad(RenderCommands *commands, Rect2 rect, PluginAsset *asset, r32 angle,
 	       r32 level, v4 color = V4(1, 1, 1, 1))
-{
-  v2 rectDim = getDim(rect);
-  v2 alignOffset = hadamard(rectDim, asset->align);
-  
+{  
   ASSERT(commands->quadCount < commands->quadCapacity);
   R_Quad *quad = commands->quads + commands->quadCount++;
-  quad->min = rect.min - alignOffset;
-  quad->max = rect.max - alignOffset;
+  quad->min = rect.min;
+  quad->max = rect.max;
+  quad->alignment = asset->align;
   quad->uvMin = asset->uv.min;
   quad->uvMax = asset->uv.max;
   quad->color = colorU32FromV4(color);
@@ -182,11 +180,19 @@ renderPushUIElement(RenderCommands *commands, UIElement *element)
 	      r32 paramPercentage = (paramValue - element->fParam->range.min)/(element->fParam->range.max - element->fParam->range.min);
 	      //logFormatString("paramPercentage: %.2f", paramPercentage);
 	      r32 paramAngle = -(paramPercentage - 0.5f)*1.5f*GS_PI;
-	      //r32 paramAngle = -paramPercentage*M_PI;
 
 	      renderPushQuad(commands,
 			     element->region, element->texture, paramAngle,
 			     RENDER_LEVEL(control), element->color);
+
+#if 0
+	      // DEBUG:
+	      {
+		Rect2 knobCenterMarker = rectCenterDim(getCenter(element->region),
+						       V2(4.f, 4.f));
+		renderPushQuad(commands, knobCenterMarker, PLUGIN_ASSET(null), 0, RENDER_LEVEL(front));
+	      }
+#endif
 	    }
 	}
     }

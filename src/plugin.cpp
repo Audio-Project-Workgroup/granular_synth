@@ -43,7 +43,7 @@
    -(FIXED) editor should render at a constant aspect ratio of 16:9, adding
             black bars if necessary (as in native/vst targets)
    -(web)   fix sort order so that knobs aren't cut off
-   -(all)   align knobs to center
+   -(FIXED) align knobs to center
 
  * (DONE) INFO (MERGE PULL REQUEST):
    -(web) put relevant readme info in the web page (description, controls, etc.)
