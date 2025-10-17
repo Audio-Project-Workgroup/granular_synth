@@ -34,15 +34,17 @@
             around 5 MB to ~ 200 KB for a single frame, and then goes back to normal
    -(FIXED?) the audio process appears to occasionally underflow
    -(web)   microphone audio input sometimes sounds choppy
+            (index.js, granade_audio.js, wasm_glue.cpp)
    -(web)   test on firefox/safari/mobile
    -(all)   prevent too much grain view data from being queued up, overflowing the render buffer
             (can happen when device selection menu is open, plugin editor window is closed, or
 	    user is in a different browser tab).
+	    (internal_granulator.h, internal_granulator.cpp, plugin.cpp)
 	   
  * FIX GRAPHICAL BUGS:
    -(FIXED) editor should render at a constant aspect ratio of 16:9, adding
             black bars if necessary (as in native/vst targets)
-   -(web)   fix sort order so that knobs aren't cut off
+   -(FIXED?) fix sort order so that knobs aren't cut off
    -(FIXED) align knobs to center
 
  * (DONE) INFO (MERGE PULL REQUEST):
@@ -52,13 +54,6 @@
    |                             LINE OF NECESSITY                             |
    -----------------------------------------------------------------------------
 
- * PERFORMANCE OPTIMIZATION:
-   -(all) profile
-   -(all) vectorize copying audio samples to output/from input
-   -(all) transpose loop order in grain process ()
-   -(all) check for false-sharing on cache lines with contended locks
-   -(web) implement simple math functions, to avoid a round-trip to javascript
-
  * NEW FEATURES:
    -(all) pitch-shift/time-stretch controls
    -(all) parameter modulation
@@ -67,7 +62,7 @@
    -(all) double-click control to reset to default value
    -(web) reselect input device
    -(web) keyboard driven ui
-   
+      
  * TECH DEBT:
    -(vst/exe) resurrect vst target, make sure all platforms still work
    -(all) merge build scripts into a single `build.bat` and `build.sh`, with
@@ -77,6 +72,14 @@
           files, compile the common implementation once, and link into each
 	  target, to hopefully speed up compilation time
    -(all) simplify/optimize ui system
+
+ * PERFORMANCE OPTIMIZATION:
+   -(all) profile
+   -(all) vectorize copying audio samples to output/from input
+   -(all) transpose loop order in grain process ()
+   -(all) check for false-sharing on cache lines with contended locks
+   -(web) implement simple math functions, to avoid a round-trip to javascript
+   
  */
 
 /* TODO:
