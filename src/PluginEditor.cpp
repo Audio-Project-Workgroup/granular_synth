@@ -305,6 +305,16 @@ newOpenGLContextCreated(void)
   glEnable(GL_SCISSOR_TEST);
 
   commands = allocRenderCommands();
+
+  juce::Image atlasImage = juce::ImageFileFormat::loadFrom(BinaryData::test_atlas_png,
+							   BinaryData::test_atlas_pngSize);
+  juce::Image::BitmapData atlasImageBitmapData(atlasImage, juce::Image::BitmapData::readOnly);
+  commands->atlas = arenaPushStruct(commands->allocator, LoadedBitmap);
+  commands->atlas->width = atlasImage.getWidth();
+  commands->atlas->height = atlasImage.getHeight();
+  commands->atlas->stride = atlasImageBitmapData.lineStride;
+  commands->atlas->pixels = (u32*)atlasImageBitmapData.data;
+  ASSERT(atlasImageBitmapData.pixelStride == 4);
 }
 
 void AudioPluginAudioProcessorEditor::

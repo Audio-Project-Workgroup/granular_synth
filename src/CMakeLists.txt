@@ -104,17 +104,24 @@ add_custom_command(
     "$<TARGET_FILE_DIR:${PROJECT_NAME}>/VST3/${PLUGIN_NAME}.vst3/Contents/data"
   )
 
-  if(UNIX)
-    add_custom_command(
-      TARGET ${PROJECT_NAME}
-      POST_BUILD
-      
-      # copy script for bundling dependencies on linux
-      COMMAND ${CMAKE_COMMAND} -E copy_if_different
-      "${CMAKE_SOURCE_DIR}/bundle_dependencies.sh"
-      "$<TARGET_FILE_DIR:${PROJECT_NAME}_VST3>"
-    )
-  endif()
+if(UNIX)
+  add_custom_command(
+    TARGET ${PROJECT_NAME}
+    POST_BUILD
+    
+    # copy script for bundling dependencies on linux
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    "${CMAKE_SOURCE_DIR}/bundle_dependencies.sh"
+    "$<TARGET_FILE_DIR:${PROJECT_NAME}_VST3>"
+  )
+endif()
+
+set(PLUGIN_BINARY_DATA "${PLUGIN_NAME}_BinaryData")
+juce_add_binary_data(
+  ${PLUGIN_BINARY_DATA}
+  SOURCES
+  "${DATA_DIR}/test_atlas.png"
+)
 
 target_compile_definitions(
   ${PROJECT_NAME}
@@ -144,6 +151,7 @@ target_link_libraries(
   juce_audio_utils
   juce_opengl
   # ${ONNX_LIBRARY}
+  ${PLUGIN_BINARY_DATA}
 )
 
 # we shouldn't have to copy the onnx dll all over the place anymore, if we start using it again
