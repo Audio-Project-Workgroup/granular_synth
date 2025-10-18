@@ -1,5 +1,4 @@
 // structures/functions for making string processing and amalgamation convenient
-//#include <stdio.h>
 #define STB_SPRINTF_IMPLEMENTATION
 #define STB_SPRINTF_DECORATE(name) gs_##name
 #include "stb_sprintf.h"

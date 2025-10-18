@@ -1,4 +1,5 @@
 #pragma once
+#define HOST_LAYER
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "context.h"
@@ -70,10 +71,12 @@ private:
   juce::String pathToPlugin;
   juce::String pathToData;
   juce::DynamicLibrary libPlugin;    
-  
-  PluginLogger pluginLogger;
-  void *loggerMemory;
+
+#if BUILD_LOGGING
+  PluginLogger pluginLogger;  
+  void *loggerMemory;  
   Arena loggerArena;
+#endif
   
   void *audioBufferMemory;
   bool resourcesReleased;

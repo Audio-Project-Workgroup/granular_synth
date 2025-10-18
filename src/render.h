@@ -1,3 +1,9 @@
+#if BUILD_DEBUG
+#  define GL_CATCH_ERROR() do { GLenum err = glGetError(); if(err != GL_NO_ERROR) ASSERT(0); } while(0)
+#else
+#  define GL_CATCH_ERROR()
+#endif
+
 #define RENDER_LEVEL(l) ((r32)(RenderLevel_##l)/(r32)RenderLevel_COUNT)
 enum RenderLevel
 {

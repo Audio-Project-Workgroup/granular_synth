@@ -37,10 +37,10 @@ static String8 basePath;
       fprintf(stderr, msg, err, ##__VA_ARGS__);	\
     }						\
   } while(0)
-#  define GL_CATCH_ERROR() do { GLenum err = glGetError(); if(err != GL_NO_ERROR) ASSERT(0); } while(0)
+// #  define GL_CATCH_ERROR() do { GLenum err = glGetError(); if(err != GL_NO_ERROR) ASSERT(0); } while(0)
 #else
 #  define GL_PRINT_ERROR(msg, ...)
-#  define GL_CATCH_ERROR()
+// #  define GL_CATCH_ERROR()
 #endif
 
 #include "miniaudio.h"

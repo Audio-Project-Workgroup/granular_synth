@@ -73,32 +73,38 @@ IF NOT EXIST ..\build mkdir ..\build
 pushd ..\build
 set BUILD_DIR=%CD%
 
+:: -----------------------------------------------------------------------------
+:: build targets
+
 :: produce logo icon file
-call rc /nologo /fo logo.res ..\data\logo.rc
+if not exist logo.res (
+    call rc /nologo /fo logo.res ..\data\logo.rc
+)
 
 :: delete old pdbs and rdis
 del *.pdb > NUL 2> NUL
 del *.rdi > NUL 2> NUL
 
-REM compile miniaudio to static library
+:: compile miniaudio to static library
 IF NOT EXIST miniaudio.lib (
     cl %CFLAGS% -c ..\src\miniaudio_impl.c
     lib -OUT:miniaudio.lib miniaudio_impl.obj
 )
 
-REM preprocessor
-::cl %CFLAGS% ..\src\preprocessor.cpp /link %LFLAGS%
-::popd
-:: TODO: this is incomprehensibly fucked
-::..\build\preprocessor.exe plugin.h > generated.cpp 
-::pushd ..\build
+:: preprocessor
+rem cl %CFLAGS% ..\src\preprocessor.cpp /link %LFLAGS%
+rem popd
+rem :: TODO: this is incomprehensibly fucked
+rem ..\build\preprocessor.exe plugin.h > generated.cpp 
+rem pushd ..\build
 
-REM asset packer
+:: asset packer
 IF NOT EXIST %DATA_DIR%\test_atlas.png (
     cl %CFLAGS% ..\src\asset_packer.cpp /link %LFLAGS% -out:asset_packer.exe
     asset_packer.exe
 )
 
+:: plugin
 :: TODO: allow linking the plugin to the exe and vst statically for release builds
 set PLUGIN_STATUS=0
 if "!target_plugin!"=="1" (
@@ -108,6 +114,7 @@ if "!target_plugin!"=="1" (
     set PLUGIN_STATUS=%ERRORLEVEL%
 )
 
+:: exe
 set EXE_STATUS=0
 if "!target_exe!"=="1" (
     if %PLUGIN_STATUS%==0 (
@@ -119,6 +126,7 @@ if "!target_exe!"=="1" (
     )
 )
 
+:: vst
 set VST_STATUS=0
 if "!target_vst!"=="1" (
     if %PLUGIN_STATUS%==0 (

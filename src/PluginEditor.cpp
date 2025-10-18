@@ -286,9 +286,9 @@ renderOpenGL(void)
   //       polling input at a particular time. We could avoid locks by having input callbacks write to a
   //       lock-free queue, which the rendering code would read from. But that's probably not necessary
   while(atomicCompareAndSwap(&inputLock, 0, 1)) {}
-  if(processorRef.pluginCode.renderNewFrame)
+  if(processorRef.pluginCode.pluginAPI.gsRenderNewFrame)
     {      
-      processorRef.pluginCode.renderNewFrame(&processorRef.pluginMemory, newInput, &commands);
+      processorRef.pluginCode.pluginAPI.gsRenderNewFrame(&processorRef.pluginMemory, newInput, &commands);
 
       // NOTE: it's so cool that you can't set the mouse cursor here and have to defer setting it in a mouse callback
       switch(commands.cursorState)
@@ -318,7 +318,7 @@ renderOpenGL(void)
       renderCommands(&commands);
       //repaint();
       
-#if BUILD_DEBUG
+#if BUILD_LOGGING
       PluginLogger *pluginLogger = processorRef.pluginMemory.logger;
       for(;;)
 	{
