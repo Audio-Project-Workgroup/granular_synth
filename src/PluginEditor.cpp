@@ -1,6 +1,43 @@
 //#include "PluginProcessor.h"
 #include "PluginEditor.h"
 
+// TODO: pull this code that's copied from main.cpp out into a shared file
+#define ARENA_MIN_ALLOCATION_SIZE KILOBYTES(64)
+
+static Arena*
+gsArenaAcquire(usz size)
+{
+  usz allocSize = MAX(size, ARENA_MIN_ALLOCATION_SIZE);
+
+  void *base = platformAllocateMemory(allocSize);
+  Arena *result = (Arena*)base;
+  result->current = result;
+  result->prev = 0;
+  result->base = 0;
+  result->capacity = allocSize;
+  result->pos = ARENA_HEADER_SIZE;
+
+  return(result);
+}
+
+static void
+gsArenaDiscard(Arena *arena)
+{
+  platformFreeMemory(arena, arena->capacity);
+}
+
+static void
+gsCopyMemory(void *dest, void *src, usz size)
+{
+  memcpy(dest, src, size);
+}
+
+static void
+gsSetMemory(void *dest, int value, usz size)
+{
+  memset(dest, value, size);
+}
+
 #include "render.cpp"
 
 using namespace juce::gl;
@@ -46,10 +83,11 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
       displayMin = V2(((r32)editorWidth - displayDim.x)*0.5f, 0);
     }
 
-  commands = {};
-  commands.generateNewTextures = true;
-  commands.widthInPixels = (u32)displayDim.x;
-  commands.heightInPixels = (u32)displayDim.y; 
+  // commands = {};
+  // commands.generateNewTextures = true;
+  // commands.widthInPixels = (u32)displayDim.x;
+  // commands.heightInPixels = (u32)displayDim.y;
+  //commands = allocRenderCommands();
 
   setWantsKeyboardFocus(true);
   setMouseClickGrabsKeyboardFocus(true);
@@ -96,9 +134,9 @@ resized()
       displayMin = V2(((r32)editorWidth - displayDim.x)*0.5f, 0);
     }
 
-  commands.windowResized = true;
-  commands.widthInPixels = (u32)displayDim.x;
-  commands.heightInPixels = (u32)displayDim.y;
+  // commands->windowResized = true;
+  // commands.widthInPixels = (u32)displayDim.x;
+  // commands.heightInPixels = (u32)displayDim.y;
 }
 
 void AudioPluginAudioProcessorEditor::
@@ -251,6 +289,8 @@ keyPressed(const juce::KeyPress &key)
 void AudioPluginAudioProcessorEditor::
 newOpenGLContextCreated(void)
 {
+  //juce::gl::loadExtensions();
+
 #if !OS_MAC
   // NOTE: this function requires OpenGL version >= 4.3, and mac supports at most version 4.1
   glDebugMessageControl(GL_DEBUG_SOURCE_API,
@@ -263,6 +303,8 @@ newOpenGLContextCreated(void)
   
   glEnable(GL_TEXTURE_2D);  
   glEnable(GL_SCISSOR_TEST);
+
+  commands = allocRenderCommands();
 }
 
 void AudioPluginAudioProcessorEditor::
@@ -273,6 +315,8 @@ renderOpenGL(void)
 
   glClearColor(0.2f, 0.2f, 0.2f, 0.f);
   glClear(GL_COLOR_BUFFER_BIT);
+
+  renderBeginCommands(commands, displayDim.x, displayDim.y);
 
   glViewport(displayMin.x, displayMin.y, displayDim.x, displayDim.y);
   glScissor(displayMin.x, displayMin.y, displayDim.x, displayDim.y);
@@ -288,10 +332,10 @@ renderOpenGL(void)
   while(atomicCompareAndSwap(&inputLock, 0, 1)) {}
   if(processorRef.pluginCode.pluginAPI.gsRenderNewFrame)
     {      
-      processorRef.pluginCode.pluginAPI.gsRenderNewFrame(&processorRef.pluginMemory, newInput, &commands);
+      processorRef.pluginCode.pluginAPI.gsRenderNewFrame(&processorRef.pluginMemory, newInput, commands);
 
       // NOTE: it's so cool that you can't set the mouse cursor here and have to defer setting it in a mouse callback
-      switch(commands.cursorState)
+      switch(commands->cursorState)
 	{
 	case CursorState_default:
 	  {
@@ -315,7 +359,8 @@ renderOpenGL(void)
 	  } break;
 	}
       
-      renderCommands(&commands);
+      renderCommands(commands);
+      renderEndCommands(commands);
       //repaint();
       
 #if BUILD_LOGGING

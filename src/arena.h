@@ -28,7 +28,7 @@ struct TemporaryMemory
 };
 
 #define ARENA_SCRATCH_POOL_COUNT 2
-thread_var Arena *m__scratchPool[ARENA_SCRATCH_POOL_COUNT] = {};
+static thread_var Arena *m__scratchPool[ARENA_SCRATCH_POOL_COUNT] = {};
 
 struct ArenaPushFlags
 {

@@ -37,7 +37,7 @@ private:
 
   juce::MouseCursor editorMouseCursor;
 
-  RenderCommands commands;  
+  RenderCommands *commands;  
 
   r32 targetAspectRatio;
   u32 editorWidth, editorHeight;

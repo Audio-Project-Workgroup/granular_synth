@@ -183,13 +183,6 @@ struct PluginFileOperations
 // functionality the plugin provides to the host
 //
 
-// video
-
-/* #define RENDER_NEW_FRAME(name) void (name)(PluginMemory *memory, PluginInput *input, RenderCommands *renderCommands) */
-/* typedef RENDER_NEW_FRAME(RenderNewFrame); */
-
-// audio
-
 enum AudioFormat
 {
   AudioFormat_none,
@@ -232,12 +225,5 @@ struct PluginAudioBuffer
   u32 parameterValueQueueWriteIndex;
   volatile u32 queuedCount;
 };
-
-/* #define AUDIO_PROCESS(name) void (name)(PluginMemory *memory, PluginAudioBuffer *audioBuffer) */
-/* typedef AUDIO_PROCESS(AudioProcess); */
-
-/* struct PluginState; */
-/* #define INITIALIZE_PLUGIN_STATE(name) PluginState *(name)(PluginMemory *memoryBlock) */
-/* typedef INITIALIZE_PLUGIN_STATE(InitializePluginState);*/
 
 #include "plugin.api.h"

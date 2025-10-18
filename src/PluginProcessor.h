@@ -2,7 +2,6 @@
 #define HOST_LAYER
 
 #include <juce_audio_processors/juce_audio_processors.h>
-#include "context.h"
 #include "common.h"
 static String8 basePath;
 #include "platform.h"
