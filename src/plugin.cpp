@@ -1082,7 +1082,9 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 		  
 		  u32 viewEntryReadIndex = grainStateView->viewReadIndex;
 		  u32 entriesQueued = gsAtomicLoad(&grainStateView->entriesQueued);
+		  //u32 entriesToProcess = entiresQueued % ARRAY_COUNT(grainStateView->view);
 		  logFormatString("entriesQueued: %u", entriesQueued);
+		  //logFormatString("entriesToProcess: %u", entriesToProcess);
 
 		  for(u32 entryIndex = 0; entryIndex < entriesQueued; ++entryIndex)
 		    {		     		  

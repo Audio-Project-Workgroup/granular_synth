@@ -51,7 +51,8 @@ juceProcessButtonPress(ButtonState *newState, bool pressed)
 
 //==============================================================================
 AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudioProcessor& p)
-    : AudioProcessorEditor(&p), processorRef(p)
+  : AudioProcessorEditor(&p),
+    processorRef(p)
 {
   juce::ignoreUnused(processorRef);
     // Make sure that before the constructor has finished, you've set the
@@ -289,8 +290,6 @@ keyPressed(const juce::KeyPress &key)
 void AudioPluginAudioProcessorEditor::
 newOpenGLContextCreated(void)
 {
-  //juce::gl::loadExtensions();
-
 #if !OS_MAC
   // NOTE: this function requires OpenGL version >= 4.3, and mac supports at most version 4.1
   glDebugMessageControl(GL_DEBUG_SOURCE_API,
@@ -300,21 +299,14 @@ newOpenGLContextCreated(void)
 			0,
 			GL_FALSE);
 #endif
-  
-  glEnable(GL_TEXTURE_2D);  
-  glEnable(GL_SCISSOR_TEST);
 
   commands = allocRenderCommands();
-
-  juce::Image atlasImage = juce::ImageFileFormat::loadFrom(BinaryData::test_atlas_png,
-							   BinaryData::test_atlas_pngSize);
-  juce::Image::BitmapData atlasImageBitmapData(atlasImage, juce::Image::BitmapData::readOnly);
   commands->atlas = arenaPushStruct(commands->allocator, LoadedBitmap);
-  commands->atlas->width = atlasImage.getWidth();
-  commands->atlas->height = atlasImage.getHeight();
-  commands->atlas->stride = atlasImageBitmapData.lineStride;
-  commands->atlas->pixels = (u32*)atlasImageBitmapData.data;
-  ASSERT(atlasImageBitmapData.pixelStride == 4);
+  commands->atlas->width = processorRef.atlasImage.getWidth();
+  commands->atlas->height = processorRef.atlasImage.getHeight();
+  commands->atlas->stride = processorRef.atlasImageBitmapData.lineStride;
+  commands->atlas->pixels = (u32*)processorRef.atlasImageBitmapData.data;
+  ASSERT(processorRef.atlasImageBitmapData.pixelStride == 4);
 }
 
 void AudioPluginAudioProcessorEditor::

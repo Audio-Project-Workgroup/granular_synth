@@ -123,12 +123,15 @@ juce_add_binary_data(
   "${DATA_DIR}/test_atlas.png"
 )
 
+message("BUILD_DEBUG=${BUILD_DEBUG}")
+message("BUILD_LOGGING=${BUILD_LOGGING}")
 target_compile_definitions(
   ${PROJECT_NAME}
   PRIVATE
-  BUILD_DEBUG=1  
+  BUILD_DEBUG=${BUILD_DEBUG}
+  BUILD_LOGGING=${BUILD_LOGGING}
   "DYNAMIC_PLUGIN_FILE_NAME=\"${DYNAMIC_PLUGIN_NAME}\""
-  # "ONNX_MODEL_PATH=\"${ONNX_MODEL_PATH}\""
+  # "ONNX_MODEL_PATH=\"${ONNX_MODEL_PATH}\""  
 )
 
 target_include_directories(

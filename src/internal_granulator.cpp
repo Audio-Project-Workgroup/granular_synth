@@ -300,9 +300,11 @@ synthesize(r32* destBufferLInit, r32* destBufferRInit,
     }
 
   grainStateView->viewWriteIndex = viewWriteIndex;
-  while(gsAtomicCompareAndSwap(&grainStateView->entriesQueued, entriesQueued, entriesQueued + 1) != entriesQueued)
+  u32 newEntriesQueued = (entriesQueued + 1) % ARRAY_COUNT(grainStateView->views);
+  while(gsAtomicCompareAndSwap(&grainStateView->entriesQueued, entriesQueued, newEntriesQueued) != entriesQueued)
     {
       entriesQueued = gsAtomicLoad(&grainStateView->entriesQueued);
+      newEntriesQueued = (entriesQueued + 1) % ARRAY_COUNT(grainStateView->views);
     }
 }
 

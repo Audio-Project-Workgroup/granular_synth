@@ -193,7 +193,10 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
 #endif
 		   .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
 #endif
-		   )
+		   ),
+    atlasImage(juce::ImageFileFormat::loadFrom(BinaryData::test_atlas_png,
+					       BinaryData::test_atlas_pngSize)),
+    atlasImageBitmapData(atlasImage, juce::Image::BitmapData::readOnly)
 {
   pluginMemoryBlockSizeInBytes = MEGABYTES(512);
   pluginMemory = {};

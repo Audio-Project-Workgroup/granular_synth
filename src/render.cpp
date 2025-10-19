@@ -2,6 +2,13 @@
 using namespace juce::gl;
 #endif
 
+#if BUILD_DEBUG
+static GLenum glerr = GL_NO_ERROR;
+#  define GL_CATCH_ERROR() do { glerr = glGetError(); if(glerr != GL_NO_ERROR) ASSERT(0); } while(0)
+#else
+#  define GL_CATCH_ERROR()
+#endif
+
 enum GLShaderKind
 {
   GLShaderKind_vertex,
@@ -210,10 +217,13 @@ renderBindTexture(LoadedBitmap *texture, bool generateNewTextures)
   else
     {
       glGenTextures(1, &texture->glHandle);
-      glBindTexture(GL_TEXTURE_2D, texture->glHandle);      
+      GL_CATCH_ERROR();
+      glBindTexture(GL_TEXTURE_2D, texture->glHandle);
+      GL_CATCH_ERROR();
       glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
 		   texture->width, texture->height, 0,
 		   GL_RGBA, GL_UNSIGNED_BYTE, texture->pixels);
+      GL_CATCH_ERROR();
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -235,6 +245,8 @@ renderCommands(RenderCommands *commands)
       renderBindTexture(commands->atlas, commands->generateNewTextures);
       commands->atlasIsBound = 1;
     }
+
+  glUseProgram(commands->glState->program);
 
   glEnableVertexAttribArray(commands->glState->patternPosition);
   glVertexAttribDivisor(commands->glState->patternPosition, 0);

@@ -65,6 +65,9 @@ public:
   PluginFloatParameter *pluginParameters;
   bool ignoreParameterChange;
 
+  juce::Image atlasImage;
+  juce::Image::BitmapData atlasImageBitmapData;
+
 private:
   juce::String pathToVST;
   juce::String pathToPlugin;

@@ -62,10 +62,8 @@ if %BUILD_DEBUG%==1 (
 set CFLAGS=%CFLAGS% -I..\src\include
 set CFLAGS=%CFLAGS% -I..\src\include\glad\include
 set CFLAGS=%CFLAGS% -MT -EHa- -GR-
-rem set CFLAGS=-DBUILD_DEBUG=0 -I..\src\include -nologo -Zi -W4 -wd"4201" -wd"4100" -wd"4146" -wd"4310" -wd"4244" -wd"4505" -MT -EHa- -GR-
 set CFLAGS=%CFLAGS% -DBUILD_DEBUG=%BUILD_DEBUG%
 set CFLAGS=%CFLAGS% -DBUILD_LOGGING=%BUILD_LOGGING%
-rem set CFLAGS=%CFLAGS% -DBUILD_DEBUG=0
 
 set LFLAGS=-incremental:no -opt:ref
 
@@ -78,6 +76,7 @@ set BUILD_DIR=%CD%
 
 :: produce logo icon file
 if not exist logo.res (
+    echo building logo resource...
     call rc /nologo /fo logo.res ..\data\logo.rc
 )
 
@@ -87,6 +86,7 @@ del *.rdi > NUL 2> NUL
 
 :: compile miniaudio to static library
 IF NOT EXIST miniaudio.lib (
+    echo compiling miniaudio...
     cl %CFLAGS% -c ..\src\miniaudio_impl.c
     lib -OUT:miniaudio.lib miniaudio_impl.obj
 )
@@ -100,22 +100,24 @@ rem pushd ..\build
 
 :: asset packer
 IF NOT EXIST %DATA_DIR%\test_atlas.png (
+    echo compiling asset packer...
     cl %CFLAGS% ..\src\asset_packer.cpp /link %LFLAGS% -out:asset_packer.exe
+    echo running asset packer...
     asset_packer.exe
 )
 
+:: TODO: try compiling common layer implementations to separate lib/obj and link
+::       with all targets to speed up build times
+
 :: plugin
 :: TODO: allow linking the plugin to the exe and vst statically for release builds
-set PLUGIN_STATUS=0
 if "!target_plugin!"=="1" (
     echo compiling plugin...
     cl %CFLAGS% -D"DATA_PATH=\"../data/\"" ..\src\plugin.cpp -Fmplugin.map -LD /link %LFLAGS% -PDB:plugin_%random%.pdb
-    REM -EXPORT:renderNewFrame -EXPORT:audioProcess -EXPORT:initializePluginState
-    set PLUGIN_STATUS=%ERRORLEVEL%
 )
+set PLUGIN_STATUS=%ERRORLEVEL%
 
 :: exe
-set EXE_STATUS=0
 if "!target_exe!"=="1" (
     if %PLUGIN_STATUS%==0 (
         echo compiling exe...
@@ -125,18 +127,19 @@ if "!target_exe!"=="1" (
         echo ERROR: plugin build failed. skipping exe compilation
     )
 )
+set EXE_STATUS=%ERRORLEVEL%
 
 :: vst
-set VST_STATUS=0
 if "!target_vst!"=="1" (
     if %PLUGIN_STATUS%==0 (
         echo compiling vst...
-	cmake -S . -B ../build/build_JUCE
-	cmake --build ../build/build_JUCE
+	cmake -S %SRC_DIR% -B %BUILD_DIR%/build_JUCE -DBUILD_DEBUG=%BUILD_DEBUG% -DBUILD_LOGGING=%BUILD_LOGGING%
+	cmake --build %BUILD_DIR%/build_JUCE
     ) else (
         echo ERROR: plugin build failed. skipping vst compilation
     )
 )
+set VST_STATUS=%ERRORLEVEL%
 
 popd
 goto end_script
