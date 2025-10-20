@@ -207,6 +207,36 @@ allocRenderCommands(void)
 }
 
 static void
+freeRenderCommands(RenderCommands *commands)
+{
+  glDeleteShader(commands->glState->vertexShader);
+  commands->glState->vertexShader = 0;
+  
+  glDeleteShader(commands->glState->fragmentShader);
+  commands->glState->fragmentShader = 0;
+  
+  glDeleteProgram(commands->glState->program);
+  commands->glState->program = 0;
+  
+  glDeleteVertexArrays(1, &commands->glState->vao);
+  commands->glState->vao = 0;
+  
+  glDeleteBuffers(1, &commands->glState->vbo);
+  commands->glState->vbo = 0;
+  
+  if(commands->atlas)
+    {
+      if(commands->atlas->glHandle)
+	{
+	  glDeleteTextures(1, &commands->atlas->glHandle);
+	  commands->atlas->glHandle = 0;
+	}
+    }
+  
+  gsArenaDiscard(commands->allocator);
+}
+
+static void
 renderBindTexture(LoadedBitmap *texture, bool generateNewTextures)
 {
   if(texture->glHandle && !generateNewTextures)
@@ -239,13 +269,15 @@ renderCommands(RenderCommands *commands)
   GL_CATCH_ERROR();
 
   // NOTE: setup
-  if(!commands->atlasIsBound)
-    {
+  // if(!commands->atlasIsBound)
+  //   {
       glActiveTexture(GL_TEXTURE0);
       renderBindTexture(commands->atlas, commands->generateNewTextures);
       commands->atlasIsBound = 1;
-    }
+    // }
 
+  glBindVertexArray(commands->glState->vao);
+  glBindBuffer(GL_ARRAY_BUFFER, commands->glState->vbo);
   glUseProgram(commands->glState->program);
 
   glEnableVertexAttribArray(commands->glState->patternPosition);

@@ -156,9 +156,11 @@ parameterValueChanged(int parameterIndex, float newValue)
 {
   if(!processorRef.ignoreParameterChange)
     {
+#if BUILD_LOGGING
       juce::Logger::writeToLog("detective pervert heard a parameter value change: " +
 			       juce::String(parameterIndex) + " " +
 			       juce::String(newValue));
+#endif
 
       PluginAudioBuffer *audioBuffer = &processorRef.audioBuffer;
       u32 writeIndex = audioBuffer->parameterValueQueueWriteIndex;
@@ -193,12 +195,9 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
 #endif
 		   .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
 #endif
-		   ),
-    atlasImage(juce::ImageFileFormat::loadFrom(BinaryData::test_atlas_png,
-					       BinaryData::test_atlas_pngSize)),
-    atlasImageBitmapData(atlasImage, juce::Image::BitmapData::readOnly)
+		   )
 {
-  pluginMemoryBlockSizeInBytes = MEGABYTES(512);
+  processorArena = gsArenaAcquire(MEGABYTES(32));
   pluginMemory = {};
 
   pluginCode = {};
@@ -207,9 +206,11 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
 
 #if BUILD_LOGGING
   pluginLogger = {};
-  loggerMemory = nullptr;
-  loggerArena = {};
+  //loggerMemory = nullptr;
+  loggerArena = 0;
 #endif
+
+  atlas = loadPNG(processorArena, STR8_LIT(DATA_DIR"/test_atlas.png"));
 
   pluginParameters = nullptr;
   parameterListener = new DetectivePervert(*this);
@@ -222,21 +223,25 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
   juce::File platformContentsDirectory = vstFile.getParentDirectory();
   juce::File contentsDirectory = platformContentsDirectory.getParentDirectory();
   juce::File resourcesDirectory = contentsDirectory.getChildFile("Resources");
+#if BUILD_LOGGING
   juce::Logger::writeToLog("platform contents directory: " + platformContentsDirectory.getFullPathName());
   juce::Logger::writeToLog("contents directory: " + contentsDirectory.getFullPathName());
   juce::Logger::writeToLog("resources directory: " + resourcesDirectory.getFullPathName());
+#endif
 
   globalVstBaseDirectory = platformContentsDirectory.getFullPathName();  
 
   pathToVST = vstFile.getFullPathName();  
   pathToPlugin = platformContentsDirectory.getFullPathName() + "/" + juce::String(DYNAMIC_PLUGIN_FILE_NAME);
   pathToData = resourcesDirectory.getFullPathName() + "/data";
-  
+
+#if BUILD_LOGGING
   juce::Logger::writeToLog("path to vst: " + pathToVST);
   juce::Logger::writeToLog("if the above path is the path to your daw, then there's a problem!");
   
   juce::Logger::writeToLog("path to plugin: " + pathToPlugin);
   juce::Logger::writeToLog("path to data: " + pathToData);
+#endif
 
   for(u32 parameterIndex = PluginParameter_none + 1; parameterIndex < PluginParameter_count; ++parameterIndex)
     {
@@ -262,7 +267,9 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
 }
 
 AudioPluginAudioProcessor::~AudioPluginAudioProcessor()
-{  
+{
+  gsArenaDiscard(processorArena);
+  processorArena = 0;
 }
 
 //==============================================================================
@@ -385,33 +392,33 @@ prepareToPlay(double sampleRate, int samplesPerBlock)
 
 #if BUILD_LOGGING
   usz loggerMemorySize = KILOBYTES(128);
-  loggerMemory = calloc(loggerMemorySize, 1);
-  loggerArena = arenaBegin(loggerMemory, loggerMemorySize);
+  loggerArena = gsArenaAcquire(loggerMemorySize);
 
-  pluginLogger.logArena = &loggerArena;
-  pluginLogger.maxCapacity = loggerMemorySize/8;
+  pluginLogger.logArena = loggerArena;
+  pluginLogger.maxCapacity = loggerMemorySize/2;
   pluginMemory.logger = &pluginLogger;
 #endif
 
-  //juce::String pluginPath(DYNAMIC_PLUGIN_PATH);
-
-  // NOTE: JUCE's platform-independent DynamicLibrary abstraction doesn't provide an interface
-  //       for getting error messages.
+  // NOTE: JUCE's platform-independent DynamicLibrary abstraction doesn't
+  //       provide an interface for getting error messages.
   if(libPlugin.open(pathToPlugin))
     {
-      pluginCode.pluginAPI.gsRenderNewFrame = (GS_RenderNewFrame*)libPlugin.getFunction("gsRenderNewFrame");
+      pluginCode.pluginAPI.gsRenderNewFrame =
+	(GS_RenderNewFrame*)libPlugin.getFunction("gsRenderNewFrame");
       if(!pluginCode.pluginAPI.gsRenderNewFrame)
 	{
 	  juce::Logger::writeToLog("failed to load function: gsRenderNewFrame");
 	}
       
-      pluginCode.pluginAPI.gsAudioProcess = (GS_AudioProcess*)libPlugin.getFunction("gsAudioProcess");
+      pluginCode.pluginAPI.gsAudioProcess =
+	(GS_AudioProcess*)libPlugin.getFunction("gsAudioProcess");
       if(!pluginCode.pluginAPI.gsAudioProcess)
 	{
 	  juce::Logger::writeToLog("failed to load function: gsAudioProcess");
 	}
 
-      pluginCode.pluginAPI.gsInitializePluginState = (GS_InitializePluginState*)libPlugin.getFunction("gsInitializePluginState");
+      pluginCode.pluginAPI.gsInitializePluginState =
+	(GS_InitializePluginState*)libPlugin.getFunction("gsInitializePluginState");
       if(!pluginCode.pluginAPI.gsInitializePluginState)
 	{
 	  juce::Logger::writeToLog("failed to load function: gsInitializePluginState");
@@ -421,10 +428,12 @@ prepareToPlay(double sampleRate, int samplesPerBlock)
     {
       juce::Logger::writeToLog("failed to open dynamic library");
     }
-  if(!pluginCode.pluginAPI.gsRenderNewFrame || !pluginCode.pluginAPI.gsAudioProcess || !pluginCode.pluginAPI.gsInitializePluginState)
+  if(!pluginCode.pluginAPI.gsRenderNewFrame ||
+     !pluginCode.pluginAPI.gsAudioProcess   ||
+     !pluginCode.pluginAPI.gsInitializePluginState)
     {      
-      pluginCode.pluginAPI.gsRenderNewFrame = nullptr;
-      pluginCode.pluginAPI.gsAudioProcess = nullptr;
+      pluginCode.pluginAPI.gsRenderNewFrame	   = nullptr;
+      pluginCode.pluginAPI.gsAudioProcess	   = nullptr;
       pluginCode.pluginAPI.gsInitializePluginState = nullptr;
     }  
 
@@ -432,27 +441,27 @@ prepareToPlay(double sampleRate, int samplesPerBlock)
   void *pluginState = (void*)pluginCode.pluginAPI.gsInitializePluginState(&pluginMemory);
   pluginParameters = (PluginFloatParameter*)pluginState;    
   
-  audioBuffer.inputFormat = audioBuffer.outputFormat = AudioFormat_r32;
+  audioBuffer.inputFormat     = audioBuffer.outputFormat = AudioFormat_r32;
   audioBuffer.inputSampleRate = audioBuffer.outputSampleRate = sampleRate;
-  audioBuffer.midiBuffer = (u8 *)calloc(KILOBYTES(1), 1); 
+  
+  audioBuffer.midiBuffer = arenaPushArray(processorArena, KILOBYTES(1), u8);
 }
 
 void AudioPluginAudioProcessor::
 releaseResources()
 {
-  // NOTE: when an instance of the plugin is deleted, this function gets called multiple times, because the DAW
-  //       wants to be *super careful* and make sure all the resources were freed for real, so we have to keep 
-  //       track of whether or not we *actually* have to free our resources, otherwise the DAW will crash itself
-  //       by double-freeing resources.
-  //       there is, of course, no need to reinvent the wheel that is the audio software toolchain, since
-  //       everyone involved in its creation was very clever and thought through everything they did perfectly
+  // NOTE: when an instance of the plugin is deleted, this function gets called
+  //       multiple times, because the DAW wants to be *super careful* and make
+  //       sure all the resources not we *actually* have to free our resources,
+  //       otherwise the DAW will crash itself by double-freeing resources.
+  //       there is, of course, no need to reinvent the wheel that is the audio
+  //       software toolchain, since everyone involved in its creation was very
+  //       clever and thought through everything they did perfectly
   if(!resourcesReleased)
     {
-      //free(audioBuffer.buffer);
-      free(audioBuffer.midiBuffer);
-      //free(pluginMemory.memory);
 #if BUILD_LOGGING
-      free(loggerMemory);
+      gsArenaDiscard(loggerArena);
+      loggerArena = 0;
 #endif
       libPlugin.close();
       resourcesReleased = true;
@@ -523,12 +532,6 @@ processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
     {
       audioBuffer.framesToWrite = buffer.getNumSamples();      
       pluginCode.pluginAPI.gsAudioProcess(&pluginMemory, &audioBuffer);
-
-      // NOTE: debug
-      // juce::Logger::writeToLog(juce::String("logger used: ") +
-      // 			       juce::String(pluginLogger.log.totalSize));
-      // juce::Logger::writeToLog(juce::String("logger capacity: ") +
-      // 			       juce::String(pluginLogger.maxCapacity));
     }
 
   ignoreParameterChange = true;
@@ -557,10 +560,12 @@ processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 	  vstParameter->parameter->endChangeGesture();
 	}
       
+#if BUILD_LOGGING
       juce::Logger::writeToLog("vstParameter " + juce::String(parameterIndex) + ": " +
 			       juce::String(vstParameter->parameter->get()));
       juce::Logger::writeToLog("pluginParameter " + juce::String(pluginParameterIndex) + ": " +
 			       juce::String(pluginParameterValue.asFloat));
+#endif
     }
   ignoreParameterChange = false;  
 }

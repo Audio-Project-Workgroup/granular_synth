@@ -5,6 +5,7 @@
 #include "common.h"
 static String8 basePath;
 #include "platform.h"
+#include "file_formats.h"
 
 struct VstParameter
 {
@@ -58,15 +59,14 @@ public:
   PluginCode pluginCode;
   PluginMemory pluginMemory;
   PluginAudioBuffer audioBuffer;
-  
+
+  LoadedBitmap *atlas;
+
   class DetectivePervert *parameterListener;
   std::map<int, int> vstParameterIndexTo_pluginParameterIndex;
   std::vector<VstParameter*> vstParameters;
   PluginFloatParameter *pluginParameters;
   bool ignoreParameterChange;
-
-  juce::Image atlasImage;
-  juce::Image::BitmapData atlasImageBitmapData;
 
 private:
   juce::String pathToVST;
@@ -74,16 +74,16 @@ private:
   juce::String pathToData;
   juce::DynamicLibrary libPlugin;    
 
+  Arena *processorArena;
+
 #if BUILD_LOGGING
   PluginLogger pluginLogger;  
-  void *loggerMemory;  
-  Arena loggerArena;
+  // void *loggerMemory;  
+  Arena *loggerArena;
 #endif
   
   void *audioBufferMemory;
   bool resourcesReleased;
-
-  int pluginMemoryBlockSizeInBytes;
 
   //==============================================================================
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioPluginAudioProcessor)

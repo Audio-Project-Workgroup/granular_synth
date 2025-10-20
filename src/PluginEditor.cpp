@@ -84,12 +84,6 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
       displayMin = V2(((r32)editorWidth - displayDim.x)*0.5f, 0);
     }
 
-  // commands = {};
-  // commands.generateNewTextures = true;
-  // commands.widthInPixels = (u32)displayDim.x;
-  // commands.heightInPixels = (u32)displayDim.y;
-  //commands = allocRenderCommands();
-
   setWantsKeyboardFocus(true);
   setMouseClickGrabsKeyboardFocus(true);
   //grabKeyboardFocus();
@@ -134,10 +128,6 @@ resized()
       displayDim.x = displayDim.y*targetAspectRatio;
       displayMin = V2(((r32)editorWidth - displayDim.x)*0.5f, 0);
     }
-
-  // commands->windowResized = true;
-  // commands.widthInPixels = (u32)displayDim.x;
-  // commands.heightInPixels = (u32)displayDim.y;
 }
 
 void AudioPluginAudioProcessorEditor::
@@ -299,14 +289,9 @@ newOpenGLContextCreated(void)
 			0,
 			GL_FALSE);
 #endif
-
+ 
   commands = allocRenderCommands();
-  commands->atlas = arenaPushStruct(commands->allocator, LoadedBitmap);
-  commands->atlas->width = processorRef.atlasImage.getWidth();
-  commands->atlas->height = processorRef.atlasImage.getHeight();
-  commands->atlas->stride = processorRef.atlasImageBitmapData.lineStride;
-  commands->atlas->pixels = (u32*)processorRef.atlasImageBitmapData.data;
-  ASSERT(processorRef.atlasImageBitmapData.pixelStride == 4);
+  commands->atlas = processorRef.atlas;
 }
 
 void AudioPluginAudioProcessorEditor::
@@ -425,4 +410,6 @@ renderOpenGL(void)
 void AudioPluginAudioProcessorEditor::
 openGLContextClosing(void)
 {
+  freeRenderCommands(commands);
+  commands = 0;
 }

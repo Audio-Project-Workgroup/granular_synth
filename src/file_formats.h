@@ -1,4 +1,5 @@
-//#include "sort.h"
+// TODO: most of this file needs to be updated to use new structures/functions
+//       in the codebase, and not depend on other things already being defined
 
 #define RIFF_CODE(a, b, c, d) (((u32)(a) << 0) | ((u32)(b) << 8) | ((u32)(c) << 16) | ((u32)(d) << 24))
 enum
@@ -64,6 +65,7 @@ struct BitmapHeader
 
 #pragma pack(pop)
 
+#if 0
 struct RiffIterator
 {
   u8 *at;
@@ -468,7 +470,46 @@ makeBitmap(Arena *allocator, s32 width, s32 height, u32 color)
 
   return(result);
 }
+#endif
 
+#define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_STATIC
+#define STBI_ONLY_PNG
+#include "stb_image.h"
+static LoadedBitmap*
+loadPNG(Arena *arena, String8 path, v2 alignment = V2(0, 0))
+{
+  stbi_set_flip_vertically_on_load(1);
+
+  int width, height, nChannels;
+  u8 *data = stbi_load((char*)path.str, &width, &height, &nChannels, 4);
+  ASSERT(nChannels == 4);
+
+  LoadedBitmap *result = arenaPushStruct(arena, LoadedBitmap);
+  result->width = width;
+  result->height = height;
+  result->stride = result->width * sizeof(u32);
+  result->pixels = (u32*)data;
+  result->alignPercentage = alignment;
+  return(result);
+}
+
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_STATIC
+#include "stb_image_write.h"
+static void
+writePNG(LoadedBitmap *image, String8 destPath)
+{
+  stbi_flip_vertically_on_write(1);
+
+  int width = image->width;
+  int height = image->height;
+  int stride = image->stride;
+  const void *data = (const void*)image->pixels;
+  int result = stbi_write_png((char*)destPath.str, width, height, 4, data, stride);
+}
+
+#if 0
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
 
@@ -632,4 +673,4 @@ getTextDim(LoadedFont *font, String8 text)
   
   return(result);
 }
-
+#endif

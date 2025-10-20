@@ -116,12 +116,18 @@ if(UNIX)
   )
 endif()
 
-set(PLUGIN_BINARY_DATA "${PLUGIN_NAME}_BinaryData")
-juce_add_binary_data(
-  ${PLUGIN_BINARY_DATA}
-  SOURCES
-  "${DATA_DIR}/test_atlas.png"
-)
+# NOTE: juce's binary data system is insufficient for our purposes.
+#       this command generates an array of pixel values from our image file,
+#       but does not include other data that we need (e.g. image dimensions), so
+#       we end up needing to load the image file at runtime anyway.
+#       it probably wouldn't be too hard to modify the system so it generates
+#       the desired metadata (exercise for the reader)
+# set(PLUGIN_BINARY_DATA "${PLUGIN_NAME}_BinaryData")
+# juce_add_binary_data(
+#   ${PLUGIN_BINARY_DATA}
+#   SOURCES
+#   "${DATA_DIR}/test_atlas.png"
+# )
 
 message("BUILD_DEBUG=${BUILD_DEBUG}")
 message("BUILD_LOGGING=${BUILD_LOGGING}")
@@ -130,6 +136,7 @@ target_compile_definitions(
   PRIVATE
   BUILD_DEBUG=${BUILD_DEBUG}
   BUILD_LOGGING=${BUILD_LOGGING}
+  "DATA_DIR=\"${DATA_DIR}\""
   "DYNAMIC_PLUGIN_FILE_NAME=\"${DYNAMIC_PLUGIN_NAME}\""
   # "ONNX_MODEL_PATH=\"${ONNX_MODEL_PATH}\""  
 )
@@ -154,7 +161,7 @@ target_link_libraries(
   juce_audio_utils
   juce_opengl
   # ${ONNX_LIBRARY}
-  ${PLUGIN_BINARY_DATA}
+  #${PLUGIN_BINARY_DATA}
 )
 
 # we shouldn't have to copy the onnx dll all over the place anymore, if we start using it again

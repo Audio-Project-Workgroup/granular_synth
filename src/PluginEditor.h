@@ -2,7 +2,7 @@
 
 #include <juce_opengl/juce_opengl.h>
 #include "PluginProcessor.h"
-#include "BinaryData.h"
+//#include "BinaryData.h"
 
 #define JUCE_GL
 
