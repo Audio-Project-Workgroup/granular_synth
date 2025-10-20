@@ -1,3 +1,7 @@
+@echo off
+
+echo WARNING: this script has been deprecated. run `build.bat target:vst` instead
+
 call "build.bat"
 
 if %ERRORLEVEL% equ 0 (

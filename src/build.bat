@@ -4,19 +4,15 @@ setlocal enabledelayedexpansion
 :: -----------------------------------------------------------------------------
 :: default options
 
-:: build options
-set BUILD_DEBUG=1
-set BUILD_LOGGING=0
+:: config options
+set "config_debug=0"
+set "config_logging=0"
 
 :: target options
-set "target_plugin=1"
-set "target_exe=1"
+set "target_plugin=0"
+set "target_exe=0"
 set "target_vst=0"
-set "target_all=0"
-echo "target_plugin: !target_plugin!"
-echo "target_exe: !target_exe!"
-echo "target_vst: !target_vst!"
-echo "target_all: !target_all!"
+set "target_all=1"
 
 :: -----------------------------------------------------------------------------
 :: parse cli arguments
@@ -38,15 +34,15 @@ for %%a in (%*) do (
 )
 
 if "!target_all!"=="1" set "target_plugin=1" && set "target_exe=1" && set "target_vst=1"
-if "!target_exe!"=="1" if "!target_plugin!"=="0" set "target_plugin=1"
-if "!target_vst!"=="1" if "!target_plugin!"=="0" set "target_plugin=1"
-echo "target_plugin: !target_plugin!"
-echo "target_exe: !target_exe!"
-echo "target_vst: !target_vst!"
-echo "target_all: !target_all!"
+if "!target_exe!"=="1" set "target_plugin=1"
+if "!target_vst!"=="1" set "target_plugin=1"
 
-if %BUILD_DEBUG%==1 echo [BUILD_DEBUG]
-if %BUILD_LOGGING%==1 echo [BUILD_LOGGING]
+if "!target_plugin!"=="1" echo [BUILD_PLUGIN]
+if "!target_exe!"=="1" echo [BUILD_EXE]
+if "!target_vst!"=="1" echo [BUILD_VST]
+
+if "!config_debug!"=="1" echo [BUILD_DEBUG]
+if "!config_logging!"=="1" echo [BUILD_LOGGING]
 
 :: -----------------------------------------------------------------------------
 :: set up directories, flags
@@ -56,14 +52,14 @@ set DATA_DIR=%CD%\..\data
 
 set CFLAGS=
 set CFLAGS=%CFLAGS% -nologo -W3 -wd"4244" -wd"4146"
-if %BUILD_DEBUG%==1 (
+if "!config_debug!"=="1" (
    set CFLAGS=%CFLAGS% -Zi
 )
 set CFLAGS=%CFLAGS% -I..\src\include
 set CFLAGS=%CFLAGS% -I..\src\include\glad\include
 set CFLAGS=%CFLAGS% -MT -EHa- -GR-
-set CFLAGS=%CFLAGS% -DBUILD_DEBUG=%BUILD_DEBUG%
-set CFLAGS=%CFLAGS% -DBUILD_LOGGING=%BUILD_LOGGING%
+set CFLAGS=%CFLAGS% -DBUILD_DEBUG=!config_debug!
+set CFLAGS=%CFLAGS% -DBUILD_LOGGING=!config_logging!
 
 set LFLAGS=-incremental:no -opt:ref
 
@@ -133,7 +129,7 @@ set EXE_STATUS=%ERRORLEVEL%
 if "!target_vst!"=="1" (
     if %PLUGIN_STATUS%==0 (
         echo compiling vst...
-	cmake -S %SRC_DIR% -B %BUILD_DIR%/build_JUCE -DBUILD_DEBUG=%BUILD_DEBUG% -DBUILD_LOGGING=%BUILD_LOGGING%
+	cmake -S %SRC_DIR% -B %BUILD_DIR%/build_JUCE -DBUILD_DEBUG=!config_debug! -DBUILD_LOGGING=!config_logging!
 	cmake --build %BUILD_DIR%/build_JUCE
     ) else (
         echo ERROR: plugin build failed. skipping vst compilation
@@ -159,20 +155,8 @@ if defined !var! (
 )
 goto :eof
 
-rem :compile_link
-rem set cflags=%1
-rem set lflags=%2
-rem set sources=%3
-rem set outname=%4
-rem echo %cflags%
-rem echo %lflags%
-rem echo %sources%
-rem echo %outname%
-rem rem cl %cflags% %sources% -link %lflags% -out:%outname%
-rem goto :eof
-
 :end_script 
 echo done
 
-rem exit /b %PLUGIN_STATUS%
+exit /b %ERRORLEVEL%
 

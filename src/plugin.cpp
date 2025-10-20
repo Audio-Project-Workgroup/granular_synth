@@ -36,7 +36,7 @@
    -(web)   microphone audio input sometimes sounds choppy
             (index.js, granade_audio.js, wasm_glue.cpp)
    -(web)   test on firefox/safari/mobile
-   -(all)   prevent too much grain view data from being queued up, overflowing the render buffer
+   -(FIXED) prevent too much grain view data from being queued up, overflowing the render buffer
             (can happen when device selection menu is open, plugin editor window is closed, or
 	    user is in a different browser tab).
 	    (internal_granulator.h, internal_granulator.cpp, plugin.cpp)
@@ -65,6 +65,7 @@
       
  * TECH DEBT:
    -(vst/exe) resurrect vst target, make sure all platforms still work
+   -(vst) figure out how to automatically copy the vst folder on windows
    -(all) merge build scripts into a single `build.bat` and `build.sh`, with
           a CLI for selecting targets and options, e.g.
 	  ```build --target=vst --debug```
