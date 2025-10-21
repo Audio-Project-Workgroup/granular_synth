@@ -161,6 +161,7 @@ struct PluginState
   UIContext uiContext;
   UIPanel *rootPanel;
   UIPanel *menuPanel;
+  UILayout *mouseTooltipLayout;
 
   GrainManager grainManager;
   AudioRingBuffer grainBuffer;

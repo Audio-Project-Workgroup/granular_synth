@@ -61,8 +61,14 @@ enum UIParameter
 struct UIHashKey
 {
   u64 key;
-  //u8 *name;
   String8 name;
+};
+
+struct UIPressHistory
+{
+  UIHashKey key;
+  u64 timestamp;
+  v2 pos;
 };
 
 struct UIContext
@@ -92,6 +98,8 @@ struct UIContext
   bool minusPressed;
   bool plusPressed;  
 
+  UIPressHistory pressHistory[MouseButton_COUNT][2];
+
   bool windowResized;
 
   u32 frameIndex;
@@ -100,7 +108,8 @@ struct UIContext
   u32 processedElementCount;
   u32 selectedElementOrdinal;
   u32 selectedElementLayoutIndex;
-  UIHashKey selectedElement;  
+  UIHashKey selectedElement;
+  UIHashKey interactingElement;
 };
 
 struct UILayout;
@@ -160,6 +169,7 @@ struct UIElement
   r32 fParamValueAtClick;
   v2 dragData;
   bool showChildren;
+  b32 inTooltip;
 };
 
 #define ELEMENT_SENTINEL(element) (UIElement *)&element->first
@@ -193,6 +203,7 @@ struct UILayout
   UISizeType currentDimSizeType;
 
   u32 index;
+  b32 isTooltip;
  
   //u32 selectedElementOrdinal;
   UIHashKey selectedElement;  
@@ -377,6 +388,13 @@ struct UIComm
 
 UIHashKey uiHashKeyFromString(u8 *name);
 bool uiHashKeysAreEqual(UIHashKey key1, UIHashKey key2);
+
+static inline b32
+uiHashKeyIsNull(UIHashKey key)
+{
+  b32 result = (key.key == 0 && key.name.str == 0 && key.name.size == 0);
+  return(result);
+}
 
 UIElement *uiCacheElement(UIElement *element);
 UIElement *uiGetCachedElement(UIElement *element);

@@ -3,12 +3,18 @@ enum RenderLevel
 {
   RenderLevel_front,
 
+  RenderLevel_tooltipText,
+  RenderLevel_tooltipBackground,
+
+  RenderLevel_outline,
   RenderLevel_text,
   RenderLevel_label,
   RenderLevel_control,
   RenderLevel_controlBackground,
 
   RenderLevel_grainViewBorder,
+  RenderLevel_grainViewMarker,
+  RenderLevel_grainViewSignal,
   RenderLevel_grainViewMiddleBar,
   RenderLevel_grainViewBackground,
 

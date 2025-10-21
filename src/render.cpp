@@ -71,7 +71,11 @@ out vec4 out_color;
 
 void main() {
   vec4 sampled = texture(atlas, f_uv);
-  out_color = f_color * sampled;
+  if(sampled.a < 0.1) {
+    discard;
+  } else {
+    out_color = f_color * sampled;
+  }
 }
 )FSRC";
 

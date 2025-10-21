@@ -372,6 +372,8 @@ gsInitializePluginState(PluginMemory *memoryBlock)
 				       pluginState->null, menuBackgroundColor);
       UNUSED(menuLeft);
       UNUSED(menuRight);
+
+      pluginState->mouseTooltipLayout = 0;
 	      
 #if 0
 #if 1
@@ -436,8 +438,6 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
       // NOTE: UI layout
       UIContext *uiContext = &pluginState->uiContext;
       uiContextNewFrame(uiContext, &input->mouseState, &input->keyboardState, renderCommands->windowResized);
-      
-      //TemporaryMemory scratchMemory = arenaBeginTemporaryMemory(&pluginState->frameArena, KILOBYTES(128));
 
       if(pluginState->pluginHost == PluginHost_executable)
 	{
@@ -651,6 +651,10 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 		  }
 #endif
 
+		  v4 mouseTooltipBackgroundColor = V4(1, 1, 0.5f, 1);
+		  v4 mouseTooltipTextColor = V4(0.055f, 0.055f, 0.098f, 1);
+		  r32 mouseTooltipTextScale = 0.7f;
+
 		  // NOTE: volume
 		  v2 volumeOffsetPOP = V2(0.857f, 0.43f);
 		  v2 volumeDimPOP = V2(0.2f, 0.46f);
@@ -664,15 +668,10 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 					       volumeTextOffset, elementTextScale,
 					       pluginState->levelBar, pluginState->levelFader, 0,
 					       V4(1, 1, 1, 1));
-#if 0
-		  if(volume.flags & UICommFlag_hovering)
-		    {
-		      volume.element->color = hadamard(volume.element->color, V4(1, 1, 0, 1));
-		    }
-#endif
 		      
 		  if(volume.flags & UICommFlag_dragging)
 		    {
+		      uiContext->interactingElement = volume.element->hashKey;
 		      gsAtomicStore(&volume.element->fParam->interacting, 1);
 		      
 		      if(volume.flags & UICommFlag_leftDragging)
@@ -703,7 +702,46 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 		  else
 		    {
 		      gsAtomicStore(&volume.element->fParam->interacting, 0);
-		    }		  
+		      if(uiHashKeysAreEqual(uiContext->interactingElement, volume.element->hashKey))
+			{
+			  ZERO_STRUCT(&uiContext->interactingElement);
+			}
+		    }
+
+		  b32 volumeIsInteracting =
+		    uiHashKeysAreEqual(uiContext->interactingElement, volume.element->hashKey);
+		  b32 volumeIsHovering = ((volume.flags & UICommFlag_hovering) &&
+					  uiHashKeyIsNull(uiContext->interactingElement));
+		  if(volumeIsInteracting || volumeIsHovering)
+		    {
+		      ASSERT(pluginState->mouseTooltipLayout == 0);
+		      pluginState->mouseTooltipLayout =
+			arenaPushStruct(pluginState->frameArena, UILayout, arenaFlagsZeroNoAlign());
+
+		      String8 volumeTooltipMessage =
+			arenaPushStringFormat(pluginState->frameArena,
+					      "volume: %.2f dB",
+					      pluginReadFloatParameter(volume.element->fParam));
+		      v2 messageRectMin = V2(MAX(uiContext->mouseP.x,
+						 volume.element->region.max.x),
+					     uiContext->mouseP.y);
+		      v2 messageRectDim =
+			(getTextDim(uiContext->font, volumeTooltipMessage, mouseTooltipTextScale) +
+			 V2(10, uiContext->font->verticalAdvance * 0.5f));
+		      if(messageRectMin.x + messageRectDim.x >= renderCommands->widthInPixels)
+			{
+			  messageRectMin.x = volume.element->region.min.x - messageRectDim.x;
+			}
+		      Rect2 messageRect = rectMinDim(messageRectMin,
+						     messageRectDim);
+		      
+		      uiBeginLayout(pluginState->mouseTooltipLayout, uiContext,
+				    messageRect, mouseTooltipBackgroundColor, PLUGIN_ASSET(null), 1);
+		      pluginState->mouseTooltipLayout->regionRemaining.min += V2(5, 5);
+		      uiMakeTextElement(pluginState->mouseTooltipLayout,
+					volumeTooltipMessage, mouseTooltipTextScale, mouseTooltipTextColor);
+		      
+		    }
 
 		  // NOTE: density
 		  {
@@ -725,6 +763,7 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 
 		    if(density.flags & UICommFlag_dragging)
 		      {
+			uiContext->interactingElement = density.element->hashKey;
 			gsAtomicStore(&density.element->fParam->interacting, 1);
 
 			if(density.flags & UICommFlag_leftDragging)
@@ -753,6 +792,7 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 		    else
 		      {
 			gsAtomicStore(&density.element->fParam->interacting, 0);
+			ZERO_STRUCT(&uiContext->interactingElement);
 		      }
 		  }
 
@@ -771,6 +811,7 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 					       V4(1, 1, 1, 1));
 		    if(spread.flags & UICommFlag_dragging)
 		      {
+			uiContext->interactingElement = spread.element->hashKey;
 			gsAtomicStore(&spread.element->fParam->interacting, 1);
 
 			if(spread.flags & UICommFlag_leftDragging)
@@ -799,6 +840,7 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 		    else
 		      {
 			gsAtomicStore(&spread.element->fParam->interacting, 0);
+			ZERO_STRUCT(&uiContext->interactingElement);
 		      }
 		  }
 
@@ -818,6 +860,7 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 
 		    if(offset.flags & UICommFlag_dragging)
 		      {
+			uiContext->interactingElement = offset.element->hashKey;
 			gsAtomicStore(&offset.element->fParam->interacting, 1);
 
 			if(offset.flags & UICommFlag_leftDragging)
@@ -846,6 +889,7 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 		    else
 		      {
 			gsAtomicStore(&offset.element->fParam->interacting, 0);
+			ZERO_STRUCT(&uiContext->interactingElement);
 		      }
 		  }
 
@@ -863,6 +907,7 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 			       V4(1, 1, 1, 1));
 		  if(size.flags & UICommFlag_dragging)
 		    {
+		      uiContext->interactingElement = size.element->hashKey;
 		      gsAtomicStore(&size.element->fParam->interacting, 1);
 		      
 		      if(size.flags & UICommFlag_leftDragging)
@@ -896,6 +941,7 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 		  else
 		    {
 		      gsAtomicStore(&size.element->fParam->interacting, 0);
+		      ZERO_STRUCT(&uiContext->interactingElement);
 		    }
 
 		  // NOTE: mix
@@ -916,6 +962,7 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 
 		    if(mix.flags & UICommFlag_dragging)
 		      {
+			uiContext->interactingElement = mix.element->hashKey;
 			gsAtomicStore(&mix.element->fParam->interacting, 1);
 
 			if(mix.flags & UICommFlag_leftDragging)
@@ -944,6 +991,7 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 		    else
 		      {
 			gsAtomicStore(&mix.element->fParam->interacting, 0);
+			ZERO_STRUCT(&uiContext->interactingElement);
 		      }
 		  }
 		  
@@ -965,6 +1013,7 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 
 		    if(pan.flags & UICommFlag_dragging)
 		      {
+			uiContext->interactingElement = pan.element->hashKey;
 			gsAtomicStore(&pan.element->fParam->interacting, 1);
 
 			if(pan.flags & UICommFlag_leftDragging)
@@ -993,6 +1042,7 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 		    else
 		      {
 			gsAtomicStore(&pan.element->fParam->interacting, 0);
+			ZERO_STRUCT(&uiContext->interactingElement);
 		      }
 		  }
 		  
@@ -1014,6 +1064,7 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 		    
 		    if(window.flags & UICommFlag_dragging)
 		      {
+			uiContext->interactingElement = window.element->hashKey;
 			gsAtomicStore(&window.element->fParam->interacting, 1);
 
 			if(window.flags & UICommFlag_leftDragging)
@@ -1042,6 +1093,7 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 		    else
 		      {
 			gsAtomicStore(&window.element->fParam->interacting, 0);
+			ZERO_STRUCT(&uiContext->interactingElement);
 		      }
 		  }
 		  		  		  
@@ -1050,15 +1102,10 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 		  v2 viewDim = hadamard(V2(0.53f, 0.25f), drawRegionDim);
 		  v2 viewMin = hadamard(V2(0.24f, 0.55f), drawRegionDim);
 		  Rect2 viewRect = rectMinDim(viewMin, viewDim);
-		  
-		  // renderPushRectOutline(renderCommands, viewRect, 2.f,
-		  // 			RENDER_LEVEL(front), V4(1, 1, 1, 1));
 
 		  v2 dim = hadamard(V2(0.843f, 0.62f), viewDim);
 		  v2 min = viewMin + hadamard(V2(0.075f, 0.2f), viewDim);
 		  Rect2 rect = rectMinDim(min, dim);
-		  // renderPushRectOutline(renderCommands, rect, 2.f,
-		  // 			RENDER_LEVEL(front), V4(1, 1, 1, 1));
 
 		  r32 middleBarThickness = 4.f;
 		  Rect2 middleBar = rectMinDim(min + V2(0, 0.5f*dim.y),
@@ -1109,7 +1156,7 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 		      Rect2 readBar = rectMinDim(min + V2(readBarPosition, 0.f),
 						 V2(barThickness, dim.y));
 		      renderPushQuad(renderCommands, readBar, pluginState->null, 0.f,
-				     RENDER_LEVEL(front), V4(1, 0, 0, 1));
+				     RENDER_LEVEL(grainViewMarker), V4(1, 0, 0, 1));
 		      
 		      u32 writeIndex = bufferWriteIndex;
 		      r32 writePosition = (r32)writeIndex/(r32)grainBufferCapacity;
@@ -1117,7 +1164,7 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 		      Rect2 writeBar = rectMinDim(min + V2(writeBarPosition, 0.f),
 						  V2(barThickness, dim.y));
 		      renderPushQuad(renderCommands, writeBar, pluginState->null, 0.f,
-				     RENDER_LEVEL(front), V4(1, 1, 1, 1));
+				     RENDER_LEVEL(grainViewMarker), V4(1, 1, 1, 1));
 
 		      // NOTE: display playing grain start and end positions
 		      v4 grainWindowColors[] =
@@ -1169,9 +1216,9 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 			  
 			  v4 grainWindowColor = grainWindowColors[grainViewIndex];
 			  renderPushQuad(renderCommands, grainStartBar, pluginState->null, 0.f,
-					 RENDER_LEVEL(front), grainWindowColor);
+					 RENDER_LEVEL(grainViewMarker), grainWindowColor);
 			  renderPushQuad(renderCommands, grainEndBar, pluginState->null, 0.f,
-					 RENDER_LEVEL(front), grainWindowColor);
+					 RENDER_LEVEL(grainViewMarker), grainWindowColor);
 			}
 		    }
 	  
@@ -1197,9 +1244,9 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 		      Rect2 sampleRBar = rectMinDim(upperRegionMiddle + V2(pixel, 0.f),
 						    V2(1.f, 0.5f*sampleR*regionDim.y));
 		      renderPushQuad(renderCommands, sampleLBar, pluginState->null, 0.f,
-				     RENDER_LEVEL(front), V4(0, 1, 0, 1));
+				     RENDER_LEVEL(grainViewSignal), V4(0, 1, 0, 1));
 		      renderPushQuad(renderCommands, sampleRBar, pluginState->null, 0.f,
-				     RENDER_LEVEL(front), V4(0, 1, 0, 1));
+				     RENDER_LEVEL(grainViewSignal), V4(0, 1, 0, 1));
 
 		      lastSampleIndex = sampleIndex;
 		    }
@@ -1216,11 +1263,17 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 	      
 		  renderPushUILayout(renderCommands, panelLayout);
 		  uiEndLayout(panelLayout);
+
+		  if(pluginState->mouseTooltipLayout)
+		    {
+		      renderPushUILayout(renderCommands, pluginState->mouseTooltipLayout);
+		      uiEndLayout(pluginState->mouseTooltipLayout);
+		      pluginState->mouseTooltipLayout = 0;
+		    }
 		}	  
 	    }
 	}
       
-      //arenaEndTemporaryMemory(&scratchMemory);
       arenaReleaseScratch(scratch);
       uiContextEndFrame(uiContext);
       

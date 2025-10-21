@@ -21,7 +21,6 @@ getGlyphFromChar(LoadedFont *font, u8 c)
 static inline v2
 getGlyphDim(PluginAsset *glyph)
 {
-  //v2 result = getDim(glyph->rect);
   v2 result = glyph->dim;
   return(result);
 }
@@ -36,7 +35,7 @@ getHorizontalAdvance(LoadedFont *font, u8 c, u8 other)
 }
 
 static inline v2
-getTextDim(LoadedFont *font, String8 text)
+getTextDim(LoadedFont *font, String8 text, r32 scale = 1.f)
 {
   r32 width = 0;
   r32 height = 0;
@@ -51,8 +50,8 @@ getTextDim(LoadedFont *font, String8 text)
     }
 
   v2 result = {};
-  result.x = width;
-  result.y = height;
+  result.x = width * scale;
+  result.y = height * scale;
 
   return(result);
 }

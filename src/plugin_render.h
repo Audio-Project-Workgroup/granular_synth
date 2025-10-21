@@ -36,12 +36,14 @@ renderPushRectOutline(RenderCommands *commands, Rect2 rect, r32 thickness, r32 l
 static inline v2
 renderPushText(RenderCommands *commands, LoadedFont *font, String8 string,
 	       v2 textMin, v2 textScale, r32 regionWidth,
-	       v4 color = V4(1, 1, 1, 1))
+	       v4 color = V4(1, 1, 1, 1), b32 inTooltip = 0)
 {
   v2 atPos = textMin;
   u8 *at = string.str;
   u64 stringSize = string.size;
-  
+
+  r32 renderLevel = inTooltip ? RENDER_LEVEL(tooltipText) : RENDER_LEVEL(text);
+
   struct GlyphPushData
   {
     u8 c;
@@ -55,7 +57,7 @@ renderPushText(RenderCommands *commands, LoadedFont *font, String8 string,
       u8 c = *at;
       PluginAsset *glyph = getGlyphFromChar(font, c);
 
-      v2 glyphDim = getGlyphDim(glyph);//V2(glyph->width, glyph->height);
+      v2 glyphDim = getGlyphDim(glyph);
       v2 scaledGlyphDim = hadamard(textScale, glyphDim);
       Rect2 glyphRect = rectMinDim(atPos, scaledGlyphDim);      
 
@@ -63,10 +65,9 @@ renderPushText(RenderCommands *commands, LoadedFont *font, String8 string,
 	{
 	  GlyphPushData glyphPushData = pastGlyphs[2];
 	  renderPushQuad(commands, glyphPushData.rect, glyphPushData.glyph, 0,
-			 RENDER_LEVEL(text), color);
+			 renderLevel, color);
 	}
 
-      //pastGlyphs[3] = pastGlyphs[2];
       pastGlyphs[2] = pastGlyphs[1];
       pastGlyphs[1] = pastGlyphs[0];
       pastGlyphs[0] = {c, glyphRect, glyph};
@@ -86,11 +87,11 @@ renderPushText(RenderCommands *commands, LoadedFont *font, String8 string,
   if(!overflow)
     {
       GlyphPushData glyphPushData = pastGlyphs[2];
-      renderPushQuad(commands, glyphPushData.rect, glyphPushData.glyph, 0, RENDER_LEVEL(text), color);
+      renderPushQuad(commands, glyphPushData.rect, glyphPushData.glyph, 0, renderLevel, color);
       glyphPushData = pastGlyphs[1];
-      renderPushQuad(commands, glyphPushData.rect, glyphPushData.glyph, 0, RENDER_LEVEL(text), color);
+      renderPushQuad(commands, glyphPushData.rect, glyphPushData.glyph, 0, renderLevel, color);
       glyphPushData = pastGlyphs[0];
-      renderPushQuad(commands, glyphPushData.rect, glyphPushData.glyph, 0, RENDER_LEVEL(text), color);
+      renderPushQuad(commands, glyphPushData.rect, glyphPushData.glyph, 0, renderLevel, color);
     }
   else
     {
@@ -102,7 +103,7 @@ renderPushText(RenderCommands *commands, LoadedFont *font, String8 string,
       for(u32 i = 0; i < 3; ++i)
 	{
 	  Rect2 glyphRect = rectMinDim(atPos, scaledGlyphDim);
-	  renderPushQuad(commands, glyphRect, glyph, 0, RENDER_LEVEL(text), color);
+	  renderPushQuad(commands, glyphRect, glyph, 0, renderLevel, color);
 	  atPos.x += hAdvance;
 	}
     }
@@ -132,19 +133,21 @@ renderPushUIElement(RenderCommands *commands, UIElement *element)
     {      
       renderPushText(commands, layout->context->font,
 		     element->name, element->region.min, element->textScale, getDim(element->region).x,
-		     element->color);
+		     element->color, element->inTooltip);
     }
   if((element->flags & UIElementFlag_drawBorder) || elementIsSelected)
     {
       v4 color = elementIsSelected ? V4(1, 0.5f, 0, 1) : V4(0, 0, 0, 1);
       Rect2 border = rectAddRadius(element->region, V2(1, 1));
       
-      renderPushRectOutline(commands, border, 2.f, RENDER_LEVEL(front), color);
+      renderPushRectOutline(commands, border, 2.f, RENDER_LEVEL(outline), color);
     }
   if(element->flags & UIElementFlag_drawBackground)
     {
+      r32 renderLevel = element->inTooltip ? RENDER_LEVEL(tooltipBackground) : RENDER_LEVEL(background);
+      
       renderPushQuad(commands, element->region, element->texture, 0,
-		     RENDER_LEVEL(background), element->color);
+		     renderLevel, element->color);
     }  
   if(element->flags & UIElementFlag_draggable)
     {            

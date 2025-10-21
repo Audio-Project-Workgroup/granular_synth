@@ -22,6 +22,7 @@ for %%a in (%*) do (
     for /f "tokens=1* delims=:" %%k in ("%%a") do (
     	set "key=%%k"
 	if "!key!"=="target" set "target_plugin=0" && set "target_exe=0" && set "target_vst=0" && set "target_all=0"
+	if "!key!"=="config" set "config_debug=0" && set "config_logging=0"
 
 	set "values=%%l"
     	for /f "tokens=1-4 delims=+" %%v in ("!values!") do (	    

@@ -94,6 +94,8 @@ uiMakeElement(UILayout *layout, String8 name, u32 flags, v4 color, PluginAsset *
       uiPushParentElement(layout, result);
     }    
 
+  result->inTooltip = layout->isTooltip;
+
   ++layout->elementCount;
   //++layout->context->elementCount;
   return(result);
@@ -260,12 +262,13 @@ uiContextEndFrame(UIContext *context)
 
 inline void
 uiBeginLayout(UILayout *layout, UIContext *context, Rect2 parentRect,
-	      v4 color = V4(1, 1, 1, 1), PluginAsset *texture = 0)
+	      v4 color = V4(1, 1, 1, 1), PluginAsset *texture = PLUGIN_ASSET(null), b32 isTooltip = 0)
 {
   ASSERT(layout->elementCount == 0);
   layout->context = context;
   layout->index = context->layoutCount++;  
   //layout->isSelected = ((layout->index + 1) == context->selectedLayoutOrdinal);
+  layout->isTooltip = isTooltip;
 
   if(layout->index == context->selectedElementLayoutIndex)
     {
@@ -277,7 +280,8 @@ uiBeginLayout(UILayout *layout, UIContext *context, Rect2 parentRect,
     }
   
   layout->root = uiMakeElement(layout, STR8_LIT("root"), 0, color, texture);
-  //layout->root->flags = UIElementFlag_drawBorder | UIElementFlag_drawBackground;
+  layout->root->flags = // UIElementFlag_drawBorder | 
+    UIElementFlag_drawBackground;
   layout->root->lastFrameTouched = context->frameIndex;
   //uiSetSemanticSizeAbsolute(layout->root, parentRect.min, getDim(parentRect));
   layout->root->region = parentRect;
@@ -313,7 +317,6 @@ uiCacheElement(UIElement *element)
 	  if(element->lastFrameTouched > cachedElement->lastFrameTouched || context->windowResized)
 	    {
 	      element->nextInHash = cachedElement->nextInHash;
-	      //COPY_SIZE(cachedElement, element, sizeof(*element));
 	      *cachedElement = *element;
 	    }
 	}
@@ -327,7 +330,6 @@ uiCacheElement(UIElement *element)
 		  if(element->lastFrameTouched > cachedElement->lastFrameTouched || context->windowResized)
 		    {
 		      element->nextInHash = cachedElement->nextInHash;
-		      //COPY_SIZE(cachedElement, element, sizeof(UIElement));
 		      *cachedElement = *element;
 		    }
 		  break;
@@ -337,7 +339,6 @@ uiCacheElement(UIElement *element)
 	  if(!cachedElement->nextInHash)
 	    {
 	      cachedElement->nextInHash = arenaPushStruct(layout->context->permanentArena, UIElement);
-	      //COPY_SIZE(layout->elementCache[cacheIndex], element, sizeof(UIElement));
 	      *cachedElement->nextInHash = *element;
 	      cachedElement = cachedElement->nextInHash;
 	    }
@@ -347,7 +348,6 @@ uiCacheElement(UIElement *element)
     {
       cachedElement = arenaPushStruct(layout->context->permanentArena, UIElement);
       layout->elementCache[cacheIndex] = cachedElement;
-      //COPY_SIZE(layout->elementCache[cacheIndex], element, sizeof(UIElement));
       *cachedElement = *element;
     }
 
@@ -543,7 +543,7 @@ inline UIComm
 uiMakeTextElement(UILayout *layout, String8 message, r32 desiredTextScale, v4 color = V4(1, 1, 1, 1))
 {
   UIContext *context = layout->context;
-  UIElement *text = uiMakeElement(layout, message, UIElementFlag_drawText | UIElementFlag_drawBorder, color, 0);
+  UIElement *text = uiMakeElement(layout, message, UIElementFlag_drawText, color, 0);
 
   v2 messageRectDim = desiredTextScale*getTextDim(context->font, message);
   v2 layoutRegionRemainingDim = getDim(layout->regionRemaining);
