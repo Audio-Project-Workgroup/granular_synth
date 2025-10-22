@@ -908,3 +908,10 @@ rectAddRadius(Rect2 rect, v2 r)
 
   return(result);
 }
+
+static inline Rect2
+rectOffset(Rect2 rect, v2 offset)
+{
+  Rect2 result = rectMinMax(rect.min + offset, rect.max + offset);
+  return(result);
+}

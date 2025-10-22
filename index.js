@@ -45,7 +45,11 @@ uniform sampler2D atlas;
 
 void main() {
   lowp vec4 sampled = texture2D(atlas, f_uv);
-  gl_FragColor = f_color * sampled;
+  if(sampled.a == 0.0) {
+    discard;
+  } else {
+    gl_FragColor = f_color * sampled; 
+  }
 }
 `;
 

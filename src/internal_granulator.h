@@ -1,27 +1,11 @@
 #define WINDOW_LENGTH 1024
 
-/* inline u32 */
-/* grainBufferSetReadPos(u32 write_pos, u32 bufferSize) */
-/* { */
-/*   // TODO: dunno why this is the way that it is */
-/*   s32 scratch_rpos = write_pos - 1000; */
-
-/*   if (scratch_rpos < 0) { */
-/*     scratch_rpos += bufferSize; */
-/*   } else { */
-/*     scratch_rpos %= bufferSize; */
-/*   } */
-    
-/*   return scratch_rpos; */
-/* } */
-
 struct Grain
 {
   Grain* next;
   Grain* prev;
 
   r32* start[2];
-  //WindowType window;
   r32 windowParam;
   
   s32 samplesToPlay;

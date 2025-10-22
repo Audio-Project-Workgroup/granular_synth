@@ -617,8 +617,8 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 		  uiPushLayoutOffsetSizeType(panelLayout, UISizeType_percentOfParent);
 		  uiPushLayoutDimSizeType(panelLayout, UISizeType_percentOfParent);
 
-		  renderPushQuad(renderCommands, panelRect, panel->texture, 0,
-				 RENDER_LEVEL(background));
+		  // renderPushQuad(renderCommands, panelRect, panel->texture, 0,
+		  // 		 RENDER_LEVEL(background));
 
 		  v2 panelDim = getDim(panelRect);
 		  v2 elementTextScale = 0.0008f*panelDim.x*V2(1.f, 1.f);
@@ -1483,11 +1483,14 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 		  Rect2 middleBar = rectMinDim(min + V2(0, 0.5f*dim.y),
 					       V2(dim.x, middleBarThickness));
 
+		  v2 outlineOffset = hadamard(V2(0, 0.002f), viewDim);
+
 		  renderPushQuad(renderCommands, viewRect, pluginState->grainViewBackground, 0,
 				 RENDER_LEVEL(grainViewBackground));
 		  renderPushQuad(renderCommands, middleBar, pluginState->null, 0.f,
 				 RENDER_LEVEL(grainViewMiddleBar), V4(0, 0, 0, 1));
-		  renderPushQuad(renderCommands, viewRect, pluginState->grainViewOutline, 0,
+		  renderPushQuad(renderCommands, rectOffset(viewRect, outlineOffset),
+				 pluginState->grainViewOutline, 0,
 				 RENDER_LEVEL(grainViewBorder));
 		 
 		  v2 upperRegionMin = min + V2(0, 0.5f*(dim.y + middleBarThickness));

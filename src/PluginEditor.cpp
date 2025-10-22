@@ -300,8 +300,12 @@ renderOpenGL(void)
   glViewport(0, 0, editorWidth, editorHeight);
   glScissor(0, 0, editorWidth, editorHeight);
 
+  glEnable(GL_DEPTH_TEST);
+  glDepthFunc(GL_LEQUAL);
+
   glClearColor(0.2f, 0.2f, 0.2f, 0.f);
-  glClear(GL_COLOR_BUFFER_BIT);
+  glClearDepth(1);
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
   renderBeginCommands(commands, displayDim.x, displayDim.y);
 

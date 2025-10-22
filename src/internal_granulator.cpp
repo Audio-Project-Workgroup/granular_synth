@@ -132,14 +132,22 @@ getWindowVal(GrainManager* grainManager, r32 samplesPlayedFrac, r32 windowParam)
   u32 windowIndex = (u32)windowParam;
   r32 windowFrac = windowParam - windowIndex;
 
-  ASSERT(tableIndex < WINDOW_LENGTH);
-  ASSERT(((tableIndex + 1) < WINDOW_LENGTH) || (indexFrac == 0));
-  ASSERT(windowIndex + 1 < ARRAY_COUNT(grainManager->windowBuffer));
+  u32 tableIndex0 = tableIndex;
+  u32 tableIndex1 = MIN(tableIndex + 1, WINDOW_LENGTH - 1);
 
-  r32 floor0 = grainManager->windowBuffer[windowIndex][tableIndex];
-  r32 ceil0 = grainManager->windowBuffer[windowIndex][tableIndex + 1];
-  r32 floor1 = grainManager->windowBuffer[windowIndex + 1][tableIndex];
-  r32 ceil1 = grainManager->windowBuffer[windowIndex + 1][tableIndex + 1];
+  u32 windowIndex0 = windowIndex;
+  u32 windowIndex1 = MIN(windowIndex + 1, ARRAY_COUNT(grainManager->windowBuffer) - 1);
+
+  // ASSERT(tableIndex < WINDOW_LENGTH);
+  // ASSERT(((tableIndex + 1) < WINDOW_LENGTH) || (indexFrac == 0));
+  // ASSERT(windowIndex + 1 < ARRAY_COUNT(grainManager->windowBuffer));
+  ASSERT(tableIndex0 < WINDOW_LENGTH && tableIndex1 < WINDOW_LENGTH);
+  ASSERT(windowIndex0 < ARRAY_COUNT(grainManager->windowBuffer) && windowIndex1 < ARRAY_COUNT(grainManager->windowBuffer));
+
+  r32 floor0 = grainManager->windowBuffer[windowIndex0][tableIndex0];
+  r32 ceil0  = grainManager->windowBuffer[windowIndex0][tableIndex1];
+  r32 floor1 = grainManager->windowBuffer[windowIndex1][tableIndex0];
+  r32 ceil1  = grainManager->windowBuffer[windowIndex1][tableIndex1];
 
   // NOTE: bilinear blend
   r32 windowVal0 = lerp(floor0, ceil0, indexFrac);
