@@ -1,3 +1,5 @@
+#define PLUGIN_PARAMETER_TOOLTIPS 1
+
 inline bool
 pluginReadBooleanParameter(PluginBooleanParameter *param)
 {

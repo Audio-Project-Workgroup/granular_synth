@@ -655,113 +655,199 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 		  v4 mouseTooltipTextColor = V4(0.055f, 0.055f, 0.098f, 1);
 		  r32 mouseTooltipTextScale = 0.7f;
 
-		  // NOTE: volume
-		  v2 volumeOffsetPOP = V2(0.857f, 0.43f);
-		  v2 volumeDimPOP = V2(0.2f, 0.46f);
-		  v2 volumeClickableOffset = V2(0.3f, 0);
-		  v2 volumeClickableDim = V2(0.4f, 1.f);
-		  v2 volumeTextOffset = hadamard(V2(0.001f, -0.045f), panelDim);
-		  UIComm volume = uiMakeSlider(panelLayout, STR8_LIT("LEVEL"),
-					       volumeOffsetPOP, volumeDimPOP, 0.5f,
-					       &pluginState->parameters[PluginParameter_volume],
-					       volumeClickableOffset, volumeClickableDim,
-					       volumeTextOffset, elementTextScale,
-					       pluginState->levelBar, pluginState->levelFader, 0,
-					       V4(1, 1, 1, 1));
-		      
-		  if(volume.flags & UICommFlag_dragging)
-		    {
-		      uiContext->interactingElement = volume.element->hashKey;
-		      gsAtomicStore(&volume.element->fParam->interacting, 1);
-		      
-		      if(volume.flags & UICommFlag_leftDragging)
-			{	
-			  v2 dragDelta = uiGetDragDelta(volume.element);			  
-		      
-			  r32 newVolume =
-			    (volume.element->fParamValueAtClick +
-			     getLength(volume.element->fParam->range)*dragDelta.y/getDim(volume.element->region).y);
-			      
-			  pluginSetFloatParameter(volume.element->fParam, newVolume);
-			}
-		      else if(volume.flags & UICommFlag_minusPressed)
-			{
-			  r32 oldVolume = pluginReadFloatParameter(volume.element->fParam);
-			  r32 newVolume = oldVolume - 0.02f*getLength(volume.element->fParam->range);
+		  // TODO: a lot of these per-element calculations could be
+		  //       condensed into loops over parameters (or an X-Macro)
+		  //       if we stored more data in some array (or X-List)
+		  //       (e.g. position, texture, tooltip label, ...)
+		  UIComm parameterComms[PluginParameter_count];
 
-			  pluginSetFloatParameter(volume.element->fParam, newVolume);
-			}
-		      else if(volume.flags & UICommFlag_plusPressed)
-			{
-			  r32 oldVolume = pluginReadFloatParameter(volume.element->fParam);
-			  r32 newVolume = oldVolume + 0.02f*getLength(volume.element->fParam->range);
-
-			  pluginSetFloatParameter(volume.element->fParam, newVolume);
-			}
-		    }
-		  else
-		    {
-		      gsAtomicStore(&volume.element->fParam->interacting, 0);
-		      if(uiHashKeysAreEqual(uiContext->interactingElement, volume.element->hashKey))
-			{
-			  ZERO_STRUCT(&uiContext->interactingElement);
-			}
-		    }
-
-		  b32 volumeIsInteracting =
-		    uiHashKeysAreEqual(uiContext->interactingElement, volume.element->hashKey);
-		  b32 volumeIsHovering = ((volume.flags & UICommFlag_hovering) &&
-					  uiHashKeyIsNull(uiContext->interactingElement));
-		  if(volumeIsInteracting || volumeIsHovering)
-		    {
-		      ASSERT(pluginState->mouseTooltipLayout == 0);
-		      pluginState->mouseTooltipLayout =
-			arenaPushStruct(pluginState->frameArena, UILayout, arenaFlagsZeroNoAlign());
-
-		      String8 volumeTooltipMessage =
-			arenaPushStringFormat(pluginState->frameArena,
-					      "volume: %.2f dB",
-					      pluginReadFloatParameter(volume.element->fParam));
-		      v2 messageRectMin = V2(MAX(uiContext->mouseP.x,
-						 volume.element->region.max.x),
-					     uiContext->mouseP.y);
-		      v2 messageRectDim =
-			(getTextDim(uiContext->font, volumeTooltipMessage, mouseTooltipTextScale) +
-			 V2(10, uiContext->font->verticalAdvance * 0.5f));
-		      if(messageRectMin.x + messageRectDim.x >= renderCommands->widthInPixels)
-			{
-			  messageRectMin.x = volume.element->region.min.x - messageRectDim.x;
-			}
-		      Rect2 messageRect = rectMinDim(messageRectMin,
-						     messageRectDim);
-		      
-		      uiBeginLayout(pluginState->mouseTooltipLayout, uiContext,
-				    messageRect, mouseTooltipBackgroundColor, PLUGIN_ASSET(null), 1);
-		      pluginState->mouseTooltipLayout->regionRemaining.min += V2(5, 5);
-		      uiMakeTextElement(pluginState->mouseTooltipLayout,
-					volumeTooltipMessage, mouseTooltipTextScale, mouseTooltipTextColor);
-		      
-		    }
-
-		  // NOTE: density
+		  // NOTE: get comms from all elements
 		  {
-		    r32 densityDimPOP = 0.235f;
-		    v2 densityOffsetPOP = V2(0.45f, 0.06f);
-		    v2 densitySizePOP = densityDimPOP*V2(1, 1);
-		    v2 densityClickableOffset = V2(0.f, 0.1f);
-		    v2 densityClickableDim = V2(1.f, 0.9f);
-		    v2 densityTextOffset = hadamard(V2(0, -0.015f), panelDim);
+		    // NOTE: volume
+		    {
+		      v2 volumeOffsetPOP = V2(0.857f, 0.43f);
+		      v2 volumeDimPOP = V2(0.2f, 0.46f);
+		      v2 volumeClickableOffset = V2(0.3f, 0);
+		      v2 volumeClickableDim = V2(0.4f, 1.f);
+		      v2 volumeTextOffset = hadamard(V2(0.001f, -0.045f), panelDim);
+		      parameterComms[PluginParameter_volume] =
+			uiMakeSlider(panelLayout, STR8_LIT("LEVEL"),
+				     volumeOffsetPOP, volumeDimPOP, 0.5f,
+				     &pluginState->parameters[PluginParameter_volume],
+				     volumeClickableOffset, volumeClickableDim,
+				     volumeTextOffset, elementTextScale,
+				     pluginState->levelBar, pluginState->levelFader, 0,
+				     V4(1, 1, 1, 1));
+		    }
 
-		    UIComm density = uiMakeKnob(panelLayout, STR8_LIT("DENSITY"),
-						densityOffsetPOP, densitySizePOP, 1.f,
-						&pluginState->parameters[PluginParameter_density],
-						V2(-0.02f, 0.02f), V2(1.02f, 1),
-						densityClickableOffset, densityClickableDim,
-						densityTextOffset, elementTextScale,
-						pluginState->densityKnob, pluginState->densityKnobLabel,
-						V4(1, 1, 1, 1));
+		    // NOTE: density
+		    {
+		      r32 densityDimPOP = 0.235f;
+		      v2 densityOffsetPOP = V2(0.45f, 0.06f);
+		      v2 densitySizePOP = densityDimPOP*V2(1, 1);
+		      v2 densityClickableOffset = V2(0.f, 0.1f);
+		      v2 densityClickableDim = V2(1.f, 0.9f);
+		      v2 densityTextOffset = hadamard(V2(0, -0.015f), panelDim);
+		      parameterComms[PluginParameter_density] =
+			uiMakeKnob(panelLayout, STR8_LIT("DENSITY"),
+				   densityOffsetPOP, densitySizePOP, 1.f,
+				   &pluginState->parameters[PluginParameter_density],
+				   V2(-0.02f, 0.02f), V2(1.02f, 1),
+				   densityClickableOffset, densityClickableDim,
+				   densityTextOffset, elementTextScale,
+				   pluginState->densityKnob, pluginState->densityKnobLabel,
+				   V4(1, 1, 1, 1));
+		    }
 
-		    if(density.flags & UICommFlag_dragging)
+		    // NOTE: spread
+		    {
+		      v2 spreadOffsetPOP = V2(-0.001f, 0.067f);
+		      v2 spreadSizePOP = knobDimPOP*V2(1, 1);
+		      v2 spreadTextOffset = hadamard(V2(0, 0.038f), panelDim);
+		      parameterComms[PluginParameter_spread] =
+			uiMakeKnob(panelLayout, STR8_LIT("SPREAD"),
+				   spreadOffsetPOP, spreadSizePOP, 1.f,
+				   &pluginState->parameters[PluginParameter_spread],
+				   knobLabelOffset, knobLabelDim,
+				   knobClickableOffset, knobClickableDim,
+				   spreadTextOffset, elementTextScale,
+				   pluginState->pomegranateKnob, pluginState->pomegranateKnobLabel,
+				   V4(1, 1, 1, 1));
+		    }
+
+		    // NOTE: offset
+		    {
+		      v2 offsetOffsetPOP = V2(0.1285f, 0.004f);
+		      v2 offsetSizePOP = knobDimPOP*V2(1, 1);
+		      v2 offsetTextOffset = hadamard(V2(0.002f, 0.038f), panelDim);
+		      parameterComms[PluginParameter_offset] =
+			uiMakeKnob(panelLayout, STR8_LIT("OFFSET"),
+				   offsetOffsetPOP, offsetSizePOP, 1.f,
+				   &pluginState->parameters[PluginParameter_offset],
+				   knobLabelOffset, knobLabelDim,
+				   knobClickableOffset, knobClickableDim,
+				   offsetTextOffset, elementTextScale,
+				   pluginState->pomegranateKnob, pluginState->pomegranateKnobLabel,
+				   V4(1, 1, 1, 1));
+		    }
+
+		    // NOTE: size
+		    {
+		      v2 sizeOffsetPOP = V2(0.239f, 0.109f);
+		      v2 sizeDimPOP = knobDimPOP*V2(1, 1);
+		      v2 sizeTextOffset = hadamard(V2(0.002f, 0.038f), panelDim);
+		      parameterComms[PluginParameter_size] =
+			uiMakeKnob(panelLayout, STR8_LIT("SIZE"), sizeOffsetPOP, sizeDimPOP, 1.f,
+				   &pluginState->parameters[PluginParameter_size],
+				   knobLabelOffset, knobLabelDim,
+				   knobClickableOffset, knobClickableDim,
+				   sizeTextOffset, elementTextScale,
+				   pluginState->pomegranateKnob, pluginState->pomegranateKnobLabel,
+				   V4(1, 1, 1, 1));
+		    }
+
+		    // NOTE: mix
+		    {
+		      r32 mixDimPOP = 0.235f;
+		      v2 mixOffsetPOP = V2(0.613f, 0.131f);
+		      v2 mixSizePOP = mixDimPOP*V2(1, 1);
+		      v2 mixLabelOffset = V2(0.02f, 0.068f);
+		      v2 mixTextOffset = hadamard(V2(0.003f, 0.042f), panelDim);
+		      parameterComms[PluginParameter_mix] =
+			uiMakeKnob(panelLayout, STR8_LIT("MIX"), mixOffsetPOP, mixSizePOP, 1.f,
+				   &pluginState->parameters[PluginParameter_mix],
+				   mixLabelOffset, knobLabelDim,
+				   knobClickableOffset, knobClickableDim,
+				   mixTextOffset, elementTextScale,
+				   pluginState->halfPomegranateKnob,
+				   pluginState->halfPomegranateKnobLabel,
+				   V4(1, 1, 1, 1));
+		    }
+
+		    // NOTE: pan
+		    {
+		      v2 panOffsetPOP = V2(0.727f, 0.0008f);
+		      v2 panSizePOP = knobDimPOP * V2(1, 1);
+		      v2 panLabelOffset = V2(0.03f, 0.065f);
+		      v2 panTextOffset = hadamard(V2(0.003f, 0.043f), panelDim);
+		      parameterComms[PluginParameter_pan] =
+			uiMakeKnob(panelLayout, STR8_LIT("PAN"), panOffsetPOP, panSizePOP, 1.f,
+				   &pluginState->parameters[PluginParameter_pan],
+				   panLabelOffset, knobLabelDim,
+				   knobClickableOffset, knobClickableDim,
+				   panTextOffset, elementTextScale,
+				   pluginState->halfPomegranateKnob,
+				   pluginState->halfPomegranateKnobLabel,
+				   V4(1, 1, 1, 1));
+		    }
+
+		    // NOTE: window
+		    {
+		      v2 windowOffsetPOP = V2(0.854f, 0.063f);
+		      v2 windowSizePOP = knobDimPOP*V2(1, 1);
+		      v2 windowLabelOffset = V2(0.03f, 0.065f);
+		      v2 windowTextOffset = hadamard(V2(0.003f, 0.02f), panelDim);
+		      parameterComms[PluginParameter_window] =
+			uiMakeKnob(panelLayout, STR8_LIT("WINDOW"), windowOffsetPOP, windowSizePOP, 1.f,
+				   &pluginState->parameters[PluginParameter_window],
+				   windowLabelOffset, knobLabelDim,
+				   knobClickableOffset, knobClickableDim,
+				   windowTextOffset, elementTextScale,
+				   pluginState->halfPomegranateKnob,
+				   pluginState->halfPomegranateKnobLabel,
+				   V4(1, 1, 1, 1));
+		    }
+		  }
+		  
+		  // NOTE: modify parameters if they are interacting		  
+		  {
+		    // NOTE: volume
+		    { 
+		    UIComm volume = parameterComms[PluginParameter_volume];
+		    if(volume.flags & UICommFlag_dragging)
+		      {
+			uiContext->interactingElement = volume.element->hashKey;
+			gsAtomicStore(&volume.element->fParam->interacting, 1);
+		      
+			if(volume.flags & UICommFlag_leftDragging)
+			  {	
+			    v2 dragDelta = uiGetDragDelta(volume.element);			  
+		      
+			    r32 newVolume =
+			      (volume.element->fParamValueAtClick +
+			      getLength(volume.element->fParam->range)*dragDelta.y/getDim(volume.element->region).y);
+			      
+			    pluginSetFloatParameter(volume.element->fParam, newVolume);
+			  }
+			else if(volume.flags & UICommFlag_minusPressed)
+			  {
+			    r32 oldVolume = pluginReadFloatParameter(volume.element->fParam);
+			    r32 newVolume = oldVolume - 0.02f*getLength(volume.element->fParam->range);
+
+			    pluginSetFloatParameter(volume.element->fParam, newVolume);
+			  }
+			else if(volume.flags & UICommFlag_plusPressed)
+			  {
+			    r32 oldVolume = pluginReadFloatParameter(volume.element->fParam);
+			    r32 newVolume = oldVolume + 0.02f*getLength(volume.element->fParam->range);
+
+			    pluginSetFloatParameter(volume.element->fParam, newVolume);
+			  }
+		      }
+		    else
+		      {
+			gsAtomicStore(&volume.element->fParam->interacting, 0);
+			if(uiHashKeysAreEqual(uiContext->interactingElement, volume.element->hashKey))
+			  {
+			    ZERO_STRUCT(&uiContext->interactingElement);
+			  }
+		      }
+		    }
+
+		    // NOTE: density
+		    {
+		      UIComm density = parameterComms[PluginParameter_density];
+		      if(density.flags & UICommFlag_dragging)
 		      {
 			uiContext->interactingElement = density.element->hashKey;
 			gsAtomicStore(&density.element->fParam->interacting, 1);
@@ -792,24 +878,17 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 		    else
 		      {
 			gsAtomicStore(&density.element->fParam->interacting, 0);
-			ZERO_STRUCT(&uiContext->interactingElement);
+			if(uiHashKeysAreEqual(uiContext->interactingElement, density.element->hashKey))
+			  {  
+			    ZERO_STRUCT(&uiContext->interactingElement);
+			  }
 		      }
-		  }
+		    }
 
-		  // NOTE: spread
-		  {
-		    v2 spreadOffsetPOP = V2(-0.001f, 0.067f);
-		    v2 spreadSizePOP = knobDimPOP*V2(1, 1);
-		    v2 spreadTextOffset = hadamard(V2(0, 0.038f), panelDim);
-		    UIComm spread = uiMakeKnob(panelLayout, STR8_LIT("SPREAD"),
-					       spreadOffsetPOP, spreadSizePOP, 1.f,
-					       &pluginState->parameters[PluginParameter_spread],
-					       knobLabelOffset, knobLabelDim,
-					       knobClickableOffset, knobClickableDim,
-					       spreadTextOffset, elementTextScale,
-					       pluginState->pomegranateKnob, pluginState->pomegranateKnobLabel,
-					       V4(1, 1, 1, 1));
-		    if(spread.flags & UICommFlag_dragging)
+		    // NOTE: spread
+		    {
+		      UIComm spread = parameterComms[PluginParameter_spread];
+		      if(spread.flags & UICommFlag_dragging)
 		      {
 			uiContext->interactingElement = spread.element->hashKey;
 			gsAtomicStore(&spread.element->fParam->interacting, 1);
@@ -840,25 +919,17 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 		    else
 		      {
 			gsAtomicStore(&spread.element->fParam->interacting, 0);
-			ZERO_STRUCT(&uiContext->interactingElement);
+			if(uiHashKeysAreEqual(uiContext->interactingElement, spread.element->hashKey))
+			  {
+			    ZERO_STRUCT(&uiContext->interactingElement);
+			  }
 		      }
-		  }
+		    }
 
-		  // NOTE: offset
-		  {
-		    v2 offsetOffsetPOP = V2(0.1285f, 0.004f);
-		    v2 offsetSizePOP = knobDimPOP*V2(1, 1);
-		    v2 offsetTextOffset = hadamard(V2(0.002f, 0.038f), panelDim);
-		    UIComm offset = uiMakeKnob(panelLayout, STR8_LIT("OFFSET"),
-					       offsetOffsetPOP, offsetSizePOP, 1.f,
-					       &pluginState->parameters[PluginParameter_offset],
-					       knobLabelOffset, knobLabelDim,
-					       knobClickableOffset, knobClickableDim,
-					       offsetTextOffset, elementTextScale,
-					       pluginState->pomegranateKnob, pluginState->pomegranateKnobLabel,
-					       V4(1, 1, 1, 1));
-
-		    if(offset.flags & UICommFlag_dragging)
+		    // NOTE: offset
+		    {
+		      UIComm offset = parameterComms[PluginParameter_offset];
+		      if(offset.flags & UICommFlag_dragging)
 		      {
 			uiContext->interactingElement = offset.element->hashKey;
 			gsAtomicStore(&offset.element->fParam->interacting, 1);
@@ -889,78 +960,63 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 		    else
 		      {
 			gsAtomicStore(&offset.element->fParam->interacting, 0);
-			ZERO_STRUCT(&uiContext->interactingElement);
+			if(uiHashKeysAreEqual(uiContext->interactingElement, offset.element->hashKey))
+			  {
+			    ZERO_STRUCT(&uiContext->interactingElement);
+			  }
 		      }
-		  }
+		    }
 
-		  // NOTE: size
-		  v2 sizeOffsetPOP = V2(0.239f, 0.109f);
-		  v2 sizeDimPOP = knobDimPOP*V2(1, 1);
-		  v2 sizeTextOffset = hadamard(V2(0.002f, 0.038f), panelDim);
-		  UIComm size =
-		    uiMakeKnob(panelLayout, STR8_LIT("SIZE"), sizeOffsetPOP, sizeDimPOP, 1.f,
-			       &pluginState->parameters[PluginParameter_size],
-			       knobLabelOffset, knobLabelDim,
-			       knobClickableOffset, knobClickableDim,
-			       sizeTextOffset, elementTextScale,
-			       pluginState->pomegranateKnob, pluginState->pomegranateKnobLabel,
-			       V4(1, 1, 1, 1));
-		  if(size.flags & UICommFlag_dragging)
+		    // NOTE: size
 		    {
-		      uiContext->interactingElement = size.element->hashKey;
-		      gsAtomicStore(&size.element->fParam->interacting, 1);
+		      UIComm size = parameterComms[PluginParameter_size];
+		      if(size.flags & UICommFlag_dragging)
+		      {
+			uiContext->interactingElement = size.element->hashKey;
+			gsAtomicStore(&size.element->fParam->interacting, 1);
 		      
-		      if(size.flags & UICommFlag_leftDragging)
-			{			
-			  v2 dragDelta = uiGetDragDelta(size.element);
-			  // post processing to set the new grain size using a temporary workaround: 
-			  // We scaled dragDelta.x by x20 to cover approximately the full grain-size scale across width resolution of the screen.
-			  // i.e. dragging fully to the left reduces grain size and sets it to a value towards zero ..
-			  // .. and dragging fully to the right sets the grain-size towards a value near its max value.
-			  // @TODO fix temporary workaround		
-			  r32 newGrainSize = (size.element->fParamValueAtClick +
-					      dragDelta.y/knobDragLength*getLength(size.element->fParam->range));
+			if(size.flags & UICommFlag_leftDragging)
+			  {			
+			    v2 dragDelta = uiGetDragDelta(size.element);
+			    // post processing to set the new grain size using a temporary workaround: 
+			    // We scaled dragDelta.x by x20 to cover approximately the full grain-size scale across width resolution of the screen.
+			    // i.e. dragging fully to the left reduces grain size and sets it to a value towards zero ..
+			    // .. and dragging fully to the right sets the grain-size towards a value near its max value.
+			    // @TODO fix temporary workaround		
+			    r32 newGrainSize = (size.element->fParamValueAtClick +
+						dragDelta.y/knobDragLength*getLength(size.element->fParam->range));
 					
-			  pluginSetFloatParameter(size.element->fParam, newGrainSize);
-			}
-		      else if(size.flags & UICommFlag_minusPressed)
-			{
-			  r32 oldSize = pluginReadFloatParameter(size.element->fParam);
-			  r32 newSize = oldSize - 0.02f*getLength(size.element->fParam->range);
+			    pluginSetFloatParameter(size.element->fParam, newGrainSize);
+			  }
+			else if(size.flags & UICommFlag_minusPressed)
+			  {
+			    r32 oldSize = pluginReadFloatParameter(size.element->fParam);
+			    r32 newSize = oldSize - 0.02f*getLength(size.element->fParam->range);
 
-			  pluginSetFloatParameter(size.element->fParam, newSize);
-			}
-		      else if(size.flags & UICommFlag_plusPressed)
-			{
-			  r32 oldSize = pluginReadFloatParameter(size.element->fParam);
-			  r32 newSize = oldSize + 0.02f*getLength(size.element->fParam->range);
+			    pluginSetFloatParameter(size.element->fParam, newSize);
+			  }
+			else if(size.flags & UICommFlag_plusPressed)
+			  {
+			    r32 oldSize = pluginReadFloatParameter(size.element->fParam);
+			    r32 newSize = oldSize + 0.02f*getLength(size.element->fParam->range);
 
-			  pluginSetFloatParameter(size.element->fParam, newSize);
-			}
+			    pluginSetFloatParameter(size.element->fParam, newSize);
+			  }
+		      }
+		    else
+		      {
+			gsAtomicStore(&size.element->fParam->interacting, 0);
+			if(uiHashKeysAreEqual(uiContext->interactingElement, size.element->hashKey))
+			  {
+			    ZERO_STRUCT(&uiContext->interactingElement);
+			  }
+		      }
 		    }
-		  else
+
+		    // NOTE: mix
 		    {
-		      gsAtomicStore(&size.element->fParam->interacting, 0);
-		      ZERO_STRUCT(&uiContext->interactingElement);
-		    }
-
-		  // NOTE: mix
-		  {
-		    r32 mixDimPOP = 0.235f;
-		    v2 mixOffsetPOP = V2(0.613f, 0.131f);
-		    v2 mixSizePOP = mixDimPOP*V2(1, 1);
-		    v2 mixLabelOffset = V2(0.02f, 0.068f);
-		    v2 mixTextOffset = hadamard(V2(0.003f, 0.042f), panelDim);
-		    UIComm mix =
-		      uiMakeKnob(panelLayout, STR8_LIT("MIX"), mixOffsetPOP, mixSizePOP, 1.f,
-				 &pluginState->parameters[PluginParameter_mix],
-				 mixLabelOffset, knobLabelDim,
-				 knobClickableOffset, knobClickableDim,
-				 mixTextOffset, elementTextScale,
-				 pluginState->halfPomegranateKnob, pluginState->halfPomegranateKnobLabel,
-				 V4(1, 1, 1, 1));
-
-		    if(mix.flags & UICommFlag_dragging)
+		      UIComm mix = parameterComms[PluginParameter_mix];
+		      if(mix.flags & UICommFlag_dragging)
 		      {
 			uiContext->interactingElement = mix.element->hashKey;
 			gsAtomicStore(&mix.element->fParam->interacting, 1);
@@ -991,27 +1047,17 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 		    else
 		      {
 			gsAtomicStore(&mix.element->fParam->interacting, 0);
-			ZERO_STRUCT(&uiContext->interactingElement);
+			if(uiHashKeysAreEqual(uiContext->interactingElement, mix.element->hashKey))
+			  {  
+			    ZERO_STRUCT(&uiContext->interactingElement);
+			  }
 		      }
-		  }
-		  
-		  // NOTE: pan
-		  {
-		    v2 panOffsetPOP = V2(0.727f, 0.0008f);
-		    v2 panSizePOP = knobDimPOP * V2(1, 1);
-		    v2 panLabelOffset = V2(0.03f, 0.065f);
-		    v2 panTextOffset = hadamard(V2(0.003f, 0.043f), panelDim);
-		    //v2 panTextScale = 0.0005f * panelDim.x * V2(1.f, 1.f);
-		    UIComm pan =
-		      uiMakeKnob(panelLayout, STR8_LIT("PAN"), panOffsetPOP, panSizePOP, 1.f,
-				 &pluginState->parameters[PluginParameter_pan],
-				 panLabelOffset, knobLabelDim,
-				 knobClickableOffset, knobClickableDim,
-				 panTextOffset, elementTextScale,
-				 pluginState->halfPomegranateKnob, pluginState->halfPomegranateKnobLabel,
-				 V4(1, 1, 1, 1));
+		    }
 
-		    if(pan.flags & UICommFlag_dragging)
+		    // NOTE: pan
+		    {
+		      UIComm pan = parameterComms[PluginParameter_pan];
+		      if(pan.flags & UICommFlag_dragging)
 		      {
 			uiContext->interactingElement = pan.element->hashKey;
 			gsAtomicStore(&pan.element->fParam->interacting, 1);
@@ -1042,27 +1088,17 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 		    else
 		      {
 			gsAtomicStore(&pan.element->fParam->interacting, 0);
-			ZERO_STRUCT(&uiContext->interactingElement);
+			if(uiHashKeysAreEqual(uiContext->interactingElement, pan.element->hashKey))
+			  {  
+			    ZERO_STRUCT(&uiContext->interactingElement);
+			  }
 		      }
-		  }
-		  
-		  // NOTE: window
-		  {
-		    v2 windowOffsetPOP = V2(0.854f, 0.063f);
-		    v2 windowSizePOP = knobDimPOP*V2(1, 1);
-		    v2 windowLabelOffset = V2(0.03f, 0.065f);
-		    v2 windowTextOffset = hadamard(V2(0.003f, 0.02f), panelDim);
-		    //v2 windowTextScale = 0.0005f*panelDim.x*V2(1.f, 1.f);
-		    UIComm window =
-		      uiMakeKnob(panelLayout, STR8_LIT("WINDOW"), windowOffsetPOP, windowSizePOP, 1.f,
-				 &pluginState->parameters[PluginParameter_window],
-				 windowLabelOffset, knobLabelDim,
-				 knobClickableOffset, knobClickableDim,
-				 windowTextOffset, elementTextScale,
-				 pluginState->halfPomegranateKnob, pluginState->halfPomegranateKnobLabel,
-				 V4(1, 1, 1, 1));
-		    
-		    if(window.flags & UICommFlag_dragging)
+		    }
+
+		    // NOTE: window
+		    {
+		      UIComm window = parameterComms[PluginParameter_window];
+		      if(window.flags & UICommFlag_dragging)
 		      {
 			uiContext->interactingElement = window.element->hashKey;
 			gsAtomicStore(&window.element->fParam->interacting, 1);
@@ -1093,10 +1129,346 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 		    else
 		      {
 			gsAtomicStore(&window.element->fParam->interacting, 0);
-			ZERO_STRUCT(&uiContext->interactingElement);
+			if(uiHashKeysAreEqual(uiContext->interactingElement, window.element->hashKey))
+			  {  
+			    ZERO_STRUCT(&uiContext->interactingElement);
+			  }
 		      }
+		    }
 		  }
-		  		  		  
+
+#if PLUGIN_PARAMETER_TOOLTIPS
+		  // NOTE: draw tooltips
+		  {
+		    // NOTE: volume
+		    {
+		      UIComm volume = parameterComms[PluginParameter_volume];
+		      b32 volumeIsInteracting =
+			uiHashKeysAreEqual(uiContext->interactingElement, volume.element->hashKey);
+		      b32 volumeIsHovering = ((volume.flags & UICommFlag_hovering) &&
+					      uiHashKeyIsNull(uiContext->interactingElement));
+		      if(volumeIsInteracting || volumeIsHovering)
+			{
+			  ASSERT(pluginState->mouseTooltipLayout == 0);
+			  pluginState->mouseTooltipLayout =
+			    arenaPushStruct(pluginState->frameArena, UILayout, arenaFlagsZeroNoAlign());
+
+			  String8 volumeTooltipMessage =
+			    arenaPushStringFormat(pluginState->frameArena,
+						  "volume: %.2f dB",
+						  pluginReadFloatParameter(volume.element->fParam));
+			  v2 messageRectMin = V2(MAX(uiContext->mouseP.x,
+						     volume.element->region.max.x),
+						 uiContext->mouseP.y);
+			  v2 messageRectDim =
+			    (getTextDim(uiContext->font, volumeTooltipMessage, mouseTooltipTextScale) +
+			     V2(10, uiContext->font->verticalAdvance * 0.5f));
+			  if(messageRectMin.x + messageRectDim.x >= renderCommands->widthInPixels)
+			    {
+			      messageRectMin.x = volume.element->region.min.x - messageRectDim.x;
+			    }
+			  Rect2 messageRect = rectMinDim(messageRectMin,
+							 messageRectDim);
+		      
+			  uiBeginLayout(pluginState->mouseTooltipLayout, uiContext,
+					messageRect, mouseTooltipBackgroundColor,
+					PLUGIN_ASSET(null), 1);
+			  pluginState->mouseTooltipLayout->regionRemaining.min += V2(5, 5);
+			  uiMakeTextElement(pluginState->mouseTooltipLayout,
+					    volumeTooltipMessage,
+					    mouseTooltipTextScale, mouseTooltipTextColor);
+		      
+			}
+		    }
+
+		    // NOTE: density
+		    {
+		      UIComm density = parameterComms[PluginParameter_density];
+		      b32 densityIsInteracting =
+			uiHashKeysAreEqual(uiContext->interactingElement, density.element->hashKey);
+		      b32 densityIsHovering = ((density.flags & UICommFlag_hovering) &&
+					       uiHashKeyIsNull(uiContext->interactingElement));
+		      if(densityIsInteracting || densityIsHovering)
+			{
+			  ASSERT(pluginState->mouseTooltipLayout == 0);
+			  pluginState->mouseTooltipLayout =
+			    arenaPushStruct(pluginState->frameArena, UILayout, arenaFlagsZeroNoAlign());
+
+			  String8 densityTooltipMessage =
+			    arenaPushStringFormat(pluginState->frameArena,
+						  "density: %.2f",
+						  pluginReadFloatParameter(density.element->fParam));
+			  v2 messageRectMin = V2(MAX(uiContext->mouseP.x,
+						     density.element->region.max.x),
+						 uiContext->mouseP.y);
+			  v2 messageRectDim =
+			    (getTextDim(uiContext->font, densityTooltipMessage, mouseTooltipTextScale) +
+			     V2(10, uiContext->font->verticalAdvance * 0.5f));
+			  if(messageRectMin.x + messageRectDim.x >= renderCommands->widthInPixels)
+			    {
+			      messageRectMin.x = density.element->region.min.x - messageRectDim.x;
+			    }
+			  Rect2 messageRect = rectMinDim(messageRectMin,
+							 messageRectDim);
+		      
+			  uiBeginLayout(pluginState->mouseTooltipLayout, uiContext,
+					messageRect, mouseTooltipBackgroundColor,
+					PLUGIN_ASSET(null), 1);
+			  pluginState->mouseTooltipLayout->regionRemaining.min += V2(5, 5);
+			  uiMakeTextElement(pluginState->mouseTooltipLayout,
+					    densityTooltipMessage,
+					    mouseTooltipTextScale, mouseTooltipTextColor);
+		      
+			}
+		    }
+
+		    // NOTE: spread
+		    {
+		      UIComm spread = parameterComms[PluginParameter_spread];
+		      b32 spreadIsInteracting =
+			uiHashKeysAreEqual(uiContext->interactingElement, spread.element->hashKey);
+		      b32 spreadIsHovering = ((spread.flags & UICommFlag_hovering) &&
+					      uiHashKeyIsNull(uiContext->interactingElement));
+		      if(spreadIsInteracting || spreadIsHovering)
+			{
+			  ASSERT(pluginState->mouseTooltipLayout == 0);
+			  pluginState->mouseTooltipLayout =
+			    arenaPushStruct(pluginState->frameArena, UILayout, arenaFlagsZeroNoAlign());
+
+			  String8 spreadTooltipMessage =
+			    arenaPushStringFormat(pluginState->frameArena,
+						  "spread: %.2f",
+						  pluginReadFloatParameter(spread.element->fParam));
+			  v2 messageRectMin = V2(MAX(uiContext->mouseP.x,
+						     spread.element->region.max.x),
+						 uiContext->mouseP.y);
+			  v2 messageRectDim =
+			    (getTextDim(uiContext->font, spreadTooltipMessage, mouseTooltipTextScale) +
+			     V2(10, uiContext->font->verticalAdvance * 0.5f));
+			  if(messageRectMin.x + messageRectDim.x >= renderCommands->widthInPixels)
+			    {
+			      messageRectMin.x = spread.element->region.min.x - messageRectDim.x;
+			    }
+			  Rect2 messageRect = rectMinDim(messageRectMin,
+							 messageRectDim);
+		      
+			  uiBeginLayout(pluginState->mouseTooltipLayout, uiContext,
+					messageRect, mouseTooltipBackgroundColor,
+					PLUGIN_ASSET(null), 1);
+			  pluginState->mouseTooltipLayout->regionRemaining.min += V2(5, 5);
+			  uiMakeTextElement(pluginState->mouseTooltipLayout,
+					    spreadTooltipMessage,
+					    mouseTooltipTextScale, mouseTooltipTextColor);
+		      
+			}
+		    }
+
+		    // NOTE: offset
+		    {
+		      UIComm offset = parameterComms[PluginParameter_offset];
+		      b32 offsetIsInteracting =
+			uiHashKeysAreEqual(uiContext->interactingElement, offset.element->hashKey);
+		      b32 offsetIsHovering = ((offset.flags & UICommFlag_hovering) &&
+					      uiHashKeyIsNull(uiContext->interactingElement));
+		      if(offsetIsInteracting || offsetIsHovering)
+			{
+			  ASSERT(pluginState->mouseTooltipLayout == 0);
+			  pluginState->mouseTooltipLayout =
+			    arenaPushStruct(pluginState->frameArena, UILayout, arenaFlagsZeroNoAlign());
+
+			  String8 offsetTooltipMessage =
+			    arenaPushStringFormat(pluginState->frameArena,
+						  "offset: %.2f",
+						  pluginReadFloatParameter(offset.element->fParam));
+			  v2 messageRectMin = V2(MAX(uiContext->mouseP.x,
+						     offset.element->region.max.x),
+						 uiContext->mouseP.y);
+			  v2 messageRectDim =
+			    (getTextDim(uiContext->font, offsetTooltipMessage, mouseTooltipTextScale) +
+			     V2(10, uiContext->font->verticalAdvance * 0.5f));
+			  if(messageRectMin.x + messageRectDim.x >= renderCommands->widthInPixels)
+			    {
+			      messageRectMin.x = offset.element->region.min.x - messageRectDim.x;
+			    }
+			  Rect2 messageRect = rectMinDim(messageRectMin,
+							 messageRectDim);
+		      
+			  uiBeginLayout(pluginState->mouseTooltipLayout, uiContext,
+					messageRect, mouseTooltipBackgroundColor,
+					PLUGIN_ASSET(null), 1);
+			  pluginState->mouseTooltipLayout->regionRemaining.min += V2(5, 5);
+			  uiMakeTextElement(pluginState->mouseTooltipLayout,
+					    offsetTooltipMessage,
+					    mouseTooltipTextScale, mouseTooltipTextColor);
+		      
+			}
+		    }
+
+		    // NOTE: size
+		    {
+		      UIComm size = parameterComms[PluginParameter_size];
+		      b32 sizeIsInteracting =
+			uiHashKeysAreEqual(uiContext->interactingElement, size.element->hashKey);
+		      b32 sizeIsHovering = ((size.flags & UICommFlag_hovering) &&
+					    uiHashKeyIsNull(uiContext->interactingElement));
+		      if(sizeIsInteracting || sizeIsHovering)
+			{
+			  ASSERT(pluginState->mouseTooltipLayout == 0);
+			  pluginState->mouseTooltipLayout =
+			    arenaPushStruct(pluginState->frameArena, UILayout, arenaFlagsZeroNoAlign());
+
+			  String8 sizeTooltipMessage =
+			    arenaPushStringFormat(pluginState->frameArena,
+						  "size: %.2f",
+						  pluginReadFloatParameter(size.element->fParam));
+			  v2 messageRectMin = V2(MAX(uiContext->mouseP.x,
+						     size.element->region.max.x),
+						 uiContext->mouseP.y);
+			  v2 messageRectDim =
+			    (getTextDim(uiContext->font, sizeTooltipMessage, mouseTooltipTextScale) +
+			     V2(10, uiContext->font->verticalAdvance * 0.5f));
+			  if(messageRectMin.x + messageRectDim.x >= renderCommands->widthInPixels)
+			    {
+			      messageRectMin.x = size.element->region.min.x - messageRectDim.x;
+			    }
+			  Rect2 messageRect = rectMinDim(messageRectMin,
+							 messageRectDim);
+		      
+			  uiBeginLayout(pluginState->mouseTooltipLayout, uiContext,
+					messageRect, mouseTooltipBackgroundColor,
+					PLUGIN_ASSET(null), 1);
+			  pluginState->mouseTooltipLayout->regionRemaining.min += V2(5, 5);
+			  uiMakeTextElement(pluginState->mouseTooltipLayout,
+					    sizeTooltipMessage,
+					    mouseTooltipTextScale, mouseTooltipTextColor);
+		      
+			}
+		    }
+
+		    // NOTE: mix
+		    {
+		      UIComm mix = parameterComms[PluginParameter_mix];
+		      b32 mixIsInteracting =
+			uiHashKeysAreEqual(uiContext->interactingElement, mix.element->hashKey);
+		      b32 mixIsHovering = ((mix.flags & UICommFlag_hovering) &&
+					   uiHashKeyIsNull(uiContext->interactingElement));
+		      if(mixIsInteracting || mixIsHovering)
+			{
+			  ASSERT(pluginState->mouseTooltipLayout == 0);
+			  pluginState->mouseTooltipLayout =
+			    arenaPushStruct(pluginState->frameArena, UILayout, arenaFlagsZeroNoAlign());
+
+			  String8 mixTooltipMessage =
+			    arenaPushStringFormat(pluginState->frameArena,
+						  "mix: %.2f",
+						  pluginReadFloatParameter(mix.element->fParam));
+			  v2 messageRectMin = V2(MAX(uiContext->mouseP.x,
+						     mix.element->region.max.x),
+						 uiContext->mouseP.y);
+			  v2 messageRectDim =
+			    (getTextDim(uiContext->font, mixTooltipMessage, mouseTooltipTextScale) +
+			     V2(10, uiContext->font->verticalAdvance * 0.5f));
+			  if(messageRectMin.x + messageRectDim.x >= renderCommands->widthInPixels)
+			    {
+			      messageRectMin.x = mix.element->region.min.x - messageRectDim.x;
+			    }
+			  Rect2 messageRect = rectMinDim(messageRectMin,
+							 messageRectDim);
+		      
+			  uiBeginLayout(pluginState->mouseTooltipLayout, uiContext,
+					messageRect, mouseTooltipBackgroundColor,
+					PLUGIN_ASSET(null), 1);
+			  pluginState->mouseTooltipLayout->regionRemaining.min += V2(5, 5);
+			  uiMakeTextElement(pluginState->mouseTooltipLayout,
+					    mixTooltipMessage,
+					    mouseTooltipTextScale, mouseTooltipTextColor);
+		      
+			}
+		    }
+
+		    // NOTE: pan
+		    {
+		      UIComm pan = parameterComms[PluginParameter_pan];
+		      b32 panIsInteracting =
+			uiHashKeysAreEqual(uiContext->interactingElement, pan.element->hashKey);
+		      b32 panIsHovering = ((pan.flags & UICommFlag_hovering) &&
+					   uiHashKeyIsNull(uiContext->interactingElement));
+		      if(panIsInteracting || panIsHovering)
+			{
+			  ASSERT(pluginState->mouseTooltipLayout == 0);
+			  pluginState->mouseTooltipLayout =
+			    arenaPushStruct(pluginState->frameArena, UILayout, arenaFlagsZeroNoAlign());
+
+			  String8 panTooltipMessage =
+			    arenaPushStringFormat(pluginState->frameArena,
+						  "pan: %.2f",
+						  pluginReadFloatParameter(pan.element->fParam));
+			  v2 messageRectMin = V2(MAX(uiContext->mouseP.x,
+						     pan.element->region.max.x),
+						 uiContext->mouseP.y);
+			  v2 messageRectDim =
+			    (getTextDim(uiContext->font, panTooltipMessage, mouseTooltipTextScale) +
+			     V2(10, uiContext->font->verticalAdvance * 0.5f));
+			  if(messageRectMin.x + messageRectDim.x >= renderCommands->widthInPixels)
+			    {
+			      messageRectMin.x = pan.element->region.min.x - messageRectDim.x;
+			    }
+			  Rect2 messageRect = rectMinDim(messageRectMin,
+							 messageRectDim);
+		      
+			  uiBeginLayout(pluginState->mouseTooltipLayout, uiContext,
+					messageRect, mouseTooltipBackgroundColor,
+					PLUGIN_ASSET(null), 1);
+			  pluginState->mouseTooltipLayout->regionRemaining.min += V2(5, 5);
+			  uiMakeTextElement(pluginState->mouseTooltipLayout,
+					    panTooltipMessage, mouseTooltipTextScale, mouseTooltipTextColor);
+		      
+			}
+		    }
+
+		    // NOTE: window
+		    {
+		      UIComm window = parameterComms[PluginParameter_window];
+		      b32 windowIsInteracting =
+			uiHashKeysAreEqual(uiContext->interactingElement, window.element->hashKey);
+		      b32 windowIsHovering = ((window.flags & UICommFlag_hovering) &&
+					      uiHashKeyIsNull(uiContext->interactingElement));
+		      if(windowIsInteracting || windowIsHovering)
+			{
+			  ASSERT(pluginState->mouseTooltipLayout == 0);
+			  pluginState->mouseTooltipLayout =
+			    arenaPushStruct(pluginState->frameArena, UILayout, arenaFlagsZeroNoAlign());
+
+			  String8 windowTooltipMessage =
+			    arenaPushStringFormat(pluginState->frameArena,
+						  "window: %.2f",
+						  pluginReadFloatParameter(window.element->fParam));
+			  v2 messageRectMin = V2(MAX(uiContext->mouseP.x,
+						     window.element->region.max.x),
+						 uiContext->mouseP.y);
+			  v2 messageRectDim =
+			    (getTextDim(uiContext->font, windowTooltipMessage, mouseTooltipTextScale) +
+			     V2(10, uiContext->font->verticalAdvance * 0.5f));
+			  if(messageRectMin.x + messageRectDim.x >= renderCommands->widthInPixels)
+			    {
+			      messageRectMin.x = window.element->region.min.x - messageRectDim.x;
+			    }
+			  Rect2 messageRect = rectMinDim(messageRectMin,
+							 messageRectDim);
+		      
+			  uiBeginLayout(pluginState->mouseTooltipLayout, uiContext,
+					messageRect, mouseTooltipBackgroundColor,
+					PLUGIN_ASSET(null), 1);
+			  pluginState->mouseTooltipLayout->regionRemaining.min += V2(5, 5);
+			  uiMakeTextElement(pluginState->mouseTooltipLayout,
+					    windowTooltipMessage,
+					    mouseTooltipTextScale, mouseTooltipTextColor);
+		      
+			}
+		    }
+		  }
+#endif
+		  
 		  // NOTE: grain view
 		  v2 drawRegionDim = getDim(panelLayout->regionRemaining);
 		  v2 viewDim = hadamard(V2(0.53f, 0.25f), drawRegionDim);
