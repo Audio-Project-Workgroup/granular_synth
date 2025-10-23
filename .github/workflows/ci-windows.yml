@@ -26,7 +26,6 @@ jobs:
           Expand-Archive -Path "glfw.zip" -DestinationPath "."
           
           # Copy GLFW to src/include and src/libs
-          Copy-Item -Recurse "glfw-3.3.8.bin.WIN64/include/GLFW" "src/include/"
           Copy-Item "glfw-3.3.8.bin.WIN64/lib-vc2022/glfw3_mt.lib" "src/libs/"
           Copy-Item "glfw-3.3.8.bin.WIN64/lib-vc2022/glfw3.lib" "src/libs/"
         shell: powershell
