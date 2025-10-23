@@ -2,12 +2,12 @@
 //       declarations and implementations. Maybe then we can also only compile
 //       shared code once, and link it in both host and plugin
 #if defined(HOST_LAYER)
-extern r32 gsRand(RangeR32 range);
-extern r32 gsAbs(r32 num);
-extern r32 gsSqrt(r32 num);
-extern r32 gsSin(r32 num);
-extern r32 gsCos(r32 num);
-extern r32 gsPow(r32 base, r32 exp);
+static r32 gsRand(RangeR32 range);
+static r32 gsAbs(r32 num);
+static r32 gsSqrt(r32 num);
+static r32 gsSin(r32 num);
+static r32 gsCos(r32 num);
+static r32 gsPow(r32 base, r32 exp);
 #endif
 
 #define GS_PI 3.141592653589793

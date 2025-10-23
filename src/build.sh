@@ -167,6 +167,17 @@ if [[ $target_exe == 1 ]]; then
 fi
 EXE_STATUS=$?
 
+if [[ $target_vst == 1 ]]; then
+    if [[ $PLUGIN_STATUS == 0 ]]; then
+	echo "compiling vst"
+	cmake -S $SRC_DIR -B $BUILD_DIR/build_JUCE -DBUILD_DEBUG=$config_debug -DBUILD_LOGGING=$config_logging
+	cmake --build $BUILD_DIR/build_JUCE
+    else
+	echo "ERROR: plugin build failed. skipping vst compilation"
+    fi
+fi
+VST_STATUS=$?
+
 # create application bundle (.app on mac, .AppImage on linux), with nonstandard dependencies included
 if [[ "$OSTYPE" == "darwin"* ]]; then
     mkdir -p Granade.app

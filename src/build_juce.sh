@@ -1,5 +1,7 @@
 #!/bin/bash
 
+echo "WARNING: this script has been deprecated. run `./build.sh target:vst` instead"
+
 ./build.sh
 
 PLUGIN_STATUS=$?

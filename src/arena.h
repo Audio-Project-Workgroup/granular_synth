@@ -3,8 +3,8 @@
 //       shared code once, and link it in both host and plugin
 #if defined(HOST_LAYER)
 struct Arena;
-extern Arena* gsArenaAcquire(usz capacity);
-extern void   gsArenaDiscard(Arena *arena);
+static Arena* gsArenaAcquire(usz capacity);
+static void   gsArenaDiscard(Arena *arena);
 //extern void*  gs_acquireMemory(usz size);
 //extern void   gs_discardMemory(void *mem, usz size);
 #endif

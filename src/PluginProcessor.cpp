@@ -101,7 +101,7 @@ juceFreeFileMemory(Buffer file, Arena *allocator)
 // TODO: pull this code that's copied from main.cpp out into a shared file
 #define ARENA_MIN_ALLOCATION_SIZE KILOBYTES(64)
 
-static Arena*
+Arena*
 gsArenaAcquire(usz size)
 {
   usz allocSize = MAX(size, ARENA_MIN_ALLOCATION_SIZE);
@@ -124,12 +124,42 @@ gsArenaDiscard(Arena *arena)
 }
 
 static r32
-platformRand(RangeR32 range)
+gsRand(RangeR32 range)
 {
   int randVal = rand();
   r32 rand01 = (r32)randVal / (r32)RAND_MAX;
   r32 result = mapToRange(rand01, range);
   return(result);
+}
+
+static r32
+gsAbs(r32 num)
+{
+  return(fabsf(num));
+}
+
+static r32
+gsSqrt(r32 num)
+{
+  return(sqrtf(num));
+}
+
+static r32
+gsSin(r32 num)
+{
+  return(sinf(num));
+}
+
+static r32
+gsCos(r32 num)
+{
+  return(cosf(num));
+}
+
+static r32
+gsPow(r32 base, r32 exp)
+{
+  return(powf(base, exp));
 }
 
 static void
@@ -370,7 +400,7 @@ prepareToPlay(double sampleRate, int samplesPerBlock)
   
   //pluginMemory.platformAPI.runModel = platformRunModel;
 
-  pluginMemory.platformAPI.gsRand = platformRand;
+  pluginMemory.platformAPI.gsRand = gsRand;
   pluginMemory.platformAPI.gsAbs  = fabsf;
   pluginMemory.platformAPI.gsSqrt = sqrtf;
   pluginMemory.platformAPI.gsSin  = sinf;

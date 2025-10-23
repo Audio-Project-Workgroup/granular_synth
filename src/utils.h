@@ -107,8 +107,8 @@
   } while(0)
 
 #if defined(HOST_LAYER)
-extern void gsSetMemory(void *dest, int value, usz size);
-extern void gsCopyMemory(void *dest, void *src, usz size);
+static void gsSetMemory(void *dest, int value, usz size);
+static void gsCopyMemory(void *dest, void *src, usz size);
 #endif
 
 #define ZERO_SIZE(ptr, size) gsSetMemory(ptr, 0, size);

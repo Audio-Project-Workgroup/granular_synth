@@ -26,6 +26,45 @@ gsArenaDiscard(Arena *arena)
   platformFreeMemory(arena, arena->capacity);
 }
 
+static r32
+gsRand(RangeR32 range)
+{
+  int randVal = rand();
+  r32 rand01 = (r32)randVal / (r32)RAND_MAX;
+  r32 result = mapToRange(rand01, range);
+  return(result);
+}
+
+static r32
+gsAbs(r32 num)
+{
+  return(fabsf(num));
+}
+
+static r32
+gsSqrt(r32 num)
+{
+  return(sqrtf(num));
+}
+
+static r32
+gsSin(r32 num)
+{
+  return(sinf(num));
+}
+
+static r32
+gsCos(r32 num)
+{
+  return(cosf(num));
+}
+
+static r32
+gsPow(r32 base, r32 exp)
+{
+  return(powf(base, exp));
+}
+
 static void
 gsCopyMemory(void *dest, void *src, usz size)
 {
