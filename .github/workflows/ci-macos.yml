@@ -15,7 +15,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
-          ref: 67061a8026ac613b7809db39fcb6a841fa19760c
 
       - name: Install dependencies
         run: |
