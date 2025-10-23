@@ -195,7 +195,6 @@ threadDestroy(OSThread *thread)
 // memory
 //
 
-//static PLATFORM_ALLOCATE_MEMORY(platformAllocateMemory)
 static void*
 platformAllocateMemory(usz size)
 {
@@ -271,9 +270,6 @@ struct PluginCode
   u64 lastWriteTime;
 
   HMODULE pluginCode;
-  /* RenderNewFrame *renderNewFrame; */
-  /* AudioProcess *audioProcess; */
-  /* InitializePluginState *initializePluginState; */
   PluginAPI pluginAPI;
 };
 
@@ -387,7 +383,7 @@ platformReadEntireFile(char *filename, Arena *allocator)
 
 	      if(result.contents)
 		{
-		  result.contents[result.size++] = 0; // NOTE: null termination
+		  result.contents[result.size] = 0; // NOTE: null termination
 		}
 	    }
 	}
@@ -412,7 +408,6 @@ platformReadEntireFile(char *filename, Arena *allocator)
   return(result);
 }
 
-//static PLATFORM_WRITE_ENTIRE_FILE(platformWriteEntireFile)
 static void
 platformWriteEntireFile(char *filename, Buffer file)
 {
@@ -443,7 +438,6 @@ platformWriteEntireFile(char *filename, Buffer file)
     }
 }
 
-//static PLATFORM_GET_PATH_TO_MODULE(platformGetPathToModule)
 static String8
 platformGetPathToModule(void *handleToModule, void *functionInModule, Arena *allocator)
 {
@@ -603,6 +597,25 @@ threadDestroy(OSThread *thread)
 }
 
 //
+// memory
+//
+
+#include <sys/mman.h>
+
+static void*
+platformAllocateMemory(usz size)
+{
+  void *result = mmap(0, size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+  return(result);
+}
+
+static void
+platformFreeMemory(void *memory, usz size)
+{
+  munmap(memory, size);
+}
+
+//
 // atomic operations
 // 
 
@@ -671,9 +684,7 @@ struct PluginCode
   u64 lastWriteTime;
   
   void *pluginCode;
-  RenderNewFrame *renderNewFrame;
-  AudioProcess *audioProcess;
-  InitializePluginState *initializePluginState;
+  PluginAPI pluginAPI;
 };
 
 static PluginCode
@@ -686,11 +697,16 @@ loadPluginCode(char *filename)
       result.pluginCode = dlopen(filename, RTLD_NOW);
       if(result.pluginCode)
 	{
-	  result.renderNewFrame = (RenderNewFrame *)dlsym(result.pluginCode, "renderNewFrame");
-	  result.audioProcess   = (AudioProcess *)dlsym(result.pluginCode, "audioProcess");
-	  result.initializePluginState   = (InitializePluginState *)dlsym(result.pluginCode, "initializePluginState");
+	  result.pluginAPI.gsRenderNewFrame
+	    = (GS_RenderNewFrame*)dlsym(result.pluginCode, "gsRenderNewFrame");
+	  result.pluginAPI.gsAudioProcess
+	    = (GS_AudioProcess*)dlsym(result.pluginCode, "gsAudioProcess");
+	  result.pluginAPI.gsInitializePluginState
+	    = (GS_InitializePluginState*)dlsym(result.pluginCode, "gsInitializePluginState");
 	  
-	  result.isValid = result.renderNewFrame && result.audioProcess && result.initializePluginState;
+	  result.isValid = (result.pluginAPI.gsRenderNewFrame &&
+			    result.pluginAPI.gsAudioProcess &&
+			    result.pluginAPI.gsInitializePluginState);
 	}
       else
 	{
@@ -700,8 +716,9 @@ loadPluginCode(char *filename)
 
   if(!result.isValid)
     {
-      result.renderNewFrame = 0;
-      result.audioProcess   = 0;
+      result.pluginAPI.gsRenderNewFrame	       = 0;
+      result.pluginAPI.gsAudioProcess	       = 0;
+      result.pluginAPI.gsInitializePluginState = 0;
     }
 
   return(result);
@@ -720,8 +737,9 @@ unloadPluginCode(PluginCode *code)
     }
 
   code->isValid = false;
-  code->renderNewFrame = 0;
-  code->audioProcess = 0;
+  code->pluginAPI.gsRenderNewFrame	  = 0;
+  code->pluginAPI.gsAudioProcess	  = 0;
+  code->pluginAPI.gsInitializePluginState = 0;
 }
 
 //
@@ -731,28 +749,30 @@ unloadPluginCode(PluginCode *code)
 typedef ssize_t ssz;
 #define PLATFORM_MAX_READ_SIZE 0x7FFFF000
 
-static PLATFORM_READ_ENTIRE_FILE(platformReadEntireFile)
+static Buffer
+platformReadEntireFile(char *filename, Arena *allocator)
 {
-  ReadFileResult result = {};
+  Buffer result = {};
 
-  String8 filePath = concatenateStrings(allocator,
-					concatenateStrings(allocator, basePath, STR8_LIT("/")),
-					STR8_CSTR(filename));
+  /* String8 filePath = concatenateStrings(allocator, */
+  /* 					concatenateStrings(allocator, basePath, STR8_LIT("/")), */
+  /* 					STR8_CSTR(filename)); */
 #if BUILD_DEBUG
-  fprintf(stderr, "reading entire file: %s\n", (char *)filePath.str);
+  fprintf(stderr, "reading entire file: %s\n", filename);
 #endif
 
-  int fileHandle = open((char *)filePath.str, O_RDONLY);
+  //int fileHandle = open((char *)filePath.str, O_RDONLY);
+  int fileHandle = open(filename, O_RDONLY);
   if(fileHandle != -1)
     {
       struct stat fileStatus;
       if(fstat(fileHandle, &fileStatus) != -1)
 	{
-	  result.contentsSize = fileStatus.st_size;
-	  result.contents = arenaPushSize(allocator, result.contentsSize + 1);
+	  result.size = fileStatus.st_size;
+	  result.contents = arenaPushSize(allocator, result.size + 1);
 	  
 	  u8 *dest = result.contents;
-	  usz totalBytesToRead = result.contentsSize;
+	  usz totalBytesToRead = result.size;
 	  usz bytesToRead = MIN(totalBytesToRead, PLATFORM_MAX_READ_SIZE);
 	  while(totalBytesToRead)
 	    {
@@ -764,42 +784,45 @@ static PLATFORM_READ_ENTIRE_FILE(platformReadEntireFile)
 		}
 	      else
 		{
-		  fprintf(stderr, "ERROR: read failed: %s: %s\n", (char *)filePath.str, strerror(errno));
+		  fprintf(stderr, "ERROR: read failed: %s: %s\n", filename, strerror(errno));
 		  result.contents = 0;
-		  result.contentsSize = 0;
+		  result.size = 0;
 		  break;
 		}
 
 	      if(result.contents)
 		{
-		  result.contents[result.contentsSize++] = 0; // NOTE: null termination
+		  result.contents[result.size] = 0; // NOTE: null termination
 		}
 	    }
 	}
       else
 	{
-	  fprintf(stderr, "ERROR: fstat failed: %.*s: %s\n", (int)filePath.size, filePath.str, strerror(errno));
+	  fprintf(stderr, "ERROR: fstat failed: %s: %s\n", filename, strerror(errno));
 	}
 
       close(fileHandle);
     }
   else
     {
-      fprintf(stderr, "ERROR: open failed: %.*s: %s\n", (int)filePath.size, filePath.str, strerror(errno));
+      fprintf(stderr, "ERROR: open failed: %s: %s\n", filename, strerror(errno));
     }
 
   return(result);
 }
 
-static PLATFORM_WRITE_ENTIRE_FILE(platformWriteEntireFile)
+static void
+platformWriteEntireFile(char *filename, Buffer file)
 {
   int fileHandle = open(filename, O_CREAT | O_WRONLY | O_TRUNC,
 			S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
   if(fileHandle != -1)
     {
-      usz bytesToWrite = fileSize;
-      while(bytesToWrite)
+      void *fileMemory = file.contents;
+      usz bytesRemaining = file.size;
+      while(bytesRemaining)
 	{
+	  u32 bytesToWrite = safeTruncateU64(bytesRemaining);
 	  ssize_t bytesWritten = write(fileHandle, fileMemory, bytesToWrite);
 	  if(bytesWritten == -1)
 	    {
@@ -808,7 +831,7 @@ static PLATFORM_WRITE_ENTIRE_FILE(platformWriteEntireFile)
 	    }
 	  else
 	    {
-	      bytesToWrite -= bytesWritten;
+	      bytesRemaining -= bytesWritten;
 	      fileMemory = (u8 *)fileMemory + bytesWritten;
 	    }
 	}
@@ -821,7 +844,8 @@ static PLATFORM_WRITE_ENTIRE_FILE(platformWriteEntireFile)
     }
 }
 
-static PLATFORM_GET_PATH_TO_MODULE(platformGetPathToModule)
+static String8
+platformGetPathToModule(void *handleToModule, void *functionInModule, Arena *allocator)
 {
   String8 result = {};
   Dl_info dlInfo = {};
@@ -844,7 +868,6 @@ static PLATFORM_GET_PATH_TO_MODULE(platformGetPathToModule)
 #error ERROR: unsupported OS
 #endif 
 
-//static PLATFORM_FREE_FILE_MEMORY(platformFreeFileMemory)
 static void
 platformFreeFileMemory(Buffer file, Arena *allocator)
 {

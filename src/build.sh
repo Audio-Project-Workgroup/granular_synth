@@ -1,13 +1,41 @@
 #!/bin/bash
 
+## -----------------------------------------------------------------------------
+## default options
+
+## config options
+config_debug=1
+config_logging=0
+
+## target options
+target_plugin=0
+target_exe=0
+target_vst=0
+target_all=0
+
+## -----------------------------------------------------------------------------
+## TODO: parse cli arguments
+
+## -----------------------------------------------------------------------------
+## set up directories, flags
+
 SRC_DIR=$PWD
 DATA_DIR=$SRC_DIR/../data
 
-CFLAGS="-g -Wall -Wno-writable-strings -Wno-missing-braces -Wno-unused-function -fno-exceptions -fno-rtti -march=native -std=gnu++11 -DBUILD_DEBUG=0"
+CFLAGS="-Wall -Wno-writable-strings -Wno-missing-braces -Wno-unused-function"
+if [[ $config_debug == 1 ]]; then
+    CFLAGS+=" -g"
+fi
+CFLAGS+=" -I$SRC_DIR/include -I$SRC_DIR/include/glad/include"
+CFLAGS+=" -fno-exceptions -fno-rtti -march=native -std=gnu++11"
+CFLAGS+=" -DBUILD_DEBUG=$config_debug -DBUILD_LOGGING=$config_logging"
+#CFLAGS="-g -Wall -Wno-writable-strings -Wno-missing-braces -Wno-unused-function -fno-exceptions -fno-rtti -march=native -std=gnu++11 -DBUILD_DEBUG=0"
 MAC_GL_FLAGS="-framework OpenGL"
 MAC_PLUGIN_FLAGS="-dynamiclib"
 LINUX_GL_FLAGS="-lGL"
 LINUX_PLUGIN_FLAGS="-shared -fPIC"
+
+echo $CFLAGS
 
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
     #CFLAGS+= " -Wl,rpath,'$ORIGIN/../lib' -Wl,--enable-new-dtags"

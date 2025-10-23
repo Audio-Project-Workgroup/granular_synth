@@ -24,9 +24,9 @@ static String8 basePath;
 #include <math.h>
 
 #include <glad/glad.h>
-#if OS_MAC || OS_LINUX
-#include <GL/glew.h>
-#endif
+// #if OS_MAC || OS_LINUX
+// #include <GL/glew.h>
+// #endif
 #define GLFW_INCLUDE_GLEXT
 #include <GLFW/glfw3.h>
 
@@ -555,13 +555,13 @@ loadPNG(String8 path, b32 flip = 1)
   return(result);
 }
 
-static void
+void
 gsCopyMemory(void *dest, void *src, usz size)
 {
   memcpy(dest, src, size);
 }
 
-static void
+void
 gsSetMemory(void *dest, int value, usz size)
 {
   memset(dest, value, size);
@@ -586,7 +586,7 @@ static HostMemoryState *hostMemoryState = 0;
 #define ARENA_MIN_ALLOCATION_SIZE KILOBYTES(64)
 //#define ARENA_MIN_ALLOCATION_SIZE MEGABYTES(1)
 
-static Arena*
+Arena*
 gsArenaAcquire(usz size)
 {
   usz allocSize = MAX(size, ARENA_MIN_ALLOCATION_SIZE);
@@ -602,7 +602,7 @@ gsArenaAcquire(usz size)
   return(result);
 }
 
-static void
+void
 gsArenaDiscard(Arena *arena)
 {
   platformFreeMemory(arena, arena->capacity);
@@ -736,7 +736,7 @@ main(int argc, char **argv)
 	  // plugin setup
 	  
 #if OS_MAC || OS_LINUX	  	  
-	  String8 pluginPath = concatenateStrings(&stringArena, basePath, STR8_LIT("/" PLUGIN_PATH));
+	  String8 pluginPath = concatenateStrings(scratch.arena, basePath, STR8_LIT("/" PLUGIN_PATH));
 #else
 	  String8 pluginPath = STR8_LIT(PLUGIN_PATH);
 #endif
