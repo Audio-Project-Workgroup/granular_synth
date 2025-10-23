@@ -12,31 +12,31 @@
 #include <math.h>
 #include <string.h>
 
-static r32
+r32
 gsSqrt(r32 num)
 {
   return(sqrtf(num));
 }
 
-static r32
+r32
 gsCos(r32 num)
 {
   return(cosf(num));
 }
 
-static r32
+r32
 gsSin(r32 num)
 {
   return(sinf(num));
 }
 
-static void
+void
 gsCopyMemory(void *dest, void *src, usz size)
 {
   memcpy(dest, src, size);
 }
 
-static void
+void
 gsSetMemory(void *dest, int value, usz size)
 {
   memset(dest, value, size);
@@ -48,26 +48,17 @@ gsSetMemory(void *dest, int value, usz size)
 #if OS_WINDOWS
 #include <windows.h>
 
-static Arena*
-gsArenaAcquire(usz size)
+static void*
+allocateMemory(usz size)
 {
-  usz allocSize = MAX(size, ARENA_MIN_ALLOCATION_SIZE);
-  void *base = VirtualAlloc(0, allocSize, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
-  Arena *result = (Arena*)base;
-  result->current = result;
-  result->prev = 0;
-  result->base = 0;
-  result->capacity = allocSize;
-  result->pos = ARENA_HEADER_SIZE;
-
+  void *result = VirtualAlloc(0, size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
   return(result);
 }
 
 static void
-gsArenaDiscard(Arena *arena)
+freeMemory(void *memory, usz size)
 {
-  usz size = arena->capacity;
-  VirtualFree((void*)arena, 0, MEM_RELEASE);
+  VirtualFree(memory, size, MEM_RELEASE);
 }
 
 static Buffer
@@ -143,9 +134,126 @@ writeEntireFile(String8 path, Buffer file)
 
 #elif OS_LINUX || OS_MAC
 
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+
+static void*
+allocateMemory(usz size)
+{
+  void *result = mmap(0, size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+  return(result);
+}
+
+static void
+freeMemory(void *memory, usz size)
+{
+  munmap(memory, size);
+}
+
+
+typedef ssize_t ssz;
+#define PLATFORM_MAX_READ_SIZE 0x7FFFF000
+
+static Buffer
+readEntireFile(Arena *arena, String8 path)
+{
+  Buffer result = {};
+
+  int fileHandle = open((char*)path.str, O_RDONLY);
+  if(fileHandle != -1)
+    {
+      struct stat fileStatus;
+      if(fstat(fileHandle, &fileStatus) != -1)
+	{
+	  result.size = fileStatus.st_size;
+	  result.contents = arenaPushSize(arena, result.size + 1);
+	  
+	  u8 *dest = result.contents;
+	  usz totalBytesToRead = result.size;
+	  usz bytesToRead = MIN(totalBytesToRead, PLATFORM_MAX_READ_SIZE);
+	  while(totalBytesToRead)
+	    {
+	      ssz bytesRead = read(fileHandle, dest, bytesToRead);
+	      if(bytesRead == bytesToRead)
+		{
+		  dest += bytesRead;
+		  totalBytesToRead -= bytesRead;
+		}
+	      else
+		{
+		  result.contents = 0;
+		  result.size = 0;
+		  break;
+		}
+
+	      if(result.contents)
+		{
+		  result.contents[result.size] = 0; // NOTE: null termination
+		}
+	    }
+	}
+
+      close(fileHandle);
+    }
+
+  return(result);
+}
+
+static void
+writeEntireFile(String8 path, Buffer file)
+{
+  int fileHandle = open((char*)path.str, O_CREAT | O_WRONLY | O_TRUNC,
+			S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+  if(fileHandle != -1)
+    {
+      void *fileMemory = file.contents;
+      usz bytesRemaining = file.size;
+      while(bytesRemaining)
+	{
+	  u32 bytesToWrite = safeTruncateU64(bytesRemaining);
+	  ssize_t bytesWritten = write(fileHandle, fileMemory, bytesToWrite);
+	  if(bytesWritten == -1)
+	    {
+	      break;
+	    }
+	  else
+	    {
+	      bytesRemaining -= bytesWritten;
+	      fileMemory = (u8 *)fileMemory + bytesWritten;
+	    }
+	}
+
+      close(fileHandle);
+    }
+}
+
 #else
 #  error unsupported OS
 #endif
+
+Arena*
+gsArenaAcquire(usz size)
+{
+  usz allocSize = MAX(size, ARENA_MIN_ALLOCATION_SIZE);
+  void *base = allocateMemory(allocSize);
+  Arena *result = (Arena*)base;
+  result->current = result;
+  result->prev = 0;
+  result->base = 0;
+  result->capacity = allocSize;
+  result->pos = ARENA_HEADER_SIZE;
+
+  return(result);
+}
+
+void
+gsArenaDiscard(Arena *arena)
+{
+  usz size = arena->capacity;
+  freeMemory((void*)arena, size);
+}
 
 #define FOURCC(str) ((u32)((str[0] << 0*8) | (str[1] << 1*8) | (str[2] << 2*8) | (str[3] << 3*8)))
 
@@ -679,7 +787,7 @@ main(int argc, char **argv)
   stringListPush(looseAssets->arena, &pluginAssetXList, STR8_LIT("  X(null)\\\n"));
 
 #define X(name, path, alignment)							\
-  looseAssetPushBitmap(looseAssets, STR8_LIT(DATA_PATH##path), STR8_LIT(#name), alignment); \
+  looseAssetPushBitmap(looseAssets, STR8_LIT(DATA_PATH path), STR8_LIT(#name), alignment); \
   stringListPushFormat(looseAssets->arena, &pluginAssetXList, "  X(%s)\\\n", #name);
   BITMAP_XLIST;
 #undef X

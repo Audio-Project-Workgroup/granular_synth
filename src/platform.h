@@ -340,7 +340,6 @@ unloadPluginCode(PluginCode *code)
 // file operations
 //
 
-//static PLATFORM_READ_ENTIRE_FILE(platformReadEntireFile)
 static Buffer
 platformReadEntireFile(char *filename, Arena *allocator)
 {
@@ -754,14 +753,10 @@ platformReadEntireFile(char *filename, Arena *allocator)
 {
   Buffer result = {};
 
-  /* String8 filePath = concatenateStrings(allocator, */
-  /* 					concatenateStrings(allocator, basePath, STR8_LIT("/")), */
-  /* 					STR8_CSTR(filename)); */
 #if BUILD_DEBUG
   fprintf(stderr, "reading entire file: %s\n", filename);
 #endif
 
-  //int fileHandle = open((char *)filePath.str, O_RDONLY);
   int fileHandle = open(filename, O_RDONLY);
   if(fileHandle != -1)
     {

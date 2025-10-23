@@ -8,8 +8,8 @@ config_debug=1
 config_logging=0
 
 ## target options
-target_plugin=0
-target_exe=0
+target_plugin=1
+target_exe=1
 target_vst=0
 target_all=0
 
@@ -56,24 +56,54 @@ mkdir -p ../build
 pushd ../build > /dev/null
 
 BUILD_DIR=$PWD
+
+## -----------------------------------------------------------------------------
+## build targets
+
 # compile miniaudio to static library
-clang -c ../src/miniaudio_impl.c -o miniaudio.o
-ar rcs libminiaudio.a miniaudio.o
+if [ ! -f libminiaudio.a ]; then
+    echo "compiling miniaudio..."
+    clang -c ../src/miniaudio_impl.c -o miniaudio.o
+    ar rcs libminiaudio.a miniaudio.o
+fi
 
 # preprocessor
 #clang $CFLAGS ../src/preprocessor.cpp -o preprocessor
-popd > /dev/null
+#popd > /dev/null
 #../build/preprocessor plugin.h > generated.cpp
-pushd ../build > /dev/null
+#pushd ../build > /dev/null
 
-# compile plugin and host
-clang $CFLAGS -D"DATA_PATH=\"../data/\"" ../src/plugin.cpp -o $PLUGIN_NAME $PLUGIN_FLAGS -lm
+# asset packer
+if [ ! -f $DATA_DIR/test_atlas.png ]; then
+    echo "compiling asset packer..."
+    clang $CFLAGS $SRC_DIR/asset_packer.cpp $LFLAGS -lm -o asset_packer
+    echo "running asset packer..."
+    ./asset_packer
+fi
 
+# TODO: try compiling common layer implementations to separate lib/obj and link
+#       with all targets to speed up build times
+
+# plugin
+# TODO: allow linking the plugin to the exe and vst statically for release builds
+if [[ $target_plugin == 1 ]]; then
+    echo "compiling plugin..."
+    clang $CFLAGS -D"DATA_PATH=\"../data/\"" ../src/plugin.cpp -o $PLUGIN_NAME $PLUGIN_FLAGS -lm
+fi
 PLUGIN_STATUS=$?
 
-clang $CFLAGS -D"PLUGIN_PATH=\"$PLUGIN_NAME\"" ../src/main.cpp -o granade -L. $GL_FLAGS -lglfw -lminiaudio -ldl -lpthread -lm
-#$(pkg-config --libs --cflags libonnxruntime)
-#-L$SRC_DIR/libs -lonnxruntime
+# exe
+if [[ $target_exe == 1 ]]; then
+    if [[ $PLUGIN_STATUS == 0 ]]; then
+	echo "compiling exe..."
+	clang $CFLAGS -D"PLUGIN_PATH=\"$PLUGIN_NAME\"" ../src/main.cpp -o granade -L. $GL_FLAGS -lglfw -lminiaudio -ldl -lpthread -lm
+	#$(pkg-config --libs --cflags libonnxruntime)
+	#-L$SRC_DIR/libs -lonnxruntime
+    else
+	echo "ERROR: plugin build failed. skipping exe compilation"
+    fi
+fi
+EXE_STATUS=$?
 
 # create application bundle (.app on mac, .AppImage on linux), with nonstandard dependencies included
 if [[ "$OSTYPE" == "darwin"* ]]; then
