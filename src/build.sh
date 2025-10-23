@@ -3,18 +3,80 @@
 ## -----------------------------------------------------------------------------
 ## default options
 
-## config options
-config_debug=1
+# config options
+config_debug=0
 config_logging=0
 
-## target options
-target_plugin=1
-target_exe=1
+# target options
+target_plugin=0
+target_exe=0
 target_vst=0
-target_all=0
+target_web=0
+target_all=1
+
+echo "initial values:"
+echo "config_debug: $config_debug"
+echo "config_logging: $config_logging"
+echo "target_plugin: $target_plugin"
+echo "target_exe: $target_exe"
+echo "target_vst: $target_vst"
+echo "target_web: $target_web"
+echo "target_all: $target_all"
 
 ## -----------------------------------------------------------------------------
-## TODO: parse cli arguments
+## parse cli arguments
+
+for arg in "$@"; do
+    echo "$arg"
+    key=$(echo $arg | cut -d ":" -f 1)
+    values=$(echo $arg | cut -d ":" -f 2)
+    if [[ "$key" == "target" ]]; then
+	target_plugin=0
+	target_exe=0
+	target_vst=0
+	target_web=0
+	target_all=0
+    fi
+
+    if [[ "$key" == "config" ]]; then
+	config_debug=0
+	config_logging=0
+    fi
+
+    OLD_IFS=$IFS
+    IFS='+' read -ra values_array <<< "$values"
+    for value in "${values_array[@]}"; do
+	var="${key}_${value}"
+	if [[ -v $var ]]; then
+	    declare "$var"=1
+	else
+	    echo "unknown variable ${key}_${value}"
+	fi
+    done
+    IFS=$OLD_IFS
+done
+
+if [[ $target_exe == 1 ]]; then
+    target_plugin=1
+fi
+if [[ $target_vst == 1 ]]; then
+    target_plugin=1
+fi
+if [[ $target_all == 1 ]]; then
+    target_plugin=1
+    target_exe=1
+    target_vst=1
+    target_web=1
+fi
+
+echo "after parsing:"
+echo "config_debug: $config_debug"
+echo "config_logging: $config_logging"
+echo "target_plugin: $target_plugin"
+echo "target_exe: $target_exe"
+echo "target_vst: $target_vst"
+echo "target_web: $target_web"
+echo "target_all: $target_all"
 
 ## -----------------------------------------------------------------------------
 ## set up directories, flags
