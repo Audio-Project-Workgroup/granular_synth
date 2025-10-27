@@ -122,42 +122,67 @@ async function main() {
 	});
 
     // NOTE: WEBAUDIO setup
-    const audioCtx = new AudioContext();
-    audioCtx.suspend();
+    let audioCtx = null;
+    let audioInitialized = false;
 
-    const stream = await navigator.mediaDevices.getUserMedia({
-	audio: true,
-    });
-    const microphoneStream = audioCtx.createMediaStreamSource(stream);
+    async function initWebAudio() {
+	// NOTE: create audio context
+	audioCtx = new AudioContext();
+	audioCtx.onstatechange = () => {
+	    console.log(`audio context state is now ${audioCtx.state}`);
+	};
+	//audioCtx.suspend();
 
-    await audioCtx.audioWorklet.addModule("./src/granade_audio.js");
-    const granadeNode = new AudioWorkletNode(audioCtx, "granade-processor", {
-	processorOptions: {
-	    sharedMemory: sharedMemory,	 
-	    wasmModule: wasmModule,
-	    audioThreadStackOffset: audioThreadStackOffset,
-	}
-    });
-    granadeNode.port.onmessage = (msg) => {
-	if(msg.data.type === "log") {
-	    const str = new TextDecoder().decode(msg.data.data);
-	    console.log(`[AUDIO]: ${str}`);
-	}
-    };
-    granadeNode.connect(audioCtx.destination);
-    microphoneStream.connect(granadeNode);
-    console.log(microphoneStream);
-    console.log(granadeNode);
+	// NOTE: create microphone stream node		
+	const stream = await navigator.mediaDevices.getUserMedia({
+	    audio: true,
+	});
+	const microphoneStream = audioCtx.createMediaStreamSource(stream);
 
+	// NOTE: create granade processor node
+	await audioCtx.audioWorklet.addModule("./src/granade_audio.js");
+	const granadeNode = new AudioWorkletNode(audioCtx, "granade-processor", {
+            processorOptions: {
+		sharedMemory: sharedMemory,	 
+		wasmModule: wasmModule,
+		audioThreadStackOffset: audioThreadStackOffset,
+            }
+	});
+	granadeNode.port.onmessage = (msg) => {
+            if(msg.data.type === "log") {
+		const str = new TextDecoder().decode(msg.data.data);
+		console.log(`[AUDIO]: ${str}`);
+            }
+	};
+
+	// NOTE: connect nodes
+	granadeNode.connect(audioCtx.destination);
+	microphoneStream.connect(granadeNode);
+	// console.log(microphoneStream);
+	// console.log(granadeNode);
+	audioInitialized = true;
+	console.log("audio initialized");
+    }
+    
     const playButton = document.querySelector("button");
     playButton.addEventListener(
 	"click",
-	() => {
-	    if(audioCtx.state === "running") {
-		audioCtx.suspend()
+	async () => {
+	    if(!audioInitialized) {
+		await initWebAudio();
 	    }
-	    else if(audioCtx.state === "suspended") {
-		audioCtx.resume();
+	    else {
+		console.log(`state before click action: ${audioCtx.state}`);
+		if(audioCtx.state === "running") {
+		    audioCtx.suspend().catch(e => {
+			console.error(`failed to suspend:`, e);
+		    });
+		}
+		else if(audioCtx.state === "suspended") {
+		    audioCtx.resume().catch(e => {
+			console.error(`failed to resume:`, e);
+		    });
+		}
 	    }
 	},
 	false

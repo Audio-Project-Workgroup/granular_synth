@@ -104,6 +104,9 @@ glfwProcessButtonPress(ButtonState *newState, bool pressed)
 static void
 glfwKeyCallback(GLFWwindow *window, int key, int scancode, int action, int mods)
 {
+  UNUSED(window);
+  UNUSED(scancode);
+  UNUSED(mods);
   // if(key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
   //   {
   //     glfwSetWindowShouldClose(window, GLFW_TRUE);
@@ -158,6 +161,9 @@ glfwKeyCallback(GLFWwindow *window, int key, int scancode, int action, int mods)
 static void
 glfwMouseButtonCallback(GLFWwindow *window, int button, int action, int mods)
 {
+  UNUSED(window);
+  UNUSED(mods);
+
   if(button == GLFW_MOUSE_BUTTON_LEFT)
     {
       glfwProcessButtonPress(&newInput->mouseState.buttons[MouseButton_left],
@@ -302,6 +308,7 @@ static BASE_THREAD_PROC(audioThreadProc)
   PluginAudioBuffer *audioBuffer = audioData->audioBuffer;
   ma_pcm_rb *outputRingBuffer = audioData->outputBuffer;
   ma_pcm_rb *inputRingBuffer = audioData->inputBuffer;
+  UNUSED(plugin);
 
   u32 baseWaitTimeMS = 1;
   u32 waitTimeMS = baseWaitTimeMS;
@@ -581,7 +588,7 @@ struct HostMemoryState
   Arena *lastFree;
 };
 
-static HostMemoryState *hostMemoryState = 0;
+//static HostMemoryState *hostMemoryState = 0;
 
 #define ARENA_MIN_ALLOCATION_SIZE KILOBYTES(64)
 //#define ARENA_MIN_ALLOCATION_SIZE MEGABYTES(1)
@@ -609,7 +616,7 @@ gsArenaDiscard(Arena *arena)
 }
 
 static r32
-platformRand(RangeR32 range)
+gsRand(RangeR32 range)
 {
   int randVal = rand();
   r32 rand01 = (r32)randVal / (r32)RAND_MAX;
@@ -617,9 +624,42 @@ platformRand(RangeR32 range)
   return(result);
 }
 
+static r32
+gsAbs(r32 num)
+{
+  return(fabsf(num));
+}
+
+static r32
+gsSqrt(r32 num)
+{
+  return(sqrtf(num));
+}
+
+static r32
+gsSin(r32 num)
+{
+  return(sinf(num));
+}
+
+static r32
+gsCos(r32 num)
+{
+  return(cosf(num));
+}
+
+static r32
+gsPow(r32 base, r32 exp)
+{
+  return(powf(base, exp));
+}
+
 int
 main(int argc, char **argv)
 {
+  UNUSED(argc);
+  UNUSED(argv);
+
 #if BUILD_DEBUG  
   printf("plugin path: %s\n", PLUGIN_PATH);
 #endif
@@ -697,12 +737,12 @@ main(int argc, char **argv)
 	  
 	  pluginMemory.platformAPI.gsGetCurrentTimestamp = platformGetCurrentTimestamp;
 
-	  pluginMemory.platformAPI.gsRand = platformRand;
-	  pluginMemory.platformAPI.gsAbs  = fabsf;
-	  pluginMemory.platformAPI.gsSqrt = sqrtf;
-	  pluginMemory.platformAPI.gsSin  = sinf;
-	  pluginMemory.platformAPI.gsCos  = cosf;
-	  pluginMemory.platformAPI.gsPow  = powf;
+	  pluginMemory.platformAPI.gsRand = gsRand;
+	  pluginMemory.platformAPI.gsAbs  = gsAbs;
+	  pluginMemory.platformAPI.gsSqrt = gsSqrt;
+	  pluginMemory.platformAPI.gsSin  = gsSin;
+	  pluginMemory.platformAPI.gsCos  = gsCos;
+	  pluginMemory.platformAPI.gsPow  = gsPow;
 
 	  pluginMemory.platformAPI.gsAllocateMemory = platformAllocateMemory;
 	  pluginMemory.platformAPI.gsFreeMemory     = platformFreeMemory;

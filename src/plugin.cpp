@@ -1477,7 +1477,7 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 
 		  v2 dim = hadamard(V2(0.843f, 0.62f), viewDim);
 		  v2 min = viewMin + hadamard(V2(0.075f, 0.2f), viewDim);
-		  Rect2 rect = rectMinDim(min, dim);
+		  //Rect2 rect = rectMinDim(min, dim);
 
 		  r32 middleBarThickness = 4.f;
 		  Rect2 middleBar = rectMinDim(min + V2(0, 0.5f*dim.y),
@@ -1661,19 +1661,13 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 EXPORT_FUNCTION void
 gsAudioProcess(PluginMemory *memory, PluginAudioBuffer *audioBuffer)
 {
-  //PluginState *pluginState = getPluginState(memory);  
+  UNUSED(memory);
+
   if(globalPluginState)
     {
       PluginState *pluginState = globalPluginState;
       if(pluginState->initialized)
 	{
-#if OS_WASM
-	  {
-	    //ASSERT(*(char*)PTR_FROM_INT(0x50D) == 'M');	    
-	    //logFormatString("looking at the memory: %s", (char*)PTR_FROM_INT(0x527));
-	  }
-#endif
-
 	  TemporaryMemory scratch = arenaGetScratch(0, 0);
 
 	  // NOTE: dequeue host-driven parameter value changes
@@ -1708,6 +1702,7 @@ gsAudioProcess(PluginMemory *memory, PluginAudioBuffer *audioBuffer)
 	  r32 inputBufferReadSpeed = ((audioBuffer->inputSampleRate != 0) ?
 				      (r32)INTERNAL_SAMPLE_RATE/(r32)audioBuffer->inputSampleRate : 1.f);
 	  r32 scaledFramesToRead = inputBufferReadSpeed*framesToRead;
+	  UNUSED(scaledFramesToRead);
       
 	  AudioRingBuffer *gbuff = &pluginState->grainBuffer;
 	  //PlayingSound *loadedSound = &pluginState->loadedSound;
@@ -1867,6 +1862,8 @@ gsAudioProcess(PluginMemory *memory, PluginAudioBuffer *audioBuffer)
 	  // NOTE: DEBUG
 	  usz genericOutputFramesIntL = INT_FROM_PTR(genericOutputFrames[0]);
 	  usz genericOutputFramesIntR = INT_FROM_PTR(genericOutputFrames[1]);
+	  UNUSED(genericOutputFramesIntL);
+	  UNUSED(genericOutputFramesIntR);
 
 	  u8 *atMidiBuffer = audioBuffer->midiBuffer;
 

@@ -248,12 +248,12 @@ static DebugPointerData debugPointers[DebugPointer_Count] = {};
 extern u8 __global_base;
 extern u8 __heap_base;
 extern u8 __heap_end;
-static volatile u32 memoryLock;
+//static volatile u32 memoryLock;
 static volatile usz __mem_used = 0;
 static usz __mem_capacity = 0;
 //static Arena *arenaFreelist = 0;
-static Arena *firstFreeArena;
-static Arena *lastFreeArena;
+//static Arena *firstFreeArena;
+//static Arena *lastFreeArena;
 
 void*
 gsAllocateMemory(usz size)
@@ -268,6 +268,7 @@ gsAllocateMemory(usz size)
     ASSERT(memUsed + size < __mem_capacity);
   }
 #endif
+  UNUSED(__mem_capacity);
   
   usz memPos = gsAtomicAdd((volatile u32*)&__mem_used, size);
   void *result = (void*)(&__heap_base + memPos);
@@ -489,6 +490,7 @@ platformLogf(char *fmt, ...)
   va_start(vaArgs, fmt);
   usz actualSize = gs_vsnprintf(buf, bufCount, fmt, vaArgs);
   ASSERT(actualSize < bufCount);
+  UNUSED(actualSize);
   va_end(vaArgs);
 
   platformLog(buf);
@@ -579,6 +581,10 @@ logQuad(R_Quad* quad)
 proc_export u32
 drawQuads(s32 width, s32 height, r32 timestamp)
 {
+  // TODO: we could calcuate input->frameMillisecondsElapsed from this, if that
+  //       was something we cared about
+  UNUSED(timestamp);
+
   if(!threadState.initialized)
     {
       threadState.id = ThreadID_render;
@@ -638,6 +644,8 @@ drawQuads(s32 width, s32 height, r32 timestamp)
 proc_export void
 audioProcess(int sampleRate, int inputChannelCount, int inputSampleCount, int outputChannelCount, int outputSampleCount)
 {
+  UNUSED(inputSampleCount);
+
   if(!threadState.initialized)
     {
       threadState.id = ThreadID_audio;

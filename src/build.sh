@@ -11,17 +11,8 @@ config_logging=0
 target_plugin=0
 target_exe=0
 target_vst=0
-target_web=0
+target_wasm=0
 target_all=1
-
-echo "initial values:"
-echo "config_debug: $config_debug"
-echo "config_logging: $config_logging"
-echo "target_plugin: $target_plugin"
-echo "target_exe: $target_exe"
-echo "target_vst: $target_vst"
-echo "target_web: $target_web"
-echo "target_all: $target_all"
 
 ## -----------------------------------------------------------------------------
 ## parse cli arguments
@@ -34,7 +25,7 @@ for arg in "$@"; do
 	target_plugin=0
 	target_exe=0
 	target_vst=0
-	target_web=0
+	target_wasm=0
 	target_all=0
     fi
 
@@ -66,17 +57,8 @@ if [[ $target_all == 1 ]]; then
     target_plugin=1
     target_exe=1
     target_vst=1
-    target_web=1
+    target_wasm=1
 fi
-
-echo "after parsing:"
-echo "config_debug: $config_debug"
-echo "config_logging: $config_logging"
-echo "target_plugin: $target_plugin"
-echo "target_exe: $target_exe"
-echo "target_vst: $target_vst"
-echo "target_web: $target_web"
-echo "target_all: $target_all"
 
 ## -----------------------------------------------------------------------------
 ## set up directories, flags
@@ -84,12 +66,14 @@ echo "target_all: $target_all"
 SRC_DIR=$PWD
 DATA_DIR=$SRC_DIR/../data
 
-CFLAGS="-Wall -Wno-writable-strings -Wno-missing-braces -Wno-unused-function"
+CFLAGS="-Wall -Wextra -Wno-writable-strings -Wno-missing-braces -Wno-unused-function"
 if [[ $config_debug == 1 ]]; then
     CFLAGS+=" -g"
+else
+    CFLAGS+=" -O3"
 fi
 CFLAGS+=" -I$SRC_DIR/include -I$SRC_DIR/include/glad/include"
-CFLAGS+=" -fno-exceptions -fno-rtti -march=native -std=gnu++11"
+CFLAGS+=" -fno-exceptions -fno-rtti -std=gnu++11" #-march=native
 CFLAGS+=" -DBUILD_DEBUG=$config_debug -DBUILD_LOGGING=$config_logging"
 #CFLAGS="-g -Wall -Wno-writable-strings -Wno-missing-braces -Wno-unused-function -fno-exceptions -fno-rtti -march=native -std=gnu++11 -DBUILD_DEBUG=0"
 MAC_GL_FLAGS="-framework OpenGL"
@@ -177,6 +161,29 @@ if [[ $target_vst == 1 ]]; then
     fi
 fi
 VST_STATUS=$?
+
+if [[ $target_wasm == 1 ]]; then
+    echo "compiling wasm..."
+    MEMORY_PAGE_COUNT=256
+    MEMORY_SIZE=$[$MEMORY_PAGE_COUNT * 64 * 1024] # NOTE: 16 MB
+    STACK_SIZE=$[4 * 1024 * 1024] # NOTE: 4 MB (per thread)
+    
+    WASM_CFLAGS="-fPIC -DSTACK_SIZE=$STACK_SIZE --target=wasm32 -nostdlib -matomics -mbulk-memory -c"
+    WASM_LFLAGS="--no-entry --export-all --export-table --import-memory --shared-memory --initial-memory=$MEMORY_SIZE --max-memory=$MEMORY_SIZE -z stack-size=$STACK_SIZE"
+
+    #compile code to object file
+    clang $CFLAGS $WASM_CFLAGS $SRC_DIR/wasm_glue.cpp -o wasm_glue.o
+
+    # link object file, producing wasm binary
+    wasm-ld $WASM_LFLAGS wasm_glue.o -o wasm_glue.wasm
+
+    # generate human-readable code from wasm binary
+    wasm2wat wasm_glue.wasm --enable-threads -o wasm_glue.wat
+
+    # copy wasm binary to project root directory
+    cp wasm_glue.wasm ../wasm_glue.wasm
+fi
+WASM_STATUS=$?
 
 # create application bundle (.app on mac, .AppImage on linux), with nonstandard dependencies included
 if [[ "$OSTYPE" == "darwin"* ]]; then
@@ -271,4 +278,4 @@ fi
 
 popd > /dev/null # build -> src
 
-exit $PLUGIN_STATUS
+exit $?

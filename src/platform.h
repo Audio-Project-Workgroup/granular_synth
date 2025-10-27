@@ -772,7 +772,7 @@ platformReadEntireFile(char *filename, Arena *allocator)
 	  while(totalBytesToRead)
 	    {
 	      ssz bytesRead = read(fileHandle, dest, bytesToRead);
-	      if(bytesRead == bytesToRead)
+	      if(bytesRead == (ssz)bytesToRead)
 		{
 		  dest += bytesRead;
 		  totalBytesToRead -= bytesRead;
@@ -842,6 +842,8 @@ platformWriteEntireFile(char *filename, Buffer file)
 static String8
 platformGetPathToModule(void *handleToModule, void *functionInModule, Arena *allocator)
 {
+  UNUSED(handleToModule);
+
   String8 result = {};
   Dl_info dlInfo = {};
   if(dladdr(functionInModule, &dlInfo))

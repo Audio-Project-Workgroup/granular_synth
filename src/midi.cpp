@@ -20,6 +20,7 @@ namespace midi {
     u8 key = data[0];
     u8 velocity = data[1];
     UNUSED(velocity);
+    UNUSED(len);
 
     pluginState->freq = hertzFromMidiNoteNumber(key);
     pluginSetFloatParameter(&pluginState->parameters[PluginParameter_volume], 0.0);
@@ -31,9 +32,9 @@ namespace midi {
   {
     u8 key = data[0];
     u8 velocity = data[1];
+    UNUSED(len);
 
     pluginState->freq = hertzFromMidiNoteNumber(key);
-    // TODO: it would be more "correct" to check the volume range here
     pluginSetFloatParameter(&pluginState->parameters[PluginParameter_volume], (r32)velocity / 127.f);
 
     logFormatString("Note On: Channel %u Key %u Velocity %u\n", channel, key, velocity);
@@ -43,9 +44,9 @@ namespace midi {
   {
     u8 key = data[0];
     u8 touch = data[1];
+    UNUSED(len);
     
     pluginState->freq = hertzFromMidiNoteNumber(key);
-    // TODO: it would be more "correct" to check the volume range here
     pluginSetFloatParameter(&pluginState->parameters[PluginParameter_volume], (r32)touch / 127.f);
 
     logFormatString("Aftertouch: Channel %u Key %u Touch %u\n", channel, key, touch);
@@ -55,6 +56,7 @@ namespace midi {
   {
     u8 controller = data[0]; 
     u8 value = data[1];
+    UNUSED(len);
     
     int paramIndex = ccParamTable[controller];
     r32 min = pluginState->parameters[paramIndex].range.min;
@@ -70,6 +72,8 @@ namespace midi {
   {
     u8 instrument = data[0];
     UNUSED(instrument);
+    UNUSED(len);
+    UNUSED(pluginState);
 
     logFormatString("Patch Change: Channel %u instrument %u\n", channel, instrument);
   }
@@ -78,14 +82,16 @@ namespace midi {
   {
     u8 pressure = data[0];  // Controller number (data[1])
     UNUSED(pressure);
+    UNUSED(len);
+    UNUSED(pluginState);
 
     logFormatString("Channel Pressure: Channel %u pressure %u\n", channel, pressure);
   }
 
   static MIDI_HANDLER(PitchBend)
   {
-    //
     ASSERT(len == 2);
+    UNUSED(len);
     u8 lsb = data[0];
     u8 msb = data[1];
     
@@ -96,6 +102,7 @@ namespace midi {
     r32 normalizedBend = (r32)pitchbenddata / 8192.0f; // Change made so we work in [-1,1] range
     r32 pitchFactor = gsPow(2.0f, normalizedBend * pitchRange / 12.0f); // semitones calculation 2^(ST/12)
     UNUSED(pitchFactor);
+    UNUSED(pluginState);
 
     //pluginState->freq[channel] = pluginState->freq[channel] * pitchFactor;
     logFormatString("Pitch Bend: Channel %u pitchFactor %.2f\n", channel, pitchFactor);
@@ -103,6 +110,10 @@ namespace midi {
 
   static MIDI_HANDLER(SystemMessages)
   {
+    UNUSED(channel);
+    UNUSED(data);
+    UNUSED(len);
+    UNUSED(pluginState);
     logString("System Messages");
   }
 
