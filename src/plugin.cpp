@@ -58,9 +58,8 @@
    -(all) pitch-shift/time-stretch controls
    -(all) parameter modulation
    -(all) input level control
-   -(all) control tooltips
+   -(DONE) control tooltips
    -(all) double-click control to reset to default value
-   -(web) reselect input device
    -(web) keyboard driven ui
       
  * TECH DEBT:

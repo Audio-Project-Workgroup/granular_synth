@@ -18,7 +18,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          brew install cmake pkg-config glfw glew 
+          brew install cmake pkg-config glfw glew wasm-component-ld wabt
           
       - name: Set up environment paths
         run: |

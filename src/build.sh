@@ -6,6 +6,7 @@
 # config options
 config_debug=0
 config_logging=0
+config_release=0
 
 # target options
 target_plugin=0
@@ -18,7 +19,6 @@ target_all=1
 ## parse cli arguments
 
 for arg in "$@"; do
-    echo "$arg"
     key=$(echo $arg | cut -d ":" -f 1)
     values=$(echo $arg | cut -d ":" -f 2)
     if [[ "$key" == "target" ]]; then
@@ -32,13 +32,14 @@ for arg in "$@"; do
     if [[ "$key" == "config" ]]; then
 	config_debug=0
 	config_logging=0
+	config_release=0
     fi
 
     OLD_IFS=$IFS
     IFS='+' read -ra values_array <<< "$values"
     for value in "${values_array[@]}"; do
 	var="${key}_${value}"
-	if [[ -v $var ]]; then
+	if [[ -n $var ]]; then
 	    declare "$var"=1
 	else
 	    echo "unknown variable ${key}_${value}"
@@ -60,13 +61,35 @@ if [[ $target_all == 1 ]]; then
     target_wasm=1
 fi
 
+if [[ $target_plugin == 1 ]]; then
+    echo "[ PLUGIN ]"
+fi
+if [[ $target_exe == 1 ]]; then
+    echo "[ EXE ]"
+fi
+if [[ $target_vst == 1 ]]; then
+    echo "[ VST ]"
+fi
+if [[ $target_wasm == 1 ]]; then
+    echo "[ WASM ]"
+fi
+if [[ $config_debug == 1 ]]; then
+    echo "[ DEBUG ]"
+fi
+if [[ $config_logging == 1 ]]; then
+    echo "[ LOGGING ]"
+fi
+if [[ $config_release == 1 ]]; then
+    echo "[ RELEASE ]"
+fi
+
 ## -----------------------------------------------------------------------------
 ## set up directories, flags
 
 SRC_DIR=$PWD
 DATA_DIR=$SRC_DIR/../data
 
-CFLAGS="-Wall -Wextra -Wno-writable-strings -Wno-missing-braces -Wno-unused-function"
+CFLAGS="-Wall -Wextra -Wshadow -Wno-writable-strings -Wno-missing-braces -Wno-unused-function"
 if [[ $config_debug == 1 ]]; then
     CFLAGS+=" -g"
 else
@@ -81,7 +104,7 @@ MAC_PLUGIN_FLAGS="-dynamiclib"
 LINUX_GL_FLAGS="-lGL"
 LINUX_PLUGIN_FLAGS="-shared -fPIC"
 
-echo $CFLAGS
+#echo $CFLAGS
 
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
     #CFLAGS+= " -Wl,rpath,'$ORIGIN/../lib' -Wl,--enable-new-dtags"
@@ -105,6 +128,8 @@ BUILD_DIR=$PWD
 
 ## -----------------------------------------------------------------------------
 ## build targets
+
+STATUS=0
 
 # compile miniaudio to static library
 if [ ! -f libminiaudio.a ]; then
@@ -137,6 +162,7 @@ if [[ $target_plugin == 1 ]]; then
     clang $CFLAGS -D"DATA_PATH=\"../data/\"" ../src/plugin.cpp -o $PLUGIN_NAME $PLUGIN_FLAGS -lm
 fi
 PLUGIN_STATUS=$?
+STATUS=$(( PLUGIN_STATUS || STATUS ))
 
 # exe
 if [[ $target_exe == 1 ]]; then
@@ -150,6 +176,7 @@ if [[ $target_exe == 1 ]]; then
     fi
 fi
 EXE_STATUS=$?
+STATUS=$(( EXE_STATUS || STATUS ))
 
 if [[ $target_vst == 1 ]]; then
     if [[ $PLUGIN_STATUS == 0 ]]; then
@@ -161,6 +188,7 @@ if [[ $target_vst == 1 ]]; then
     fi
 fi
 VST_STATUS=$?
+STATUS=$(( VST_STATUS || STATUS ))
 
 if [[ $target_wasm == 1 ]]; then
     echo "compiling wasm..."
@@ -184,98 +212,106 @@ if [[ $target_wasm == 1 ]]; then
     cp wasm_glue.wasm ../wasm_glue.wasm
 fi
 WASM_STATUS=$?
+STATUS=$(( WASM_STATUS || STATUS ))
 
-# create application bundle (.app on mac, .AppImage on linux), with nonstandard dependencies included
-if [[ "$OSTYPE" == "darwin"* ]]; then
-    mkdir -p Granade.app
-    pushd Granade.app > /dev/null
+## -----------------------------------------------------------------------------
+## assemble release bundles
 
-    mkdir -p Contents
-    pushd Contents > /dev/null
+if [[ $config_release == 1 ]]; then
+    echo "asssembling release bundle..."
+    # create application bundle (.app on mac, .AppImage on linux), with
+    # nonstandard dependencies included
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+	mkdir -p Granade.app
+	pushd Granade.app > /dev/null
 
-    cp -r $DATA_DIR data
-    cp $DATA_DIR/Info.plist Info.plist
+	mkdir -p Contents
+	pushd Contents > /dev/null
 
-    mkdir -p Frameworks
+	cp -r $DATA_DIR data
+	cp $DATA_DIR/Info.plist Info.plist
 
-    mkdir -p Resources
-    pushd Resources > /dev/null
+	mkdir -p Frameworks
 
-    cp $DATA_DIR/icon.icns Granade.icns
+	mkdir -p Resources
+	pushd Resources > /dev/null
 
-    popd > /dev/null # Resources -> Contents
+	cp $DATA_DIR/icon.icns Granade.icns
 
-    mkdir -p MacOS
-    pushd MacOS > /dev/null
+	popd > /dev/null # Resources -> Contents
 
-    cp $BUILD_DIR/granade Granade
-    cp $BUILD_DIR/plugin.dylib plugin.dylib
+	mkdir -p MacOS
+	pushd MacOS > /dev/null
 
-    # copy dependencies to app bundle
-    cp -Rn $(otool -L Granade | grep -oE "/(.+?)/OpenGL.framework") ../Frameworks
-    cp -Rn $(otool -L Granade | grep -oE "/(.+?)/glfw/lib/") ../Frameworks
+	cp $BUILD_DIR/granade Granade
+	cp $BUILD_DIR/plugin.dylib plugin.dylib
 
-    # tell the executable to use the libraries in the bundle instead
-    install_name_tool -change /opt/homebrew/opt/glfw/lib/libglfw.3.dylib @rpath/libglfw.3.dylib Granade
-    install_name_tool -add_rpath @executable_path/../Frameworks Granade
+	# copy dependencies to app bundle
+	cp -Rn $(otool -L Granade | grep -oE "/(.+?)/OpenGL.framework") ../Frameworks
+	cp -Rn $(otool -L Granade | grep -oE "/(.+?)/glfw/lib/") ../Frameworks
 
-    popd > /dev/null # MacOS -> Contents
+	# tell the executable to use the libraries in the bundle instead
+	install_name_tool -change /opt/homebrew/opt/glfw/lib/libglfw.3.dylib @rpath/libglfw.3.dylib Granade
+	install_name_tool -add_rpath @executable_path/../Frameworks Granade
 
-    popd > /dev/null # Contents -> Granade.app
+	popd > /dev/null # MacOS -> Contents
 
-    popd > /dev/null # Granade.app -> build
-elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    mkdir -p Granade.AppDir
-    pushd Granade.AppDir > /dev/null    
+	popd > /dev/null # Contents -> Granade.app
 
-    cp $DATA_DIR/Granade.desktop Granade.desktop
+	popd > /dev/null # Granade.app -> build
+    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+	mkdir -p Granade.AppDir
+	pushd Granade.AppDir > /dev/null    
 
-    cp $DATA_DIR/PNG/DENSITYPOMEGRANATE_BUTTON.png Granade.png
+	cp $DATA_DIR/Granade.desktop Granade.desktop
 
-    cp $DATA_DIR/AppRun.sh AppRun.sh
-    ln -sf ./AppRun.sh AppRun
+	cp $DATA_DIR/PNG/DENSITYPOMEGRANATE_BUTTON.png Granade.png
 
-    mkdir -p usr
-    pushd usr > /dev/null
+	cp $DATA_DIR/AppRun.sh AppRun.sh
+	ln -sf ./AppRun.sh AppRun
 
-    cp -r $DATA_DIR data
+	mkdir -p usr
+	pushd usr > /dev/null
 
-    # TODO: is this necessary?
-    mkdir -p share/icons/hicolor/512x512
-    pushd share/icons/hicolor/512x512 > /dev/null
-    cp $DATA_DIR/PNG/DENSITYPOMEGRANATE_BUTTON.png Granade.png
-    popd > /dev/null # share/icons/hicolor/512x512 -> usr
+	cp -r $DATA_DIR data
 
-    mkdir -p lib
-    pushd lib > /dev/null    
-    popd > /dev/null # lib -> usr    
+	# TODO: is this necessary?
+	mkdir -p share/icons/hicolor/512x512
+	pushd share/icons/hicolor/512x512 > /dev/null
+	cp $DATA_DIR/PNG/DENSITYPOMEGRANATE_BUTTON.png Granade.png
+	popd > /dev/null # share/icons/hicolor/512x512 -> usr
 
-    mkdir -p bin
-    pushd bin > /dev/null
+	mkdir -p lib
+	pushd lib > /dev/null    
+	popd > /dev/null # lib -> usr    
 
-    cp $BUILD_DIR/granade Granade
-    cp $BUILD_DIR/plugin.so plugin.so    
+	mkdir -p bin
+	pushd bin > /dev/null
 
-    # NOTE: copy dependencies (OpenGL, glfw, X11)
-    DEPENDENCIES=$(ldd Granade | grep -oE "/(.+?)\\.so\\.[0-9]+" | grep -vE "(libc|libm|libdl|libpthread|ld-linux-)")
-    for DEPENDENCY in $DEPENDENCIES
-    do
-	ABSOLUTE_SYMLINK=$(realpath "$DEPENDENCY")
-	cp -P $DEPENDENCY ../lib
-	cp $ABSOLUTE_SYMLINK ../lib
-    done
-    
-    popd > /dev/null # bin -> usr    
+	cp $BUILD_DIR/granade Granade
+	cp $BUILD_DIR/plugin.so plugin.so    
 
-    popd > /dev/null # usr -> Granade.AppDir
+	# NOTE: copy dependencies (OpenGL, glfw, X11)
+	DEPENDENCIES=$(ldd Granade | grep -oE "/(.+?)\\.so\\.[0-9]+" | grep -vE "(libc|libm|libdl|libpthread|ld-linux-)")
+	for DEPENDENCY in $DEPENDENCIES
+	do
+	    ABSOLUTE_SYMLINK=$(realpath "$DEPENDENCY")
+	    cp -P $DEPENDENCY ../lib
+	    cp $ABSOLUTE_SYMLINK ../lib
+	done
+	
+	popd > /dev/null # bin -> usr    
 
-    popd > /dev/null # Granade.AppDir -> build
+	popd > /dev/null # usr -> Granade.AppDir
 
-    # NOTE: uncomment if you want to make an appimage (need appimagetool)
-    # appimagetool Granade.AppDir
-    # cp Granade-*.AppImage ~/Applications
+	popd > /dev/null # Granade.AppDir -> build
+
+	# NOTE: uncomment if you want to make an appimage (need appimagetool)
+	appimagetool Granade.AppDir
+	cp Granade-*.AppImage ~/Applications
+    fi
 fi
 
 popd > /dev/null # build -> src
 
-exit $?
+exit $STATUS
