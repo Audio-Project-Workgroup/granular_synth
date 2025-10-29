@@ -43,6 +43,8 @@ class GranadeProcessor extends AudioWorkletProcessor {
 	    for(let sampleIdx = 0; sampleIdx < inputSampleCount; ++sampleIdx) {
 		inputSamples[sampleIdx] = input[channelIdx][sampleIdx];
 	    }
+
+	    // console.log(`input[${channelIdx}]: ${inputSamples}`);
 	}
 
 	// NOTE: run the audio process

@@ -33,7 +33,7 @@
    -(FIXED) the `__memory_used` value sometimes drops from its stable value of
             around 5 MB to ~ 200 KB for a single frame, and then goes back to normal
    -(FIXED?) the audio process appears to occasionally underflow
-   -(web)   microphone audio input sometimes sounds choppy
+   -(FIXED) microphone audio input sometimes sounds choppy
             (index.js, granade_audio.js, wasm_glue.cpp)
    -(web)   test on firefox/safari/mobile
    -(FIXED) prevent too much grain view data from being queued up, overflowing the render buffer

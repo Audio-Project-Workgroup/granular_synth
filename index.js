@@ -135,9 +135,20 @@ async function main() {
 
 	// NOTE: create microphone stream node		
 	const stream = await navigator.mediaDevices.getUserMedia({
-	    audio: true,
+	    audio: {
+		autoGainControl: false,
+		echoCancellation: false,
+		noiseSuppression: false,
+
+		sampleRate: audioCtx.sampleRate,
+	    },
 	});
+	console.log(stream);
+	console.log(stream.getAudioTracks()[0].getSettings());
 	const microphoneStream = audioCtx.createMediaStreamSource(stream);
+
+	// NOTE: create merger node to map mono input to stereo
+	const merger = audioCtx.createChannelMerger(2);
 
 	// NOTE: create granade processor node
 	await audioCtx.audioWorklet.addModule("./src/granade_audio.js");
@@ -157,9 +168,14 @@ async function main() {
 
 	// NOTE: connect nodes
 	granadeNode.connect(audioCtx.destination);
-	microphoneStream.connect(granadeNode);
-	// console.log(microphoneStream);
-	// console.log(granadeNode);
+	merger.connect(granadeNode);
+	microphoneStream.connect(merger, 0, 0);
+	microphoneStream.connect(merger, 0, 1);
+
+	console.log(microphoneStream);
+	console.log(merger);
+	console.log(granadeNode);	
+
 	audioInitialized = true;
 	console.log("audio initialized");
     }
