@@ -26,9 +26,9 @@
 # elif defined(__aarch64__)
 #  define ARCH_ARM64 1
 # elif defined(__wasm32__)
-#  define ARCH_WASM32
+#  define ARCH_WASM32 1
 # elif defined(__wasm64__)
-#  define ARCH_WASM64
+#  define ARCH_WASM64 1
 # else
 #  error ERROR: architecture undetected
 # endif // clang architecture
@@ -117,6 +117,12 @@
 #endif
 #if !defined(ARCH_ARM64)
 # define ARCH_ARM64 0
+#endif
+#if !defined(ARCH_WASM32)
+# define ARCH_WASM32 0
+#endif
+#if !defined(ARCH_ARM64)
+# define ARCH_WASM64 0
 #endif
 
 // NOTE: language

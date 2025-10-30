@@ -1,7 +1,7 @@
 #pragma once
 
-struct WideFloat;
-struct WideInt;
+union WideFloat;
+union WideInt;
 
 static WideFloat wideLoadFloats(r32 *src);
 static WideFloat wideSetConstantFloats(r32 src);
@@ -23,18 +23,38 @@ static WideInt	 wideSubInts(WideInt a, WideInt b);
 static WideInt	 wideMulInts(WideInt a, WideInt b);
 static WideInt   wideAndInts(WideInt a, WideInt b);
 
+#if LANG_CPP
+static inline WideFloat operator+(WideFloat a, WideFloat b) { return(wideAddFloats(a, b)); }
+static inline WideFloat operator-(WideFloat a, WideFloat b) { return(wideSubFloats(a, b)); }
+static inline WideFloat operator*(WideFloat a, WideFloat b) { return(wideMulFloats(a, b)); }
+static inline WideFloat& operator+=(WideFloat& a, WideFloat b) { a = a + b; return(a); }
+static inline WideFloat& operator-=(WideFloat& a, WideFloat b) { a = a - b; return(a); }
+static inline WideFloat& operator*=(WideFloat& a, WideFloat b) { a = a + b; return(a); }
+
+static inline WideInt operator+(WideInt a, WideInt b) { return(wideAddInts(a, b)); }
+static inline WideInt operator-(WideInt a, WideInt b) { return(wideSubInts(a, b)); }
+static inline WideInt operator*(WideInt a, WideInt b) { return(wideMulInts(a, b)); }
+static inline WideInt operator&(WideInt a, WideInt b) { return(wideAndInts(a, b)); }
+static inline WideInt& operator+=(WideInt& a, WideInt b) { a = a + b; return(a); }
+static inline WideInt& operator-=(WideInt& a, WideInt b) { a = a - b; return(a); }
+static inline WideInt& operator*=(WideInt& a, WideInt b) { a = a * b; return(a); }
+static inline WideInt& operator&=(WideInt& a, WideInt b) { a = a & b; return(a); }
+#endif
+
 #if ARCH_X86 || ARCH_X64
 
 #include <immintrin.h>
 
-struct WideFloat
+union WideFloat
 {
   __m128 val;
+  r32 floats[4];
 };
 
-struct WideInt
+union WideInt
 {
   __m128i val;
+  u32 ints[4];
 };
 
 static WideFloat
@@ -68,11 +88,15 @@ static WideFloat
 wideSetFloats(r32 a, r32 b, r32 c, r32 d)
 {
   WideFloat result = {};
-  r32 *val = (r32 *)&result.val;
-  val[0] = a;
-  val[1] = b;
-  val[2] = c;
-  val[3] = d;
+  // r32 *val = (r32 *)&result.val;
+  // val[0] = a;
+  // val[1] = b;
+  // val[2] = c;
+  // val[3] = d;
+  result.floats[0] = a;
+  result.floats[1] = b;
+  result.floats[2] = c;
+  result.floats[3] = d;
 
   return(result);
 }
@@ -80,8 +104,9 @@ wideSetFloats(r32 a, r32 b, r32 c, r32 d)
 static void
 wideSetLaneFloats(WideFloat *w, r32 val, u32 lane)
 {
-  r32 *vals = (r32 *)&w->val;
-  vals[lane] = val;
+  // r32 *vals = (r32 *)&w->val;
+  // vals[lane] = val;
+  w->floats[lane] = val;
 }
 
 static WideInt
@@ -97,11 +122,15 @@ static WideInt
 wideSetInts(u32 a, u32 b, u32 c, u32 d)
 {
   WideInt result = {};
-  u32 *val = (u32 *)&result.val; // TODO: check this is legal
-  val[0] = a;
-  val[1] = b;
-  val[2] = c;
-  val[3] = d;
+  // u32 *val = (u32 *)&result.val; // TODO: check this is legal
+  // val[0] = a;
+  // val[1] = b;
+  // val[2] = c;
+  // val[3] = d;
+  result.ints[0] = a;
+  result.ints[1] = b;
+  result.ints[2] = c;
+  result.ints[3] = d;
 
   return(result);
 }
@@ -109,8 +138,9 @@ wideSetInts(u32 a, u32 b, u32 c, u32 d)
 static void
 wideSetLaneInts(WideInt *w, u32 val, u32 lane)
 {
-  u32 *vals = (u32 *)&w->val;
-  vals[lane]= val;  
+  // u32 *vals = (u32 *)&w->val;
+  // vals[lane]= val;
+  w->ints[lane] = val;
 }
 
 static void
@@ -170,18 +200,6 @@ wideMulFloats(WideFloat a, WideFloat b)
   return(result);
 }
 
-/* static WideFloat */
-/* wideMaskFloats(WideFloat a, WideFloat mask) */
-/* {   */
-/*   //__m128i aInt = _mm_cvtps_epi32(a.val); */
-/*   //__m128i resultInt = _mm_and_si128(aInt, mask.val); */
-
-/*   WideFloat result = {}; */
-/*   result.val = _mm_and_ps(a.val, mask.val); */
-/*   //result.val = _mm_cvtepi32_ps(resultInt); */
-/*   return(result); */
-/* } */
-
 static WideFloat
 wideMaskFloats(WideFloat a, WideFloat b, WideInt mask)
 {
@@ -215,14 +233,16 @@ wideAndInts(WideInt a, WideInt b)
 
 #include <arm_neon.h>
 
-struct WideFloat
+union WideFloat
 {
   float32x4_t val;
+  r32 floats[4];
 };
 
-struct WideInt
+union WideInt
 {
   uint32x4_t val;
+  u32 ints[4];
 };
 
 static WideFloat
@@ -378,9 +398,179 @@ wideMaskFloats(WideFloat a, WideFloat b, WideInt mask)
   return(result);
 }
 
+#elif ARCH_WASM32 || ARCH_WASM64
+
+#include <wasm_simd128.h>
+
+union WideFloat
+{
+  v128_t val;
+  r32 floats[4];
+};
+
+union WideInt
+{
+  v128_t val;
+  u32 ints[4];
+};
+
+static WideFloat
+wideLoadFloats(r32 *src)
+{
+  WideFloat result = {};
+  result.val = wasm_v128_load(src);
+  return(result);
+}
+
+static WideFloat
+wideSetConstantFloats(r32 src)
+{
+  WideFloat result = {};
+  result.val = wasm_f32x4_make(src, src, src, src);
+  return(result);
+}
+
+static WideFloat
+wideSetFloats(r32 a, r32 b, r32 c, r32 d)
+{
+  WideFloat result = {};
+  result.val = wasm_f32x4_make(a, b, c, d);
+  return(result);
+}
+
+static void
+wideSetLaneFloats(WideFloat *w, r32 val, u32 lane)
+{
+  // NOTE: this sucks
+  // switch(lane)
+  //   {
+  //   case 0: { w->val = wasm_f32x4_replace_lane(w->val, 0, val); } break;
+  //   case 1: { w->val = wasm_f32x4_replace_lane(w->val, 1, val); } break;
+  //   case 2: { w->val = wasm_f32x4_replace_lane(w->val, 2, val); } break;
+  //   case 3: { w->val = wasm_f32x4_replace_lane(w->val, 3, val); } break;
+  //   default: { ASSERT(!"lane index out of bounds"); } break;
+  //   }
+  w->floats[lane] = val;
+}
+
+static void
+wideStoreFloats(r32 *dest, WideFloat src)
+{
+  wasm_v128_store(dest, src.val);
+}
+
+static WideFloat
+wideAddFloats(WideFloat a, WideFloat b)
+{
+  WideFloat result = {};
+  result.val = wasm_f32x4_add(a.val, b.val);
+  return(result);
+}
+
+static WideFloat
+wideSubFloats(WideFloat a, WideFloat b)
+{
+  WideFloat result = {};
+  result.val = wasm_f32x4_sub(a.val, b.val);
+  return(result);
+}
+
+static WideFloat
+wideMulFloats(WideFloat a, WideFloat b)
+{
+  WideFloat result = {};
+  result.val = wasm_f32x4_mul(a.val, b.val);
+  return(result);
+}
+
+static WideFloat
+wideMaskFloats(WideFloat a, WideFloat b, WideInt mask)
+{
+  WideFloat result = {};
+  result.val = wasm_v128_or(wasm_v128_andnot(a.val, mask.val),
+			    wasm_v128_and(b.val, mask.val));
+  return(result);
+}
+
+static WideInt
+wideLoadInts(u32 *src)
+{
+  WideInt result = {};
+  result.val = wasm_v128_load(src);
+  return(result);
+}
+
+static WideInt
+wideSetConstantInts(u32 src)
+{
+  WideInt result = {};
+  result.val = wasm_u32x4_make(src, src, src, src);
+  return(result);
+}
+
+static WideInt
+wideSetInts(u32 a, u32 b, u32 c, u32 d)
+{
+  WideInt result = {};
+  result.val = wasm_u32x4_make(a, b, c, d);
+  return(result);
+}
+
+static void
+wideSetLaneInts(WideInt *w, u32 val, u32 lane)
+{
+  // NOTE: this still sucks
+  // switch(lane)
+  //   {
+  //   case 0: { w->val = wasm_u32x4_replace_lane(w->val, 0, val); } break;
+  //   case 1: { w->val = wasm_u32x4_replace_lane(w->val, 1, val); } break;
+  //   case 2: { w->val = wasm_u32x4_replace_lane(w->val, 2, val); } break;
+  //   case 3: { w->val = wasm_u32x4_replace_lane(w->val, 3, val); } break;
+  //   default: { ASSERT(!"lane index out of bounds"); } break;
+  //   }
+  w->ints[lane] = val;
+}
+
+static void
+wideStoreInts(u32 *dest, WideInt src)
+{
+  wasm_v128_store(dest, src.val);
+}
+
+static WideInt
+wideAddInts(WideInt a, WideInt b)
+{
+  WideInt result = {};
+  result.val = wasm_i32x4_add(a.val, b.val);
+  return(result);
+}
+
+static WideInt
+wideSubInts(WideInt a, WideInt b)
+{
+  WideInt result = {};
+  result.val = wasm_i32x4_sub(a.val, b.val);
+  return(result);
+}
+
+static WideInt
+wideMulInts(WideInt a, WideInt b)
+{
+  WideInt result = {};
+  result.val = wasm_i32x4_mul(a.val, b.val);
+  return(result);
+}
+
+static WideInt
+wideAndInts(WideInt a, WideInt b)
+{
+  WideInt result = {};
+  result.val = wasm_v128_and(a.val, b.val);
+  return(result);
+}
+
 #else
 // NOTE: default to scalar
-// TODO: wasm
 
 struct WideFloat
 {
