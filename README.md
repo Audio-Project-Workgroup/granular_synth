@@ -8,9 +8,16 @@
 <!-- temporarily hide until we develop the ci pipeline
 ![Build Status](https://img.shields.io/github/workflow/status/Audio-Project-Workgroup/granular_synth/CI)
 -->
-![Linux](https://github.com/Audio-Project-Workgroup/granular_synth/workflows/Linux/badge.svg)
+<!-- ![Linux](https://github.com/Audio-Project-Workgroup/granular_synth/workflows/Linux/badge.svg)
 ![MacOs](https://github.com/Audio-Project-Workgroup/granular_synth/workflows/macOS/badge.svg)
-![Windows](https://github.com/Audio-Project-Workgroup/granular_synth/workflows/Windows/badge.svg)
+![Windows](https://github.com/Audio-Project-Workgroup/granular_synth/workflows/Windows/badge.svg) -->
+
+| Target / Platform | Linux | macOS | Windows |
+|--------------------|:------:|:------:|:--------:|
+| **PLugin** | ![Build](https://github.com/Audio-Project-Workgroup/granular_synth/workflows/Linux-plugin/badge.svg) | ![Build](https://github.com/Audio-Project-Workgroup/granular_synth/workflows/macOS-plugin/badge.svg) | ![Build](https://github.com/Audio-Project-Workgroup/granular_synth/workflows/Windows-plugin/badge.svg) |
+| **Standalone** | ![Build](https://github.com/Audio-Project-Workgroup/granular_synth/workflows/Linux-exe/badge.svg) | ![Build](https://github.com/Audio-Project-Workgroup/granular_synth/workflows/macOS-exe/badge.svg) | ![Build](https://github.com/Audio-Project-Workgroup/granular_synth/workflows/Windows-exe/badge.svg) |
+| **VST** | ![Build](https://github.com/Audio-Project-Workgroup/granular_synth/workflows/Linux-vst/badge.svg) | ![Build](https://github.com/Audio-Project-Workgroup/granular_synth/workflows/macOS-vst/badge.svg) | ![Build](https://github.com/Audio-Project-Workgroup/granular_synth/workflows/Windows-vst/badge.svg) |
+| **WASM** | ![Build](https://github.com/Audio-Project-Workgroup/granular_synth/workflows/Linux-wasm/badge.svg) | - | - |
 
 Granade is a real-time granular synthesizer, available as a vst3 plugin and as a standalone application for mac, windows, and linux. Granade records audio input into a buffer and deconstructs the sound into multiple overlapping delayed, enveloped, and panned segments called grains, creating complex textures and new sonic landscapes. Several interactive parameters such as grain size, density, spread, and windowing, are provided for manipulating grain playback in real time. 
 

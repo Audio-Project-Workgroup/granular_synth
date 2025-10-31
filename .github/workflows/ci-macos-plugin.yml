@@ -1,5 +1,5 @@
-name: macOS
-run-name: "🚀 MacOs Build | Commit: ${{ github.sha }} 🛠️"
+name: macOS-plugin
+run-name: "🚀 MacOs Build Plugin | Commit: ${{ github.sha }} 🛠️"
 on:
   push:
     branches:
@@ -27,8 +27,8 @@ jobs:
           echo "LIBRARY_PATH=/opt/homebrew/lib:$LIBRARY_PATH" >> $GITHUB_ENV
           echo "PKG_CONFIG_PATH=/opt/homebrew/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
           
-      - name: Build standalone
+      - name: Build plugin
         run: |
           cd src
           chmod +x build.sh
-          ./build.sh target:plugin+exe+vst
+          ./build.sh target:plugin

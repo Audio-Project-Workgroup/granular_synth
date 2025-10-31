@@ -1,5 +1,5 @@
-name: Linux
-run-name: "🚀 Linux Build | Commit: ${{ github.sha }} 🛠️"
+name: Linux-vst
+run-name: "🚀 Linux Build VST | Commit: ${{ github.sha }} 🛠️"
 on:
   push:
     branches:
@@ -35,8 +35,8 @@ jobs:
           libglu1-mesa-dev mesa-common-dev
           sudo apt install -y build-essential cmake pkg-config libglfw3-dev clang libgl1-mesa-dev libglew-dev
                     
-      - name: Build standalone
+      - name: Build vst plugin
         run: |
           cd src
           chmod +x build.sh
-          ./build.sh
+          ./build.sh target:vst

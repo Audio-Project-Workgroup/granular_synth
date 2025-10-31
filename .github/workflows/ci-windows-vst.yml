@@ -1,5 +1,5 @@
-name: Windows
-run-name: "🚀 Windows Build | Commit: ${{ github.sha }} 🛠️"
+name: Windows-vst
+run-name: "🚀 Windows Build VST | Commit: ${{ github.sha }} 🛠️"
 on:
   push:
     branches:
@@ -31,9 +31,9 @@ jobs:
           Copy-Item "glfw-3.3.8.bin.WIN64/lib-vc2022/glfw3.lib" "src/libs/"
         shell: powershell
         
-      - name: Build standalone
+      - name: Build vst plugin
         run: |
           cd src
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" x64
-          .\build.bat target:plugin+exe+vst
+          .\build.bat target:vst
         shell: cmd 
