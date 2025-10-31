@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+      - testCI
   pull_request:
     branches:
       - master
@@ -31,9 +32,3 @@ jobs:
           cd src
           chmod +x build.sh
           ./build.sh
-          
-      - name: Build VST3 plugin
-        run: |
-          cd src
-          chmod +x build_juce.sh
-          ./build_juce.sh

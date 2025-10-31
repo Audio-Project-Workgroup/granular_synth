@@ -133,7 +133,7 @@ LINUX_PLUGIN_FLAGS="-shared -fPIC"
 
 #echo $CFLAGS
 
-if [[ "$(uname)" == "Linux" ]]; then
+if [[ "$(uname)" == "Linux"* ]]; then
     #CFLAGS+= " -Wl,rpath,'$ORIGIN/../lib' -Wl,--enable-new-dtags"
     GL_FLAGS=$LINUX_GL_FLAGS
     PLUGIN_NAME="plugin.so"
