@@ -31,4 +31,4 @@ jobs:
         run: |
           cd src
           chmod +x build.sh
-          ./build.sh
+          ./build.sh target:plugin+exe+vst

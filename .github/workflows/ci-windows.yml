@@ -35,5 +35,5 @@ jobs:
         run: |
           cd src
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" x64
-          .\build.bat
-        shell: cmd
+          .\build.bat target:plugin+exe+vst
+        shell: cmd 
