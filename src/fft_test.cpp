@@ -1,3 +1,85 @@
+struct FFT_TestResult
+{
+  b32 success;
+  usz cycleCount;
+  String8List log;
+};
+
+static FFT_TestResult
+testFFTFunction(Arena *arena, FFT_Function *fft, FloatBuffer input, ComplexBuffer target)
+{
+  ComplexBuffer fftResult = fft(arena, input);
+
+  String8List log = {};
+  
+  b32 success = target.count == fftResult.count;
+  if(success)
+    {
+      r32 tol = 1e-3;
+      for(u32 i = 0; i < target.count && success; ++i)
+	{
+	  r32 resultRe = fftResult.reVals[i];
+	  r32 resultIm = fftResult.imVals[i];
+	  r32 targetRe = target.reVals[i];
+	  r32 targetIm = target.imVals[i];
+
+	  resultMagSq = resultRe*resultRe + resultIm*resultIm;
+	  targetMagSq = targetRe*targetRe + targetIm*targetIm;
+	  success = fabsf(resultMagSq - targetMagSq) < tol;
+	}
+    }
+  else
+    {
+      stringListPushFormat(arena, &log,
+			   "ERROR: result and target lengths differ:\n"
+			   "       result.count = %u\n"
+			   "       target.count = %u\n",
+			   fftResult.count,
+			   target.count);
+    }
+
+  FFT_TestResult result = {};
+  result.success = success;
+  result.cyclesCount = 0; // TODO: profile
+  result.log = log;
+  return(result);
+}
+
+static FFT_TestResult
+testIFFTFunction(Arena *arena, IFFT_Function *ifft, ComplexBuffer input, FloatBuffer target)
+{
+  FloatBuffer ifftResult = ifft(arena, input);
+
+  String8List log = {};
+
+  b32 result = target.count == ifftResult.count;
+  if(result)
+    {
+      r32 tol = 1e-6;
+      for(u32 i = 0; i < target.count; ++i)
+	{
+	  r32 resultSample = ifftResult.vals[i];
+	  r32 targetSample = target.vals[i];
+	  success = fabsf(resultSample - targetSample) < tol;
+	}
+    }
+  else
+    {
+      stringListPushFormat(arena, &log,
+			   "ERROR: result and target lengths differ:\n"
+			   "       result.count = %u\n"
+			   "       target.count = %u\n",
+			   ifftResult.count,
+			   target.count);
+    }
+
+  FFT_TestResult result = {};
+  result.success = success;
+  result.cycleCount = 0; // TODO: profile
+  result.log = log;
+  return(result);
+}
+
 static bool
 fftTest(Arena *allocator)
 {

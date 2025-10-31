@@ -1,5 +1,10 @@
 // TODO: investigate different fft radices
 
+#define FFT_FUNCTION(name) ComplexBuffer (name)(Arena *arena, FloatBuffer input)
+#define IFFT_FUNCTION(name) FloatBuffer (name)(Arena *arena, ComplexBuffer input)
+typedef FFT_FUNCTION(FFT_Function);
+typedef IFFT_FUNCTION(IFFT_Function);
+
 #define REAL_FFT_FUNCTION(name) void (name)(r32 *destRe, r32 *destIm, r32 *src, u32 length)
 #define REAL_IFFT_FUNCTION(name) void (name)(r32 *dest, r32 *destImTemp, r32 *srcRe, r32 *srcIm, u32 length)
 

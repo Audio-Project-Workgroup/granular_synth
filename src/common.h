@@ -12,6 +12,7 @@
 #include "common.api.h"
 #include "arena.h"
 #include "strings.h"
+#include "buffer.h"
 #include "profile.h"
 #include "math.h"
 #include "render.h"

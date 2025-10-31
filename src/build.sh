@@ -4,21 +4,22 @@
 ## default options
 
 # config options
-config_debug=0
-config_logging=0
-config_release=0
+config_debug=0      # compiles with debug info, enables asserts
+config_logging=0    # enables the logging system
+config_release=0    # assembles a distributable application bundle
 
 # target options
-target_plugin=0
-target_exe=0
-target_vst=0
-target_wasm=0
-target_all=1
+target_plugin=0     # compiles the plugin to a dynamic library
+target_exe=0        # compiles the host executable
+target_vst=0        # compiles the vst target
+target_wasm=0       # compiles the webassembly target
+target_all=1        # compiles all targets
 
 ## -----------------------------------------------------------------------------
 ## parse cli arguments
 
 for arg in "$@"; do
+    # echo $arg
     key=$(echo $arg | cut -d ":" -f 1)
     values=$(echo $arg | cut -d ":" -f 2)
     if [[ "$key" == "target" ]]; then
@@ -27,7 +28,7 @@ for arg in "$@"; do
 	target_vst=0
 	target_wasm=0
 	target_all=0
-    fi
+    fi    
 
     if [[ "$key" == "config" ]]; then
 	config_debug=0
@@ -35,14 +36,40 @@ for arg in "$@"; do
 	config_release=0
     fi
 
+    if [[ "$key" == "help" ]]; then
+	echo ""
+	echo "syntax: <key>:<value1>+<value2>+... ..."
+	echo " "
+	echo "keys:"
+	echo "  config:"
+	echo "    values:"
+	echo "      debug:   compiles with debug info, enables asserts"
+	echo "      logging: enables the logging system"
+	echo "      release: assembles a distributable application bundle"
+	echo ""
+	echo "  target:"
+	echo "    values:"
+	echo "      plugin:  compiles the plugin to a dynamic library"
+	echo "      exe:     compiles the host executable"
+	echo "      vst:     compiles the vst target"
+	echo "      wasm:    compiles the webassembly target"
+	echo "      all:     compiles all targets"
+	echo ""
+	echo "  help: displays this output and exits"
+	echo ""
+	exit 0
+    fi
+
     OLD_IFS=$IFS
     IFS='+' read -ra values_array <<< "$values"
-    for value in "${values_array[@]}"; do
+    for value in "${values_array[@]}"; do	
 	var="${key}_${value}"
-	if [[ -n $var ]]; then
+	if declare -p ${var} >& /dev/null; then
 	    declare "$var"=1
 	else
-	    echo "unknown variable ${key}_${value}"
+	    echo "---------------------------------------------"
+	    echo "| WARNING: unknown variable ${key}_${value} |"
+	    echo "---------------------------------------------"
 	fi
     done
     IFS=$OLD_IFS
@@ -106,18 +133,18 @@ LINUX_PLUGIN_FLAGS="-shared -fPIC"
 
 #echo $CFLAGS
 
-if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+if [[ "$(uname)" == "Linux" ]]; then
     #CFLAGS+= " -Wl,rpath,'$ORIGIN/../lib' -Wl,--enable-new-dtags"
     GL_FLAGS=$LINUX_GL_FLAGS
     PLUGIN_NAME="plugin.so"
     PLUGIN_FLAGS=$LINUX_PLUGIN_FLAGS
-elif [[ "$OSTYPE" == "darwin"* ]]; then
+elif [[ "$(uname)" == "Darwin" ]]; then
     CFLAGS+=" -Wno-deprecated-declarations"
     GL_FLAGS=$MAC_GL_FLAGS
     PLUGIN_NAME="plugin.dylib"
     PLUGIN_FLAGS=$MAC_PLUGIN_FLAGS
 else
-    echo "ERROR: unsupported os: $OSTYPE"
+    echo "ERROR: unsupported os: $(uname)"
     exit 1
 fi
 
