@@ -112,7 +112,7 @@ profileEnd(Arena *arena)
       if(info->tscElapsed)
 	{
 	  u64 tscElapsed_self = info->tscElapsed - info->tscElapsed_children;
-	  r64 percent = 100.0 * ((r64)tscElapsed_self/(r64)totalTscElapsed);
+	  r64 percent = 100.0 * ((r64)tscElapsed_self/(r64)totalTscElapsed);	  
 	  if(info->tscElapsed_root != tscElapsed_self)
 	    {
 	      r64 percentWithChildren = 100.0 * ((r64)info->tscElapsed_root/(r64)totalTscElapsed);

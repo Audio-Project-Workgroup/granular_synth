@@ -54,6 +54,8 @@ static FFT_FUNCTION(fft_dit_radix2_scalar)
 	    r32 *at1Im = imVals + k + m/2;
 	    for(u32 j = 0; j < m/2; ++j)
 	      {
+		PROFILE_BLOCK("fft_dit_radix2_scalar:kernel");
+
 		r32 in0Re = *at0Re;
 		r32 in0Im = *at0Im;
 		r32 in1Re = *at1Re;
@@ -119,8 +121,6 @@ static FFT_FUNCTION(fft_dit_radix2_simd)
     for(u32 m = 2; m <= count; m <<= 1)
       {
 	r32 theta = -2.f * GS_PI / (r32)m;
-	/* r32 wmRe = gsCos(theta); */
-	/* r32 wmIm = gsSin(theta); */
 	c64 wm = C64Polar(1.f, theta);
 	c64 wmSq = wm*wm;
 	c64 wmCu = wmSq*wm;
@@ -137,9 +137,10 @@ static FFT_FUNCTION(fft_dit_radix2_simd)
 	    r32 *at0Im = imVals + k;
 	    r32 *at1Re = reVals + k + m/2;
 	    r32 *at1Im = imVals + k + m/2;
-	    //for(u32 j = 0; j < m/2; ++j)
 	    for(u32 j = 0; j < m/2; j += simdWidth)
 	      {
+		PROFILE_BLOCK("fft_dit_radix2_simd:kernel");
+		
 		WideInt storeMask = wideSetConstantInts(0);
 		for(u32 lane = 0; lane < simdWidth; ++lane)
 		  {
@@ -191,7 +192,7 @@ static FFT_FUNCTION(fft_dit_radix2_simd)
   return(result);
 }
 
-static IFFT_FUNCTION(ifft_dit_radix2)
+static IFFT_FUNCTION(ifft_dit_radix2_scalar)
 {
   PROFILE_FUNCTION();
 
@@ -201,7 +202,7 @@ static IFFT_FUNCTION(ifft_dit_radix2)
 
   // NOTE: input permutation
   {
-    PROFILE_BLOCK("ifft_dit_radix_2:input_permutation");
+    PROFILE_BLOCK("ifft_dit_radix_2_scalar:input_permutation");
     
     usz countLog2 = LOG2(count);
     r32 invCount = 1.f / (r32)count;
@@ -217,7 +218,7 @@ static IFFT_FUNCTION(ifft_dit_radix2)
   
   // NOTE: twiddles
   {
-    PROFILE_BLOCK("ifft_dit_radix_2:twiddles");
+    PROFILE_BLOCK("ifft_dit_radix_2_scalar:twiddles");
 
     for(u32 m = 2; m <= count; m <<= 1)
       {
@@ -235,6 +236,8 @@ static IFFT_FUNCTION(ifft_dit_radix2)
 	    r32 *at1Im = imVals + k + m/2;
 	    for(u32 j = 0; j < m/2; ++j)
 	      {
+		PROFILE_BLOCK("ifft_dit_radix_2_scalar:kernel");
+
 		r32 in0Re = *at0Re;
 		r32 in0Im = *at0Im;
 		r32 in1Re = *at1Re;
@@ -268,13 +271,118 @@ static IFFT_FUNCTION(ifft_dit_radix2)
   return(result);
 }
 
+static IFFT_FUNCTION(ifft_dit_radix2_simd)
+{
+  PROFILE_FUNCTION();
+
+  u32 simdWidth = 4; // TODO: make this a constant set in `simd_intrinsics.h`
+
+  usz count = ROUND_UP_POW_2(input.count);
+  r32 *reVals = arenaPushArray(arena, count, r32, arenaFlagsNoZeroAlign(simdWidth * sizeof(r32)));
+  r32 *imVals = arenaPushArray(arena, count, r32, arenaFlagsNoZeroAlign(simdWidth * sizeof(r32)));
+
+  // NOTE: input permutation
+  // TODO: simd-ize
+  {
+    PROFILE_BLOCK("ifft_dit_radix2_simd:input_permutation");
+    
+    usz countLog2 = LOG2(count);
+    r32 invCount = 1.f / (r32)count;
+    r32 *srcRe = input.reVals;
+    r32 *srcIm = input.imVals;
+    for(u32 i = 0; i < count; ++i)
+      {
+	u32 iRev = reverseBits(i) >> (sizeof(u32)*8 - countLog2);
+	reVals[iRev] = invCount * srcRe[i];
+	imVals[iRev] = invCount * srcIm[i];
+      }
+  }
+  
+  // NOTE: twiddles
+  {
+    PROFILE_BLOCK("ifft_dit_radix2_simd:twiddles");
+    
+    for(u32 m = 2; m <= count; m <<= 1)
+      {
+	r32 theta = 2.f * GS_PI / (r32)m;
+	c64 wm = C64Polar(1.f, theta);
+	c64 wmSq = wm*wm;
+	c64 wmCu = wmSq*wm;
+	c64 wmQu = wmCu*wm;	
+	WideFloat wmQuRe = wideSetConstantFloats(wmQu.re);
+	WideFloat wmQuIm = wideSetConstantFloats(wmQu.im);
+	
+	for(u32 k = 0; k < count; k += m)
+	  {
+	    WideFloat wRe = wideSetFloats(1.f, wm.re, wmSq.re, wmCu.re);
+	    WideFloat wIm = wideSetFloats(0.f, wm.im, wmSq.im, wmCu.im);
+
+	    r32 *at0Re = reVals + k;
+	    r32 *at0Im = imVals + k;
+	    r32 *at1Re = reVals + k + m/2;
+	    r32 *at1Im = imVals + k + m/2;
+	    for(u32 j = 0; j < m/2; j += simdWidth)
+	      {
+		PROFILE_BLOCK("ifft_dit_radix2_simd:kernel");
+		
+		WideInt storeMask = wideSetConstantInts(0);
+		for(u32 lane = 0; lane < simdWidth; ++lane)
+		  {
+		    u32 val = (j + lane < m/2) ? 0xFFFFFFFF : 0;
+		    wideSetLaneInts(&storeMask, val, lane);
+		  }
+
+		WideFloat in0Re = wideLoadFloats(at0Re);
+		WideFloat in0Im = wideLoadFloats(at0Im);
+		WideFloat in1Re = wideLoadFloats(at1Re);
+		WideFloat in1Im = wideLoadFloats(at1Im);
+
+		WideFloat tRe = wRe*in1Re - wIm*in1Im;
+		WideFloat tIm = wRe*in1Im + wIm*in1Re;
+
+		WideFloat out0Re = in0Re + tRe;
+		WideFloat out0Im = in0Im + tIm;
+		WideFloat out1Re = in0Re - tRe;
+		WideFloat out1Im = in0Im - tIm;
+
+		WideFloat store0Re = wideMaskFloats(out0Re, in0Re, storeMask);
+		WideFloat store0Im = wideMaskFloats(out0Im, in0Im, storeMask);
+		WideFloat store1Re = wideMaskFloats(out1Re, in1Re, storeMask);
+		WideFloat store1Im = wideMaskFloats(out1Im, in1Im, storeMask);
+
+		wideStoreFloats(at0Re, store0Re);
+		wideStoreFloats(at0Im, store0Im);
+		wideStoreFloats(at1Re, store1Re);
+		wideStoreFloats(at1Im, store1Im);
+
+		WideFloat wOldRe = wRe;
+		WideFloat wOldIm = wIm;
+		wRe = wOldRe*wmQuRe - wOldIm*wmQuIm;
+		wIm = wOldRe*wmQuIm + wOldIm*wmQuRe;
+
+		at0Re += simdWidth;
+		at0Im += simdWidth;
+		at1Re += simdWidth;
+		at1Im += simdWidth;
+	      }
+	  }
+      }
+  }
+  
+  FloatBuffer result = {};
+  result.count = count;
+  result.vals = reVals;
+  return(result);
+}
+
 static FFT_Function *fftFunctions[] = {
   fft_dit_radix2_scalar,
   fft_dit_radix2_simd,
 };
 
 static IFFT_Function *ifftFunctions[] = {
-  ifft_dit_radix2,
+  ifft_dit_radix2_scalar,
+  ifft_dit_radix2_simd,
 };
 
 #if 0
