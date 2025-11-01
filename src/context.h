@@ -127,14 +127,14 @@
 
 // NOTE: language
 #if defined(__cplusplus)
-# define LANGUAGE_CXX 1
+# define LANG_CPP 1
 #else
-# define LANGUAGE_C 1
+# define LANG_C 1
 #endif
 
-#if !defined(LANGUAGE_CXX)
-# define LANGUAGE_CXX 0
+#if !defined(LANG_CPP)
+# define LANG_CPP 0
 #endif
-#if !defined(LANGUAGE_C)
-# define LANGUAGE_C 0
+#if !defined(LANG_C)
+# define LANG_C 0
 #endif

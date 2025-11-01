@@ -23,24 +23,6 @@ static WideInt	 wideSubInts(WideInt a, WideInt b);
 static WideInt	 wideMulInts(WideInt a, WideInt b);
 static WideInt   wideAndInts(WideInt a, WideInt b);
 
-#if LANG_CPP
-static inline WideFloat operator+(WideFloat a, WideFloat b) { return(wideAddFloats(a, b)); }
-static inline WideFloat operator-(WideFloat a, WideFloat b) { return(wideSubFloats(a, b)); }
-static inline WideFloat operator*(WideFloat a, WideFloat b) { return(wideMulFloats(a, b)); }
-static inline WideFloat& operator+=(WideFloat& a, WideFloat b) { a = a + b; return(a); }
-static inline WideFloat& operator-=(WideFloat& a, WideFloat b) { a = a - b; return(a); }
-static inline WideFloat& operator*=(WideFloat& a, WideFloat b) { a = a + b; return(a); }
-
-static inline WideInt operator+(WideInt a, WideInt b) { return(wideAddInts(a, b)); }
-static inline WideInt operator-(WideInt a, WideInt b) { return(wideSubInts(a, b)); }
-static inline WideInt operator*(WideInt a, WideInt b) { return(wideMulInts(a, b)); }
-static inline WideInt operator&(WideInt a, WideInt b) { return(wideAndInts(a, b)); }
-static inline WideInt& operator+=(WideInt& a, WideInt b) { a = a + b; return(a); }
-static inline WideInt& operator-=(WideInt& a, WideInt b) { a = a - b; return(a); }
-static inline WideInt& operator*=(WideInt& a, WideInt b) { a = a * b; return(a); }
-static inline WideInt& operator&=(WideInt& a, WideInt b) { a = a & b; return(a); }
-#endif
-
 #if ARCH_X86 || ARCH_X64
 
 #include <immintrin.h>
@@ -61,7 +43,7 @@ static WideFloat
 wideLoadFloats(r32 *src)
 {
   WideFloat result = {};
-  result.val = _mm_load_ps(src);
+  result.val = _mm_loadu_ps(src);
 
   return(result);
 }
@@ -70,7 +52,7 @@ static WideInt
 wideLoadInts(u32 *src)
 {
   WideInt result = {};
-  result.val = _mm_load_si128((__m128i *)src);
+  result.val = _mm_loadu_si128((__m128i *)src);
 
   return(result);
 }
@@ -146,13 +128,13 @@ wideSetLaneInts(WideInt *w, u32 val, u32 lane)
 static void
 wideStoreFloats(r32 *dest, WideFloat src)
 {
-  _mm_store_ps(dest, src.val);
+  _mm_storeu_ps(dest, src.val);
 }
 
 static void
 wideStoreInts(u32 *dest, WideInt src)
 {
-  _mm_store_si128((__m128i *)dest, src.val);
+  _mm_storeu_si128((__m128i *)dest, src.val);
 }
 
 static WideFloat
@@ -205,8 +187,8 @@ wideMaskFloats(WideFloat a, WideFloat b, WideInt mask)
 {
   WideFloat result = {};
   __m128 maskF = _mm_castsi128_ps(mask.val);
-  result.val = _mm_or_ps(_mm_and_ps(a.val, maskF),
-			 _mm_andnot_ps(b.val, maskF));
+  result.val = _mm_or_ps(_mm_and_ps(maskF, a.val),
+			 _mm_andnot_ps(maskF, b.val));
 
   return(result);
 }
@@ -715,4 +697,22 @@ wideAndInts(WideInt a, WideInt b)
   return(result);
 }
 
+#endif
+
+#if LANG_CPP
+static inline WideFloat operator+(WideFloat a, WideFloat b) { return(wideAddFloats(a, b)); }
+static inline WideFloat operator-(WideFloat a, WideFloat b) { return(wideSubFloats(a, b)); }
+static inline WideFloat operator*(WideFloat a, WideFloat b) { return(wideMulFloats(a, b)); }
+static inline WideFloat& operator+=(WideFloat& a, WideFloat b) { a = a + b; return(a); }
+static inline WideFloat& operator-=(WideFloat& a, WideFloat b) { a = a - b; return(a); }
+static inline WideFloat& operator*=(WideFloat& a, WideFloat b) { a = a + b; return(a); }
+
+static inline WideInt operator+(WideInt a, WideInt b) { return(wideAddInts(a, b)); }
+static inline WideInt operator-(WideInt a, WideInt b) { return(wideSubInts(a, b)); }
+static inline WideInt operator*(WideInt a, WideInt b) { return(wideMulInts(a, b)); }
+static inline WideInt operator&(WideInt a, WideInt b) { return(wideAndInts(a, b)); }
+static inline WideInt& operator+=(WideInt& a, WideInt b) { a = a + b; return(a); }
+static inline WideInt& operator-=(WideInt& a, WideInt b) { a = a - b; return(a); }
+static inline WideInt& operator*=(WideInt& a, WideInt b) { a = a * b; return(a); }
+static inline WideInt& operator&=(WideInt& a, WideInt b) { a = a & b; return(a); }
 #endif

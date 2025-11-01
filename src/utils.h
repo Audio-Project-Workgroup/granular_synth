@@ -1,6 +1,6 @@
 // common utilities and miscellaneous functions
 
-#if LANGUAGE_CXX
+#if LANG_CPP
 #  define BEGIN_C_LINKAGE extern "C" {
 #  define END_C_LINKAGE }
 #  define C_LINKAGE extern "C"

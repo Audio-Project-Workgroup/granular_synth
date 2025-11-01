@@ -192,7 +192,7 @@ fi
 # TODO: allow linking the plugin to the exe and vst statically for release builds
 if [[ $target_plugin == 1 ]]; then
     echo "compiling plugin..."
-    clang $CFLAGS -D"DATA_PATH=\"../data/\"" ../src/plugin.cpp -o $PLUGIN_NAME $PLUGIN_FLAGS -lm
+    clang $CFLAGS -march=native -D"DATA_PATH=\"../data/\"" ../src/plugin.cpp -o $PLUGIN_NAME $PLUGIN_FLAGS -lm
 fi
 PLUGIN_STATUS=$?
 STATUS=$(( PLUGIN_STATUS || STATUS ))
@@ -201,7 +201,7 @@ STATUS=$(( PLUGIN_STATUS || STATUS ))
 if [[ $target_exe == 1 ]]; then
     if [[ $PLUGIN_STATUS == 0 ]]; then
 	echo "compiling exe..."
-	clang $CFLAGS -D"PLUGIN_PATH=\"$PLUGIN_NAME\"" ../src/main.cpp -o granade -L. $GL_FLAGS -lglfw -lminiaudio -ldl -lpthread -lm
+	clang $CFLAGS -march=native -D"PLUGIN_PATH=\"$PLUGIN_NAME\"" ../src/main.cpp -o granade -L. $GL_FLAGS -lglfw -lminiaudio -ldl -lpthread -lm
 	#$(pkg-config --libs --cflags libonnxruntime)
 	#-L$SRC_DIR/libs -lonnxruntime
     else
