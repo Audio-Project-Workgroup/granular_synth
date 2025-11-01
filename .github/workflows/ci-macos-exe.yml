@@ -1,0 +1,33 @@
+name: macOS-exe
+run-name: "🚀 MacOs Build exe | Commit: ${{ github.sha }} 🛠️"
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          brew install cmake pkg-config glfw glew wasm-component-ld wabt
+          
+      - name: Set up environment paths
+        run: |
+          echo "CPATH=/opt/homebrew/include:$CPATH" >> $GITHUB_ENV
+          echo "LIBRARY_PATH=/opt/homebrew/lib:$LIBRARY_PATH" >> $GITHUB_ENV
+          echo "PKG_CONFIG_PATH=/opt/homebrew/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
+          
+      - name: Build standalone
+        run: |
+          cd src
+          chmod +x build.sh
+          ./build.sh target:exe
