@@ -83,6 +83,7 @@ logFormatString(char *format, ...)
 }
 
 #include "simd_intrinsics.h"
+#include "profile.h"
 #include "fft.h"
 #include "plugin_parameters.h"
 #include "file_granulator.h"

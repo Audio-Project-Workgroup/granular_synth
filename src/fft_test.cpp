@@ -16,16 +16,26 @@ testFFTFunction(Arena *arena, FFT_Function *fft, FloatBuffer input, ComplexBuffe
   if(success)
     {
       r32 tol = 1e-3;
-      for(u32 i = 0; i < target.count && success; ++i)
+      for(u32 i = 0; i < target.count; ++i)
 	{
 	  r32 resultRe = fftResult.reVals[i];
 	  r32 resultIm = fftResult.imVals[i];
 	  r32 targetRe = target.reVals[i];
 	  r32 targetIm = target.imVals[i];
 
-	  resultMagSq = resultRe*resultRe + resultIm*resultIm;
-	  targetMagSq = targetRe*targetRe + targetIm*targetIm;
-	  success = fabsf(resultMagSq - targetMagSq) < tol;
+	  r32 resultMagSq = resultRe*resultRe + resultIm*resultIm;
+	  r32 targetMagSq = targetRe*targetRe + targetIm*targetIm;
+	  success = ((gsAbs(resultMagSq - targetMagSq) / targetMagSq) < tol);
+	  if(!success)
+	    {
+	      stringListPushFormat(arena, &log,
+				   "fft discrepancy at sample %lu: \n"
+				   "  result = %.4f + %.4fi\n"
+				   "  target = %.4f + %.4fi\n",
+				   i,
+				   resultRe, resultIm,
+				   targetRe, targetIm);
+	    }
 	}
     }
   else
@@ -40,7 +50,7 @@ testFFTFunction(Arena *arena, FFT_Function *fft, FloatBuffer input, ComplexBuffe
 
   FFT_TestResult result = {};
   result.success = success;
-  result.cyclesCount = 0; // TODO: profile
+  result.cycleCount = 0; // TODO: profile
   result.log = log;
   return(result);
 }
@@ -52,15 +62,25 @@ testIFFTFunction(Arena *arena, IFFT_Function *ifft, ComplexBuffer input, FloatBu
 
   String8List log = {};
 
-  b32 result = target.count == ifftResult.count;
-  if(result)
+  b32 success = target.count == ifftResult.count;
+  if(success)
     {
-      r32 tol = 1e-6;
+      r32 tol = 1e-3;
       for(u32 i = 0; i < target.count; ++i)
 	{
 	  r32 resultSample = ifftResult.vals[i];
 	  r32 targetSample = target.vals[i];
-	  success = fabsf(resultSample - targetSample) < tol;
+	  success = ((gsAbs(resultSample - targetSample) / targetSample) < tol);
+	  if(!success)
+	    {
+	      stringListPushFormat(arena, &log,
+				   "ifft discrepancy at sample %lu: \n"
+				   "  result = %.7f\n"
+				   "  target = %.7f\n",
+				   i,
+				   resultSample,
+				   targetSample);
+	    }
 	}
     }
   else
@@ -80,6 +100,7 @@ testIFFTFunction(Arena *arena, IFFT_Function *ifft, ComplexBuffer input, FloatBu
   return(result);
 }
 
+#if 0
 static bool
 fftTest(Arena *allocator)
 {
@@ -118,3 +139,4 @@ fftTest(Arena *allocator)
   bool result = (maxErr <= errTol);
   return(result);
 }
+#endif

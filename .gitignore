@@ -24,6 +24,8 @@ data/fingertips_old.grains
 data/test_input.data
 data/test_output.data
 data/test_atlas.bmp
+data/test/log.txt
+data/test/profile_log.txt
 
 src/*.txt
 onnx_build_debug.txt

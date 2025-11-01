@@ -72,6 +72,8 @@ struct ScopedProfiler
     u64 end = getCpuCounter();
     u64 tscElapsed = end - start;
 
+    globalProfilerCurrentParentIdx = parentInfoIdx;
+
     ProfileInfo *parentInfo = globalProfiler.profileInfos + parentInfoIdx;
     parentInfo->tscElapsed_children += tscElapsed;
 
@@ -111,20 +113,28 @@ profileEnd(Arena *arena)
 	{
 	  u64 tscElapsed_self = info->tscElapsed - info->tscElapsed_children;
 	  r64 percent = 100.0 * ((r64)tscElapsed_self/(r64)totalTscElapsed);
-	  stringListPushFormat(arena, &result,
-			       "%.*s[%llu]: %llu (%.2f%%,",
-			       (int)info->label.size, info->label.str,
-			       info->hitCount,
-			       tscElapsed_self,
-			       percent);
 	  if(info->tscElapsed_root != tscElapsed_self)
 	    {
 	      r64 percentWithChildren = 100.0 * ((r64)info->tscElapsed_root/(r64)totalTscElapsed);
 	      stringListPushFormat(arena, &result,
-				   " %.2f%% w/ children",
+				   "%.*s[%llu]: %llu(%llu) (%.2f%%, %.2f%% w/ children)",
+				   (int)info->label.size, info->label.str,
+				   info->hitCount,
+				   tscElapsed_self,
+				   info->tscElapsed_root,
+				   percent,
 				   percentWithChildren);
 	    }
-	  stringListPush(arena, &result, STR8_LIT(")"));
+	  else
+	    {
+	      stringListPushFormat(arena, &result,
+				   "%.*s[%llu]: %llu(%llu) (%.2f%%)",
+				   (int)info->label.size, info->label.str,
+				   info->hitCount,
+				   tscElapsed_self,
+				   info->tscElapsed_root,
+				   percent);
+	    }
 	}
     }
 

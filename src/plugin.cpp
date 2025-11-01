@@ -134,11 +134,15 @@
 
 #include "plugin.h"
 
-//#include "fft_test.cpp"
 #include "midi.cpp"
 #include "ui_layout.cpp"
 //#include "file_granulator.cpp"
 #include "internal_granulator.cpp"
+
+#if BUILD_TESTING && !OS_WASM
+#  include "tests.cpp"
+#endif
+
 
 #if BUILD_LOGGING
 PluginLogger *globalLogger;
@@ -288,59 +292,11 @@ gsInitializePluginState(PluginMemory *memoryBlock)
 #define X(name) pluginState->name = PLUGIN_ASSET(name);
       PLUGIN_ASSET_XLIST;
 #undef X
-      // pluginState->nullTexture =
-      // 	makeBitmap(pluginState->permanentArena, 1920, 1080, 0xFFFFFFFF);
-      // // TODO: maybe have some kind of x macro list for the bitmap loading
-      // pluginState->editorReferenceLayout =
-      // 	loadBitmap(DATA_PATH"BMP/NEWGRANADE_UI_POSITIONSREFERENCE.bmp", pluginState->permanentArena);
-      // pluginState->editorSkin =
-      // 	loadBitmap(DATA_PATH"BMP/TREE.bmp", pluginState->permanentArena);
-      // pluginState->pomegranateKnob =
-      // 	loadBitmap(DATA_PATH"BMP/POMEGRANATE_BUTTON.bmp", pluginState->permanentArena,
-      // 		   V2(0, -0.03f));
-      // pluginState->pomegranateKnobLabel =
-      // 	loadBitmap(DATA_PATH"BMP/POMEGRANATE_BUTTON_WHITEMARKERS.bmp", pluginState->permanentArena,
-      // 		   V2(0, 0));
-      // pluginState->halfPomegranateKnob =
-      // 	loadBitmap(DATA_PATH"BMP/HALFPOMEGRANATE_BUTTON.bmp", pluginState->permanentArena,
-      // 		   V2(-0.005f, -0.035f));
-      // pluginState->halfPomegranateKnobLabel =
-      // 	loadBitmap(DATA_PATH"BMP/HALFPOMEGRANATE_BUTTON_WHITEMARKERS.bmp", pluginState->permanentArena,
-      // 		   V2(0, 0));
-      // pluginState->densityKnob =
-      // 	loadBitmap(DATA_PATH"BMP/DENSITYPOMEGRANATE_BUTTON.bmp", pluginState->permanentArena,
-      // 		   V2(0.01f, -0.022f));
-      // pluginState->densityKnobShadow =
-      // 	loadBitmap(DATA_PATH"BMP/DENSITYPOMEGRANATE_BUTTON_SHADOW.bmp", pluginState->permanentArena);
-      // pluginState->densityKnobLabel =
-      // 	loadBitmap(DATA_PATH"BMP/DENSITYPOMEGRANATE_BUTTON_WHITEMARKERS.bmp", pluginState->permanentArena,
-      // 		   V2(0, 0));
-      // pluginState->levelBar =
-      // 	loadBitmap(DATA_PATH"BMP/LEVELBAR.bmp", pluginState->permanentArena);
-      // pluginState->levelFader =
-      // 	loadBitmap(DATA_PATH"BMP/LEVELBAR_SLIDINGLEVER.bmp", pluginState->permanentArena,
-      // 		   V2(0, -0.416f));
-      // pluginState->grainViewBackground =
-      // 	loadBitmap(DATA_PATH"BMP/GREENFRAME_RECTANGLE.bmp", pluginState->permanentArena);
-      // pluginState->grainViewOutline =
-      // 	loadBitmap(DATA_PATH"BMP/GREENFRAME.bmp", pluginState->permanentArena);
-
-      // RangeU32 characterRange = {32, 127}; // NOTE: from SPACE up to (but not including) DEL
-      // pluginState->agencyBold =
-      // 	loadFont(pluginState->permanentArena, STR8_LIT(DATA_PATH"FONT/AGENCYB.ttf"),
-      // 		 characterRange, 36.f);
       
-      // TODO: get this data from asset packing/codegen
-      // pluginState->agencyBold.characterRange = {32, 127};
-      // pluginState->agencyBold.verticalAdvance = 0.f;
-      // pluginState->agencyBold.glyphs = PLUGIN_ASSET(AgencyBold_32);
       pluginState->agencyBold = &fontAgencyBold;
-      // TODO: set vertical advance!!!
 
       // NOTE: ui initialization
       pluginState->uiContext =
-	// uiInitializeContext(pluginState->frameArena, pluginState->framePermanentArena,
-	// 		    &pluginState->agencyBold);
 	uiInitializeContext(pluginState->frameArena, pluginState->permanentArena,
 			    pluginState->agencyBold);
 
@@ -389,6 +345,10 @@ gsInitializePluginState(PluginMemory *memoryBlock)
 #endif
       void *outputData = globalPlatform.runModel(testModelInput, testModelInputSampleCount);
       r32 *outputFloat = (r32 *)outputData;
+#endif
+
+#if BUILD_TESTING && !OS_WASM
+      testRun();
 #endif
 
       pluginState->initialized = true;

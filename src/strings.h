@@ -168,11 +168,11 @@ stringListPushFormat(Arena *arena, String8List *list, char *fmt, ...)
 }
 
 inline String8
-stringListJoin(Arena *arena, String8List *list)
+stringListJoin(Arena *arena, String8List *list, String8 sep)
 {
   String8 result = {};
-  result.str = arenaPushArray(arena, list->totalSize, u8);
-  result.size = list->totalSize;
+  result.size = list->totalSize + list->nodeCount * sep.size;
+  result.str = arenaPushArray(arena, result.size, u8);
 
   u8 *stringAt = result.str;
   for(String8Node *node = list->first; node; node = node->next)
@@ -180,6 +180,9 @@ stringListJoin(Arena *arena, String8List *list)
       usz nodeStringSize = node->string.size;
       COPY_ARRAY(stringAt, node->string.str, nodeStringSize, u8);
       stringAt += nodeStringSize;
+
+      COPY_ARRAY(stringAt, sep.str, sep.size, u8);
+      stringAt += sep.size;
     }
 
   return(result);

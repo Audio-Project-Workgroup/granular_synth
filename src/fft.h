@@ -5,6 +5,167 @@
 typedef FFT_FUNCTION(FFT_Function);
 typedef IFFT_FUNCTION(IFFT_Function);
 
+static FFT_FUNCTION(fft_dit_radix2)
+{
+  PROFILE_FUNCTION();
+
+  usz count = ROUND_UP_POW_2(input.count);
+  r32 *reVals = arenaPushArray(arena, count, r32);
+  r32 *imVals = arenaPushArray(arena, count, r32);
+
+  // NOTE: input permutation
+  {
+    PROFILE_BLOCK("fft_dit_radix2:input_permutation");
+    
+    usz countLog2 = LOG2(count);
+    r32 *src = input.vals;
+    for(u32 i = 0; i < count; ++i)
+      {
+	u32 iRev = reverseBits(i) >> (sizeof(u32)*8 - countLog2);
+	reVals[iRev] = src[i];
+      }
+  }
+  
+  // NOTE: twiddles
+  {
+    PROFILE_BLOCK("fft_dit_radix2:twiddles");
+    
+    for(u32 m = 2; m <= count; m <<= 1)
+      {
+	r32 theta = -2.f * GS_PI / (r32)m;
+	r32 wmRe = gsCos(theta);
+	r32 wmIm = gsSin(theta);
+	
+	for(u32 k = 0; k < count; k += m)
+	  {
+	    r32 wRe = 1.f;
+	    r32 wIm = 0.f;
+	    r32 *at0Re = reVals + k;
+	    r32 *at0Im = imVals + k;
+	    r32 *at1Re = reVals + k + m/2;
+	    r32 *at1Im = imVals + k + m/2;
+	    for(u32 j = 0; j < m/2; ++j)
+	      {
+		r32 in0Re = *at0Re;
+		r32 in0Im = *at0Im;
+		r32 in1Re = *at1Re;
+		r32 in1Im = *at1Im;
+
+		r32 tRe = wRe*in1Re - wIm*in1Im;
+		r32 tIm = wRe*in1Im + wIm*in1Re;
+
+		r32 out0Re = in0Re + tRe;
+		r32 out0Im = in0Im + tIm;
+		r32 out1Re = in0Re - tRe;
+		r32 out1Im = in0Im - tIm;
+
+		*at0Re++ = out0Re;
+		*at0Im++ = out0Im;
+		*at1Re++ = out1Re;
+		*at1Im++ = out1Im;
+
+		r32 wOldRe = wRe;
+		r32 wOldIm = wIm;
+		wRe = wOldRe*wmRe - wOldIm*wmIm;
+		wIm = wOldRe*wmIm + wOldIm*wmRe;
+	      }
+	  }
+      }
+  }
+  
+  ComplexBuffer result = {};
+  result.count = count;
+  result.reVals = reVals;
+  result.imVals = imVals;
+  return(result);
+}
+
+static IFFT_FUNCTION(ifft_dit_radix2)
+{
+  PROFILE_FUNCTION();
+
+  usz count = ROUND_UP_POW_2(input.count);
+  r32 *reVals = arenaPushArray(arena, count, r32);
+  r32 *imVals = arenaPushArray(arena, count, r32);
+
+  // NOTE: input permutation
+  {
+    PROFILE_BLOCK("ifft_dit_radix_2:input_permutation");
+    
+    usz countLog2 = LOG2(count);
+    r32 invCount = 1.f / (r32)count;
+    r32 *srcRe = input.reVals;
+    r32 *srcIm = input.imVals;
+    for(u32 i = 0; i < count; ++i)
+      {
+	u32 iRev = reverseBits(i) >> (sizeof(u32)*8 - countLog2);
+	reVals[iRev] = invCount * srcRe[i];
+	imVals[iRev] = invCount * srcIm[i];
+      }
+  }
+  
+  // NOTE: twiddles
+  {
+    PROFILE_BLOCK("ifft_dit_radix_2:twiddles");
+
+    for(u32 m = 2; m <= count; m <<= 1)
+      {
+	r32 theta = 2.f * GS_PI / (r32)m;
+	r32 wmRe = gsCos(theta);
+	r32 wmIm = gsSin(theta);
+	
+	for(u32 k = 0; k < count; k += m)
+	  {
+	    r32 wRe = 1.f;
+	    r32 wIm = 0.f;
+	    r32 *at0Re = reVals + k;
+	    r32 *at0Im = imVals + k;
+	    r32 *at1Re = reVals + k + m/2;
+	    r32 *at1Im = imVals + k + m/2;
+	    for(u32 j = 0; j < m/2; ++j)
+	      {
+		r32 in0Re = *at0Re;
+		r32 in0Im = *at0Im;
+		r32 in1Re = *at1Re;
+		r32 in1Im = *at1Im;
+
+		r32 tRe = wRe*in1Re - wIm*in1Im;
+		r32 tIm = wRe*in1Im + wIm*in1Re;
+
+		r32 out0Re = in0Re + tRe;
+		r32 out0Im = in0Im + tIm;
+		r32 out1Re = in0Re - tRe;
+		r32 out1Im = in0Im - tIm;
+
+		*at0Re++ = out0Re;
+		*at0Im++ = out0Im;
+		*at1Re++ = out1Re;
+		*at1Im++ = out1Im;
+
+		r32 wOldRe = wRe;
+		r32 wOldIm = wIm;
+		wRe = wOldRe*wmRe - wOldIm*wmIm;
+		wIm = wOldRe*wmIm + wOldIm*wmRe;
+	      }
+	  }
+      }
+  }
+  
+  FloatBuffer result = {};
+  result.count = count;
+  result.vals = reVals;
+  return(result);
+}
+
+static FFT_Function *fftFunctions[] = {
+  fft_dit_radix2,
+};
+
+static IFFT_Function *ifftFunctions[] = {
+  ifft_dit_radix2,
+};
+
+#if 0
 #define REAL_FFT_FUNCTION(name) void (name)(r32 *destRe, r32 *destIm, r32 *src, u32 length)
 #define REAL_IFFT_FUNCTION(name) void (name)(r32 *dest, r32 *destImTemp, r32 *srcRe, r32 *srcIm, u32 length)
 
@@ -928,3 +1089,4 @@ iczt(r32 *outputReal, r32 *outputImag, c64 *input, u32 length, Arena *scratchAll
       outputImag[index] = outVal.im;
     }
 }
+#endif

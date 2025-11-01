@@ -73,6 +73,22 @@
 #define ALIGN_DOWN_POW_2(num, alignment) ((num) & ~((alignment) - 1LL))
 #define ROUND_UP_TO_MULTIPLE(num, length) (((num) % (length)) ? ((num) + (length) - ((num) % (length))) : (num))
 
+#if COMPILER_CLANG || COMPILER_GCC
+#  define MSB(num) (8*sizeof(u32) - __builtin_clz((num)|1) - 1)
+#  define LSB(num) (__builtin_ctz(num))
+#elif COMPILER_MSVC
+#  include <intrin.h>
+static inline u32 msbHelper(u64 num) { u32 idx = 0; _BitScanReverse64(&idx, num|1); return(idx); }
+static inline u32 lsbHelper(u64 num) { u32 idx = 0; _BitScanForward64(&idx, num); return(idx); }
+#  define MSB(num) msbHelper(num)
+#  define LSB(num) lsbHelper(num)
+#else
+#  error ERROR: MSB and LSB not implemented for this compiler
+#endif
+
+#define LOG2(num) MSB(num)
+#define ROUND_UP_POW_2(num) (1ULL << (MSB((num) - 1) + 1))
+
 #define CYCLIC_ARRAY_INDEX(i, len) ((i < len) ? ((i < 0) ? (i + len) : i) : (i - len))
 
 // NOTE: linked-list utilities

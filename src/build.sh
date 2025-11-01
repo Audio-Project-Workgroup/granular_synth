@@ -6,6 +6,7 @@
 # config options
 config_debug=0      # compiles with debug info, enables asserts
 config_logging=0    # enables the logging system
+config_testing=0    # runs tests in `gsInitializePluginState`
 config_release=0    # assembles a distributable application bundle
 
 # target options
@@ -33,6 +34,7 @@ for arg in "$@"; do
     if [[ "$key" == "config" ]]; then
 	config_debug=0
 	config_logging=0
+	config_testing=0
 	config_release=0
     fi
 
@@ -45,6 +47,7 @@ for arg in "$@"; do
 	echo "    values:"
 	echo "      debug:   compiles with debug info, enables asserts"
 	echo "      logging: enables the logging system"
+	echo "      testing: runs tests in `gsInitializePluginState`"
 	echo "      release: assembles a distributable application bundle"
 	echo ""
 	echo "  target:"
@@ -106,6 +109,9 @@ fi
 if [[ $config_logging == 1 ]]; then
     echo "[ LOGGING ]"
 fi
+if [[ $config_testing == 1 ]]; then
+    echo "[ TESTING ]"
+fi
 if [[ $config_release == 1 ]]; then
     echo "[ RELEASE ]"
 fi
@@ -124,7 +130,7 @@ else
 fi
 CFLAGS+=" -I$SRC_DIR/include -I$SRC_DIR/include/glad/include"
 CFLAGS+=" -fno-exceptions -fno-rtti -std=gnu++11" #-march=native
-CFLAGS+=" -DBUILD_DEBUG=$config_debug -DBUILD_LOGGING=$config_logging"
+CFLAGS+=" -DBUILD_DEBUG=$config_debug -DBUILD_LOGGING=$config_logging -DBUILD_TESTING=$config_testing"
 #CFLAGS="-g -Wall -Wno-writable-strings -Wno-missing-braces -Wno-unused-function -fno-exceptions -fno-rtti -march=native -std=gnu++11 -DBUILD_DEBUG=0"
 MAC_GL_FLAGS="-framework OpenGL"
 MAC_PLUGIN_FLAGS="-dynamiclib"
