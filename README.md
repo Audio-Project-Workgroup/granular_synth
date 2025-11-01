@@ -23,6 +23,7 @@ Granade is a real-time granular synthesizer, available as a vst3 plugin and as a
 	- [Building from Source](#building-from-source)
 		- [Requirements](#install-requirements)
 		- [Initialize local repo](#Clone-the-repository-and-initialize-submodules)
+		- [Configuration options](#configuration-options)
 		- [Platform-specific-setup](#Platform-specific-setup)
 		- [Verify build](#Verify-your-build)
 - [Documentation](#documentation)
@@ -79,8 +80,54 @@ git clone --recurse-submodules https://github.com/Audio-Project-Workgroup/granul
 ```
 This places the `https://github.com/juce-framework/JUCE` repository within `src/JUCE` directory.
 
+
+#### Configuration options
+
+To build `Granade` from source, the following configuration options are available:
+
+
+**Configuration Options**
+
+| Value | Description |
+|--------|-------------|
+| `debug` | Compiles with debug info and enables asserts. |
+| `logging` | Enables the logging system. |
+| `release` | Assembles a distributable application bundle. |
+
+
+**Target Options**
+
+| Value | Description |
+|--------|-------------|
+| `plugin` | Compiles the plugin to a dynamic library. |
+| `exe` | Compiles the host executable. |
+| `vst` | Compiles the VST target. |
+| `wasm` | Compiles the WebAssembly target. |
+| `all` | Compiles all targets. *(Default)* |
+
+Display available commands and usage information using the `help` option.
+
+You can configure builds using key–value pairs passed as command-line arguments:
+
+```bash
+./build.sh <key>:<value1>+<value2>+...
+```
+
+*The following example enables **debug mode** and **logging** and builds the **plugin** and **WebAssembly** targets.*
+
+```bash
+./build.sh config:debug+logging target:plugin+wasm
+```
+
+**Defaults**
+
+- If you specify a `target:` key, all other target flags are reset to `0`.
+- If you specify a `config:` key, all other configuration flags are reset to `0`.
+
+> Note: Unknown arguments will print a warning but won’t stop the build.
+
 #### Platform-specific setup:
-	
+
 ##### Windows 
 
 1. **Set up GLFW:**
@@ -151,7 +198,6 @@ NOTE:
 	./build.sh target:vst
 	``` 
 	The `Granade.vst3` file will be created into a nested directory within the build directory (i.e. within `granular_synth\build\build_JUCE\Granade_artefacts\Debug\VST3`). 
-
 
 #### Verify your build
 
