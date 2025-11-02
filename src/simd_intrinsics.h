@@ -380,6 +380,14 @@ wideMaskFloats(WideFloat a, WideFloat b, WideInt mask)
   return(result);
 }
 
+static WideInt
+wideAndInts(WideInt a, WideInt b)
+{
+  WideInt result = {};
+  result.val = vandq_u32(a.val, b.val);
+  return(result);
+}
+
 #elif ARCH_WASM32 || ARCH_WASM64
 
 #include <wasm_simd128.h>
