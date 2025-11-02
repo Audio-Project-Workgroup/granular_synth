@@ -139,10 +139,9 @@
 //#include "file_granulator.cpp"
 #include "internal_granulator.cpp"
 
-#if BUILD_TESTING && !OS_WASM
+#if BUILD_TESTING
 #  include "tests.cpp"
 #endif
-
 
 #if BUILD_LOGGING
 PluginLogger *globalLogger;
@@ -347,7 +346,7 @@ gsInitializePluginState(PluginMemory *memoryBlock)
       r32 *outputFloat = (r32 *)outputData;
 #endif
 
-#if BUILD_TESTING && !OS_WASM
+#if BUILD_TESTING
       testRun();
 #endif
 

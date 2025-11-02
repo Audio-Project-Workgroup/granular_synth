@@ -214,7 +214,7 @@ STATUS=$(( EXE_STATUS || STATUS ))
 if [[ $target_vst == 1 ]]; then
     if [[ $PLUGIN_STATUS == 0 ]]; then
 	echo "compiling vst"
-	cmake -S $SRC_DIR -B $BUILD_DIR/build_JUCE -DBUILD_DEBUG=$config_debug -DBUILD_LOGGING=$config_logging
+	cmake -S $SRC_DIR -B $BUILD_DIR/build_JUCE -DBUILD_DEBUG=$config_debug -DBUILD_LOGGING=$config_logging -DBUILD_TESTING=$config_testing
 	cmake --build $BUILD_DIR/build_JUCE
     else
 	echo "ERROR: plugin build failed. skipping vst compilation"
@@ -229,11 +229,11 @@ if [[ $target_wasm == 1 ]]; then
     MEMORY_SIZE=$[$MEMORY_PAGE_COUNT * 64 * 1024] # NOTE: 16 MB
     STACK_SIZE=$[4 * 1024 * 1024] # NOTE: 4 MB (per thread)
     
-    WASM_CFLAGS="-fPIC -DSTACK_SIZE=$STACK_SIZE --target=wasm32 -nostdlib -matomics -mbulk-memory -c"
+    WASM_CFLAGS="-fPIC -DSTACK_SIZE=$STACK_SIZE --target=wasm32 -nostdlib -matomics -mbulk-memory -msimd128 -c"
     WASM_LFLAGS="--no-entry --export-all --export-table --import-memory --shared-memory --initial-memory=$MEMORY_SIZE --max-memory=$MEMORY_SIZE -z stack-size=$STACK_SIZE"
 
     #compile code to object file
-    clang $CFLAGS $WASM_CFLAGS $SRC_DIR/wasm_glue.cpp -o wasm_glue.o
+    clang $CFLAGS -D"DATA_PATH=\"./data/\"" $WASM_CFLAGS $SRC_DIR/wasm_glue.cpp -o wasm_glue.o
 
     # link object file, producing wasm binary
     wasm-ld $WASM_LFLAGS wasm_glue.o -o wasm_glue.wasm

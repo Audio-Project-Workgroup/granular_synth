@@ -9,8 +9,8 @@ testRun(void)
 
   String8List testLog = {};
 
-  Buffer fftTestInputBuffer = gsReadEntireFile(DATA_PATH"test/fft_test_signal.float", scratch.arena);
-  Buffer fftTestTargetBuffer = gsReadEntireFile(DATA_PATH"test/fft_test_target.float", scratch.arena);
+  Buffer fftTestInputBuffer = bufferMake(fft_test_signal, ARRAY_COUNT(fft_test_signal));
+  Buffer fftTestTargetBuffer = bufferMake(fft_test_result, ARRAY_COUNT(fft_test_result));
 
   FloatBuffer fftTestInput = {};
   fftTestInput.count = fftTestInputBuffer.size / sizeof(r32);
@@ -73,7 +73,12 @@ testRun(void)
   Buffer fileBuffer = {};
   fileBuffer.size = testLogString.size;
   fileBuffer.contents = testLogString.str;
+
+#if OS_WASM
+  platformLog((const char*)fileBuffer.contents);
+#else
   gsWriteEntireFile(DATA_PATH"test/log.txt", fileBuffer);
+#endif
 
   arenaReleaseScratch(scratch);
 }

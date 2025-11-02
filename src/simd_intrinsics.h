@@ -469,8 +469,8 @@ static WideFloat
 wideMaskFloats(WideFloat a, WideFloat b, WideInt mask)
 {
   WideFloat result = {};
-  result.val = wasm_v128_or(wasm_v128_andnot(a.val, mask.val),
-			    wasm_v128_and(b.val, mask.val));
+  result.val = wasm_v128_or(wasm_v128_and(a.val, mask.val),
+			    wasm_v128_andnot(b.val, mask.val));
   return(result);
 }
 

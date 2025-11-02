@@ -22,8 +22,20 @@ getCpuCounter(void)
 static u64
 getCpuCounter(void)
 {
-# error TODO: implement
+  return(0); // TODO: implement
 }
+
+#elif ARCH_WASM32 || ARCH_WASM64
+
+static u64
+getCpuCounter(void)
+{
+  return(0); // TODO: implement
+}
+
+#else
+
+# error profiling not supported for this architecture
 
 #endif
 

@@ -1,3 +1,5 @@
+#include "fft_test_signals.h"
+
 struct FFT_TestResult
 {
   b32 success;

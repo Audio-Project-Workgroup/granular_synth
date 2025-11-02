@@ -7,6 +7,7 @@ setlocal enabledelayedexpansion
 :: config options
 set "config_debug=0"
 set "config_logging=0"
+set "config_testing=0"
 
 :: target options
 set "target_plugin=0"
@@ -18,11 +19,12 @@ set "target_all=1"
 :: parse cli arguments
 
 :: NOTE: syntax is `key:value1+value2` to set variables `key_value1` and `key_value2` to 1
+:: TODO: help output on windows
 for %%a in (%*) do (
     for /f "tokens=1* delims=:" %%k in ("%%a") do (
     	set "key=%%k"
 	if "!key!"=="target" set "target_plugin=0" && set "target_exe=0" && set "target_vst=0" && set "target_all=0"
-	if "!key!"=="config" set "config_debug=0" && set "config_logging=0"
+	if "!key!"=="config" set "config_debug=0" && set "config_logging=0" && set "config_testing=0"
 
 	set "values=%%l"
     	for /f "tokens=1-4 delims=+" %%v in ("!values!") do (	    
@@ -44,6 +46,7 @@ if "!target_vst!"=="1" echo [BUILD_VST]
 
 if "!config_debug!"=="1" echo [BUILD_DEBUG]
 if "!config_logging!"=="1" echo [BUILD_LOGGING]
+if "!config_testing!"=="1" echo [BUILD_TESTING]
 
 :: -----------------------------------------------------------------------------
 :: set up directories, flags
@@ -61,6 +64,7 @@ set CFLAGS=%CFLAGS% -I..\src\include\glad\include
 set CFLAGS=%CFLAGS% -MT -EHa- -GR-
 set CFLAGS=%CFLAGS% -DBUILD_DEBUG=!config_debug!
 set CFLAGS=%CFLAGS% -DBUILD_LOGGING=!config_logging!
+set CFLAGS=%CFLAGS% -DBUILD_TESTING=!config_testing!
 
 set LFLAGS=-incremental:no -opt:ref
 
@@ -130,7 +134,7 @@ set EXE_STATUS=%ERRORLEVEL%
 if "!target_vst!"=="1" (
     if %PLUGIN_STATUS%==0 (
         echo compiling vst...
-	cmake -S %SRC_DIR% -B %BUILD_DIR%/build_JUCE -DBUILD_DEBUG=!config_debug! -DBUILD_LOGGING=!config_logging!
+	cmake -S %SRC_DIR% -B %BUILD_DIR%/build_JUCE -DBUILD_DEBUG=!config_debug! -DBUILD_LOGGING=!config_logging! -DBUILD_TESTING=!config_testing!
 	cmake --build %BUILD_DIR%/build_JUCE
     ) else (
         echo ERROR: plugin build failed. skipping vst compilation
