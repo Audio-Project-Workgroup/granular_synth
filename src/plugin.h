@@ -4,6 +4,10 @@
 #include "common.h"
 #endif
 
+#if BUILD_DEBUG && !OS_WASM
+#  define FINGERTIPS 1
+#endif
+
 #define TAKE_LOCK(lock, ...) \
   do { __VA_ARGS__ } while(gsAtomicCompareAndSwap(lock, 0, 1) != 0)
 #define RELEASE_LOCK(lock, ...) \
@@ -87,13 +91,204 @@ logFormatString(char *format, ...)
 #include "fft.h"
 #include "plugin_parameters.h"
 #include "file_granulator.h"
-//#include "file_formats.h"
 #include "plugin_asset.h"
 #include "ui_layout.h"
 #include "plugin_ui.h"
 #include "plugin_render.h"
 #include "ring_buffer.h"
 #include "internal_granulator.h"
+
+#define RIFF(str) FOURCC(str)
+
+union RiffID
+{
+  u32 id;
+  u8 str[4];
+};
+
+#pragma pack(push, 1)
+struct RiffHeader
+{
+  RiffID chunkID;
+  u32 chunkSize;  
+};
+
+struct WaveHeader
+{
+  RiffID waveID;  
+};
+
+struct WaveFormatChunk
+{
+  RiffHeader header;
+  u16 formatTag;
+  u16 channelCount;
+  u32 sampleRate;
+  u32 avgBytesPerSec;
+  u16 dataBlockSize;
+  u16 bitsPerSample;
+};
+
+struct WaveFormatExtension
+{
+  u16 cbSize;
+  u16 validBitsPerSample;
+  u32 channelMask;
+  u8 subFmt[16];
+};
+
+struct WaveFormatExtended
+{
+  WaveFormatChunk fmt;
+  WaveFormatExtension ex;
+};
+#pragma pack(pop)
+
+typedef RiffHeader WaveDataChunk;
+
+static inline LoadedSound
+loadWav(Arena *arena, String8 path)
+{
+  TemporaryMemory scratch = arenaGetScratch(&arena, 1);
+
+  Buffer file = gsReadEntireFile((char*)path.str, scratch.arena);
+
+  RiffHeader *riffHeader = bufferReadStruct(&file, RiffHeader);
+  ASSERT(riffHeader->chunkID.id == RIFF("RIFF"));
+
+  WaveHeader *waveHeader = bufferReadStruct(&file, WaveHeader);
+  ASSERT(waveHeader->waveID.id == RIFF("WAVE"));
+
+  WaveFormatChunk *waveFmt = bufferReadStruct(&file, WaveFormatChunk);
+  ASSERT(waveFmt->header.chunkID.id == RIFF("fmt "));
+  //u16 formatTag = waveFmt->formatTag;
+  u16 bytesPerSample = waveFmt->bitsPerSample / 8;
+  u32 channelCount = waveFmt->channelCount;
+  u32 sampleRate = waveFmt->sampleRate;
+  if(waveFmt->header.chunkSize == (sizeof(WaveFormatExtended) - sizeof(RiffHeader)))
+  {
+    bufferReadStruct(&file, WaveFormatExtension);
+  }
+
+  WaveDataChunk *waveData = bufferReadStruct(&file, WaveDataChunk);
+  ASSERT(waveData->chunkID.id == RIFF("data"));
+  u32 waveDataSize = waveData->chunkSize;
+
+  ASSERT(sampleRate == INTERNAL_SAMPLE_RATE);
+
+  u32 sampleCount = waveDataSize / (channelCount * bytesPerSample);
+  u8 *sampleData = bufferReadArray(&file, waveDataSize, u8);
+
+  r32 *samplesL = arenaPushArray(arena, 2 * sampleCount, r32);
+  r32 *samplesR = samplesL + sampleCount;
+
+  // NOTE: copy samples
+  {
+#define CONVERT_SAMPLE(srcData, srcSample, type, channels) do {\
+      type sample = *(type*)srcData;\
+      srcSample = (r32)sample/(r32)type##_MAX;\
+      srcData = (type*)srcData + channels;\
+    } while(0)
+
+    void *srcDataL = sampleData;
+    r32 *destL = samplesL;
+    r32 *destR = samplesR;
+    if(channelCount == 1)
+    {
+      if(bytesPerSample == 1)
+      {
+	for(u32 sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex)
+	{
+	  r32 srcSample = 0;
+	  CONVERT_SAMPLE(srcDataL, srcSample, u8, channelCount);
+	  *destL++ = srcSample;
+	  *destR++ = srcSample;
+	}
+      }
+      else if(bytesPerSample == 2)
+      {
+	for(u32 sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex)
+	{
+	  r32 srcSample = 0;
+	  CONVERT_SAMPLE(srcDataL, srcSample, s16, channelCount);
+	  *destL++ = srcSample;
+	  *destR++ = srcSample;
+	}
+      }
+      else if(bytesPerSample == 4)
+      {
+	for(u32 sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex)
+	{
+	  r32 srcSample = 0;
+	  CONVERT_SAMPLE(srcDataL, srcSample, r32, channelCount);
+	  *destL++ = srcSample;
+	  *destR++ = srcSample;
+	}
+      }
+      else
+      {
+	ASSERT(!"unsupported sample size")
+      }
+    }
+    else if(channelCount == 2)
+    {
+      void *srcDataR = sampleData + bytesPerSample;
+      if(bytesPerSample == 1)
+      {
+	for(u32 sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex)
+	{
+	  r32 srcSampleL = 0;
+	  r32 srcSampleR = 0;
+	  CONVERT_SAMPLE(srcDataL, srcSampleL, u8, channelCount);
+	  CONVERT_SAMPLE(srcDataR, srcSampleR, u8, channelCount);
+	  *destL++ = srcSampleL;
+	  *destR++ = srcSampleR;
+	}
+      }
+      else if(bytesPerSample == 2)
+      {
+	for(u32 sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex)
+	{
+	  r32 srcSampleL = 0;
+	  r32 srcSampleR = 0;
+	  CONVERT_SAMPLE(srcDataL, srcSampleL, s16, channelCount);
+	  CONVERT_SAMPLE(srcDataR, srcSampleR, s16, channelCount);
+	  *destL++ = srcSampleL;
+	  *destR++ = srcSampleR;
+	}
+      }
+      else if(bytesPerSample == 4)
+      {
+	for(u32 sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex)
+	{
+	  r32 srcSampleL = 0;
+	  r32 srcSampleR = 0;
+	  CONVERT_SAMPLE(srcDataL, srcSampleL, r32, channelCount);
+	  CONVERT_SAMPLE(srcDataR, srcSampleR, r32, channelCount);
+	  *destL++ = srcSampleL;
+	  *destR++ = srcSampleR;
+	}
+      }
+      else
+      {
+	ASSERT(!"unsupported sample size")
+      }
+    }
+    else
+    {
+      ASSERT(!"unsupported channel count");
+    }
+  }
+
+  arenaReleaseScratch(scratch);
+
+  LoadedSound result = {};
+  result.sampleCount = sampleCount;
+  result.channelCount = channelCount;
+  result.samples[0] = samplesL;
+  result.samples[1] = samplesR;
+  return(result);
+}
 
 enum PluginMode
 {
@@ -138,7 +333,9 @@ struct PluginState
   r32 freq;
   PluginBooleanParameter soundIsPlaying;
 
-  /* PlayingSound loadedSound; */
+#if FINGERTIPS
+  PlayingSound loadedSound;
+#endif
 
   PluginAsset *null;
   //PluginAsset *editorReferenceLayout;
@@ -164,7 +361,7 @@ struct PluginState
   UIPanel *menuPanel;
   UILayout *mouseTooltipLayout;
 
-  GrainManager grainManager;
+  GrainManager grainManager;  
   AudioRingBuffer grainBuffer;
   GrainStateView grainStateView;
 

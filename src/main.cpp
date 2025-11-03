@@ -446,7 +446,7 @@ struct BitmapHeader
 };
 #pragma pack(pop)
 
-#define FOURCC(str) (((u32)((str)[0]) << 0) | ((u32)((str)[1]) << 8) | ((u32)((str)[2]) << 16) | ((u32)((str)[3]) << 24))
+// #define FOURCC(str) (((u32)((str)[0]) << 0) | ((u32)((str)[1]) << 8) | ((u32)((str)[2]) << 16) | ((u32)((str)[3]) << 24))
 
 static LoadedBitmap
 loadBitmap(Arena *destAllocator, String8 filename, b32 flip = 1)

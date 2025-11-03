@@ -255,7 +255,7 @@ gsArenaDiscard(Arena *arena)
   freeMemory((void*)arena, size);
 }
 
-#define FOURCC(str) ((u32)((str[0] << 0*8) | (str[1] << 1*8) | (str[2] << 2*8) | (str[3] << 3*8)))
+// #define FOURCC(str) ((u32)((str[0] << 0*8) | (str[1] << 1*8) | (str[2] << 2*8) | (str[3] << 3*8)))
 
 #pragma pack(push, 1)
 

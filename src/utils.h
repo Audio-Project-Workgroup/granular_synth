@@ -88,8 +88,11 @@ static inline u32 lsbHelper(u64 num) { u32 idx = 0; _BitScanForward64(&idx, num)
 
 #define LOG2(num) MSB(num)
 #define ROUND_UP_POW_2(num) (1ULL << (MSB((num) - 1) + 1))
+#define IS_POWER_OF_2(num) (num == ROUND_UP_POW_2(num))
 
 #define CYCLIC_ARRAY_INDEX(i, len) ((i < len) ? ((i < 0) ? (i + len) : i) : (i - len))
+
+#define FOURCC(str) ((u32)((str[0]<<0)|(str[1]<<8)|(str[2]<<16)|(str[3]<<24)))
 
 // NOTE: linked-list utilities
 #define STACK_PUSH(head, node) do {(node)->next = (head); (head) = (node);} while(0)

@@ -63,18 +63,18 @@
    -(web) keyboard driven ui
       
  * TECH DEBT:
-   -(vst/exe) resurrect vst target, make sure all platforms still work
+   -(DONE) resurrect vst target, make sure all platforms still work
    -(vst) figure out how to automatically copy the vst folder on windows
-   -(all) merge build scripts into a single `build.bat` and `build.sh`, with
-          a CLI for selecting targets and options, e.g.
-	  ```build --target=vst --debug```
+   -(DONE) merge build scripts into a single `build.bat` and `build.sh`, with
+           a CLI for selecting targets and options, e.g.
+	   ```build --target=vst --debug```
    -(all) split function declarations and definitions into separate .h and .cpp
           files, compile the common implementation once, and link into each
 	  target, to hopefully speed up compilation time
    -(all) simplify/optimize ui system
 
  * PERFORMANCE OPTIMIZATION:
-   -(all) profile
+   -(DONE) profile
    -(all) vectorize copying audio samples to output/from input
    -(all) transpose loop order in grain process ()
    -(all) check for false-sharing on cache lines with contended locks
@@ -242,7 +242,7 @@ gsInitializePluginState(PluginMemory *memoryBlock)
 	}
 
       // NOTE: grain buffer initialization
-      u32 grainBufferCount = 48000;
+      u32 grainBufferCount = 1ULL << 16;
       pluginState->grainBuffer = initializeGrainBuffer(pluginState, grainBufferCount);
       pluginState->grainManager = initializeGrainManager(pluginState);
 
@@ -272,9 +272,12 @@ gsInitializePluginState(PluginMemory *memoryBlock)
 
       // NOTE: file loading, embedded grain caching
       pluginState->soundIsPlaying.value = false;
-      // pluginState->loadedSound.sound =
-      // 	loadWav(pluginState->permanentArena, STR8_LIT("../data/fingertips_44100_PCM_16.wav"));
-      // pluginState->loadedSound.samplesPlayed = 0;// + pluginState->start_pos);
+#if FINGERTIPS
+      pluginState->loadedSound.sound =
+	loadWav(pluginState->permanentArena, STR8_LIT(DATA_PATH"fingertips.wav"));
+      pluginState->loadedSound.samplesPlayed = 0;// + pluginState->start_pos);
+#endif
+      
 #if 0
       char *fingertipsPackfilename = "../data/fingertips.grains";
       TemporaryMemory packfileMemory = arenaBeginTemporaryMemory(&pluginState->loadArena, MEGABYTES(64));

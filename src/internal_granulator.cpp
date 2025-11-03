@@ -38,7 +38,6 @@ static AudioRingBuffer
 initializeGrainBuffer(PluginState *pluginState, u32 bufferCount)
 {
   AudioRingBuffer grainBuffer = {};
-  //GrainBuffer grainBuffer = {};
   grainBuffer.capacity = bufferCount;
   grainBuffer.samples[0] = arenaPushArray(pluginState->permanentArena, bufferCount, r32,
 					  arenaFlagsNoZeroAlign(4*sizeof(r32)));
@@ -72,9 +71,14 @@ initializeGrainManager(PluginState *pluginState)
   initializeWindows(&result);
   
   result.grainAllocator = pluginState->audioArena;
-  result.grainPlayList = arenaPushStruct(result.grainAllocator, Grain);
-  result.grainPlayList->next = result.grainPlayList;
-  result.grainPlayList->prev = result.grainPlayList;
+  
+  result.firstPlayingGrain = 0;
+  result.lastPlayingGrain = 0;
+  result.grainCount = 0;
+  result.grainFreeList = 0;
+  // result.grainPlayList = arenaPushStruct(result.grainAllocator, Grain);
+  // result.grainPlayList->next = result.grainPlayList;
+  // result.grainPlayList->prev = result.grainPlayList;
 
   return(result);
 }
@@ -82,22 +86,22 @@ initializeGrainManager(PluginState *pluginState)
 static void
 makeNewGrain(GrainManager* grainManager, u32 grainSize, r32 windowParam, r32 spread)
 {
-  Grain* result;
-  //TODO: Add some logic that could update based off of position so it doesn't just re-use the same grains over n over
-  if (grainManager->grainFreeList)
+  Grain* result = grainManager->grainFreeList;
+  if(result)
     {
-      result = grainManager->grainFreeList;
-      grainManager->grainFreeList = result->next;
-      //result->next = 0;
+      //grainManager->grainFreeList = result->next;
+      STACK_POP(grainManager->grainFreeList);
     }
   else
     {
       result = arenaPushStruct(grainManager->grainAllocator, Grain);
     }
+  ASSERT(result);
 
   AudioRingBuffer* buffer = grainManager->grainBuffer;
-  result->start[0] = buffer->samples[0] + buffer->readIndex;
-  result->start[1] = buffer->samples[1] + buffer->readIndex;
+  // result->start[0] = buffer->samples[0] + buffer->readIndex;
+  // result->start[1] = buffer->samples[1] + buffer->readIndex;
+  result->readIndex = buffer->readIndex;
     
   result->samplesToPlay = grainSize;
   result->length = grainSize;
@@ -106,7 +110,10 @@ makeNewGrain(GrainManager* grainManager, u32 grainSize, r32 windowParam, r32 spr
 
   result->stereoPosition = getRandomStereoPosition(spread);
 
-  DLINKED_LIST_APPEND(grainManager->grainPlayList, result);
+  result->isFinished = 0;
+
+  //DLINKED_LIST_APPEND(grainManager->grainPlayList, result);
+  DLL_PUSH_BACK(grainManager->firstPlayingGrain, grainManager->lastPlayingGrain, result);
 
   grainManager->samplesProcessedSinceLastSeed = 0;
   ++grainManager->grainCount;
@@ -115,11 +122,12 @@ makeNewGrain(GrainManager* grainManager, u32 grainSize, r32 windowParam, r32 spr
 static void
 destroyGrain(GrainManager* grainManager, Grain* grain)
 {
-  --grainManager->grainCount;
-
-  DLINKED_LIST_REMOVE(grainManager->grainPlayList, grain);
+  ASSERT(grain->isFinished);
+  // DLINKED_LIST_REMOVE(grainManager->grainPlayList, grain);
+  DLL_REMOVE(grainManager->firstPlayingGrain, grainManager->lastPlayingGrain, grain);
   STACK_PUSH(grainManager->grainFreeList, grain);
   grain->prev = 0;
+  --grainManager->grainCount;
 }
 
 inline r32
@@ -194,22 +202,105 @@ synthesize(r32* destBufferLInit, r32* destBufferRInit,
   newView->bufferReadIndex = buffer->readIndex;
   newView->bufferWriteIndex = buffer->writeIndex;
 
-  for(Grain *grain = grainManager->grainPlayList->next;
-      grain && grain != grainManager->grainPlayList;
-      grain = grain->next)
+  // for(Grain *grain = grainManager->grainPlayList->next;
+  //     grain && grain != grainManager->grainPlayList;
+  //     grain = grain->next)
+  for(Grain *grain = grainManager->firstPlayingGrain; grain; grain = grain->next)
     {      
       GrainViewEntry *grainView = newView->grainViews + newView->grainCount++;
-      usz ptrDiff = (usz)grain->start[0] - (usz)buffer->samples[0];
-      u32 readIndex = safeTruncateU64(ptrDiff)/sizeof(*grain->start[0]);
-      grainView->endIndex = (readIndex + grain->samplesToPlay) % buffer->capacity;
-      grainView->startIndex = ((grainView->endIndex >= grain->length) ?
-			       (grainView->endIndex - grain->length) :
-			       (buffer->capacity + grainView->endIndex - grain->length));      
+      // usz ptrDiff = (usz)grain->start[0] - (usz)buffer->samples[0];
+      // u32 readIndex = safeTruncateU64(ptrDiff)/sizeof(*grain->start[0]);
+      // grainView->endIndex = (readIndex + grain->samplesToPlay) % buffer->capacity;
+      // grainView->startIndex = ((grainView->endIndex >= grain->length) ?
+      // 			       (grainView->endIndex - grain->length) :
+      // 			       (buffer->capacity + grainView->endIndex - grain->length));
+      grainView->startIndex = grain->readIndex;
+      grainView->endIndex = (grain->readIndex + grain->samplesToPlay) % buffer->capacity;
     }
 
-  // NOTE: process grains
+  // NOTE: process grains  
+#if 1
+
+  // NOTE: create new grains
   u32 startReadIndex = buffer->readIndex;
+  for(u32 sampleIndex = 0; sampleIndex < samplesToWrite; ++sampleIndex)
+  {
+    r32 windowParam = windowParamVals[sampleIndex];
+    u32 grainSize = (u32)sizeParamVals[sampleIndex];
+    r32 density = densityParamVals[sampleIndex];
+    r32 spread = spreadParamVals[sampleIndex];
+
+    r32 iot = (r32)grainSize/density;
+    if(grainManager->samplesProcessedSinceLastSeed >= iot)
+    {
+      makeNewGrain(grainManager, grainSize, windowParam, spread);
+    }
     
+    ++grainManager->samplesProcessedSinceLastSeed;
+
+    r32 newReadPosition = (r32)startReadIndex + readPositionIncrement*(r32)(sampleIndex + 1);
+    buffer->readIndex = (u32)newReadPosition;
+    buffer->readIndex %= buffer->capacity;
+  }
+
+  // NOTE: process playing grains 
+  for(Grain *grain = grainManager->firstPlayingGrain; grain; grain = grain->next)
+  {
+    ASSERT(!grain->isFinished);
+    for(u32 sampleIndex = 0; sampleIndex < samplesToWrite; ++sampleIndex)
+    {
+      // r32 windowParam = windowParamVals[sampleIndex];
+      // u32 grainSize = (u32)sizeParamVals[sampleIndex];
+      r32 density = densityParamVals[sampleIndex];
+      // r32 spread = spreadParamVals[sampleIndex];
+
+      // r32 iot = (r32)grainSize/density;
+      r32 volume = MAX(1.f/density, 1.f); // TODO: how to adapt volume to prevent clipping?
+
+      if(grain->samplesToPlay)
+      {	       
+	r32 grainSampleL = buffer->samples[0][grain->readIndex];
+	r32 grainSampleR = buffer->samples[1][grain->readIndex];
+
+	u32 samplesPlayed = grain->length - grain->samplesToPlay;
+	r32 samplesPlayedFrac = (r32)samplesPlayed*grain->lengthInv;
+	r32 windowVal = getWindowVal(grainManager, samplesPlayedFrac, grain->windowParam);
+	      
+	r32 panL = 1.0f - MAX(0.0f, grain->stereoPosition);
+	r32 panR = 1.0f + MIN(0.0f, grain->stereoPosition);
+          
+	r32 outSampleL = windowVal * panL * grainSampleL;
+	r32 outSampleR = windowVal * panR * grainSampleR;
+
+	destBufferLInit[sampleIndex] += outSampleL;
+	destBufferRInit[sampleIndex] += outSampleR;
+
+	++grain->readIndex;
+	grain->readIndex %= buffer->capacity;
+	--grain->samplesToPlay;
+      }
+      else
+      {
+	grain->isFinished = 1;
+	break;
+      }
+    }
+  }
+
+  // NOTE: remove finished grains from playlist
+  for(Grain *grain = grainManager->firstPlayingGrain; grain;)
+  {
+    Grain *next = grain->next;
+    if(grain->isFinished)
+    {
+      destroyGrain(grainManager, grain);
+    }
+    grain = next;
+  }
+
+#else
+  u32 startReadIndex = buffer->readIndex;
+  
   r32* destBufferL = destBufferLInit;
   r32* destBufferR = destBufferRInit;  
   for (u32 sampleIndex = 0; sampleIndex < samplesToWrite; ++sampleIndex)
@@ -306,6 +397,7 @@ synthesize(r32* destBufferLInit, r32* destBufferRInit,
       // *destBufferL++ = clampToRange(mixedSampleL, -1.f, 1.f);
       // *destBufferR++ = clampToRange(mixedSampleR, -1.f, 1.f);
     }
+#endif
 
   grainStateView->viewWriteIndex = viewWriteIndex;
   u32 newEntriesQueued = (entriesQueued + 1) % ARRAY_COUNT(grainStateView->views);

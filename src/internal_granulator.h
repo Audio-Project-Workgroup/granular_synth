@@ -5,7 +5,8 @@ struct Grain
   Grain* next;
   Grain* prev;
 
-  r32* start[2];
+  //r32* start[2];
+  u32 readIndex;
   r32 windowParam;
   
   s32 samplesToPlay;
@@ -13,29 +14,21 @@ struct Grain
   r32 lengthInv;
   //bool onFreeList;
   r32 stereoPosition;
+
+  b32 isFinished;
 };
-
-/* struct GrainBuffer */
-/* { */
-/*   r32 *samples[2]; */
-/*   u32 capacity; */
-
-/*   r32 writePosition; */
-/*   r32 readPosition; */
-
-/*   r32 writeSpeed; */
-/*   r32 readSpeed; */
-/* } */
 
 struct GrainManager
 {
   Arena* grainAllocator;
 
   u32 grainCount;
-  Grain* grainPlayList;
+  /* Grain* grainPlayList; */
+  Grain *firstPlayingGrain;
+  Grain *lastPlayingGrain;
+
   Grain* grainFreeList;
   
-  //GrainBuffer *grainBuffer;
   AudioRingBuffer *grainBuffer;  
   u32 samplesProcessedSinceLastSeed;
   
