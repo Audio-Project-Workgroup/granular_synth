@@ -5,12 +5,13 @@
 [![Version](https://img.shields.io/badge/version-0.1.0-blue)](https://github.com/Audio-Project-Workgroup/granular_synth)
 [![License](https://img.shields.io/badge/license-MIT-green)](https://github.com/Audio-Project-Workgroup/granular_synth/tree/readme?tab=License-1-ov-file)
 [![Year](https://img.shields.io/badge/year-2025-brightgreen)](https://github.com/Audio-Project-Workgroup/granular_synth)
-<!-- temporarily hide until we develop the ci pipeline
-![Build Status](https://img.shields.io/github/workflow/status/Audio-Project-Workgroup/granular_synth/CI)
--->
-![Linux](https://github.com/Audio-Project-Workgroup/granular_synth/workflows/Linux/badge.svg)
-![MacOs](https://github.com/Audio-Project-Workgroup/granular_synth/workflows/macOS/badge.svg)
-![Windows](https://github.com/Audio-Project-Workgroup/granular_synth/workflows/Windows/badge.svg)
+
+| Target/Platform | Linux | MacOS | Windows |
+|:------:|:------:|:------:|:--------:|
+|**Plugin**| ![Build](https://github.com/Audio-Project-Workgroup/granular_synth/workflows/Linux-plugin/badge.svg) | ![Build](https://github.com/Audio-Project-Workgroup/granular_synth/workflows/macOS-plugin/badge.svg) | ![Build](https://github.com/Audio-Project-Workgroup/granular_synth/workflows/Windows-plugin/badge.svg) |
+|**App**| ![Build](https://github.com/Audio-Project-Workgroup/granular_synth/workflows/Linux-exe/badge.svg) | ![Build](https://github.com/Audio-Project-Workgroup/granular_synth/workflows/macOS-exe/badge.svg) | ![Build](https://github.com/Audio-Project-Workgroup/granular_synth/workflows/Windows-exe/badge.svg) |
+|**VST**| ![Build](https://github.com/Audio-Project-Workgroup/granular_synth/workflows/Linux-vst/badge.svg) | ![Build](https://github.com/Audio-Project-Workgroup/granular_synth/workflows/macOS-vst/badge.svg) | ![Build](https://github.com/Audio-Project-Workgroup/granular_synth/workflows/Windows-vst/badge.svg) |
+|**WASM**| ![Build](https://github.com/Audio-Project-Workgroup/granular_synth/workflows/Linux-wasm/badge.svg) | - | - |
 
 Granade is a real-time granular synthesizer, available as a vst3 plugin and as a standalone application for mac, windows, and linux. Granade records audio input into a buffer and deconstructs the sound into multiple overlapping delayed, enveloped, and panned segments called grains, creating complex textures and new sonic landscapes. Several interactive parameters such as grain size, density, spread, and windowing, are provided for manipulating grain playback in real time. 
 
@@ -22,6 +23,7 @@ Granade is a real-time granular synthesizer, available as a vst3 plugin and as a
 	- [Building from Source](#building-from-source)
 		- [Requirements](#install-requirements)
 		- [Initialize local repo](#Clone-the-repository-and-initialize-submodules)
+		- [Configuration options](#configuration-options)
 		- [Platform-specific-setup](#Platform-specific-setup)
 		- [Verify build](#Verify-your-build)
 - [Documentation](#documentation)
@@ -70,15 +72,62 @@ For building from source, you'll need:
 * clang (mac and linux)
 <!--* pkg-config (mac and linux)-->
 
-linux users will also need the development versions (ie with headers) of all packages JUCE requires for building VSTs (eg gtk, asound, ...).
+Linux users will also need the development versions (ie with headers) of all packages JUCE requires for building VSTs (eg gtk, asound, ...).
 
 #### Clone the repository and initialize submodules: 
 ``` bash
 git clone --recurse-submodules https://github.com/Audio-Project-Workgroup/granular_synth	
 ```
 This places the `https://github.com/juce-framework/JUCE` repository within `src/JUCE` directory.
+
+
+#### Configuration options
+
+To build `Granade` from source, the following configuration options are available:
+
+
+**Configuration Options**
+
+| Value | Description |
+|--------|-------------|
+| `debug` | Compiles with debug info and enables asserts. |
+| `logging` | Enables the logging system. |
+| `release` | Assembles a distributable application bundle. |
+
+
+**Target Options**
+
+| Value | Description |
+|--------|-------------|
+| `plugin` | Compiles the plugin to a dynamic library. |
+| `exe` | Compiles the host executable. |
+| `vst` | Compiles the VST target. |
+| `wasm` | Compiles the WebAssembly target. |
+| `all` | Compiles all targets. *(Default)* |
+
+Display available commands and usage information using the `help` option.
+
+You can configure builds using key–value pairs passed as command-line arguments:
+
+```bash
+./build.sh <key>:<value1>+<value2>+...
+```
+
+*The following example enables **debug mode** and **logging** and builds the **plugin** and **WebAssembly** targets.*
+
+```bash
+./build.sh config:debug+logging target:plugin+wasm
+```
+
+**Defaults**
+
+- If you specify a `target:` key, all other target flags are reset to `0`.
+- If you specify a `config:` key, all other configuration flags are reset to `0`.
+
+> Note: Unknown arguments will print a warning but won’t stop the build.
+
 #### Platform-specific setup:
-	
+
 ##### Windows 
 
 1. **Set up GLFW:**
@@ -94,16 +143,16 @@ This places the `https://github.com/juce-framework/JUCE` repository within `src/
 3. **Build the native host application and the dynamic library plugin:**
 	```batch
 	cd src
-	build
+	build target:exe
 	```
 	These will be located in a new directory called `build` (with names `Granade.exe` and `plugin.dll`)
 
 4. **Build the VST3 plugin with JUCE:**
 	```batch
 	cd src
-	build_juce
+	build target:vst
 	```
-	you will have to put the resulting vst3 bundle (located in `granular_synth\build\build_JUCE\Granade_artefacts\Debug\VST3`) somewhere where your DAW/plugin host can find it (@TODO: get JUCE to do the installation automatically)
+	you will have to put the resulting vst3 bundle (located in `granular_synth\build\build_JUCE\Granade_artefacts\Debug\VST3`) somewhere where your DAW/plugin host can find it.
 
 <!--
 Uncomment in the future in case that onnx is supported.
@@ -136,20 +185,19 @@ NOTE:
 
 3. **Build the native host application and the dynamic library plugin**
 
-```bash
-cd src
-./build.sh
-``` 
-The compiled native host application and the dynamic library plugin will be located in a new directory called `build`
+	```bash
+	cd src
+	./build.sh target:exe
+	``` 
+	The compiled native host application and the dynamic library plugin will be located in a new directory called `build`
 
 4. **Build the VST3 plugin with JUCE:**
 
-```bash
-cd src
-./build_juce.sh
-``` 
-The `Granade.vst3` file will be created into a nested directory within the build directory (i.e. within `granular_synth\build\build_JUCE\Granade_artefacts\Debug\VST3`). 
-
+	```bash
+	cd src
+	./build.sh target:vst
+	``` 
+	The `Granade.vst3` file will be created into a nested directory within the build directory (i.e. within `granular_synth\build\build_JUCE\Granade_artefacts\Debug\VST3`). 
 
 #### Verify your build
 
@@ -165,7 +213,7 @@ To test the VST3 plugin, make sure it is visible by your DAW by either moving it
 
 ## Documentation
 
-Some files include comments explaining implementation details. Documentation coverage is currently limited but being expanded. For more technical information, visit [How Granade Works](data\docs\HOW_GRANADE_WORKS.md).
+Some files include comments explaining implementation details. Documentation coverage is currently limited but being expanded. For more technical information, visit [How Granade Works](data/docs/HOW_GRANADE_WORKS.md).
 
 ## Quick Start Guide
 
@@ -270,6 +318,7 @@ REM lib -OUT:miniaudio.lib miniaudio_impl.obj
 This is a list of bugs and issues that require fixing:
 
 - [ ] vst3 automatic installation into default VST3 directory
+	- [ ] get JUCE to do the installation automatically
 - [ ] make parameters visible to fl studio last tweaked automation menu
 	- [ ] per-grain level
 	- [ ] modulation
@@ -279,11 +328,11 @@ This is a list of bugs and issues that require fixing:
 
 This is a list of existing features that require curation and improvement:
 
-- [ ] automatically detect if we need to build a miniaudio library, discarding the need of commenting out compilation instructions
-- [ ] condense builds into a single script, with optional arguments
+- [x] automatically detect if we need to build a miniaudio library, discarding the need of commenting out compilation instructions
+- [x] condense builds into a single script, with optional arguments
 - Improve UI:
 	- [ ] improve font rendering
-	- [ ] tooltips when hovering (eg show numeric parameter value)
+	- [x] tooltips when hovering (eg show numeric parameter value)
 	- [ ] improve grain buffer state display
 	- [ ] support modifying parameters with mouse wheel scrolling
 - [ ] full state (de)serialization (not just parameters, also grain buffer)
@@ -295,7 +344,7 @@ This is a list of existing features that require curation and improvement:
 - Enhance development practices:
 	- [ ] static analysis
 	- [ ] hook a fuzzer up to the input for resilience testing
-	- [ ] remove plugin dependence on crt for maximum portability
+	- [x] remove plugin dependence on crt for maximum portability
 - Optimize codebase:
 	- [ ] profiling
 	- [ ] simd everywhere

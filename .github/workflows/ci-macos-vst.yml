@@ -1,5 +1,5 @@
-name: macOS
-run-name: "🚀 MacOs Build | Commit: ${{ github.sha }} 🛠️"
+name: macOS-vst
+run-name: "🚀 MacOs Build VST | Commit: ${{ github.sha }} 🛠️"
 on:
   push:
     branches:
@@ -26,14 +26,8 @@ jobs:
           echo "LIBRARY_PATH=/opt/homebrew/lib:$LIBRARY_PATH" >> $GITHUB_ENV
           echo "PKG_CONFIG_PATH=/opt/homebrew/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
           
-      - name: Build standalone
+      - name: Build vst plugin
         run: |
           cd src
           chmod +x build.sh
-          ./build.sh
-          
-      - name: Build VST3 plugin
-        run: |
-          cd src
-          chmod +x build_juce.sh
-          ./build_juce.sh
+          ./build.sh target:vst
