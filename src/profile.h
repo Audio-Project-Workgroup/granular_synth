@@ -17,12 +17,37 @@ getCpuCounter(void)
   return(__rdtsc());
 }
 
+static u64
+getCpuCounterFreq(void)
+{
+  u64 result = 0;
+  return(result); // TODO: implement
+}
+
 #elif ARCH_ARM || ARCH_ARM64
 
 static u64
 getCpuCounter(void)
 {
-  return(0); // TODO: implement
+  u64 result = 0;
+#if COMPILER_CLANG || COMPILER_GCC
+  __asm__ __volatile__ ("mrs %0, cntvct_el0" : "=r"(result));
+#elif COMPILER_MSVC
+  result = _ReadStatusReg(ARM64_CNTVCT_EL0);
+#endif
+  return(result);
+}
+
+static u64
+getCpuCounterFreq(void)
+{
+  u64 result = 0;
+#if COMPILER_CLANG || COMPILER_GCC
+  __asm__ __volatile__ ("mrs %0, cntfrq_el0" : "=r"(result));
+#elif COMPILER_MSVC
+  result = _ReadStatusReg(ARM64_CNTFRQ_EL0);
+#endif
+  return(result);
 }
 
 #elif ARCH_WASM32 || ARCH_WASM64
@@ -58,6 +83,7 @@ struct Profiler
   ProfileInfo profileInfos[4096];
   u64 startCycles;
   u64 endCycles;
+  u64 counterFreq;
 };
 static Profiler globalProfiler;
 static u32 globalProfilerCurrentParentIdx;
@@ -107,6 +133,7 @@ static inline void
 profileBegin(void)
 {
   globalProfiler.startCycles = getCpuCounter();
+  globalProfiler.counterFreq = getCpuCounterFreq();
 }
 
 static inline String8List
@@ -116,6 +143,12 @@ profileEnd(Arena *arena)
   u64 totalTscElapsed = globalProfiler.endCycles - globalProfiler.startCycles;
 
   String8List result = {};
+
+  if(globalProfiler.counterFreq)
+    {
+      stringListPushFormat(arena, &result, "counter frequency: %llu", globalProfiler.counterFreq);
+    }
+  
   for(u32 profileInfoIdx = 0;
       profileInfoIdx < ARRAY_COUNT(globalProfiler.profileInfos);
       ++profileInfoIdx)
