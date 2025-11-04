@@ -58,6 +58,12 @@ getCpuCounter(void)
   return(0); // TODO: implement
 }
 
+static u64
+getCpuCounterFreq(void)
+{
+  return(0); // TODO: implement
+}
+
 #else
 
 # error profiling not supported for this architecture

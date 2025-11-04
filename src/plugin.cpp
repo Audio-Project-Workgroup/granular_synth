@@ -1751,7 +1751,9 @@ gsAudioProcess(PluginMemory *memory, PluginAudioBuffer *audioBuffer)
 	  bool soundIsPlaying = pluginReadBooleanParameter(&pluginState->soundIsPlaying);
 	  if(soundIsPlaying)
 	    {
-	      //loadedSound->samplesPlayed += scaledFramesToRead;
+#if FINGERTIPS
+	      loadedSound->samplesPlayed += scaledFramesToRead;
+#endif
 	    }
 
 	  writeSamplesToAudioRingBuffer(gbuff, inputMixBuffers[0], inputMixBuffers[1], framesToRead);
@@ -1793,24 +1795,21 @@ gsAudioProcess(PluginMemory *memory, PluginAudioBuffer *audioBuffer)
 	    }     
 
 	  u32 targetOffset = (u32)offsetParamVals[0];
-	  r32 *grainMixBuffersArray = arenaPushArray(scratch.arena, 2 * framesToWrite, r32,
-						     arenaFlagsZeroNoAlign());
-	  r32 *grainMixBuffers[2] = {};
-	  grainMixBuffers[0] = grainMixBuffersArray + (0 * framesToWrite);
-	  grainMixBuffers[1] = grainMixBuffersArray + (1 * framesToWrite);
-	  synthesize(grainMixBuffers[0], grainMixBuffers[1],
-		     gManager, &pluginState->grainStateView,
-		     densityParamVals, sizeParamVals, windowParamVals, spreadParamVals,
-		     targetOffset,
-		     framesToWrite);
+	  AudioBuffer grainMixBuffers =
+	    synthesize(scratch.arena, gManager, &pluginState->grainStateView,
+		       densityParamVals, sizeParamVals, windowParamVals, spreadParamVals,
+		       targetOffset,
+		       framesToWrite);
 	  logFormatString("grainMixBuffers = %p, %p",
-			  grainMixBuffers[0], grainMixBuffers[1]);
-	  // NOTE: DEBUG
+			  grainMixBuffers.samples[0], grainMixBuffers.samples[1]);
+	  
+#if BUILD_DEBUG	  
 	  usz grainMixBuffersIntL = INT_FROM_PTR(grainMixBuffers[0]);
 	  usz grainMixBuffersIntR = INT_FROM_PTR(grainMixBuffers[1]);
 #if OS_WASM
 	  DEBUG_POINTER_INITIALIZE(audio__grainMixBuffersL, grainMixBuffers[0]);
 	  DEBUG_POINTER_INITIALIZE(audio__grainMixBuffersR, grainMixBuffers[1]);
+#endif
 #endif
 
 	  // NOTE: audio output
@@ -1862,6 +1861,7 @@ gsAudioProcess(PluginMemory *memory, PluginAudioBuffer *audioBuffer)
 		  r32 nextGrainVal = grainMixBuffers[channelIndex][grainReadIndex + 1];
 		  r32 grainVal = lerp(firstGrainVal, nextGrainVal, grainReadFrac);
 #else
+#if 0
 		  if(grainMixBuffersIntL != INT_FROM_PTR(grainMixBuffers[0]) ||
 		     grainMixBuffersIntR != INT_FROM_PTR(grainMixBuffers[1]))
 		    {
@@ -1870,10 +1870,11 @@ gsAudioProcess(PluginMemory *memory, PluginAudioBuffer *audioBuffer)
 				      grainMixBuffers[0], grainMixBuffers[1],
 				      frameIndex, channelIndex);
 		    }
+#endif
 
-		  r32 grainVal = grainMixBuffers[channelIndex][frameIndex];
-		  r32 leftGrainVal = grainMixBuffers[0][frameIndex];
-		  r32 rightGrainVal = grainMixBuffers[1][frameIndex];
+		  r32 grainVal = grainMixBuffers.samples[channelIndex][frameIndex];
+		  r32 leftGrainVal = grainMixBuffers.samples[0][frameIndex];
+		  r32 rightGrainVal = grainMixBuffers.samples[1][frameIndex];
 		  r32 stereoWidth = spreadParamVals[frameIndex];
 		  if (channelIndex < 2) { // Make sure we only process left and right channels
 		    //r32 widthVal = stereoWidth * 0.5f;

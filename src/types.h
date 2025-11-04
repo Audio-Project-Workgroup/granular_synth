@@ -52,6 +52,12 @@ struct Buffer
   u8 *contents;
 };
 
+struct AudioBuffer
+{
+  usz sampleCount;
+  r32 *samples[2];
+};
+
 struct String8
 {
   u8 *str;
@@ -257,10 +263,5 @@ struct LoadedFont
 
   r32 verticalAdvance; 
 
-  //r32 horizontalAdvance;
   PluginAsset *glyphs;
-
-  /* u32 glyphCount; */
-  /* LoadedBitmap *glyphs; */
-  /* r32 *horizontalAdvance;   */
 };
