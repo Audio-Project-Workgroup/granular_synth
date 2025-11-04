@@ -610,7 +610,8 @@ uiMakeBox(UILayout *layout, String8 name, Rect2 rect,
 
 inline UIComm
 uiMakeButton(UILayout *layout, String8 name, v2 offset, v2 dim, r32 aspectRatio,
-	     PluginBooleanParameter *param, PluginAsset *texture = 0, v4 color = V4(1, 1, 1, 1))
+	     PluginBooleanParameter *param,
+	     PluginAsset *texture = PLUGIN_ASSET(null), v4 color = V4(1, 1, 1, 1))
 {
   u32 flags = UIElementFlag_clickable | UIElementFlag_drawBackground | UIElementFlag_drawBorder;
   UIElement *button = uiMakeElement(layout, name, flags, color, texture);

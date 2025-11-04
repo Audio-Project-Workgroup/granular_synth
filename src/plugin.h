@@ -155,9 +155,11 @@ loadWav(Arena *arena, String8 path)
 
   RiffHeader *riffHeader = bufferReadStruct(&file, RiffHeader);
   ASSERT(riffHeader->chunkID.id == RIFF("RIFF"));
+  UNUSED(riffHeader);
 
   WaveHeader *waveHeader = bufferReadStruct(&file, WaveHeader);
   ASSERT(waveHeader->waveID.id == RIFF("WAVE"));
+  UNUSED(waveHeader);
 
   WaveFormatChunk *waveFmt = bufferReadStruct(&file, WaveFormatChunk);
   ASSERT(waveFmt->header.chunkID.id == RIFF("fmt "));
@@ -175,6 +177,7 @@ loadWav(Arena *arena, String8 path)
   u32 waveDataSize = waveData->chunkSize;
 
   ASSERT(sampleRate == INTERNAL_SAMPLE_RATE);
+  UNUSED(sampleRate);
 
   u32 sampleCount = waveDataSize / (channelCount * bytesPerSample);
   u8 *sampleData = bufferReadArray(&file, waveDataSize, u8);

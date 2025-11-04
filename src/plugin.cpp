@@ -592,13 +592,14 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 		  //v2 knobTextOffset = hadamard(V2(0, 0.04f), panelDim);
 		  r32 knobDragLength = 0.35f*panelDim.y;
 
-#if 0
-		  // NOTE: play (for now)
+#if FINGERTIPS
+		  // NOTE: play
 		  {
 		    v2 playOffsetPOP = V2(0.05f, 0.6f);
 		    v2 playSizePOP = knobDimPOP*V2(1, 1);
-		    UIComm play = uiMakeButton(panelLayout, STR8_LIT("play"), playOffsetPOP, playSizePOP, 1.f,
-					       &pluginState->soundIsPlaying, 0, V4(0, 0, 1, 1));
+		    UIComm play =
+		      uiMakeButton(panelLayout, STR8_LIT("play"), playOffsetPOP, playSizePOP, 1.f,
+				   &pluginState->soundIsPlaying, PLUGIN_ASSET(null), V4(0, 0, 1, 1));
 		    
 		    if(play.flags & UICommFlag_pressed)
 		      {
@@ -1666,7 +1667,9 @@ gsAudioProcess(PluginMemory *memory, PluginAudioBuffer *audioBuffer)
 	  UNUSED(scaledFramesToRead);
       
 	  AudioRingBuffer *gbuff = &pluginState->grainBuffer;
-	  //PlayingSound *loadedSound = &pluginState->loadedSound;
+#if FINGERTIPS
+	  PlayingSound *loadedSound = &pluginState->loadedSound;
+#endif
 	  logFormatString("samples to read: %lu", framesToRead);
 
 	  r32 *inputMixBuffersArray = arenaPushArray(scratch.arena, 2*framesToRead, r32,
@@ -1680,31 +1683,38 @@ gsAudioProcess(PluginMemory *memory, PluginAudioBuffer *audioBuffer)
 	  genericInputFrames[1] = audioBuffer->inputBuffer[1];
 
 	  for(u32 frameIndex = 0; frameIndex < framesToRead; ++frameIndex)
-	    {		
-	      bool soundIsPlaying = pluginReadBooleanParameter(&pluginState->soundIsPlaying);       
-	      // r32 currentTime = (r32)loadedSound->samplesPlayed + inputBufferReadSpeed*(r32)frameIndex;
-	      // u32 soundReadIndex = (u32)currentTime;
-	      // r32 soundReadFrac = currentTime - (r32)soundReadIndex;		
+	    {
+#if FINGERTIPS
+	      bool soundIsPlaying = pluginReadBooleanParameter(&pluginState->soundIsPlaying);
+	      r32 currentTime = (r32)loadedSound->samplesPlayed + inputBufferReadSpeed*(r32)frameIndex;
+	      u32 soundReadIndex = (u32)currentTime;
+	      r32 soundReadFrac = currentTime - (r32)soundReadIndex;
+#endif
 
 	      for(u32 channelIndex = 0; channelIndex < audioBuffer->inputChannels; ++channelIndex)
 		{
-		  r32 mixedVal = 0.f;		   
+		  r32 mixedVal = 0.f;
+#if FINGERTIPS
 		  if(soundIsPlaying)		       
-		    {			
-		      // if(currentTime < loadedSound->sound.sampleCount)
-		      // 	{
-		      // 	  r32 loadedSoundSample0 = loadedSound->sound.samples[channelIndex][soundReadIndex];
-		      // 	  r32 loadedSoundSample1 = loadedSound->sound.samples[channelIndex][soundReadIndex + 1];
-		      // 	  r32 loadedSoundSample = lerp(loadedSoundSample0, loadedSoundSample1, soundReadFrac);
+		    {
+		      if(currentTime < loadedSound->sound.sampleCount)
+			{
+			  r32 loadedSoundSample0 =
+			    loadedSound->sound.samples[channelIndex][soundReadIndex];
+			  r32 loadedSoundSample1 =
+			    loadedSound->sound.samples[channelIndex][soundReadIndex + 1];
+			  r32 loadedSoundSample =
+			    lerp(loadedSoundSample0, loadedSoundSample1, soundReadFrac);
 
-		      // 	  mixedVal += 0.5f*loadedSoundSample;
-		      // 	}
-		      // else
-		      // 	{		      
-		      // 	  pluginSetBooleanParameter(&pluginState->soundIsPlaying, false);
-		      // 	  loadedSound->samplesPlayed = 0;// + pluginState->start_pos);
-		      // 	}		  
+			  mixedVal += 0.5f*loadedSoundSample;
+			}
+		      else
+			{		      
+			  pluginSetBooleanParameter(&pluginState->soundIsPlaying, false);
+			  loadedSound->samplesPlayed = 0;// + pluginState->start_pos);
+			}
 		    }
+#endif
 
 		  switch(audioBuffer->inputFormat)
 		    {

@@ -15,6 +15,7 @@ struct Grain
   //bool onFreeList;
   r32 stereoPosition;
 
+  u32 startSampleIndex; // NOTE: the sample index in the processing loop at which we start processing this grain
   b32 isFinished;
 };
 

@@ -84,7 +84,7 @@ initializeGrainManager(PluginState *pluginState)
 }
 
 static void
-makeNewGrain(GrainManager* grainManager, u32 grainSize, r32 windowParam, r32 spread)
+makeNewGrain(GrainManager* grainManager, u32 grainSize, r32 windowParam, r32 spread, u32 sampleIndex)
 {
   Grain* result = grainManager->grainFreeList;
   if(result)
@@ -110,6 +110,7 @@ makeNewGrain(GrainManager* grainManager, u32 grainSize, r32 windowParam, r32 spr
 
   result->stereoPosition = getRandomStereoPosition(spread);
 
+  result->startSampleIndex = sampleIndex;
   result->isFinished = 0;
 
   //DLINKED_LIST_APPEND(grainManager->grainPlayList, result);
@@ -117,6 +118,8 @@ makeNewGrain(GrainManager* grainManager, u32 grainSize, r32 windowParam, r32 spr
 
   grainManager->samplesProcessedSinceLastSeed = 0;
   ++grainManager->grainCount;
+  
+  logFormatString("created a grain. grain count is now %u", grainManager->grainCount);
 }
 
 static void
@@ -128,6 +131,8 @@ destroyGrain(GrainManager* grainManager, Grain* grain)
   STACK_PUSH(grainManager->grainFreeList, grain);
   grain->prev = 0;
   --grainManager->grainCount;
+  
+  logFormatString("destroyed a grain. grain count is now %u", grainManager->grainCount);
 }
 
 inline r32
@@ -213,9 +218,11 @@ synthesize(r32* destBufferLInit, r32* destBufferRInit,
       // grainView->endIndex = (readIndex + grain->samplesToPlay) % buffer->capacity;
       // grainView->startIndex = ((grainView->endIndex >= grain->length) ?
       // 			       (grainView->endIndex - grain->length) :
-      // 			       (buffer->capacity + grainView->endIndex - grain->length));
-      grainView->startIndex = grain->readIndex;
+      // 			       (buffer->capacity + grainView->endIndex - grain->length));     
       grainView->endIndex = (grain->readIndex + grain->samplesToPlay) % buffer->capacity;
+      grainView->startIndex = ((grainView->endIndex >= grain->length) ?
+			       (grainView->endIndex - grain->length) :
+			       (buffer->capacity + grainView->endIndex - grain->length));
     }
 
   // NOTE: process grains  
@@ -233,7 +240,8 @@ synthesize(r32* destBufferLInit, r32* destBufferRInit,
     r32 iot = (r32)grainSize/density;
     if(grainManager->samplesProcessedSinceLastSeed >= iot)
     {
-      makeNewGrain(grainManager, grainSize, windowParam, spread);
+      makeNewGrain(grainManager, grainSize, windowParam, spread, sampleIndex);
+      logFormatString("creating grain at sample %u", sampleIndex);
     }
     
     ++grainManager->samplesProcessedSinceLastSeed;
@@ -247,7 +255,7 @@ synthesize(r32* destBufferLInit, r32* destBufferRInit,
   for(Grain *grain = grainManager->firstPlayingGrain; grain; grain = grain->next)
   {
     ASSERT(!grain->isFinished);
-    for(u32 sampleIndex = 0; sampleIndex < samplesToWrite; ++sampleIndex)
+    for(u32 sampleIndex = grain->startSampleIndex; sampleIndex < samplesToWrite; ++sampleIndex)
     {
       // r32 windowParam = windowParamVals[sampleIndex];
       // u32 grainSize = (u32)sizeParamVals[sampleIndex];
@@ -282,6 +290,7 @@ synthesize(r32* destBufferLInit, r32* destBufferRInit,
       else
       {
 	grain->isFinished = 1;
+	logFormatString("destroying grain at sample %u", sampleIndex);
 	break;
       }
     }
@@ -294,6 +303,10 @@ synthesize(r32* destBufferLInit, r32* destBufferRInit,
     if(grain->isFinished)
     {
       destroyGrain(grainManager, grain);
+    }
+    else
+    {
+      grain->startSampleIndex = 0;
     }
     grain = next;
   }
