@@ -7,6 +7,16 @@ struct AudioRingBuffer
   u32 readIndex; 
 };
 
+static inline AudioRingBuffer
+makeAudioRingBuffer(r32 *samplesL, r32 *samplesR, u32 capacity)
+{
+  AudioRingBuffer result = {};
+  result.samples[0] = samplesL;
+  result.samples[1] = samplesR;
+  result.capacity = capacity;
+  return(result);
+}
+
 inline u32
 getAudioRingBufferOffset(AudioRingBuffer *rb)
 {

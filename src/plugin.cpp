@@ -182,9 +182,7 @@ gsInitializePluginState(PluginMemory *memoryBlock)
       pluginState->pluginHost = memoryBlock->host;
       pluginState->pluginMode = PluginMode_editor;
 
-      // TODO: maybe these initial sizes can be tuned for fewer allocation calls
       pluginState->frameArena = gsArenaAcquire(MEGABYTES(1));
-      //pluginState->framePermanentArena = gsArenaAcquire(0);
       pluginState->audioArena = gsArenaAcquire(MEGABYTES(1));
 
       if(pluginState->pluginHost == PluginHost_executable ||
@@ -194,6 +192,7 @@ gsInitializePluginState(PluginMemory *memoryBlock)
 	    gsGetPathToModule(memoryBlock->pluginHandle, (void *)gsInitializePluginState,
 			      pluginState->permanentArena);
 	}
+      
       // NOTE: parameter initialization
       // pluginState->phasor = 0.f;
       pluginState->freq = 440.f;
@@ -241,35 +240,48 @@ gsInitializePluginState(PluginMemory *memoryBlock)
 	    arenaPushString(pluginState->permanentArena, memoryBlock->inputDeviceNames[i]);
 	}
 
+      // NOTE: phase vocoder buffer initialization
+      {
+	u32 pvBufferSampleCount = 1ULL << 13;
+	r32 *pvSamplesL = arenaPushArray(pluginState->permanentArena, 2 * pvBufferSampleCount, r32);
+	r32 *pvSamplesR = pvSamplesL + pvBufferSampleCount;	
+	pluginState->phaseVocoderInputBuffer =
+	  makeAudioRingBuffer(pvSamplesL, pvSamplesR, pvBufferSampleCount);
+      }
+
       // NOTE: grain buffer initialization
-      u32 grainBufferCount = 1ULL << 16;
-      pluginState->grainBuffer = initializeGrainBuffer(pluginState, grainBufferCount);
-      pluginState->grainManager = initializeGrainManager(pluginState);
-
+      {
+	u32 grainBufferSampleCount = 1ULL << 16;
+	pluginState->grainInputBuffer = initializeGrainBuffer(pluginState, grainBufferSampleCount);
+	pluginState->grainManager = initializeGrainManager(pluginState);
+      }
+      
       // NOTE: grain view initialization
-      GrainStateView *grainStateView = &pluginState->grainStateView;
-      grainStateView->viewWriteIndex = 1;
-      grainStateView->viewBuffer.capacity = grainBufferCount;
-      grainStateView->viewBuffer.samples[0] =
-	arenaPushArray(pluginState->permanentArena, grainStateView->viewBuffer.capacity, r32,
-		       arenaFlagsNoZeroAlign(4*sizeof(r32)));
-      grainStateView->viewBuffer.samples[1] =
-	arenaPushArray(pluginState->permanentArena, grainStateView->viewBuffer.capacity, r32,
-		       arenaFlagsNoZeroAlign(4*sizeof(r32)));
-      grainStateView->viewBuffer.readIndex = pluginState->grainBuffer.readIndex;
-      grainStateView->viewBuffer.writeIndex = pluginState->grainBuffer.writeIndex;
+      {
+	GrainStateView *grainStateView = &pluginState->grainStateView;
+	grainStateView->viewWriteIndex = 1;
+	grainStateView->viewBuffer.capacity = pluginState->grainInputBuffer.capacity;
+	grainStateView->viewBuffer.samples[0] =
+	  arenaPushArray(pluginState->permanentArena, grainStateView->viewBuffer.capacity, r32,
+			 arenaFlagsNoZeroAlign(4*sizeof(r32)));
+	grainStateView->viewBuffer.samples[1] =
+	  arenaPushArray(pluginState->permanentArena, grainStateView->viewBuffer.capacity, r32,
+			 arenaFlagsNoZeroAlign(4*sizeof(r32)));
+	grainStateView->viewBuffer.readIndex = pluginState->grainInputBuffer.readIndex;
+	grainStateView->viewBuffer.writeIndex = pluginState->grainInputBuffer.writeIndex;
 
-      u32 grainViewSampleCapacity = 4096;
-      for(u32 i = 0; i < ARRAY_COUNT(grainStateView->views); ++i)
-	{
-	  GrainBufferViewEntry *view = grainStateView->views + i;
-	  view->sampleCapacity = grainViewSampleCapacity;
-	  view->bufferSamples[0] =
-	    arenaPushArray(pluginState->permanentArena, grainViewSampleCapacity, r32);
-	  view->bufferSamples[1] =
-	    arenaPushArray(pluginState->permanentArena, grainViewSampleCapacity, r32);
-	}
-
+	u32 grainViewSampleCapacity = 4096;
+	for(u32 i = 0; i < ARRAY_COUNT(grainStateView->views); ++i)
+	  {
+	    GrainBufferViewEntry *view = grainStateView->views + i;
+	    view->sampleCapacity = grainViewSampleCapacity;
+	    view->bufferSamples[0] =
+	      arenaPushArray(pluginState->permanentArena, grainViewSampleCapacity, r32);
+	    view->bufferSamples[1] =
+	      arenaPushArray(pluginState->permanentArena, grainViewSampleCapacity, r32);
+	  }
+      }
+      
       // NOTE: file loading, embedded grain caching
       pluginState->soundIsPlaying.value = false;
 #if FINGERTIPS
@@ -1461,7 +1473,7 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 		  v2 lowerRegionMiddle = lowerRegionMin + V2(0, 0.5f*regionDim.y);
 		  v2 upperRegionMiddle = upperRegionMin + V2(0, 0.5f*regionDim.y);
 
-		  u32 grainBufferCapacity = pluginState->grainBuffer.capacity;
+		  u32 grainBufferCapacity = pluginState->grainInputBuffer.capacity;
 		  GrainStateView *grainStateView = &pluginState->grainStateView;
 		  AudioRingBuffer *grainViewBuffer = &grainStateView->viewBuffer;
 		  
@@ -1665,8 +1677,10 @@ gsAudioProcess(PluginMemory *memory, PluginAudioBuffer *audioBuffer)
 				      (r32)INTERNAL_SAMPLE_RATE/(r32)audioBuffer->inputSampleRate : 1.f);
 	  r32 scaledFramesToRead = inputBufferReadSpeed*framesToRead;
 	  UNUSED(scaledFramesToRead);
-      
-	  AudioRingBuffer *gbuff = &pluginState->grainBuffer;
+
+	  AudioRingBuffer *pvbuff = &pluginState->phaseVocoderInputBuffer;
+	  AudioRingBuffer *gbuff = &pluginState->grainInputBuffer;
+
 #if FINGERTIPS
 	  PlayingSound *loadedSound = &pluginState->loadedSound;
 #endif
@@ -1756,7 +1770,20 @@ gsAudioProcess(PluginMemory *memory, PluginAudioBuffer *audioBuffer)
 #endif
 	    }
 
-	  writeSamplesToAudioRingBuffer(gbuff, inputMixBuffers[0], inputMixBuffers[1], framesToRead);
+	  // TODO: phase vocoder pitch-shift & time-strectch
+	  {
+	    #define PV_WINDOW_SAMPLE_COUNT 512
+
+	    writeSamplesToAudioRingBuffer(pvbuff, inputMixBuffers[0], inputMixBuffers[1], framesToRead);
+	  }
+
+	  r32 *pvOutputSamplesL = arenaPushArray(scratch.arena, 2 * framesToRead, r32,
+						 arenaFlagsZeroNoAlign());
+	  r32 *pvOutputSamplesR = pvOutputSamplesL + framesToRead;
+	  readSamplesFromAudioRingBuffer(pvbuff, pvOutputSamplesL, pvOutputSamplesR, framesToRead);
+	  
+	  //writeSamplesToAudioRingBuffer(gbuff, inputMixBuffers[0], inputMixBuffers[1], framesToRead);
+	  writeSamplesToAudioRingBuffer(gbuff, pvOutputSamplesL, pvOutputSamplesR, framesToRead);
 	  //arenaEndTemporaryMemory(&inputMixerMemory);
 
 	  // NOTE: grain playback

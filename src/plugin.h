@@ -364,8 +364,10 @@ struct PluginState
   UIPanel *menuPanel;
   UILayout *mouseTooltipLayout;
 
-  GrainManager grainManager;  
-  AudioRingBuffer grainBuffer;
+  AudioRingBuffer phaseVocoderInputBuffer;
+  AudioRingBuffer grainInputBuffer;
+
+  GrainManager grainManager;
   GrainStateView grainStateView;
 
   volatile u32 initializationLock;

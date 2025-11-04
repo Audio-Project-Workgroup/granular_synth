@@ -58,7 +58,7 @@ static GrainManager
 initializeGrainManager(PluginState *pluginState)
 {
   GrainManager result = {};
-  result.grainBuffer = &pluginState->grainBuffer;
+  result.grainBuffer = &pluginState->grainInputBuffer;
   
   result.windowBuffer[0] = arenaPushArray(pluginState->permanentArena, WINDOW_LENGTH, r32,
 					  arenaFlagsNoZeroAlign(4*sizeof(r32)));
