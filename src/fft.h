@@ -385,6 +385,18 @@ static IFFT_Function *ifftFunctions[] = {
   ifft_dit_radix2_simd,
 };
 
+// NOTE: clang autovectorization on mac is really good, producing better
+//       vectorized machine code than the manually vectorized code here. So we
+//       only use the manually vecotrized routines on targets where we actually
+//       see a performance boost
+#if ARCH_ARM || ARCH_ARM64
+static FFT_Function  *fft  = fft_dit_radix2_scalar;
+static IFFT_Function *ifft = ifft_dit_radix2_scalar;
+#else
+static FFT_Function  *fft  = fft_dit_radix2_simd;
+static IFFT_Function *ifft = ifft_dit_radix2_simd;
+#endif
+
 #if 0
 #define REAL_FFT_FUNCTION(name) void (name)(r32 *destRe, r32 *destIm, r32 *src, u32 length)
 #define REAL_IFFT_FUNCTION(name) void (name)(r32 *dest, r32 *destImTemp, r32 *srcRe, r32 *srcIm, u32 length)

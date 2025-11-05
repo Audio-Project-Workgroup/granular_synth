@@ -654,6 +654,18 @@ gsPow(r32 base, r32 exp)
   return(powf(base, exp));
 }
 
+static r32
+gsAtan(r32 num)
+{
+  return(atanf(num));
+}
+
+static r32
+gsModf(r32 num, r32 mod)
+{
+  return(fmodf(num, mod));
+}
+
 int
 main(int argc, char **argv)
 {
@@ -743,6 +755,8 @@ main(int argc, char **argv)
 	  pluginMemory.platformAPI.gsSin  = gsSin;
 	  pluginMemory.platformAPI.gsCos  = gsCos;
 	  pluginMemory.platformAPI.gsPow  = gsPow;
+	  pluginMemory.platformAPI.gsAtan = gsAtan;
+	  pluginMemory.platformAPI.gsModf = gsModf;
 
 	  pluginMemory.platformAPI.gsAllocateMemory = platformAllocateMemory;
 	  pluginMemory.platformAPI.gsFreeMemory     = platformFreeMemory;

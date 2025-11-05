@@ -8,6 +8,8 @@ static r32 gsSqrt(r32 num);
 static r32 gsSin(r32 num);
 static r32 gsCos(r32 num);
 static r32 gsPow(r32 base, r32 exp);
+static r32 gsAtan(r32 num);
+static r32 gsModf(r32 num, r32 mod);
 #endif
 
 #define GS_PI 3.141592653589793
@@ -16,6 +18,13 @@ static r32 gsPow(r32 base, r32 exp);
 //
 // scalar
 //
+
+static inline r32
+principalPhaseAngle(r32 angle)
+{
+  r32 result = gsModf(GS_PI + angle, GS_TAU) - GS_PI;
+  return(result);
+}
 
 inline r32
 lerp(r32 val1, r32 val2, r32 t)

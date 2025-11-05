@@ -255,6 +255,11 @@ gsInitializePluginState(PluginMemory *memoryBlock)
 	pluginState->grainInputBuffer = initializeGrainBuffer(pluginState, grainBufferSampleCount);
 	pluginState->grainManager = initializeGrainManager(pluginState);
       }
+
+      // NOTE: phaseVocoder initializetion
+      pluginState->phaseVocoder = initializePhaseVocoder(pluginState->permanentArena,
+							 &pluginState->phaseVocoderInputBuffer,
+							 &pluginState->grainInputBuffer);
       
       // NOTE: grain view initialization
       {
@@ -1678,9 +1683,6 @@ gsAudioProcess(PluginMemory *memory, PluginAudioBuffer *audioBuffer)
 	  r32 scaledFramesToRead = inputBufferReadSpeed*framesToRead;
 	  UNUSED(scaledFramesToRead);
 
-	  AudioRingBuffer *pvbuff = &pluginState->phaseVocoderInputBuffer;
-	  AudioRingBuffer *gbuff = &pluginState->grainInputBuffer;
-
 #if FINGERTIPS
 	  PlayingSound *loadedSound = &pluginState->loadedSound;
 #endif
@@ -1768,23 +1770,22 @@ gsAudioProcess(PluginMemory *memory, PluginAudioBuffer *audioBuffer)
 #if FINGERTIPS
 	      loadedSound->samplesPlayed += scaledFramesToRead;
 #endif
-	    }
+	    }	  
 
-	  // TODO: phase vocoder pitch-shift & time-strectch
-	  {
-	    #define PV_WINDOW_SAMPLE_COUNT 512
-
-	    writeSamplesToAudioRingBuffer(pvbuff, inputMixBuffers[0], inputMixBuffers[1], framesToRead);
-	  }
-
-	  r32 *pvOutputSamplesL = arenaPushArray(scratch.arena, 2 * framesToRead, r32,
-						 arenaFlagsZeroNoAlign());
-	  r32 *pvOutputSamplesR = pvOutputSamplesL + framesToRead;
-	  readSamplesFromAudioRingBuffer(pvbuff, pvOutputSamplesL, pvOutputSamplesR, framesToRead);
+	  AudioRingBuffer *pvbuff = &pluginState->phaseVocoderInputBuffer;
+	  AudioRingBuffer *gbuff = &pluginState->grainInputBuffer;
 	  
-	  //writeSamplesToAudioRingBuffer(gbuff, inputMixBuffers[0], inputMixBuffers[1], framesToRead);
-	  writeSamplesToAudioRingBuffer(gbuff, pvOutputSamplesL, pvOutputSamplesR, framesToRead);
-	  //arenaEndTemporaryMemory(&inputMixerMemory);
+	  PhaseVocoder *phaseVocoder = &pluginState->phaseVocoder;
+
+	  // NOTE: allocate twice at many samples as the minimum needed, so we
+	  //       definitely don't overflow (maybe we can call another function
+	  //       to get a better estimate, but idgaf rn)
+	  r32 *pvOutputSamplesL = arenaPushArray(scratch.arena, 4 * framesToRead, r32,
+						 arenaFlagsZeroNoAlign());
+	  r32 *pvOutputSamplesR = pvOutputSamplesL + 2 * framesToRead;
+	  phaseVocoderProcess(phaseVocoder, pvOutputSamplesL, pvOutputSamplesR, framesToRead);
+	  //readSamplesFromAudioRingBuffer(pvbuff, pvOutputSamplesL, pvOutputSamplesR, framesToRead); 
+	  //writeSamplesToAudioRingBuffer(gbuff, pvOutputSamplesL, pvOutputSamplesR, framesToRead);
 
 	  // NOTE: grain playback
 	  GrainManager* gManager = &pluginState->grainManager;

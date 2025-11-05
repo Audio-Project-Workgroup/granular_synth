@@ -97,6 +97,7 @@ logFormatString(char *format, ...)
 #include "plugin_render.h"
 #include "ring_buffer.h"
 #include "internal_granulator.h"
+#include "phase_vocoder.h"
 
 #define RIFF(str) FOURCC(str)
 
@@ -366,6 +367,8 @@ struct PluginState
 
   AudioRingBuffer phaseVocoderInputBuffer;
   AudioRingBuffer grainInputBuffer;
+
+  PhaseVocoder phaseVocoder;
 
   GrainManager grainManager;
   GrainStateView grainStateView;
