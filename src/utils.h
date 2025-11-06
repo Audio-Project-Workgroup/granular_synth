@@ -67,6 +67,11 @@
 #define INT_FROM_PTR(ptr) (usz)((u8*)(ptr))
 #define PTR_FROM_INT(n) (void*)((usz)(n))
 
+#define FLOOR(num) ((int)(num))
+#define CEIL(num) (((num) > 0) ? (CEIL__POS(num)) : (CEIL__NEG(num)))
+#define CEIL__POS(num) (((num) - FLOOR(num) > 0) ? (FLOOR((num) + 1)) : (FLOOR(num)))
+#define CEIL__NEG(num) (FLOOR(num))
+
 #define IS_MULTIPLE_OF_2(num) (((num) & ((num) - 1)) == (num))
 #define ROUND_UP_TO_MULTIPLE_OF_2(num) (((num) + 1) & (~1))
 #define ALIGN_POW_2(num, alignment) (((num) + ((alignment)-1LL)) & (~((alignment)-1LL)))

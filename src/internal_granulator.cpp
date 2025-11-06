@@ -164,20 +164,20 @@ getWindowVal(GrainManager* grainManager, r32 samplesPlayedFrac, r32 windowParam)
 static AudioBuffer
 synthesize(Arena *arena, GrainManager* grainManager, GrainStateView *grainStateView,
 	   r32 *densityParamVals, r32 *sizeParamVals, r32 *windowParamVals, r32 *spreadParamVals,
-	   u32 targetOffset,
+	   s32 offsetDifference,
 	   u32 samplesToWrite)
 {
   TemporaryMemory scratch = arenaGetScratch(&arena, 1);
 
   AudioRingBuffer *buffer = grainManager->grainBuffer;
 
-  u32 currentOffset = getAudioRingBufferOffset(buffer);
-  r32 readPositionIncrement = ((r32)currentOffset - (r32)targetOffset)/(r32)samplesToWrite;
-#if 0
-  logFormatString("currentOffset: %.2f", currentOffset);
-  logFormatString("targetOffset: %.2f", targetOffset);
-  logFormatString("readPositionIncrement: %.2f", readPositionIncrement);
-#endif
+ //  u32 currentOffset = getAudioRingBufferOffset(buffer);
+//   r32 readPositionIncrement = ((r32)currentOffset - (r32)targetOffset)/(r32)samplesToWrite;
+// #if 0
+//   logFormatString("currentOffset: %.2f", currentOffset);
+//   logFormatString("targetOffset: %.2f", targetOffset);
+//   logFormatString("readPositionIncrement: %.2f", readPositionIncrement);
+// #endif
 
   // NOTE: queue a new view and fill out its data
   u32 viewWriteIndex = (grainStateView->viewWriteIndex + 1) % ARRAY_COUNT(grainStateView->views);  
@@ -209,6 +209,8 @@ synthesize(Arena *arena, GrainManager* grainManager, GrainStateView *grainStateV
 
   // NOTE: create new grains
   u32 startReadIndex = buffer->readIndex;
+  u32 endReadIndex = startReadIndex + samplesToWrite + offsetDifference;
+  r32 readPositionIncrement = ((r32)endReadIndex - (r32)startReadIndex)/(r32)samplesToWrite;
   for(u32 sampleIndex = 0; sampleIndex < samplesToWrite; ++sampleIndex)
   {
     r32 windowParam = windowParamVals[sampleIndex];
@@ -230,7 +232,8 @@ synthesize(Arena *arena, GrainManager* grainManager, GrainStateView *grainStateV
     buffer->readIndex %= buffer->capacity;
   }
 
-  // NOTE: process playing grains 
+  // NOTE: process playing grains
+  r32 maxLevel = 0;
   for(Grain *grain = grainManager->firstPlayingGrain; grain; grain = grain->next)
   {
     ASSERT(!grain->isFinished);
@@ -260,6 +263,9 @@ synthesize(Arena *arena, GrainManager* grainManager, GrainStateView *grainStateV
 
 	tempBufferL[sampleIndex] += outSampleL;
 	tempBufferR[sampleIndex] += outSampleR;
+
+	maxLevel = MAX(tempBufferL[sampleIndex], maxLevel);
+	maxLevel = MAX(tempBufferR[sampleIndex], maxLevel);
 
 	++grain->readIndex;
 	grain->readIndex %= buffer->capacity;
@@ -293,11 +299,23 @@ synthesize(Arena *arena, GrainManager* grainManager, GrainStateView *grainStateV
   for(u32 sampleIndex = 0; sampleIndex < samplesToWrite; ++sampleIndex)
   {
     r32 density = densityParamVals[sampleIndex];
-    r32 volume = MAX(1.f/density, 1.f); // TODO: how to adapt volume to prevent clipping?
+    r32 volume = 0.8f * MAX(1.f/density, 1.f); // TODO: how to adapt volume to prevent clipping?
 
 #if 1
-    destBufferLInit[sampleIndex] = clampToRange(volume * tempBufferL[sampleIndex], -1.f, 1.f);
-    destBufferRInit[sampleIndex] = clampToRange(volume * tempBufferR[sampleIndex], -1.f, 1.f);
+    destBufferLInit[sampleIndex] = volume * tempBufferL[sampleIndex];
+    destBufferRInit[sampleIndex] = volume * tempBufferR[sampleIndex];
+
+#if BUILD_DEBUG
+    if(gsAbs(destBufferLInit[sampleIndex]) > 1 ||
+       gsAbs(destBufferRInit[sampleIndex]) > 1)
+    {
+      logFormatString("CLIPPING AT SAMPLE %u: (%.3f, %.3f)",
+		      sampleIndex,
+		      destBufferLInit[sampleIndex],
+		      destBufferRInit[sampleIndex]);
+    }
+#endif
+
 #else
     u32 index = (startReadIndex + sampleIndex) % buffer->capacity;
     destBufferLInit[sampleIndex] = clampToRange(volume * buffer->samples[0][index], -1.f, 1.f);

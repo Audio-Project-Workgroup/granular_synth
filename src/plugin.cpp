@@ -1648,8 +1648,9 @@ gsAudioProcess(PluginMemory *memory, PluginAudioBuffer *audioBuffer)
       if(pluginState->initialized)
 	{
 	  TemporaryMemory scratch = arenaGetScratch(0, 0);
+	  // TemporaryMemory scratch = arenaBeginTemporaryMemory(pluginState->audioArena);
 
-	  // NOTE: dequeue host-driven parameter value changes
+	  // note: dequeue host-driven parameter value changes
 	  u32 queuedCount = gsAtomicLoad(&audioBuffer->queuedCount);
 	  if(queuedCount)
 	    {
@@ -1770,30 +1771,10 @@ gsAudioProcess(PluginMemory *memory, PluginAudioBuffer *audioBuffer)
 #if FINGERTIPS
 	      loadedSound->samplesPlayed += scaledFramesToRead;
 #endif
-	    }	  
-
-	  AudioRingBuffer *pvbuff = &pluginState->phaseVocoderInputBuffer;
-	  AudioRingBuffer *gbuff = &pluginState->grainInputBuffer;
-	  
-	  PhaseVocoder *phaseVocoder = &pluginState->phaseVocoder;
-
-	  writeSamplesToAudioRingBuffer(pvbuff, inputMixBuffers[0], inputMixBuffers[1], framesToRead);
-
-	  // NOTE: allocate twice at many samples as the minimum needed, so we
-	  //       definitely don't overflow (maybe we can call another function
-	  //       to get a better estimate, but idgaf rn)
-	  r32 *pvOutputSamplesL = arenaPushArray(scratch.arena, 4 * framesToRead, r32,
-						 arenaFlagsZeroNoAlign());
-	  r32 *pvOutputSamplesR = pvOutputSamplesL + 2 * framesToRead;
-	  phaseVocoderProcess(phaseVocoder, pvOutputSamplesL, pvOutputSamplesR, framesToRead);
-	  //readSamplesFromAudioRingBuffer(pvbuff, pvOutputSamplesL, pvOutputSamplesR, framesToRead); 
-	  //writeSamplesToAudioRingBuffer(gbuff, pvOutputSamplesL, pvOutputSamplesR, framesToRead);
-
-	  // NOTE: grain playback
-	  GrainManager* gManager = &pluginState->grainManager;
-	  u32 framesToWrite = audioBuffer->framesToWrite;
+	    }
 
 	  // NOTE: parameter updates
+	  u32 framesToWrite = audioBuffer->framesToWrite;
 	  r32 *paramValsArray = arenaPushArray(scratch.arena, 8 * framesToWrite, r32,
 					       arenaFlagsZeroNoAlign());
 	  r32 *volumeParamVals	= paramValsArray + (0 * framesToWrite);
@@ -1824,11 +1805,40 @@ gsAudioProcess(PluginMemory *memory, PluginAudioBuffer *audioBuffer)
 		pluginUpdateFloatParameter(pluginState->parameters + PluginParameter_offset);
 	    }     
 
-	  u32 targetOffset = (u32)offsetParamVals[0];
+	  // NOTE: phase vocoder time-stretching
+
+	  AudioRingBuffer *pvbuff = &pluginState->phaseVocoderInputBuffer;
+	  AudioRingBuffer *gbuff = &pluginState->grainInputBuffer;
+	  u32 currentOffset = (u32)offsetParamVals[0];
+	  s32 offsetDifference = (s32)(offsetParamVals[framesToWrite - 1] - offsetParamVals[0]);
+	  logFormatString("offset difference: %d", offsetDifference);
+	  
+#define PHASE_VOCODER_ENABLED 0
+#if PHASE_VOCODER_ENABLED
+	  PhaseVocoder *phaseVocoder = &pluginState->phaseVocoder;
+
+	  writeSamplesToAudioRingBuffer(pvbuff, inputMixBuffers[0], inputMixBuffers[1], framesToRead);
+	  // NOTE: allocate twice at many samples as the minimum needed, so we
+	  //       definitely don't overflow (maybe we can call another function
+	  //       to get a better estimate, but idgaf rn)
+	  r32 *pvOutputSamplesL = arenaPushArray(scratch.arena, 4 * framesToRead, r32,
+						 arenaFlagsZeroNoAlign());
+	  r32 *pvOutputSamplesR = pvOutputSamplesL + 2 * framesToRead;
+	  phaseVocoderProcess(phaseVocoder, pvOutputSamplesL, pvOutputSamplesR, framesToRead, currentOffset);
+#else
+	  //readSamplesFromAudioRingBuffer(pvbuff, pvOutputSamplesL, pvOutputSamplesR, framesToRead); 
+	  writeSamplesToAudioRingBuffer(gbuff, inputMixBuffers[0], inputMixBuffers[1], framesToRead);
+#endif
+#undef PHASE_VOCODER_ENABLED
+
+	  // NOTE: grain playback
+	  GrainManager* gManager = &pluginState->grainManager;
+
+	  //u32 targetOffset = (u32)offsetParamVals[0];
 	  AudioBuffer grainMixBuffers =
 	    synthesize(scratch.arena, gManager, &pluginState->grainStateView,
 		       densityParamVals, sizeParamVals, windowParamVals, spreadParamVals,
-		       targetOffset,
+		       offsetDifference,
 		       framesToWrite);
 	  logFormatString("grainMixBuffers = %p, %p",
 			  grainMixBuffers.samples[0], grainMixBuffers.samples[1]);
@@ -1963,6 +1973,7 @@ gsAudioProcess(PluginMemory *memory, PluginAudioBuffer *audioBuffer)
 	    }
 
 	  arenaReleaseScratch(scratch);
+	  // arenaEndTemporaryMemory(scratch);
 	}
     }
 }

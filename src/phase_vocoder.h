@@ -78,25 +78,57 @@ initializePhaseVocoder(Arena *arena, AudioRingBuffer *inputBuffer, AudioRingBuff
 }
 
 static inline void
-phaseVocoderProcess(PhaseVocoder *pv, r32 *outputL, r32 *outputR, u32 processBlockSamples,
+phaseVocoderProcess(PhaseVocoder *pv, r32 *outputL, r32 *outputR,
+		    u32 processBlockSamples, u32 currentOffset,
 		    r32 timeStretchFactor = 1.f)
-{
+{ 
   u32 inHopSize = PV_WINDOW_SAMPLE_COUNT / PV_ANALYSIS_HOP_DIVISOR;
   u32 outHopSize = (u32)(timeStretchFactor * (r32)inHopSize);
 
   u32 samplesInInputBuffer = getAudioRingBufferOffset(pv->inputBuffer);
   u32 samplesInOutputBuffer = getAudioRingBufferOffset(pv->outputBuffer);
+  ASSERT(samplesInOutputBuffer >= currentOffset);
+  samplesInOutputBuffer -= currentOffset;
 
-  // TODO: do better math here
-  u32 windowsToWrite = 1 + (processBlockSamples - samplesInOutputBuffer) / outHopSize;
-  u32 samplesToWrite = windowsToWrite * PV_WINDOW_SAMPLE_COUNT;
-  while(samplesToWrite > samplesInInputBuffer)
+  ASSERT(processBlockSamples >= samplesInOutputBuffer);
+  u32 windowsToWrite =
+    CEIL((r32)(processBlockSamples - PV_WINDOW_SAMPLE_COUNT - samplesInOutputBuffer) /
+	 (r32)outHopSize) + 1;
+  ASSERT(windowsToWrite > 1);
+  u32 samplesToWrite = PV_WINDOW_SAMPLE_COUNT + (windowsToWrite - 1)*outHopSize;
+  if(samplesToWrite > samplesInInputBuffer)
   {
-    ASSERT(windowsToWrite > 0);
-    --windowsToWrite;
-    samplesToWrite = windowsToWrite * PV_WINDOW_SAMPLE_COUNT;
+    // NOTE: write zeros
+    logFormatString("phase vocoder: not enough samples in input buffer. writing %u zeros",
+		    samplesToWrite);
+    writeZerosToAudioRingBuffer(pv->outputBuffer, samplesToWrite);
+    return;
   }
+
+  /* // TODO: do better math here */
+  /* ASSERT(processBlockSamles >= samplesInOutputBuffer); */
+  /* u32 windowsToWrite = 1 + (processBlockSamples - samplesInOutputBuffer) / outHopSize; */
+  /* u32 samplesToWrite = windowsToWrite * PV_WINDOW_SAMPLE_COUNT; */
+  /* if(samplesToWrite > samplesInInputBuffer) */
+  /* { */
+  /*   // NOTE: write zeros */
+  /*   logFormatString("phase vocoder: not enough samples in input buffer. writing %u zeros", */
+  /* 		    samplesToWrite); */
+  /*   writeZerosToAudioRingBuffer(pv->outputBuffer, samplesToWrite); */
+  /*   return; */
+  /* } */
   
+  logFormatString("phase vocoder\n  processing %u samples\n  writing %u samples (%u windows)",
+		  processBlockSamples,
+		  samplesToWrite,
+		  windowsToWrite);
+  logFormatString("inputBuffer:\n  readIndex: %u\n  writeIndex: %u\n",
+		  pv->inputBuffer->readIndex,
+		  pv->inputBuffer->writeIndex);
+  logFormatString("outputBuffer:\n  readIndex: %u\n  writeIndex: %u\n",
+		  pv->outputBuffer->readIndex,
+		  pv->outputBuffer->writeIndex);
+
   u32 currentMemoryIndex = pv->currentMemoryIndex;
   u32 lastMemoryIndex = !currentMemoryIndex;
   r32 *phaseInL = pv->phaseInL[currentMemoryIndex];
@@ -227,7 +259,7 @@ phaseVocoderProcess(PhaseVocoder *pv, r32 *outputL, r32 *outputR, u32 processBlo
     FloatBuffer outL = ifft(scratch.arena, fftL);
     FloatBuffer outR = ifft(scratch.arena, fftR);
 
-    // TODO: write output samples to output buffer
+    // NOTE: overlap-add new samples to output
     {
       r32 *destL = outputL + windowIndex*outHopSize;
       r32 *destR = outputR + windowIndex*outHopSize;
@@ -239,6 +271,7 @@ phaseVocoderProcess(PhaseVocoder *pv, r32 *outputL, r32 *outputR, u32 processBlo
 	destR[binIndex] += srcR[binIndex];
       }
     }
+    
     // NOTE: update pointers/index
     r32 *phaseInLTemp = phaseInL;
     phaseInL = lastPhaseInL;
@@ -272,7 +305,6 @@ phaseVocoderProcess(PhaseVocoder *pv, r32 *outputL, r32 *outputR, u32 processBlo
     pv->lastScratch = scratch;
   }
 
-  // TODO: why is the _read_ index advancing by the number of samples we write
-  //       here, not the number of samples to process _for the whole block_
+  // NOTE: copy samples to grain buffer
   writeSamplesToAudioRingBuffer(pv->outputBuffer, outputL, outputR, samplesToWrite);
 }
