@@ -8,7 +8,7 @@ static r32 gsSqrt(r32 num);
 static r32 gsSin(r32 num);
 static r32 gsCos(r32 num);
 static r32 gsPow(r32 base, r32 exp);
-static r32 gsAtan(r32 num);
+static r32 gsAtan2(r32 im, r32 re);
 static r32 gsModf(r32 num, r32 mod);
 #endif
 

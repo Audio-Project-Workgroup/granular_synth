@@ -655,9 +655,9 @@ gsPow(r32 base, r32 exp)
 }
 
 static r32
-gsAtan(r32 num)
+gsAtan2(r32 im, r32 re)
 {
-  return(atanf(num));
+  return(atan2f(im, re));
 }
 
 static r32
@@ -749,14 +749,14 @@ main(int argc, char **argv)
 	  
 	  pluginMemory.platformAPI.gsGetCurrentTimestamp = platformGetCurrentTimestamp;
 
-	  pluginMemory.platformAPI.gsRand = gsRand;
-	  pluginMemory.platformAPI.gsAbs  = gsAbs;
-	  pluginMemory.platformAPI.gsSqrt = gsSqrt;
-	  pluginMemory.platformAPI.gsSin  = gsSin;
-	  pluginMemory.platformAPI.gsCos  = gsCos;
-	  pluginMemory.platformAPI.gsPow  = gsPow;
-	  pluginMemory.platformAPI.gsAtan = gsAtan;
-	  pluginMemory.platformAPI.gsModf = gsModf;
+	  pluginMemory.platformAPI.gsRand  = gsRand;
+	  pluginMemory.platformAPI.gsAbs   = gsAbs;
+	  pluginMemory.platformAPI.gsSqrt  = gsSqrt;
+	  pluginMemory.platformAPI.gsSin   = gsSin;
+	  pluginMemory.platformAPI.gsCos   = gsCos;
+	  pluginMemory.platformAPI.gsPow   = gsPow;
+	  pluginMemory.platformAPI.gsAtan2 = gsAtan2;
+	  pluginMemory.platformAPI.gsModf  = gsModf;
 
 	  pluginMemory.platformAPI.gsAllocateMemory = platformAllocateMemory;
 	  pluginMemory.platformAPI.gsFreeMemory     = platformFreeMemory;

@@ -29,7 +29,7 @@ struct PhaseVocoder
 static inline PhaseVocoder
 initializePhaseVocoder(Arena *arena, AudioRingBuffer *inputBuffer, AudioRingBuffer *outputBuffer)
 {
-  u32 pvArrayCount = PV_WINDOW_SAMPLE_COUNT / 2;
+  u32 pvArrayCount = PV_WINDOW_SAMPLE_COUNT / 2 + 1;
   r32 *freq = arenaPushArray(arena, pvArrayCount, r32);  
   for(u32 binIndex = 0; binIndex < pvArrayCount; ++binIndex)
   {
@@ -63,6 +63,7 @@ initializePhaseVocoder(Arena *arena, AudioRingBuffer *inputBuffer, AudioRingBuff
   result.inputBuffer = inputBuffer;
   result.outputBuffer = outputBuffer;
   result.freq = freq;
+  result.window = window;
   result.phaseInL[0] = phaseInL0;
   result.phaseInL[1] = phaseInL1;
   result.phaseInR[0] = phaseInR0;
@@ -83,12 +84,18 @@ phaseVocoderProcess(PhaseVocoder *pv, r32 *outputL, r32 *outputR, u32 processBlo
   u32 inHopSize = PV_WINDOW_SAMPLE_COUNT / PV_ANALYSIS_HOP_DIVISOR;
   u32 outHopSize = (u32)(timeStretchFactor * (r32)inHopSize);
 
-  // TODO: check if there are enough samples in the input buffer to fill the
-  // output buffer with the required amount of samples, given the time stretch
-  // factor
+  u32 samplesInInputBuffer = getAudioRingBufferOffset(pv->inputBuffer);
   u32 samplesInOutputBuffer = getAudioRingBufferOffset(pv->outputBuffer);
+
+  // TODO: do better math here
   u32 windowsToWrite = 1 + (processBlockSamples - samplesInOutputBuffer) / outHopSize;
   u32 samplesToWrite = windowsToWrite * PV_WINDOW_SAMPLE_COUNT;
+  while(samplesToWrite > samplesInInputBuffer)
+  {
+    ASSERT(windowsToWrite > 0);
+    --windowsToWrite;
+    samplesToWrite = windowsToWrite * PV_WINDOW_SAMPLE_COUNT;
+  }
   
   u32 currentMemoryIndex = pv->currentMemoryIndex;
   u32 lastMemoryIndex = !currentMemoryIndex;
@@ -128,7 +135,7 @@ phaseVocoderProcess(PhaseVocoder *pv, r32 *outputL, r32 *outputR, u32 processBlo
     ComplexBuffer fftR = fft(scratch.arena, fftInR);
 
     // NOTE: compute magnitudes and phases
-    for(u32 binIndex = 0; binIndex < PV_WINDOW_SAMPLE_COUNT / 2; ++binIndex)
+    for(u32 binIndex = 0; binIndex < PV_WINDOW_SAMPLE_COUNT / 2 + 1; ++binIndex)
     {
       r32 reL = fftL.reVals[binIndex];
       r32 imL = fftL.imVals[binIndex];
@@ -137,8 +144,8 @@ phaseVocoderProcess(PhaseVocoder *pv, r32 *outputL, r32 *outputR, u32 processBlo
       magL[binIndex] = gsSqrt(reL*reL + imL*imL);
       magR[binIndex] = gsSqrt(reR*reR + imR*imR);
 
-      r32 binPhaseL = gsAtan(reL/imL);
-      r32 binPhaseR = gsAtan(reR/imR);
+      r32 binPhaseL = gsAtan2(imL, reL);
+      r32 binPhaseR = gsAtan2(imR, reR);
       r32 lastBinPhaseL = lastPhaseInL[binIndex];
       r32 lastBinPhaseR = lastPhaseInR[binIndex];
 
@@ -157,23 +164,63 @@ phaseVocoderProcess(PhaseVocoder *pv, r32 *outputL, r32 *outputR, u32 processBlo
     }
 
     // NOTE: modify spectrum with adjusted phase
-    for(u32 binIndex = 0; binIndex < PV_WINDOW_SAMPLE_COUNT / 2; ++binIndex)
     {
-      r32 binMagL = magL[binIndex];
-      r32 binMagR = magR[binIndex];
-      r32 binPhaseL = phaseAdjL[binIndex];
-      r32 binPhaseR = phaseAdjR[binIndex];
+      {
+	r32 binMagL = magL[0];
+	r32 binMagR = magR[0];
+	r32 binPhaseL = phaseAdjL[0];
+	r32 binPhaseR = phaseAdjR[0];
 
-      r32 binReL = binMagL*gsCos(binPhaseL);
-      r32 binImL = binMagL*gsSin(binPhaseL);
-      r32 binReR = binMagR*gsCos(binPhaseR);
-      r32 binImR = binMagR*gsSin(binPhaseR);
+	r32 binReL = binMagL*gsCos(binPhaseL);
+	r32 binImL = binMagL*gsSin(binPhaseL);
+	r32 binReR = binMagR*gsCos(binPhaseR);
+	r32 binImR = binMagR*gsSin(binPhaseR);
 
-      fftL.reVals[binIndex] = binReL;
-      fftL.imVals[binIndex] = binImL;
-      fftR.reVals[binIndex] = binReR;
-      fftR.imVals[binIndex] = binImR;
-      // TODO: conjugate-symmetry
+	fftL.reVals[0] = binReL;
+	fftL.imVals[0] = binImL;
+	fftR.reVals[0] = binReR;
+	fftR.imVals[0] = binImR;
+      }
+      
+      for(u32 binIndex = 1; binIndex < PV_WINDOW_SAMPLE_COUNT / 2; ++binIndex)
+      {
+	r32 binMagL = magL[binIndex];
+	r32 binMagR = magR[binIndex];
+	r32 binPhaseL = phaseAdjL[binIndex];
+	r32 binPhaseR = phaseAdjR[binIndex];
+
+	r32 binReL = binMagL*gsCos(binPhaseL);
+	r32 binImL = binMagL*gsSin(binPhaseL);
+	r32 binReR = binMagR*gsCos(binPhaseR);
+	r32 binImR = binMagR*gsSin(binPhaseR);
+	
+	fftL.reVals[binIndex] = binReL;
+	fftL.imVals[binIndex] = binImL;
+	fftR.reVals[binIndex] = binReR;
+	fftR.imVals[binIndex] = binImR;
+	// NOTE: conjugate-symmetry
+	fftL.reVals[PV_WINDOW_SAMPLE_COUNT - binIndex] = binReL;
+	fftL.imVals[PV_WINDOW_SAMPLE_COUNT - binIndex] = -binImL;
+	fftR.reVals[PV_WINDOW_SAMPLE_COUNT - binIndex] = binReR;
+	fftR.imVals[PV_WINDOW_SAMPLE_COUNT - binIndex] = -binImR;
+      }
+
+      {
+	r32 binMagL = magL[PV_WINDOW_SAMPLE_COUNT / 2];
+	r32 binMagR = magR[PV_WINDOW_SAMPLE_COUNT / 2];
+	r32 binPhaseL = phaseAdjL[PV_WINDOW_SAMPLE_COUNT / 2];
+	r32 binPhaseR = phaseAdjR[PV_WINDOW_SAMPLE_COUNT / 2];
+
+	r32 binReL = binMagL*gsCos(binPhaseL);
+	r32 binImL = binMagL*gsSin(binPhaseL);
+	r32 binReR = binMagR*gsCos(binPhaseR);
+	r32 binImR = binMagR*gsSin(binPhaseR);
+
+	fftL.reVals[PV_WINDOW_SAMPLE_COUNT / 2] = binReL;
+	fftL.imVals[PV_WINDOW_SAMPLE_COUNT / 2] = binImL;
+	fftR.reVals[PV_WINDOW_SAMPLE_COUNT / 2] = binReR;
+	fftR.imVals[PV_WINDOW_SAMPLE_COUNT / 2] = binImR;
+      }
     }
 
     // NOTE: synthesize output samples from modified spectrum
@@ -221,9 +268,11 @@ phaseVocoderProcess(PhaseVocoder *pv, r32 *outputL, r32 *outputR, u32 processBlo
     pv->lastOutputSignalR = outR;
 
     // NOTE: update scratch
-    arenaReleaseScratch(pv->lastScratch);
+    if(pv->lastScratch.arena) arenaReleaseScratch(pv->lastScratch);
     pv->lastScratch = scratch;
   }
 
-  writeSamplesToAudioRingBuffer(pv->outputBuffer, outputL, outputR, processBlockSamples);
+  // TODO: why is the _read_ index advancing by the number of samples we write
+  //       here, not the number of samples to process _for the whole block_
+  writeSamplesToAudioRingBuffer(pv->outputBuffer, outputL, outputR, samplesToWrite);
 }

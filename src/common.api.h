@@ -11,7 +11,7 @@
   X(Sin, r32, (r32 num))\
   X(Cos, r32, (r32 num))\
   X(Pow, r32, (r32 base, r32 exp))\
-  X(Atan, r32, (r32 num))\
+  X(Atan2, r32, (r32 im, r32 re))\
   X(Modf, r32, (r32 num, r32 mod))\
   X(AllocateMemory, void*, (usz size))\
   X(FreeMemory, void, (void *memory, usz size))\

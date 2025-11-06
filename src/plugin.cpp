@@ -1777,6 +1777,8 @@ gsAudioProcess(PluginMemory *memory, PluginAudioBuffer *audioBuffer)
 	  
 	  PhaseVocoder *phaseVocoder = &pluginState->phaseVocoder;
 
+	  writeSamplesToAudioRingBuffer(pvbuff, inputMixBuffers[0], inputMixBuffers[1], framesToRead);
+
 	  // NOTE: allocate twice at many samples as the minimum needed, so we
 	  //       definitely don't overflow (maybe we can call another function
 	  //       to get a better estimate, but idgaf rn)
@@ -1831,14 +1833,14 @@ gsAudioProcess(PluginMemory *memory, PluginAudioBuffer *audioBuffer)
 	  logFormatString("grainMixBuffers = %p, %p",
 			  grainMixBuffers.samples[0], grainMixBuffers.samples[1]);
 	  
-#if BUILD_DEBUG	  
-	  usz grainMixBuffersIntL = INT_FROM_PTR(grainMixBuffers[0]);
-	  usz grainMixBuffersIntR = INT_FROM_PTR(grainMixBuffers[1]);
-#if OS_WASM
-	  DEBUG_POINTER_INITIALIZE(audio__grainMixBuffersL, grainMixBuffers[0]);
-	  DEBUG_POINTER_INITIALIZE(audio__grainMixBuffersR, grainMixBuffers[1]);
-#endif
-#endif
+// #if BUILD_DEBUG	  
+// 	  usz grainMixBuffersIntL = INT_FROM_PTR(grainMixBuffers[0]);
+// 	  usz grainMixBuffersIntR = INT_FROM_PTR(grainMixBuffers[1]);
+// #if OS_WASM
+// 	  DEBUG_POINTER_INITIALIZE(audio__grainMixBuffersL, grainMixBuffers[0]);
+// 	  DEBUG_POINTER_INITIALIZE(audio__grainMixBuffersR, grainMixBuffers[1]);
+// #endif
+// #endif
 
 	  // NOTE: audio output
 	  r32 formatVolumeFactor = 1.f;      
