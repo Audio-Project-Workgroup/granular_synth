@@ -1,3 +1,5 @@
+// NOTE: functions the host calls and the plugin impelements
+
 #define PLUGIN_API_XLIST\
   X(RenderNewFrame, void, (PluginMemory *memory, PluginInput *input, RenderCommands *renderCommands))\
   X(AudioProcess, void, (PluginMemory *memory, PluginAudioBuffer *audioBuffer))\

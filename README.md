@@ -13,7 +13,7 @@
 |**VST**| ![Build](https://github.com/Audio-Project-Workgroup/granular_synth/workflows/Linux-vst/badge.svg) | ![Build](https://github.com/Audio-Project-Workgroup/granular_synth/workflows/macOS-vst/badge.svg) | ![Build](https://github.com/Audio-Project-Workgroup/granular_synth/workflows/Windows-vst/badge.svg) |
 |**WASM**| ![Build](https://github.com/Audio-Project-Workgroup/granular_synth/workflows/Linux-wasm/badge.svg) | - | - |
 
-Granade is a real-time granular synthesizer, available as a vst3 plugin and as a standalone application for mac, windows, and linux. Granade records audio input into a buffer and deconstructs the sound into multiple overlapping delayed, enveloped, and panned segments called grains, creating complex textures and new sonic landscapes. Several interactive parameters such as grain size, density, spread, and windowing, are provided for manipulating grain playback in real time. 
+Granade is a cross-platfrom real-time granular synthesizer. Granade runs as a vst3 plugin in a DAW; as a standalone application on mac, windows, and linux; and in the browser. Granade records audio input into a buffer and deconstructs the sound into multiple overlapping delayed, enveloped, and panned segments called grains, creating complex textures and new sonic landscapes. Interactive parameters such as grain size, density, spread, and windowing allow for dynamic manipulation of grain playback in real time.
 
 ## Contents
 
@@ -37,7 +37,7 @@ Granade is a real-time granular synthesizer, available as a vst3 plugin and as a
 
 - Real-time granular synthesis
 - Advanced grain control: size, density, spread, windowing, panning, and mix controls
-- Cross-platform support (Windows, macOS, Linux)
+- Cross-platform support (Windows, macOS, Linux, Web)
 
 ## Installation
 
@@ -60,7 +60,7 @@ Once you have appimaged running, copy Granade to ~/Applications and appimaged wi
 
 ### Building from Source
 
-#### Install requirements
+#### Install Requirements
 
 For building from source, you'll need:
 
@@ -74,59 +74,13 @@ For building from source, you'll need:
 
 Linux users will also need the development versions (ie with headers) of all packages JUCE requires for building VSTs (eg gtk, asound, ...).
 
-#### Clone the repository and initialize submodules: 
+#### Clone the Repository and Initialize Submodules: 
 ``` bash
 git clone --recurse-submodules https://github.com/Audio-Project-Workgroup/granular_synth	
 ```
 This places the `https://github.com/juce-framework/JUCE` repository within `src/JUCE` directory.
 
-
-#### Configuration options
-
-To build `Granade` from source, the following configuration options are available:
-
-
-**Configuration Options**
-
-| Value | Description |
-|--------|-------------|
-| `debug` | Compiles with debug info and enables asserts. |
-| `logging` | Enables the logging system. |
-| `release` | Assembles a distributable application bundle. |
-
-
-**Target Options**
-
-| Value | Description |
-|--------|-------------|
-| `plugin` | Compiles the plugin to a dynamic library. |
-| `exe` | Compiles the host executable. |
-| `vst` | Compiles the VST target. |
-| `wasm` | Compiles the WebAssembly target. |
-| `all` | Compiles all targets. *(Default)* |
-
-Display available commands and usage information using the `help` option.
-
-You can configure builds using key–value pairs passed as command-line arguments:
-
-```bash
-./build.sh <key>:<value1>+<value2>+...
-```
-
-*The following example enables **debug mode** and **logging** and builds the **plugin** and **WebAssembly** targets.*
-
-```bash
-./build.sh config:debug+logging target:plugin+wasm
-```
-
-**Defaults**
-
-- If you specify a `target:` key, all other target flags are reset to `0`.
-- If you specify a `config:` key, all other configuration flags are reset to `0`.
-
-> Note: Unknown arguments will print a warning but won’t stop the build.
-
-#### Platform-specific setup:
+#### Platform-Specific Setup:
 
 ##### Windows 
 
@@ -139,20 +93,18 @@ You can configure builds using key–value pairs passed as command-line argument
 	```batch
 	"C:\Program Files\Microsoft Visual Studio\[YEAR]\Community\VC\Auxiliary\Build\vcvarsall.bat" x64
 	```
+3. **Build all targets**
 
-3. **Build the native host application and the dynamic library plugin:**
-	```batch
+	``` batch
 	cd src
-	build target:exe
+	build
 	```
-	These will be located in a new directory called `build` (with names `Granade.exe` and `plugin.dll`)
+	This creates a new `build` directory in the project root, which contains the executable (`Granade.exe`), plugin library (`plugin.dll`), and VST3 bundle (`build_JUCE\Granade_artefacts\Debug\VST3`) targets.
+	See [Configuration Options](#configuration-options) for how to enable developer features, or only recompile specific targets.
 
-4. **Build the VST3 plugin with JUCE:**
-	```batch
-	cd src
-	build target:vst
-	```
-	you will have to put the resulting vst3 bundle (located in `granular_synth\build\build_JUCE\Granade_artefacts\Debug\VST3`) somewhere where your DAW/plugin host can find it.
+4. **Install VST**
+
+	You will have to put the VST3 bundle somewhere where your DAW/plugin host can find it.
 
 <!--
 Uncomment in the future in case that onnx is supported.
@@ -183,37 +135,76 @@ NOTE:
 	on linux, onnx is not available via standard package managers. Download the binaries (recommended version is 1.20.1) and install them globally (the exact directories can be found in the libonnxruntime.pc file, located in `[onnxruntime folder]/lib/pkgconfig`) 
 -->
 
-3. **Build the native host application and the dynamic library plugin**
+3. **Build all targets**
+   ```bash
+   cd src
+   ./build.sh
+   ```
+   This creates a new `build` directory in the project root, which contains the executable (`Granade.exe`), plugin library (`plugin.dylib` on mac and `plugin.so` on linux), and VST3 bundle (`build_JUCE/Granade_artefacts/Debug/VST3`) targets.
+	See [Configuration Options](#configuration-options) for how to enable developer features, or only recompile specific targets.
 
+#### Configuration Options
+	To build `Granade` from source, the following configuration options are available:
+
+**`config` Options**
+
+| Value | Description |
+|--------|-------------|
+| `debug` | Compiles with debug info and enables asserts. |
+| `logging` | Enables the logging system. |
+| `release` | Assembles a distributable application bundle (mac and linux only). |
+
+
+**`target` Options**
+
+| Value | Description |
+|--------|-------------|
+| `plugin` | Compiles the plugin to a dynamic library. |
+| `exe` | Compiles the host executable. |
+| `vst` | Compiles the VST target. |
+| `wasm` | Compiles the WebAssembly target (mac and linux only). |
+| `all` | Compiles all targets. *(Default)* |
+	Display available commands and usage information using the `help` option.	
+	You can configure builds using key–value pairs passed as command-line arguments:
 	```bash
-	cd src
-	./build.sh target:exe
-	``` 
-	The compiled native host application and the dynamic library plugin will be located in a new directory called `build`
+	./build.sh <key>:<value1>+<value2>+...
+	```
+	on mac and linux, or
+	``` batch
+	build <key>:<value1>+<value2>+...
+	```
+	on windows.
 
-4. **Build the VST3 plugin with JUCE:**
-
+*The following example enables **debug mode** and **logging** and builds the **executable** target.*
 	```bash
-	cd src
-	./build.sh target:vst
-	``` 
-	The `Granade.vst3` file will be created into a nested directory within the build directory (i.e. within `granular_synth\build\build_JUCE\Granade_artefacts\Debug\VST3`). 
+	./build.sh config:debug+logging target:exe+wasm
+	```
+	on mac and linux, or
+	```batch
+	build config:debug+logging target:exe+wasm
+	```
+	on windows
 
-#### Verify your build
+**Defaults**
+
+- All `config` options are **disabled** by default.
+- All `target` options are **enabled** by default.
+- **Enabling** any option will **disable** all other unenabled options for that key.
+
+> Note: Unknown arguments will print a warning but won’t stop the build.
+
+#### Verify your Build
 
 ##### Standalone application:
+	To test the standalone application, simply:
+	- in Windows: Run `build\Granade`
+	- in macOS/Linux: Run `./build/Granade`
 
-To test the standalone application, simply:
-- in Windows: Run `build\Granade`
-- in macOS/Linux: Run `./build/Granade`
-
-##### VST3 plugin:
-
-To test the VST3 plugin, make sure it is visible by your DAW by either moving it inside the default VST directory, or adding the parent directory of the VST3 bundle to your DAW's list of scanned directories.
+##### VST3 Plugin:
+	To test the VST3 plugin, make sure it is visible by your DAW by either moving it inside the default VST directory, or adding the parent directory of the VST3 bundle to your DAW's list of scanned directories.
 
 ## Documentation
-
-Some files include comments explaining implementation details. Documentation coverage is currently limited but being expanded. For more technical information, visit [How Granade Works](data/docs/HOW_GRANADE_WORKS.md).
+	Some files include comments explaining implementation details. Documentation coverage is currently limited but being expanded. For more technical information, visit [How Granade Works](data/docs/HOW_GRANADE_WORKS.md).
 
 ## Quick Start Guide
 
@@ -221,8 +212,9 @@ Some files include comments explaining implementation details. Documentation cov
 
 #### Audio Input Sources
 
-- **Standalone:** Uses microphone input
+- **Standalone:** Uses any audio device as input
 - **VST:** Works as audio effect
+- **Web:** Uses the microphone as input
 
 #### Controls
 
@@ -287,26 +279,6 @@ Not currently. The codebase includes ONNX runtime integration to support potenti
 
 </details>
 
-<details>
-<summary><strong>How can I speed up build times after the first compilation?</strong></summary>
-<br>
-After your first successful build, you can comment out the miniaudio compilation lines in your platform's build script to significantly reduce recompilation time:
-
-*Windows (`build.bat`):*
-```batch
-REM compile miniaudio to static library
-REM cl %CFLAGS% -c ..\src\miniaudio_impl.c
-REM lib -OUT:miniaudio.lib miniaudio_impl.obj
-
-```
-*macOS/Linux (`build.sh`):*
-```bash
-# compile miniaudio to static library
-# clang -c ../src/miniaudio_impl.c -o miniaudio.o
-# ar rcs libminiaudio.a miniaudio.o
-```
-</details>
-
 ## Future Work
 
 ### Bugs/Issues
@@ -346,7 +318,7 @@ This is a list of existing features that require curation and improvement:
 	- [ ] hook a fuzzer up to the input for resilience testing
 	- [x] remove plugin dependence on crt for maximum portability
 - Optimize codebase:
-	- [ ] profiling
+	- [x] profiling
 	- [ ] simd everywhere
  
 ### Additions
@@ -373,6 +345,9 @@ This is a list of missing features for concrete Granade implementation, or envis
 - [ ] Integrate ML into the pipeline for grouping grains
 
 ## Release Notes
+
+### 0.2.0 (ADC Release) - TBD
+New WebAssembly target, renderer improvements, reduced memory footprint, build configuration interface
 
 ### 0.1.0 (Initial Release) - 1st June 2025
 Initial release with real-time granular synthesis, cross-platform support, and VST3 plugin.

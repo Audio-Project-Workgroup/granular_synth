@@ -2,6 +2,17 @@
 
 All notable changes to Granade will be documented in this file.
 
+## [0.2.0] - 2025-11-TBD
+- Added WebAssembly target
+- Updated renderer to OpenGL 3.3 / WebGL2
+- Reduced memory footprint significantly
+- Added a build configuration interface
+- Added control tooltips
+- Removed all dependence on the C runtime library from the plugin
+- Added support for statically linking the plugin library
+- Added a rudimentary profiler
+- Fixed a bug where the logger's lock was not taken when flushing the log
+
 ## [0.1.0] - 2025-06-01
 
 ### Added

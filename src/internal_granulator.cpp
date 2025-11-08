@@ -277,8 +277,8 @@ synthesize(r32* destBufferLInit, r32* destBufferRInit,
 	r32 panL = 1.0f - MAX(0.0f, grain->stereoPosition);
 	r32 panR = 1.0f + MIN(0.0f, grain->stereoPosition);
           
-	r32 outSampleL = windowVal * panL * grainSampleL;
-	r32 outSampleR = windowVal * panR * grainSampleR;
+	r32 outSampleL = volume * windowVal * panL * grainSampleL;
+	r32 outSampleR = volume * windowVal * panR * grainSampleR;
 
 	destBufferLInit[sampleIndex] += outSampleL;
 	destBufferRInit[sampleIndex] += outSampleR;

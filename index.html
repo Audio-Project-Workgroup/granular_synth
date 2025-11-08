@@ -137,10 +137,7 @@
     <details id="description-section" open>
       <summary>📖 Description</summary>
       <p>
-        Granade is a real-time granular synthesizer, available as a VST3 plugin and as a standalone application for macOS, Windows, and Linux. 
-        It records audio input into a buffer and deconstructs the sound into multiple overlapping delayed, enveloped, and panned segments 
-        called grains, creating complex textures and new sonic landscapes. Interactive parameters such as grain size, density, spread, and 
-        windowing allow for dynamic manipulation of grain playback in real time.
+        Granade is a cross-platfrom real-time granular synthesizer. Granade runs as a standalone application on mac, windows, and linux; as a vst3 plugin in a DAW; and in the browser. Granade records audio input into a buffer and deconstructs the sound into multiple overlapping delayed, enveloped, and panned segments called grains, creating complex textures and new sonic landscapes. Interactive parameters such as grain size, density, spread, and windowing allow for dynamic manipulation of grain playback in real time.
       </p>
     </details>
 
@@ -149,7 +146,7 @@
       <ul>
         <li>Real-time granular synthesis</li>
         <li>Advanced grain control: size, density, spread, windowing, panning, and mix controls</li>
-        <li>Cross-platform support (Windows, macOS, Linux)</li>
+        <li>Cross-platform support (Windows, macOS, Linux, Web)</li>
       </ul>
     </details>
 
@@ -176,10 +173,17 @@
       </table>
     </details>
 
+    <details id="architecture-section" open>
+      <summary>📐 Architecture</summary>
+      <p>
+	Granade&#39s core audio-visual application logic is completely platform-independent with no dependencies outside from a small platform-level interface. Each platform backend implements this interface and calls into the application logic. The backend can either include the application logic directly, or load it dynamically at runtime to enable hot code reloading.
+      </p>
+    </details>
+
     <details id="acknowledgments-section">
       <summary>🙏 Acknowledgments</summary>
       <p>
-        Born from connections made at <a href="https://audio.dev/archive/adc24-bristol/" target="_blank">ADC 24</a>, Granade exists thanks to the <a href="https://github.com/Audio-Project-Workgroup" target="_blank">Audio-Project-Workgroup's</a> initiative to unite developers 
+        Born from connections made at <a href="https://audio.dev/archive/adc24-bristol/" target="_blank">ADC 24</a>, Granade exists thanks to the <a href="https://github.com/Audio-Project-Workgroup" target="_blank">Audio-Project-Workgroup&#39s</a> initiative to unite developers 
         with shared interests under the scope of music and IT. Special appreciation to all the people who contributed their time to it.
       </p>
     </details>

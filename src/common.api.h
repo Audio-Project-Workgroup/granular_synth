@@ -1,5 +1,7 @@
+// NOTE: functions the plugin calls and the host implements
+
 #define PLATFORM_API_XLIST\
-  X(ReadEntireFile, Buffer, (char *filename, Arena *allocator))	\
+  X(ReadEntireFile, Buffer, (char *filename, Arena *allocator))\
   X(FreeFileMemory, void, (Buffer file, Arena *allocator))\
   X(WriteEntireFile, void, (char *filename, Buffer file))\
   X(GetPathToModule, String8, (void *handleToModule, void *functionInModule, Arena *allocator))\
