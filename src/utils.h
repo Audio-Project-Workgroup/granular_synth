@@ -78,8 +78,8 @@
 #  define LSB(num) (__builtin_ctz(num))
 #elif COMPILER_MSVC
 #  include <intrin.h>
-static inline u32 msbHelper(u64 num) { u32 idx = 0; _BitScanReverse64(&idx, num|1); return(idx); }
-static inline u32 lsbHelper(u64 num) { u32 idx = 0; _BitScanForward64(&idx, num); return(idx); }
+static inline u32 msbHelper(u64 num) { u32 idx = 0; _BitScanReverse64((unsigned long*)&idx, num|1); return(idx); }
+static inline u32 lsbHelper(u64 num) { u32 idx = 0; _BitScanForward64((unsigned long*)&idx, num); return(idx); }
 #  define MSB(num) msbHelper(num)
 #  define LSB(num) lsbHelper(num)
 #else

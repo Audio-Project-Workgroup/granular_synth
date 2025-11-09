@@ -18,13 +18,35 @@ set "target_all=1"
 :: -----------------------------------------------------------------------------
 :: parse cli arguments
 
-:: NOTE: syntax is `key:value1+value2` to set variables `key_value1` and `key_value2` to 1
-:: TODO: help output on windows
 for %%a in (%*) do (
     for /f "tokens=1* delims=:" %%k in ("%%a") do (
     	set "key=%%k"
 	if "!key!"=="target" set "target_plugin=0" && set "target_exe=0" && set "target_vst=0" && set "target_all=0"
+
 	if "!key!"=="config" set "config_debug=0" && set "config_logging=0" && set "config_testing=0"
+
+	if "!key!"=="help" (
+	    echo "                                                           "
+	    echo " syntax is <key>:<value1>+<value2>+... ...                 "
+	    echo "                                                           "
+	    echo " keys:                                                     "
+	    echo "   config:                                                 "
+	    echo "     values:                                               "
+	    echo "       debug:    compiles with debug info, enables asserts "
+	    echo "       logging:  enables the logging system                "
+	    echo "       testing:  runs tests in `gsInitializePluginState`   "
+	    echo "                                                           "
+	    echo "   target:                                                 "
+	    echo "     values:                                               "
+	    echo "       plugin:   compiles the plugin to a dynamic library  "
+	    echo "       exe:      compiles the host executable              "
+	    echo "       vst:      compiles the webassembly target           "
+	    echo "       all:      compiles all targets                      "
+	    echo "                                                           "
+	    echo "   help:         displays this output and exits            "
+	    echo "                                                           "
+	    exit 0
+	)
 
 	set "values=%%l"
     	for /f "tokens=1-4 delims=+" %%v in ("!values!") do (	    
@@ -46,7 +68,7 @@ if "!target_vst!"=="1" echo [BUILD_VST]
 
 if "!config_debug!"=="1" echo [BUILD_DEBUG]
 if "!config_logging!"=="1" echo [BUILD_LOGGING]
-if "!config_testing!"=="1" echo [BUILD_TESTING]
+if "!config_logging!"=="1" echo [BUILD_TESTING]
 
 :: -----------------------------------------------------------------------------
 :: set up directories, flags
@@ -126,6 +148,7 @@ if "!target_exe!"=="1" (
     	REM onnxruntime.lib
     ) else (
         echo ERROR: plugin build failed. skipping exe compilation
+	exit /b %PLUGIN_STATUS%
     )
 )
 set EXE_STATUS=%ERRORLEVEL%
@@ -134,10 +157,11 @@ set EXE_STATUS=%ERRORLEVEL%
 if "!target_vst!"=="1" (
     if %PLUGIN_STATUS%==0 (
         echo compiling vst...
-	cmake -S %SRC_DIR% -B %BUILD_DIR%/build_JUCE -DBUILD_DEBUG=!config_debug! -DBUILD_LOGGING=!config_logging! -DBUILD_TESTING=!config_testing!
+	cmake -S %SRC_DIR% -B %BUILD_DIR%/build_JUCE -DBUILD_DEBUG=!config_debug! -DBUILD_LOGGING=!config_logging! -DBUILD_LOGGING=!config_logging!
 	cmake --build %BUILD_DIR%/build_JUCE
     ) else (
         echo ERROR: plugin build failed. skipping vst compilation
+	exit /b %PLUGIN_STATUS%
     )
 )
 set VST_STATUS=%ERRORLEVEL%
@@ -152,11 +176,12 @@ goto end_script
 set "key=%1"
 set "value=%2"
 set "var=!key!_!value!"
-rem echo "set_var: !var!"
 if defined !var! (
-    set "!var!=1" && echo "set !var! to 1"
+    set "!var!=1"
 ) else (
-    echo "unknown key-value pair: !var!"
+    echo "------------------------------------------"
+    echo "| WARNING: unknown key-value pair: !var! |"
+    echo "------------------------------------------"
 )
 goto :eof
 

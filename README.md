@@ -58,7 +58,7 @@ We distribute Granade as an AppImage on linux. We recommend using appimaged
 Once you have appimaged running, copy Granade to ~/Applications and appimaged will handle the rest.
 -->
 
-### Building from Source
+### Building From Source
 
 #### Install Requirements
 
@@ -72,7 +72,7 @@ For building from source, you'll need:
 * clang (mac and linux)
 <!--* pkg-config (mac and linux)-->
 
-Linux users will also need the development versions (ie with headers) of all packages JUCE requires for building VSTs (eg gtk, asound, ...).
+Linux users will also need the development versions (ie with headers) of all packages JUCE requires for building VSTs (eg gtk, asound, etc).
 
 #### Clone the Repository and Initialize Submodules: 
 ``` bash
@@ -84,15 +84,18 @@ This places the `https://github.com/juce-framework/JUCE` repository within `src/
 
 ##### Windows 
 
-1. **Set up GLFW:**
-	- Copy the `GLFW` folder from your downloaded GLFW package to `src\include`
-	- From the `lib-vc[YEAR]` folder (corresponding to your version of Visual Studio), copy `glfw3_mt.lib` and `glfw3.lib` to `src\libs`
 
-2. **Configure your shell to be able to call a C compiler from the command line:**
+1. **Configure your shell to be able to call a C compiler from the command line:**
 	- Open a Developer Command Prompt and run (e.g. for x64 architectures):
 	```batch
 	"C:\Program Files\Microsoft Visual Studio\[YEAR]\Community\VC\Auxiliary\Build\vcvarsall.bat" x64
 	```
+	
+2. **Set up GLFW:**
+    - [Download GLFW](https://www.glfw.org/download.html) and extract the folder
+	- Open the `lib-vc[YEAR]` folder corresponding to your version of Visual Studio.
+	- Copy the `glfw3.lib` and `glfw3_mt.lib` files to the `src\libs` folder in the project root.
+
 3. **Build all targets**
 
 	``` batch
@@ -101,6 +104,7 @@ This places the `https://github.com/juce-framework/JUCE` repository within `src/
 	```
 	This creates a new `build` directory in the project root, which contains the executable (`Granade.exe`), plugin library (`plugin.dll`), and VST3 bundle (`build_JUCE\Granade_artefacts\Debug\VST3`) targets.
 	See [Configuration Options](#configuration-options) for how to enable developer features, or only recompile specific targets.
+	Note that building the WebAssembly target is not supported on Windows. The recommended way for Windows users to build the WASM target is to set up [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) and follow the [linux build instructions](#mac-and-linux). Since we ship a compiled WASM module with the project, there is no benefit to building the WASM target unless you are modifying the code.	
 
 4. **Install VST**
 
@@ -142,6 +146,7 @@ NOTE:
    ```
    This creates a new `build` directory in the project root, which contains the executable (`Granade.exe`), plugin library (`plugin.dylib` on mac and `plugin.so` on linux), and VST3 bundle (`build_JUCE/Granade_artefacts/Debug/VST3`) targets.
 	See [Configuration Options](#configuration-options) for how to enable developer features, or only recompile specific targets.
+	Mac users may see one or more errors relating to WebAssembly build failure. This is not a problem, it only means your version of clang does not support WebAssembly (which the default version that comes with Xode does not). To build the WebAssembly target on Mac, you will need to replace the system's version of clang with a more recent version, which can be installed from homebrew. Since we ship a compiled WASM module with the project, there is no benefit to building the WASM target unless you are modifying the code.
 
 #### Configuration Options
 	To build `Granade` from source, the following configuration options are available:
