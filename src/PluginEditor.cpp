@@ -98,7 +98,12 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
     // editor's size to whatever you need it to be.
   setSize(640, 480);
   setResizable(true, true);
-  
+
+  // ASIDE: whoever wrote this interface, where I can only request a small
+  //        number of versions, must be a complete imbecile. YOU HAVE ALL THE
+  //        FUNCTIONS/TYPES/DEFINITIONS PAINSTAKINGLY ORGANIZED BY VERSION IN
+  //        YOUR LOADER! IT'S NOT HARD! WHAT GIVES?!
+  glContext.setOpenGLVersionRequired(juce::OpenGLContext::OpenGLVersion::openGL4_1);
   glContext.setRenderer(this);
   glContext.setContinuousRepainting(true);
   glContext.attachTo(*this);

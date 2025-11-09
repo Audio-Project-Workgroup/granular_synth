@@ -261,7 +261,7 @@ if [[ $config_release == 1 ]]; then
 	mkdir -p Contents
 	pushd Contents > /dev/null
 
-	cp -r $DATA_DIR data
+	cp -R $DATA_DIR/ data
 	cp $DATA_DIR/Info.plist Info.plist
 
 	mkdir -p Frameworks

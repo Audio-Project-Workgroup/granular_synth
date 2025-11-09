@@ -384,9 +384,12 @@ prepareToPlay(double sampleRate, int samplesPerBlock)
   //onnxState = onnxInitializeState(modelPath);
 
   pluginMemory.host			     = PluginHost_daw;
-  pluginMemory.platformAPI.gsReadEntireFile  = platformReadEntireFile;
-  pluginMemory.platformAPI.gsWriteEntireFile = platformWriteEntireFile;
-  pluginMemory.platformAPI.gsFreeFileMemory  = platformFreeFileMemory;
+  // pluginMemory.platformAPI.gsReadEntireFile  = platformReadEntireFile;
+  // pluginMemory.platformAPI.gsWriteEntireFile = platformWriteEntireFile;
+  // pluginMemory.platformAPI.gsFreeFileMemory  = platformFreeFileMemory;
+  pluginMemory.platformAPI.gsReadEntireFile  = juceReadEntireFile;
+  pluginMemory.platformAPI.gsWriteEntireFile = juceWriteEntireFile;
+  pluginMemory.platformAPI.gsFreeFileMemory  = juceFreeFileMemory;
   pluginMemory.platformAPI.gsGetPathToModule = platformGetPathToModule;
   
   //pluginMemory.platformAPI.runModel = platformRunModel;
