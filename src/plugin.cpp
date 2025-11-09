@@ -375,7 +375,6 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 #endif
 
       PluginState *pluginState = globalPluginState;
-      //renderBeginCommands(renderCommands, &pluginState->frameArena);
       TemporaryMemory scratch = arenaGetScratch(0, 0);
 
 #if 0
@@ -418,7 +417,7 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 	      if(!panel->first)
 		{
 		  UILayout *panelLayout = &panel->layout;
-		  uiBeginLayout(panelLayout, uiContext, panelRect, panel->color, panel->texture);		 
+		  uiBeginLayout(panelLayout, uiContext, panelRect, panel->color, panel->texture);
 
 		  r32 textScale = 0.7f;
 		  v4 baseTextColor = colorV4FromU32(0xFFDEADFF);
@@ -431,12 +430,13 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 			  outputDeviceIndex < pluginState->outputDeviceCount;
 			  ++outputDeviceIndex)
 			{
-			  bool isSelected = (outputDeviceIndex == pluginState->selectedOutputDeviceIndex);
+			  b32 isSelected = (outputDeviceIndex == pluginState->selectedOutputDeviceIndex);
 			  v4 textColor =  isSelected ? selectedTextColor : baseTextColor;
 			  String8 outputDeviceName = pluginState->outputDeviceNames[outputDeviceIndex];
 			  
-			  UIComm outputDevice = uiMakeSelectableTextElement(panelLayout, outputDeviceName,
-									    textScale, textColor);
+			  UIComm outputDevice =
+			    uiMakeSelectableTextElement(panelLayout, outputDeviceName,
+							textScale, textColor);
 			  if(outputDevice.flags & UICommFlag_hovering)
 			    {
 			      if(!isSelected) outputDevice.element->color = hoveringTextColor;
@@ -542,8 +542,6 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 		  
 			  v2 dragData = uiLoadDragData(hresize.element);
 			  v2 dragDelta = uiGetDragDelta(hresize.element);
-			  //printf("dragData: (%.2f, %.2f)\n", dragData.x, dragData.y);
-			  //printf("dragDelta: (%.2f, %.2f)\n", dragDelta.x, dragDelta.y);
 		  
 			  r32 minChildPercentPreDrag = dragData.x;
 			  r32 maxChildPercentPreDrag = dragData.y;
@@ -816,23 +814,26 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 
 			if(density.flags & UICommFlag_leftDragging)
 			  {
-			    v2 dragDelta = uiGetDragDelta(density.element);		      			    
-			    r32 newDensity = (density.element->fParamValueAtClick +
-					     dragDelta.y/knobDragLength*getLength(density.element->fParam->range));
+			    v2 dragDelta = uiGetDragDelta(density.element);
+			    r32 newDensity =
+			      (density.element->fParamValueAtClick +
+			       dragDelta.y/knobDragLength*getLength(density.element->fParam->range));
 			    
-			    pluginSetFloatParameter(density.element->fParam, newDensity);			
+			    pluginSetFloatParameter(density.element->fParam, newDensity);
 			  }
 			else if(density.flags & UICommFlag_minusPressed)
 			  {
 			    r32 oldDensity = pluginReadFloatParameter(density.element->fParam);
-			    r32 newDensity = oldDensity - 0.02f*getLength(density.element->fParam->range);
+			    r32 newDensity =
+			      oldDensity - 0.02f*getLength(density.element->fParam->range);
 
 			    pluginSetFloatParameter(density.element->fParam, newDensity);
 			  }
 			else if(density.flags & UICommFlag_plusPressed)
 			  {
 			    r32 oldDensity = pluginReadFloatParameter(density.element->fParam);
-			    r32 newDensity = oldDensity + 0.02f*getLength(density.element->fParam->range);
+			    r32 newDensity =
+			      oldDensity + 0.02f*getLength(density.element->fParam->range);
 
 			    pluginSetFloatParameter(density.element->fParam, newDensity);
 			  }
@@ -858,9 +859,9 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 			if(spread.flags & UICommFlag_leftDragging)
 			  {
 			    v2 dragDelta = uiGetDragDelta(spread.element);
-			    //printf("dragDelta: (%.2f, %.2f)\n", dragDelta.x, dragDelta.y);
-			    r32 newSpread = (spread.element->fParamValueAtClick +
-					     dragDelta.y/knobDragLength*getLength(spread.element->fParam->range));
+			    r32 newSpread =
+			      (spread.element->fParamValueAtClick +
+			       dragDelta.y/knobDragLength*getLength(spread.element->fParam->range));
 			    pluginSetFloatParameter(spread.element->fParam, newSpread);
 			  }
 			else if(spread.flags & UICommFlag_minusPressed)
@@ -899,8 +900,9 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 			if(offset.flags & UICommFlag_leftDragging)
 			  {
 			    v2 dragDelta = uiGetDragDelta(offset.element);
-			    r32 newOffset = (offset.element->fParamValueAtClick +
-					     dragDelta.y/knobDragLength*getLength(offset.element->fParam->range));
+			    r32 newOffset =
+			      (offset.element->fParamValueAtClick +
+			       dragDelta.y/knobDragLength*getLength(offset.element->fParam->range));
 
 			    pluginSetFloatParameter(offset.element->fParam, newOffset);
 			  }
@@ -940,13 +942,9 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 			if(size.flags & UICommFlag_leftDragging)
 			  {			
 			    v2 dragDelta = uiGetDragDelta(size.element);
-			    // post processing to set the new grain size using a temporary workaround: 
-			    // We scaled dragDelta.x by x20 to cover approximately the full grain-size scale across width resolution of the screen.
-			    // i.e. dragging fully to the left reduces grain size and sets it to a value towards zero ..
-			    // .. and dragging fully to the right sets the grain-size towards a value near its max value.
-			    // @TODO fix temporary workaround		
-			    r32 newGrainSize = (size.element->fParamValueAtClick +
-						dragDelta.y/knobDragLength*getLength(size.element->fParam->range));
+			    r32 newGrainSize =
+			      (size.element->fParamValueAtClick +
+			       dragDelta.y/knobDragLength*getLength(size.element->fParam->range));
 					
 			    pluginSetFloatParameter(size.element->fParam, newGrainSize);
 			  }
@@ -986,8 +984,9 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 			if(mix.flags & UICommFlag_leftDragging)
 			  {
 			    v2 dragDelta = uiGetDragDelta(mix.element);
-			    r32 newMix = (mix.element->fParamValueAtClick +
-					     dragDelta.y/knobDragLength*getLength(mix.element->fParam->range));
+			    r32 newMix =
+			      (mix.element->fParamValueAtClick +
+			       dragDelta.y/knobDragLength*getLength(mix.element->fParam->range));
 
 			    pluginSetFloatParameter(mix.element->fParam, newMix);
 			  }
@@ -1027,8 +1026,9 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 			if(pan.flags & UICommFlag_leftDragging)
 			  {
 			    v2 dragDelta = uiGetDragDelta(pan.element);
-			    r32 newpan = (pan.element->fParamValueAtClick +
-					  dragDelta.y / knobDragLength * getLength(pan.element->fParam->range));
+			    r32 newpan =
+			      (pan.element->fParamValueAtClick +
+			       dragDelta.y / knobDragLength * getLength(pan.element->fParam->range));
 
 			    pluginSetFloatParameter(pan.element->fParam, newpan);
 			  }
@@ -1068,8 +1068,9 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 			if(window.flags & UICommFlag_leftDragging)
 			  {
 			    v2 dragDelta = uiGetDragDelta(window.element);		
-			    r32 newWindow = (window.element->fParamValueAtClick +
-					     dragDelta.y/knobDragLength*getLength(window.element->fParam->range));
+			    r32 newWindow =
+			      (window.element->fParamValueAtClick +
+			       dragDelta.y/knobDragLength*getLength(window.element->fParam->range));
 
 			    pluginSetFloatParameter(window.element->fParam, newWindow);
 			  }
@@ -1158,8 +1159,8 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 
 			  String8 densityTooltipMessage =
 			    arenaPushStringFormat(pluginState->frameArena,
-						  "density: %.2f",
-						  pluginReadFloatParameter(density.element->fParam));
+						  "density: %.2f grains",
+						  pluginReadFloatParameterProcessing(density.element->fParam));
 			  v2 messageRectMin = V2(MAX(uiContext->mouseP.x,
 						     density.element->region.max.x),
 						 uiContext->mouseP.y);
@@ -1240,7 +1241,7 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 
 			  String8 offsetTooltipMessage =
 			    arenaPushStringFormat(pluginState->frameArena,
-						  "offset: %.2f",
+						  "offset: %.2f samples",
 						  pluginReadFloatParameter(offset.element->fParam));
 			  v2 messageRectMin = V2(MAX(uiContext->mouseP.x,
 						     offset.element->region.max.x),
@@ -1281,7 +1282,7 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 
 			  String8 sizeTooltipMessage =
 			    arenaPushStringFormat(pluginState->frameArena,
-						  "size: %.2f",
+						  "size: %.2f samples",
 						  pluginReadFloatParameter(size.element->fParam));
 			  v2 messageRectMin = V2(MAX(uiContext->mouseP.x,
 						     size.element->region.max.x),
@@ -1322,8 +1323,8 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 
 			  String8 mixTooltipMessage =
 			    arenaPushStringFormat(pluginState->frameArena,
-						  "mix: %.2f",
-						  pluginReadFloatParameter(mix.element->fParam));
+						  "mix: %.2f%%",
+						  100.f*pluginReadFloatParameter(mix.element->fParam));
 			  v2 messageRectMin = V2(MAX(uiContext->mouseP.x,
 						     mix.element->region.max.x),
 						 uiContext->mouseP.y);
@@ -1439,7 +1440,6 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 
 		  v2 dim = hadamard(V2(0.843f, 0.62f), viewDim);
 		  v2 min = viewMin + hadamard(V2(0.075f, 0.2f), viewDim);
-		  //Rect2 rect = rectMinDim(min, dim);
 
 		  r32 middleBarThickness = 4.f;
 		  Rect2 middleBar = rectMinDim(min + V2(0, 0.5f*dim.y),
@@ -1467,9 +1467,7 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 		  
 		  u32 viewEntryReadIndex = grainStateView->viewReadIndex;
 		  u32 entriesQueued = gsAtomicLoad(&grainStateView->entriesQueued);
-		  //u32 entriesToProcess = entiresQueued % ARRAY_COUNT(grainStateView->view);
 		  logFormatString("entriesQueued: %u", entriesQueued);
-		  //logFormatString("entriesToProcess: %u", entriesToProcess);
 
 		  for(u32 entryIndex = 0; entryIndex < entriesQueued; ++entryIndex)
 		    {		     		  
@@ -1615,8 +1613,6 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
       uiContextEndFrame(uiContext);
       
       arenaEnd(pluginState->frameArena);
-
-      //logFormatString("permanent arena used %zu bytes", pluginState->permanentArena->pos);
     }  
 }
 
@@ -1643,8 +1639,6 @@ gsAudioProcess(PluginMemory *memory, PluginAudioBuffer *audioBuffer)
 		    audioBuffer->parameterValueQueueEntries + parameterValueQueueReadIndex;
 
 		  PluginFloatParameter *parameter = pluginState->parameters + entry->index;
-		  //r32 parameterRangeLen = getLength(parameter->range);
-		  //r32 newVal = entry->value.asFloat*parameterRangeLen + parameter->range.min;
 		  r32 newVal = mapToRange(entry->value.asFloat, parameter->range);
 		  pluginSetFloatParameter(parameter, newVal);
 		}
@@ -1721,8 +1715,7 @@ gsAudioProcess(PluginMemory *memory, PluginAudioBuffer *audioBuffer)
 		    case AudioFormat_s16:
 		      {
 			s16 *inputFrames = (s16 *)genericInputFrames[channelIndex];
-			r32 inputSample = (r32)*inputFrames/(r32)S16_MAX;		    
-			//ASSERT(isInRange(inputSample, -1.f, 1.f));
+			r32 inputSample = (r32)*inputFrames/(r32)S16_MAX;
 			inputSample = clampToRange(inputSample, -1.f, 1.f);
 			mixedVal += 0.5f*inputSample;
 
@@ -1733,7 +1726,6 @@ gsAudioProcess(PluginMemory *memory, PluginAudioBuffer *audioBuffer)
 		      {
 			r32 *inputFrames = (r32 *)genericInputFrames[channelIndex];
 			r32 inputSample = *inputFrames;
-			//ASSERT(isInRange(inputSample, -1.f, 1.f));
 			inputSample = clampToRange(inputSample, -1.f, 1.f);
 			mixedVal += 0.5f*inputSample;		    
 
@@ -1751,11 +1743,12 @@ gsAudioProcess(PluginMemory *memory, PluginAudioBuffer *audioBuffer)
 	  bool soundIsPlaying = pluginReadBooleanParameter(&pluginState->soundIsPlaying);
 	  if(soundIsPlaying)
 	    {
-	      //loadedSound->samplesPlayed += scaledFramesToRead;
+#if FINGERTIPS
+	      loadedSound->samplesPlayed += scaledFramesToRead;
+#endif
 	    }
 
 	  writeSamplesToAudioRingBuffer(gbuff, inputMixBuffers[0], inputMixBuffers[1], framesToRead);
-	  //arenaEndTemporaryMemory(&inputMixerMemory);
 
 	  // NOTE: grain playback
 	  GrainManager* gManager = &pluginState->grainManager;
@@ -1875,8 +1868,8 @@ gsAudioProcess(PluginMemory *memory, PluginAudioBuffer *audioBuffer)
 		  r32 leftGrainVal = grainMixBuffers[0][frameIndex];
 		  r32 rightGrainVal = grainMixBuffers[1][frameIndex];
 		  r32 stereoWidth = spreadParamVals[frameIndex];
-		  if (channelIndex < 2) { // Make sure we only process left and right channels
-		    //r32 widthVal = stereoWidth * 0.5f;
+		  if (channelIndex < 2) {
+		    // NOTE: Make sure we only process left and right channels
 		    r32 tmp = 1.0f / MAX(1.0f + stereoWidth, 2.0f);
 		    r32 coef_M = 1.0f * tmp;
 		    r32 coef_S = stereoWidth * tmp;

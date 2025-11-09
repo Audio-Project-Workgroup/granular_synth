@@ -30,6 +30,14 @@ pluginReadFloatParameter(PluginFloatParameter *param)
   return(currentValue.asFloat);
 }
 
+static inline r32
+pluginReadFloatParameterProcessing(PluginFloatParameter *param)
+{
+  r32 resultRaw = pluginReadFloatParameter(param);
+  r32 result = param->processingTransform(resultRaw);
+  return(result);
+}
+
 inline void
 pluginSetFloatParameter(PluginFloatParameter *param, r32 value, r32 changeTimeMS = 10)
 {

@@ -221,7 +221,8 @@ mouseDown(const juce::MouseEvent &event)
 void AudioPluginAudioProcessorEditor::
 mouseUp(const juce::MouseEvent &event)
 {
-  // NOTE: JUCE is a very intuitive and well-designed framework that everyone should use without question
+  // NOTE: JUCE is a very intuitive and well-designed framework that everyone
+  //       should use without question
   while(atomicCompareAndSwap(&inputLock, 0, 1)) {}
   
   if(event.mods.isLeftButtonDown())
@@ -259,13 +260,11 @@ keyPressed(const juce::KeyPress &key)
     {
       result = true;
       juceProcessButtonPress(&newInput->keyboardState.keys[KeyboardButton_tab], result);
-      //juce::Logger::writeToLog("tab pressed");
     }
   else if(key == juce::KeyPress::backspaceKey)
     {
       result = true;
       juceProcessButtonPress(&newInput->keyboardState.keys[KeyboardButton_backspace], result);
-      //juce::Logger::writeToLog("backspace pressed");
     }
   else if(key == juce::KeyPress::returnKey)
     {
@@ -356,15 +355,18 @@ renderOpenGL(void)
   glEnable(GL_BLEND);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-  // NOTE: we have to put locks around input usage and input callback code, because juce doesn't give us a way of
-  //       polling input at a particular time. We could avoid locks by having input callbacks write to a
-  //       lock-free queue, which the rendering code would read from. But that's probably not necessary
+  // NOTE: we have to put locks around input usage and input callback code,
+  //       because juce doesn't give us a way of polling input at a particular
+  //       time. We could avoid locks by having input callbacks write to a
+  //       lock-free queue, which the rendering code would read from. But that's
+  //       probably not necessary
   while(atomicCompareAndSwap(&inputLock, 0, 1)) {}
   if(processorRef.pluginCode.pluginAPI.gsRenderNewFrame)
     {      
       processorRef.pluginCode.pluginAPI.gsRenderNewFrame(&processorRef.pluginMemory, newInput, commands);
 
-      // NOTE: it's so cool that you can't set the mouse cursor here and have to defer setting it in a mouse callback
+      // NOTE: it's so cool that you can't set the mouse cursor here and have to
+      //       defer setting it in a mouse callback
       switch(commands->cursorState)
 	{
 	case CursorState_default:
@@ -391,7 +393,6 @@ renderOpenGL(void)
       
       renderCommands(commands);
       renderEndCommands(commands);
-      //repaint();
       
 #if BUILD_LOGGING
       PluginLogger *pluginLogger = processorRef.pluginMemory.logger;
@@ -417,8 +418,6 @@ renderOpenGL(void)
 	}
 #endif
     }
-  
-  //juce::Logger::writeToLog(juce::String("inputs swapped"));  
   
   PluginInput *temp = newInput;
   newInput = oldInput;

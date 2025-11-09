@@ -6,7 +6,6 @@
 
 static juce::String globalVstBaseDirectory;
 
-//PLATFORM_READ_ENTIRE_FILE(juceReadEntireFile)
 static Buffer
 juceReadEntireFile(char *filename, Arena *allocator)
 {
@@ -61,14 +60,12 @@ juceReadEntireFile(char *filename, Arena *allocator)
   return(result);
 }
 
-//PLATFORM_WRITE_ENTIRE_FILE(juceWriteEntireFile)
 static void
 juceWriteEntireFile(char *filename, Buffer file)
 { 
   juce::String filepath = globalVstBaseDirectory + "/" + juce::String(filename);
   juce::Logger::writeToLog(filepath);
   
-  //juce::File file(filepath);  
   juce::FileOutputStream outputStream(filepath);
   if(outputStream.openedOk())
     {
@@ -91,7 +88,6 @@ juceWriteEntireFile(char *filename, Buffer file)
     }
 }
 
-//PLATFORM_FREE_FILE_MEMORY(juceFreeFileMemory)
 static void
 juceFreeFileMemory(Buffer file, Arena *allocator)
 {
@@ -236,7 +232,6 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
 
 #if BUILD_LOGGING
   pluginLogger = {};
-  //loggerMemory = nullptr;
   loggerArena = 0;
 #endif
 
@@ -388,11 +383,7 @@ prepareToPlay(double sampleRate, int samplesPerBlock)
   //onnxState = {};
   //onnxState = onnxInitializeState(modelPath);
 
-  //pluginMemory.memory			     = calloc(pluginMemoryBlockSizeInBytes, 1);
   pluginMemory.host			     = PluginHost_daw;
-  // pluginMemory.platformAPI.gsReadEntireFile  = juceReadEntireFile;
-  // pluginMemory.platformAPI.gsWriteEntireFile = juceWriteEntireFile;
-  // pluginMemory.platformAPI.gsFreeFileMemory  = juceFreeFileMemory;
   pluginMemory.platformAPI.gsReadEntireFile  = platformReadEntireFile;
   pluginMemory.platformAPI.gsWriteEntireFile = platformWriteEntireFile;
   pluginMemory.platformAPI.gsFreeFileMemory  = platformFreeFileMemory;

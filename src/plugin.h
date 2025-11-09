@@ -373,6 +373,7 @@ struct PluginState
 };
 
 // MIdi Continuous Controller Table 0-127
+// NOTE: our parameters are on channels 20 - 29 by default
 static PluginParameterEnum ccParamTable[128] = {
     PluginParameter_none,   // CC 0: Bank Select (followed by cc32 & Program Change)
     PluginParameter_none, // CC 1: Modulation Wheel (mapped to volume)
@@ -395,16 +396,16 @@ static PluginParameterEnum ccParamTable[128] = {
     PluginParameter_none,   // CC 18: General Purpose Controller 3
     PluginParameter_none,   // CC 19: General Purpose Controller 4
     //22-31 are undefined, available for use by synths that let you assign controllers
-    PluginParameter_none,   // CC 20: Undefined
-    PluginParameter_none,   // CC 21: Undefined
-    PluginParameter_none,   // CC 22: Undefined
-    PluginParameter_none,   // CC 23: Undefined
-    PluginParameter_none,   // CC 24: Undefined
-    PluginParameter_none,   // CC 25: Undefined
-    PluginParameter_none,   // CC 26: Undefined
-    PluginParameter_none,   // CC 27: Undefined
-    PluginParameter_none,   // CC 28: Undefined
-    PluginParameter_none,   // CC 29: Undefined
+    PluginParameter_volume,   // CC 20: Undefined
+    PluginParameter_density,   // CC 21: Undefined
+    PluginParameter_pan,   // CC 22: Undefined
+    PluginParameter_size,   // CC 23: Undefined
+    PluginParameter_window,   // CC 24: Undefined
+    PluginParameter_spread,   // CC 25: Undefined
+    PluginParameter_mix,   // CC 26: Undefined
+    PluginParameter_offset,   // CC 27: Undefined
+    PluginParameter_pitch,   // CC 28: Undefined
+    PluginParameter_stretch,   // CC 29: Undefined
     PluginParameter_none,   // CC 30: Undefined
     PluginParameter_none,   // CC 31: Undefined
     PluginParameter_none,   // CC 32: LSB for Control 0 (Bank Select)
