@@ -351,7 +351,7 @@ This is a list of missing features for concrete Granade implementation, or envis
 
 ## Release Notes
 
-### 0.2.0 (ADC Release) - TBD
+### 0.2.0 (ADC Release) - 9th November 2025
 New WebAssembly target, renderer improvements, reduced memory footprint, build configuration interface
 
 ### 0.1.0 (Initial Release) - 1st June 2025

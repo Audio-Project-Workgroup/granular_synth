@@ -2,7 +2,7 @@
 
 All notable changes to Granade will be documented in this file.
 
-## [0.2.0] - 2025-11-TBD
+## [0.2.0] - 2025-11-09
 - Added WebAssembly target
 - Updated renderer to OpenGL 3.3 / WebGL2
 - Reduced memory footprint significantly
