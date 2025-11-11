@@ -84,7 +84,7 @@ async function main() {
 
     // NOTE: WEBGL setup
     const canvas = document.querySelector("#gl-canvas");
-    const gl = canvas.getContext("webgl2");
+    const gl = canvas.getContext("webgl2");    
 
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
@@ -260,6 +260,8 @@ async function main() {
 	}
     });
 
+    
+
     // webgl setup
     // init shaders
     const vertexShader = gl.createShader(gl.VERTEX_SHADER);
@@ -326,8 +328,14 @@ async function main() {
 
     const targetAspectRatio = 16.0 / 9.0;
 
+    const header = document.querySelector("header");
+
     // render loop
     function render(now) {
+
+	// NOTE: resize canvas
+	canvas.width = canvas.clientWidth;
+	canvas.height = canvas.clientHeight;
 
 	gl.viewport(0, 0, canvas.width, canvas.height);
 	gl.scissor(0, 0, canvas.width, canvas.height);
@@ -336,9 +344,12 @@ async function main() {
 	gl.clearDepth(1.0);
 	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
+	// NOTE: compute draw region
 	const windowAspectRatio = canvas.width / canvas.height;
 	let viewportDimX = canvas.width;
 	let viewportDimY = canvas.height;
+	viewportMinX = 0;
+	viewportMinY = 0;
 	if(windowAspectRatio < targetAspectRatio) {
 	    viewportDimY = viewportDimX / targetAspectRatio;
 	    viewportMinY = (canvas.height - viewportDimY) * 0.5;

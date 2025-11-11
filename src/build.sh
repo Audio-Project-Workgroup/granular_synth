@@ -47,7 +47,7 @@ for arg in "$@"; do
 	echo "    values:"
 	echo "      debug:   compiles with debug info, enables asserts"
 	echo "      logging: enables the logging system"
-	echo "      testing: runs tests in `gsInitializePluginState`"
+	echo "      testing: runs tests in gsInitializePluginState"
 	echo "      release: assembles a distributable application bundle"
 	echo ""
 	echo "  target:"

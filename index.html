@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
+  <head>
   <meta charset="utf-8" />
   <title>Granade</title>
   <script src="index.js" type="module"></script>
@@ -15,7 +15,6 @@
       background-color: #121212;
       color: #f0f0f0;
       font-family: Arial, sans-serif;
-      min-height: 100vh;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -25,6 +24,7 @@
     header {
       text-align: center;
       margin-bottom: 2em;
+      flex-shrink: 0;
     }
 
     header h1 {
@@ -43,12 +43,17 @@
       flex-direction: column;
       align-items: center;
       margin-bottom: 2em;
+      flex-grow: 1;
+      width: 100%;
+      min-height: calc(100vh - 200px - 100px);
     }
 
     canvas {
       border: 2px solid #ffffff22;
       border-radius: 8px;
       margin-bottom: 1em;
+      flex-grow: 1;
+      width: 100%;
     }
 
     button {
@@ -60,6 +65,7 @@
       border-radius: 4px;
       cursor: pointer;
       transition: background-color 0.2s ease;
+      flex-shrink: 0;
     }
 
     button:hover {
@@ -128,7 +134,7 @@
   </header>
 
   <section id="app">
-    <canvas id="gl-canvas" width="640" height="480"></canvas>
+    <canvas id="gl-canvas"></canvas>
     <button id="play-pause-btn">Play/Pause</button>
   </section>
 
