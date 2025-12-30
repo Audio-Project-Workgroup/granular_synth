@@ -598,8 +598,24 @@ main(int argc, char **argv)
         audioBuffer.midiMessageCount = 0; // TODO: send midi messages to the plugin
         audioBuffer.midiBuffer = (u8 *)calloc(KILOBYTES(1), 1);
 
+        // TODO: it would be better to default to using jack over pulseaudio on
+        // linux. However, miniaudio's jack implementation does not provide the
+        // same level of experience as pulseaudio, particularly when it comes to
+        // device enumeration (and if the system uses pipewire, it will not work
+        // at all). Miniaudio could be modified to fix these problems.
+        ma_backend maBackends[] = {
+          ma_backend_wasapi,
+          ma_backend_dsound,
+          ma_backend_winmm,
+          ma_backend_coreaudio,
+          ma_backend_pulseaudio,
+          ma_backend_alsa,
+          ma_backend_jack,
+        };
+        u32 maBackendCount = sizeof(maBackends)/sizeof(maBackends[0]);
+
         ma_context maContext;
-        if(ma_context_init(NULL, 0, NULL, &maContext) == MA_SUCCESS)
+        if(ma_context_init(maBackends, maBackendCount, NULL, &maContext) == MA_SUCCESS)
         {
           ma_device_info maDefaultPlaybackDeviceInfo;
           ma_device_info maDefaultCaptureDeviceInfo;
@@ -654,7 +670,7 @@ main(int argc, char **argv)
             MACallbackData maCallbackData = {};
             maCallbackData.memory = &pluginMemory;
             maCallbackData.audioBuffer = &audioBuffer;
-
+#if 1
             ma_device_config maConfig;
             if(maCaptureCount)
             {
@@ -676,9 +692,20 @@ main(int argc, char **argv)
               maConfig.dataCallback = maDataCallback;
               maConfig.pUserData = &maCallbackData;
             }
-
+#else
+            // TODO: it would be nice if we could get the default configuration
+            // from audio devices, instead of relying on miniaudio to convert
+            // between the kind of data we want to deal with and the default
+            // device formats. But that requires us to do some level of
+            // conversion ourselves, and as long as we're using miniaudio, we
+            // may as well leave it that way.
+            ma_device_config maConfig =
+              ma_device_config_init(maCaptureCount ? ma_device_type_duplex : ma_device_type_playback);
+            maConfig.dataCallback = maDataCallback;
+            maConfig.pUserData = &maCallbackData;
+#endif
             ma_device maDevice;
-            if(ma_device_init(NULL, &maConfig, &maDevice) == MA_SUCCESS)
+            if(ma_device_init(&maContext, &maConfig, &maDevice) == MA_SUCCESS)
             {
               ma_device_start(&maDevice);
 
