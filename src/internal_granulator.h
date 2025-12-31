@@ -5,14 +5,12 @@ struct Grain
   Grain* next;
   Grain* prev;
 
-  //r32* start[2];
   u32 readIndex;
   r32 windowParam;
-  
+
   s32 samplesToPlay;
   u32 length;
   r32 lengthInv;
-  //bool onFreeList;
   r32 stereoPosition;
 
   u32 startSampleIndex; // NOTE: the sample index in the processing loop at which we start processing this grain
@@ -24,15 +22,14 @@ struct GrainManager
   Arena* grainAllocator;
 
   u32 grainCount;
-  /* Grain* grainPlayList; */
   Grain *firstPlayingGrain;
   Grain *lastPlayingGrain;
 
   Grain* grainFreeList;
-  
-  AudioRingBuffer *grainBuffer;  
+
+  AudioRingBuffer *grainBuffer;
   u32 samplesProcessedSinceLastSeed;
-  
+
   r32* windowBuffer[WindowShape_count];
 };
 
@@ -57,12 +54,11 @@ struct GrainBufferViewEntry
 
 struct GrainStateView
 {
-  u32 viewReadIndex;  
+  u32 viewReadIndex;
   u32 viewWriteIndex;
   volatile u32 entriesQueued;
 
   GrainBufferViewEntry views[32];
-  
+
   AudioRingBuffer viewBuffer;
 };
-
