@@ -13,8 +13,8 @@ pluginSetBooleanParameter(PluginBooleanParameter *param, bool value)
 }
 
 inline void
-initializeFloatParameter(PluginFloatParameter *param, PluginParameterInitData initData,		
-			 ParameterTransform *transform = defaultTransform)
+initializeFloatParameter(PluginFloatParameter *param, PluginParameterInitData initData,
+                         ParameterTransform *transform = defaultTransform)
 {
   param->currentValue.asFloat = param->targetValue.asFloat = initData.init;
   param->range = makeRange(initData.min, initData.max);
@@ -46,11 +46,11 @@ pluginSetFloatParameter(PluginFloatParameter *param, r32 value, r32 changeTimeMS
   gsAtomicStore(&param->targetValue.asInt, targetValue.asInt);
 
   ParameterValue currentValue = {};
-  currentValue.asInt = gsAtomicLoad(&param->currentValue.asInt);   
+  currentValue.asInt = gsAtomicLoad(&param->currentValue.asInt);
 
   ParameterValue dValue = {};
   r32 changeTimeSamples = 0.001f*changeTimeMS*(r32)INTERNAL_SAMPLE_RATE;
-  dValue.asFloat = (targetValue.asFloat - currentValue.asFloat)/changeTimeSamples;  
+  dValue.asFloat = (targetValue.asFloat - currentValue.asFloat)/changeTimeSamples;
   gsAtomicStore(&param->dValue.asInt, dValue.asInt);
 }
 
@@ -58,7 +58,7 @@ inline void
 pluginOffsetFloatParameter(PluginFloatParameter *param, r32 inc, r32 changeTimeMS = 10)
 {
   ParameterValue currentValue = {};
-  currentValue.asInt = gsAtomicLoad(&param->currentValue.asInt);   
+  currentValue.asInt = gsAtomicLoad(&param->currentValue.asInt);
 
   ParameterValue targetValue = {};
   targetValue.asFloat = clampToRange(currentValue.asFloat + inc, param->range);
@@ -66,7 +66,7 @@ pluginOffsetFloatParameter(PluginFloatParameter *param, r32 inc, r32 changeTimeM
 
   ParameterValue dValue = {};
   r32 changeTimeSamples = 0.001f*changeTimeMS*(r32)INTERNAL_SAMPLE_RATE;
-  dValue.asFloat = (targetValue.asFloat - currentValue.asFloat)/changeTimeSamples;  
+  dValue.asFloat = (targetValue.asFloat - currentValue.asFloat)/changeTimeSamples;
   gsAtomicStore(&param->dValue.asInt, dValue.asInt);
 }
 
@@ -89,15 +89,15 @@ pluginUpdateFloatParameter(PluginFloatParameter *param)
       ParameterValue dValue = {};
       dValue.asInt = gsAtomicLoad(&param->dValue.asInt);
 
-      ParameterValue newValue = {};      
+      ParameterValue newValue = {};
       newValue.asFloat = currentValue.asFloat + dValue.asFloat;
       resultRaw = newValue.asFloat;
-      
+
       if(gsAtomicCompareAndSwap(&param->currentValue.asInt, currentValue.asInt, newValue.asInt) !=
-	 currentValue.asInt)
-	{
-	  logString("WARNING: Atomic CAS failed to modify parameter!");
-	}
+         currentValue.asInt)
+        {
+          logString("WARNING: Atomic CAS failed to modify parameter!");
+        }
     }
 
   r32 result = param->processingTransform(resultRaw);

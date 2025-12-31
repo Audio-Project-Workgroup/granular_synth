@@ -17,20 +17,10 @@ struct Grain
   b32 isFinished;
 };
 
-struct GrainManager
+struct SamplePair
 {
-  Arena* grainAllocator;
-
-  u32 grainCount;
-  Grain *firstPlayingGrain;
-  Grain *lastPlayingGrain;
-
-  Grain* grainFreeList;
-
-  AudioRingBuffer *grainBuffer;
-  u32 samplesProcessedSinceLastSeed;
-
-  r32* windowBuffer[WindowShape_count];
+  r32 left;
+  r32 right;
 };
 
 struct GrainViewEntry
@@ -46,7 +36,8 @@ struct GrainBufferViewEntry
 
   u32 sampleCount;
   u32 sampleCapacity;
-  r32 *bufferSamples[2];
+  //r32 *bufferSamples[2];
+  SamplePair *bufferSamples;
 
   u32 grainCount;
   GrainViewEntry grainViews[32];
@@ -60,5 +51,38 @@ struct GrainStateView
 
   GrainBufferViewEntry views[32];
 
-  AudioRingBuffer viewBuffer;
+  //AudioRingBuffer viewBuffer;
+  SamplePair *viewBufferSamples;
+  u32 viewBufferCount;
+  u32 viewBufferWriteIndex;
+  u32 viewBufferReadIndex;
+};
+
+struct GrainManager
+{
+  BufferStream self; // NOTE: must always be the first member (so we can do casting tricks)
+  BufferStream *sampleSource;
+
+  Arena *grainAllocator;
+  Arena *refillArena;
+
+  PluginFloatParameter *parameters;
+
+  GrainStateView *grainStateView;
+
+  u32 grainCount;
+  Grain *firstPlayingGrain;
+  Grain *lastPlayingGrain;
+
+  Grain *grainFreeList;
+
+  //AudioRingBuffer *grainBuffer;
+  SamplePair *grainBufferSamples;
+  u32 grainBufferCount;
+  u32 readIndex;
+  u32 writeIndex;
+
+  u32 samplesProcessedSinceLastSeed;
+
+  r32 *windowBuffer[WindowShape_count];
 };

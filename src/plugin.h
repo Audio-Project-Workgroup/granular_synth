@@ -26,20 +26,20 @@ logString(char *string)
   RELEASE_LOCK(&globalLogger->mutex);
 #else
   for(;;)
-    {    
+    {
       if(gsAtomicCompareAndSwap(&globalLogger->mutex, 0, 1) == 0)
-	{
-	  stringListPush(globalLogger->logArena, &globalLogger->log, STR8_CSTR(string));
+        {
+          stringListPush(globalLogger->logArena, &globalLogger->log, STR8_CSTR(string));
 
-	  if(globalLogger->log.totalSize >= globalLogger->maxCapacity)
-	    {
-	      ZERO_STRUCT(&globalLogger->log);
-	      arenaEnd(globalLogger->logArena);
-	    }
+          if(globalLogger->log.totalSize >= globalLogger->maxCapacity)
+            {
+              ZERO_STRUCT(&globalLogger->log);
+              arenaEnd(globalLogger->logArena);
+            }
 
-	  gsAtomicStore(&globalLogger->mutex, 0);
-	  break;
-	}
+          gsAtomicStore(&globalLogger->mutex, 0);
+          break;
+        }
     }
 #endif
 #else
@@ -64,20 +64,20 @@ logFormatString(char *format, ...)
   RELEASE_LOCK(&globalLogger->mutex);
 #else
   for(;;)
-    {    
+    {
       if(gsAtomicCompareAndSwap(&globalLogger->mutex, 0, 1) == 0)
-	{   
-	  stringListPushFormatV(globalLogger->logArena, &globalLogger->log, format, vaArgs);
+        {
+          stringListPushFormatV(globalLogger->logArena, &globalLogger->log, format, vaArgs);
 
-	  if(globalLogger->log.totalSize >= globalLogger->maxCapacity)
-	    {
-	      ZERO_STRUCT(&globalLogger->log);
-	      arenaEnd(globalLogger->logArena);
-	    }
+          if(globalLogger->log.totalSize >= globalLogger->maxCapacity)
+            {
+              ZERO_STRUCT(&globalLogger->log);
+              arenaEnd(globalLogger->logArena);
+            }
 
-	  gsAtomicStore(&globalLogger->mutex, 0);
-	  break;
-	}
+          gsAtomicStore(&globalLogger->mutex, 0);
+          break;
+        }
     }
 #endif
 #else
@@ -95,6 +95,7 @@ logFormatString(char *format, ...)
 #include "ui_layout.h"
 #include "plugin_ui.h"
 #include "plugin_render.h"
+#include "buffer_stream.h"
 #include "ring_buffer.h"
 #include "internal_granulator.h"
 
@@ -110,12 +111,12 @@ union RiffID
 struct RiffHeader
 {
   RiffID chunkID;
-  u32 chunkSize;  
+  u32 chunkSize;
 };
 
 struct WaveHeader
 {
-  RiffID waveID;  
+  RiffID waveID;
 };
 
 struct WaveFormatChunk
@@ -200,37 +201,37 @@ loadWav(Arena *arena, String8 path)
     {
       if(bytesPerSample == 1)
       {
-	for(u32 sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex)
-	{
-	  r32 srcSample = 0;
-	  CONVERT_SAMPLE(srcDataL, srcSample, u8, channelCount);
-	  *destL++ = srcSample;
-	  *destR++ = srcSample;
-	}
+        for(u32 sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex)
+        {
+          r32 srcSample = 0;
+          CONVERT_SAMPLE(srcDataL, srcSample, u8, channelCount);
+          *destL++ = srcSample;
+          *destR++ = srcSample;
+        }
       }
       else if(bytesPerSample == 2)
       {
-	for(u32 sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex)
-	{
-	  r32 srcSample = 0;
-	  CONVERT_SAMPLE(srcDataL, srcSample, s16, channelCount);
-	  *destL++ = srcSample;
-	  *destR++ = srcSample;
-	}
+        for(u32 sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex)
+        {
+          r32 srcSample = 0;
+          CONVERT_SAMPLE(srcDataL, srcSample, s16, channelCount);
+          *destL++ = srcSample;
+          *destR++ = srcSample;
+        }
       }
       else if(bytesPerSample == 4)
       {
-	for(u32 sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex)
-	{
-	  r32 srcSample = 0;
-	  CONVERT_SAMPLE(srcDataL, srcSample, r32, channelCount);
-	  *destL++ = srcSample;
-	  *destR++ = srcSample;
-	}
+        for(u32 sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex)
+        {
+          r32 srcSample = 0;
+          CONVERT_SAMPLE(srcDataL, srcSample, r32, channelCount);
+          *destL++ = srcSample;
+          *destR++ = srcSample;
+        }
       }
       else
       {
-	ASSERT(!"unsupported sample size")
+        ASSERT(!"unsupported sample size")
       }
     }
     else if(channelCount == 2)
@@ -238,43 +239,43 @@ loadWav(Arena *arena, String8 path)
       void *srcDataR = sampleData + bytesPerSample;
       if(bytesPerSample == 1)
       {
-	for(u32 sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex)
-	{
-	  r32 srcSampleL = 0;
-	  r32 srcSampleR = 0;
-	  CONVERT_SAMPLE(srcDataL, srcSampleL, u8, channelCount);
-	  CONVERT_SAMPLE(srcDataR, srcSampleR, u8, channelCount);
-	  *destL++ = srcSampleL;
-	  *destR++ = srcSampleR;
-	}
+        for(u32 sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex)
+        {
+          r32 srcSampleL = 0;
+          r32 srcSampleR = 0;
+          CONVERT_SAMPLE(srcDataL, srcSampleL, u8, channelCount);
+          CONVERT_SAMPLE(srcDataR, srcSampleR, u8, channelCount);
+          *destL++ = srcSampleL;
+          *destR++ = srcSampleR;
+        }
       }
       else if(bytesPerSample == 2)
       {
-	for(u32 sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex)
-	{
-	  r32 srcSampleL = 0;
-	  r32 srcSampleR = 0;
-	  CONVERT_SAMPLE(srcDataL, srcSampleL, s16, channelCount);
-	  CONVERT_SAMPLE(srcDataR, srcSampleR, s16, channelCount);
-	  *destL++ = srcSampleL;
-	  *destR++ = srcSampleR;
-	}
+        for(u32 sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex)
+        {
+          r32 srcSampleL = 0;
+          r32 srcSampleR = 0;
+          CONVERT_SAMPLE(srcDataL, srcSampleL, s16, channelCount);
+          CONVERT_SAMPLE(srcDataR, srcSampleR, s16, channelCount);
+          *destL++ = srcSampleL;
+          *destR++ = srcSampleR;
+        }
       }
       else if(bytesPerSample == 4)
       {
-	for(u32 sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex)
-	{
-	  r32 srcSampleL = 0;
-	  r32 srcSampleR = 0;
-	  CONVERT_SAMPLE(srcDataL, srcSampleL, r32, channelCount);
-	  CONVERT_SAMPLE(srcDataR, srcSampleR, r32, channelCount);
-	  *destL++ = srcSampleL;
-	  *destR++ = srcSampleR;
-	}
+        for(u32 sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex)
+        {
+          r32 srcSampleL = 0;
+          r32 srcSampleR = 0;
+          CONVERT_SAMPLE(srcDataL, srcSampleL, r32, channelCount);
+          CONVERT_SAMPLE(srcDataR, srcSampleR, r32, channelCount);
+          *destL++ = srcSampleL;
+          *destR++ = srcSampleR;
+        }
       }
       else
       {
-	ASSERT(!"unsupported sample size")
+        ASSERT(!"unsupported sample size")
       }
     }
     else
@@ -300,9 +301,9 @@ enum PluginMode
 };
 
 struct PlayingSound
-{  
+{
   LoadedSound sound;
-  r32 samplesPlayed;  
+  r32 samplesPlayed;
 };
 
 INTROSPECT
@@ -364,8 +365,8 @@ struct PluginState
   UIPanel *menuPanel;
   UILayout *mouseTooltipLayout;
 
-  GrainManager grainManager;  
-  AudioRingBuffer grainBuffer;
+  GrainManager grainManager;
+  //AudioRingBuffer grainBuffer;
   GrainStateView grainStateView;
 
   volatile u32 initializationLock;
@@ -472,7 +473,7 @@ static PluginParameterEnum ccParamTable[128] = {
     PluginParameter_none,   // CC 93: Effects 3 Depth (Chorus)
     PluginParameter_none,   // CC 94: Effects 4 Depth (Detune)
     PluginParameter_none,   // CC 95: Effects 5 Depth (Phaser)
-    //It's probably best not to use the group below for assigning controllers. 
+    //It's probably best not to use the group below for assigning controllers.
     PluginParameter_none,   // CC 96: Data Increment
     PluginParameter_none,   // CC 97: Data Decrement
     PluginParameter_none,   // CC 98: Non-Registered Parameter Number LSB
