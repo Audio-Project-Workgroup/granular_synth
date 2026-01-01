@@ -23,7 +23,7 @@
 #if BUILD_LOGGING
 struct PluginLogger
 {
-  Arena *logArena;  
+  Arena *logArena;
   String8List log;
   usz maxCapacity;
 
@@ -54,7 +54,7 @@ struct PluginMemory
   String8 inputDeviceNames[32];
   u32 inputDeviceCount;
   u32 selectedInputDeviceIndex;
-  
+
   PlatformAPI platformAPI;
 
 #if BUILD_LOGGING
@@ -74,7 +74,7 @@ static inline bool
 wasPressed(ButtonState button)
 {
   bool result = ((button.halfTransitionCount > 1) ||
-		 ((button.halfTransitionCount == 1) && button.endedDown));
+                 ((button.halfTransitionCount == 1) && button.endedDown));
 
   return(result);
 }
@@ -91,7 +91,7 @@ inline bool
 wasReleased(ButtonState button)
 {
   bool result = ((button.halfTransitionCount > 1) ||
-		 ((button.halfTransitionCount == 1) && !button.endedDown));
+                 ((button.halfTransitionCount == 1) && !button.endedDown));
 
   return(result);
 }
@@ -108,9 +108,9 @@ enum MouseButton
 struct MouseState
 {
   v2 position;
-  
+
   ButtonState buttons[MouseButton_COUNT];
-  
+
   int scrollDelta;
 };
 
@@ -143,7 +143,7 @@ enum KeyboardButton
   KeyboardButton_y,
   KeyboardButton_z,
   KeyboardButton_esc,
-  KeyboardButton_tab,  
+  KeyboardButton_tab,
   KeyboardButton_backspace,
   KeyboardButton_minus,
   KeyboardButton_equal,
@@ -187,9 +187,15 @@ struct PluginFileOperations
 enum AudioFormat
 {
   AudioFormat_none,
-  
+
   AudioFormat_s16,
   AudioFormat_r32,
+};
+
+union SamplePair
+{
+  struct { r32 left, right; };
+  r32 c[2];
 };
 
 struct MidiHeader
@@ -201,7 +207,7 @@ struct MidiHeader
 struct PluginAudioBuffer
 {
   u64 millisecondsElapsedSinceLastCall;
-  
+
   AudioFormat outputFormat;
   u32 outputBufferCapacity;
   const void *outputBuffer[2];

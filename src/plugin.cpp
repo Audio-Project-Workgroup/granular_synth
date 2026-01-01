@@ -1635,180 +1635,382 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
     }
 }
 
+//
+// audio
+//
+
+struct OutputMixStream
+{
+  BufferStream stream; // NOTE: must be the first member for casting reasons
+  BufferStream *grainSource; // NOTE: grain process
+  BufferStream *inputSource;
+
+  PluginAudioBuffer *audioBuffer;
+  PluginState *pluginState;
+};
+
+static BUFFER_STREAM_REFILL_PROC(mixOutputSamples)
+{
+  ASSERT(stream->at == stream->end);
+
+  OutputMixStream *outMix = (OutputMixStream*)stream;
+  BufferStream *grainSource = outMix->grainSource;
+  BufferStream *inputSource = outMix->inputSource;
+
+  PluginAudioBuffer *audioBuffer = outMix->audioBuffer;
+  PluginState *pluginState = outMix->pluginState;
+
+  PluginFloatParameter *params = pluginState->parameters;
+  PluginFloatParameter *volumeParam = params + PluginParameter_volume;
+  PluginFloatParameter *panParam = params + PluginParameter_pan;
+  PluginFloatParameter *mixParam = params + PluginParameter_mix;
+  PluginFloatParameter *spreadParam = params + PluginParameter_spread;
+
+  if(grainSource->at == grainSource->end) grainSource->refill(grainSource);
+  ASSERT(inputSource->at == inputSource->start);
+
+  r32 formatVolumeFactor = 1.f;
+  switch(audioBuffer->outputFormat)
+  {
+    case AudioFormat_s16:
+    {
+      formatVolumeFactor = 32000.f;
+    } break;
+    case AudioFormat_r32: break;
+    default: { ASSERT(!"invalid audio format"); } break;
+  }
+
+  void *genericOutputFrames[2] = {};
+  genericOutputFrames[0] = (void*)audioBuffer->outputBuffer[0];
+  genericOutputFrames[1] = (void*)audioBuffer->outputBuffer[1];
+  logFormatString("genericOutputFrames = %p, %p",
+                  genericOutputFrames[0], genericOutputFrames[1]);
+  // NOTE: DEBUG
+  usz genericOutputFramesIntL = INT_FROM_PTR(genericOutputFrames[0]);
+  usz genericOutputFramesIntR = INT_FROM_PTR(genericOutputFrames[1]);
+  UNUSED(genericOutputFramesIntL);
+  UNUSED(genericOutputFramesIntR);
+
+  u8 *atMidiBuffer = audioBuffer->midiBuffer;
+
+  logFormatString("samples to write: %lu", audioBuffer->framesToWrite);
+  for(u32 frameIndex = 0;
+      frameIndex < audioBuffer->framesToWrite;
+      ++frameIndex, grainSource->at += sizeof(SamplePair), inputSource->at += sizeof(SamplePair))
+  {
+    // TODO: think harder about how and when parameters are updated from various sources
+    atMidiBuffer = midi::parseMidiMessage(atMidiBuffer, pluginState,
+                                          audioBuffer->midiMessageCount, frameIndex);
+
+    SamplePair grainSample = *(SamplePair*)grainSource->at;
+    SamplePair inputSample = *(SamplePair*)inputSource->at;
+
+    // r32 volume = formatVolumeFactor * volumeParamVals[frameIndex];
+    // r32 mixParam = mixParamVals[frameIndex];
+    // r32 panner = panParamVals[frameIndex];
+    r32 volume = formatVolumeFactor * pluginUpdateFloatParameter(volumeParam);
+    r32 mix = pluginUpdateFloatParameter(mixParam);
+    r32 panner = pluginUpdateFloatParameter(panParam);
+    r32 spread = pluginUpdateFloatParameter(spreadParam);
+    for(u32 channelIndex = 0; channelIndex < audioBuffer->outputChannels; ++channelIndex)
+    {
+#if 0
+      if(grainMixBuffersIntL != INT_FROM_PTR(grainMixBuffers[0]) ||
+         grainMixBuffersIntR != INT_FROM_PTR(grainMixBuffers[1]))
+      {
+        logFormatString("grain mix buffers (%p, %p) got fucked up "
+                        "at sample %u, channel %u",
+                        grainMixBuffers[0], grainMixBuffers[1],
+                        frameIndex, channelIndex);
+      }
+#endif
+
+      r32 mixedVal = 0.f;
+      //r32 grainVal = grainMixBuffers[channelIndex][frameIndex];
+      r32 leftGrainVal = grainSample.left;//grainMixBuffers[0][frameIndex];
+      r32 rightGrainVal = grainSample.right;//grainMixBuffers[1][frameIndex];
+      //r32 stereoWidth = spreadParamVals[frameIndex];
+      r32 grainVal = 0.f;
+      if (channelIndex < 2) {
+        // NOTE: Make sure we only process left and right channels
+        r32 tmp = 1.0f / MAX(1.0f + spread, 2.0f);
+        r32 coef_M = 1.0f * tmp;
+        r32 coef_S = spread * tmp;
+
+        r32 mid = (leftGrainVal + rightGrainVal) * coef_M;
+        r32 sides = (rightGrainVal - leftGrainVal) * coef_S;
+
+        // Update grain value based on channel
+        if (channelIndex == 0) {
+          grainVal = mid - sides; // Left channel
+          grainVal = grainVal * (1 - panner);
+        }
+        else {
+          grainVal = mid + sides; // Right channel
+          grainVal = grainVal * (1 + panner);
+        }
+      }
+
+      //mixedVal += lerp(inputMixBuffers[channelIndex][frameIndex], grainVal, mixParam);
+      mixedVal += lerp(inputSample.c[channelIndex], grainVal, mix);
+      //logFormatString("mixedVal: %.2f", mixedVal);
+
+      switch(audioBuffer->outputFormat)
+      {
+        case AudioFormat_r32:
+        {
+          r32 *audioFrames = (r32 *)genericOutputFrames[channelIndex];
+          *audioFrames = volume*mixedVal;
+          genericOutputFrames[channelIndex] = (u8 *)audioFrames + audioBuffer->outputStride;
+        } break;
+        case AudioFormat_s16:
+        {
+          s16 *audioFrames = (s16 *)genericOutputFrames[channelIndex];
+          *audioFrames = (s16)(volume*mixedVal);
+          genericOutputFrames[channelIndex] = (u8 *)audioFrames + audioBuffer->outputStride;
+        } break;
+
+        default: ASSERT(!"ERROR: invalid audio output format");
+      }
+    }
+  }
+}
+
+// TODO: manage refill arenas in the input and the grain streams !!
+
+struct InputMixStream
+{
+  BufferStream stream; // NOTE: must be the first member for casting reasons
+  BufferStream *clone; // NOTE: copy of state after refill because this stream has multiple consumers
+  Arena *refillArena;
+
+  PluginAudioBuffer *audioBuffer;
+  PluginState *pluginState;
+};
+
+static BUFFER_STREAM_REFILL_PROC(mixInputSamples)
+{
+  InputMixStream *mix = (InputMixStream*)stream;
+
+  Arena *refillArena = mix->refillArena;
+
+  PluginAudioBuffer *audioBuffer = mix->audioBuffer;
+  PluginState *pluginState = mix->pluginState;
+
+  u32 framesToRead = audioBuffer->framesToWrite;
+
+  //AudioRingBuffer *gbuff = &pluginState->grainBuffer;
+  logFormatString("samples to read: %lu", framesToRead);
+
+  // r32 *inputMixBuffersArray = arenaPushArray(mix->refillArena, 2*framesToRead, r32,
+  //                                            arenaFlagsZeroAlign(4*sizeof(r32)));
+  // r32 *inputMixBuffers[2] = {};
+  // inputMixBuffers[0] = inputMixBuffersArray + (0 * framesToRead);
+  // inputMixBuffers[1] = inputMixBuffersArray + (1 * framesToRead);
+  SamplePair *samplesStart = arenaPushArray(refillArena, framesToRead, SamplePair,
+                                            arenaFlagsZeroAlign(4*sizeof(SamplePair)));
+  SamplePair *samplesEnd = samplesStart + framesToRead;
+
+  const void *genericInputFrames[2] = {};
+  genericInputFrames[0] = audioBuffer->inputBuffer[0];
+  genericInputFrames[1] = audioBuffer->inputBuffer[1];
+
+#if FINGERTIPS
+  {
+    // TODO: sample rate convert to the audio input sample rate, not the old internal sample rate!
+    r32 inputBufferReadSpeed = ((audioBuffer->inputSampleRate != 0) ?
+                                (r32)INTERNAL_SAMPLE_RATE/(r32)audioBuffer->inputSampleRate : 1.f);
+    r32 scaledFramesToRead = inputBufferReadSpeed*framesToRead;
+
+    PlayingSound *loadedSound = &pluginState->loadedSound;
+    SamplePair *samplesAt = samplesStart;
+    for(u32 frameIndex = 0; frameIndex < framesToRead; ++frameIndex, ++samplesAt)
+    {
+      bool soundIsPlaying = pluginReadBooleanParameter(&pluginState->soundIsPlaying);
+      r32 currentTime = (r32)loadedSound->samplesPlayed + inputBufferReadSpeed*(r32)frameIndex;
+      u32 soundReadIndex = (u32)currentTime;
+      r32 soundReadFrac = currentTime - (r32)soundReadIndex;
+
+      if(soundIsPlaying)
+      {
+        if(currentTime < loadedSound->sound.sampleCount)
+        {
+          for(u32 channelIndex = 0; channelIndex < audioBuffer->inputChannels; ++channelIndex)
+          {
+            r32 loadedSoundSample0 =
+              loadedSound->sound.samples[channelIndex][soundReadIndex];
+            r32 loadedSoundSample1 =
+              loadedSound->sound.samples[channelIndex][soundReadIndex + 1];
+            r32 loadedSoundSample =
+              lerp(loadedSoundSample0, loadedSoundSample1, soundReadFrac);
+
+            samplesAt->c[channelIndex] += 0.5f*loadedSoundSample;
+          }
+        }
+        else
+        {
+          pluginSetBooleanParameter(&pluginState->soundIsPlaying, false);
+          loadedSound->samplesPlayed = 0;
+        }
+      }
+    }
+
+    bool soundIsPlaying = pluginReadBooleanParameter(&pluginState->soundIsPlaying);
+    if(soundIsPlaying)
+    {
+      loadedSound->samplesPlayed += scaledFramesToRead;
+    }
+  }
+#endif
+
+  // NOTE: mix input samples
+  {
+    SamplePair *samplesAt = samplesStart;
+    switch(audioBuffer->inputFormat)
+    {
+      case AudioFormat_s16:
+      {
+        for(u32 sampleIndex = 0; sampleIndex < framesToRead; ++sampleIndex, ++samplesAt)
+        {
+          for(u32 channelIndex = 0; channelIndex < audioBuffer->inputChannels; ++channelIndex)
+          {
+            s16 inputSample = *(s16*)genericInputFrames[channelIndex];
+            samplesAt->c[channelIndex] += 0.5f * clampToRange((r32)inputSample/(r32)S16_MAX, -1.f, 1.f);
+            genericInputFrames[channelIndex] = (u8*)genericInputFrames + audioBuffer->inputStride;
+          }
+        }
+      }break;
+
+      case AudioFormat_r32:
+      {
+        for(u32 sampleIndex = 0; sampleIndex < framesToRead; ++sampleIndex, ++samplesAt)
+        {
+          for(u32 channelIndex = 0; channelIndex < audioBuffer->inputChannels; ++channelIndex)
+          {
+            r32 inputSample = *(r32*)genericInputFrames[channelIndex];
+            samplesAt->c[channelIndex] += 0.5f * clampToRange(inputSample, -1.f, 1.f);
+            genericInputFrames[channelIndex] = (u8*)genericInputFrames + audioBuffer->inputStride;
+          }
+        }
+      }break;
+
+      default: {}break;
+    }
+  }
+
+  // NOTE: expose pointers
+  stream->start = (u8*)samplesStart;
+  stream->at = stream->start;
+  stream->end = (u8*)samplesEnd;
+
+  // NOTE: copy to clone
+  COPY_ARRAY(mix->clone, stream, 1, BufferStream);
+}
+
 EXPORT_FUNCTION void
 gsAudioProcess(PluginMemory *memory, PluginAudioBuffer *audioBuffer)
 {
   UNUSED(memory);
 
   if(globalPluginState)
+  {
+    PluginState *pluginState = globalPluginState;
+    if(pluginState->initialized)
     {
-      PluginState *pluginState = globalPluginState;
-      if(pluginState->initialized)
+      TemporaryMemory scratch = arenaGetScratch(0, 0);
+
+      // TODO: think harder about how and when parameters are updated from various sources
+      // NOTE: dequeue host-driven parameter value changes
+      {
+        u32 queuedCount = gsAtomicLoad(&audioBuffer->queuedCount);
+        if(queuedCount)
         {
-          TemporaryMemory scratch = arenaGetScratch(0, 0);
+          u32 parameterValueQueueReadIndex = audioBuffer->parameterValueQueueReadIndex;
+          for(u32 entryIndex = 0; entryIndex < queuedCount; ++entryIndex)
+          {
+            ParameterValueQueueEntry *entry =
+              audioBuffer->parameterValueQueueEntries + parameterValueQueueReadIndex;
 
-          // NOTE: dequeue host-driven parameter value changes
-          u32 queuedCount = gsAtomicLoad(&audioBuffer->queuedCount);
-          if(queuedCount)
-            {
-              u32 parameterValueQueueReadIndex = audioBuffer->parameterValueQueueReadIndex;
-              for(u32 entryIndex = 0; entryIndex < queuedCount; ++entryIndex)
-                {
-                  ParameterValueQueueEntry *entry =
-                    audioBuffer->parameterValueQueueEntries + parameterValueQueueReadIndex;
+            PluginFloatParameter *parameter = pluginState->parameters + entry->index;
+            r32 newVal = mapToRange(entry->value.asFloat, parameter->range);
+            pluginSetFloatParameter(parameter, newVal);
+          }
 
-                  PluginFloatParameter *parameter = pluginState->parameters + entry->index;
-                  r32 newVal = mapToRange(entry->value.asFloat, parameter->range);
-                  pluginSetFloatParameter(parameter, newVal);
-                }
+          audioBuffer->parameterValueQueueReadIndex =
+            (parameterValueQueueReadIndex + queuedCount) % ARRAY_COUNT(audioBuffer->parameterValueQueueEntries);
 
-              audioBuffer->parameterValueQueueReadIndex =
-                (parameterValueQueueReadIndex + queuedCount) % ARRAY_COUNT(audioBuffer->parameterValueQueueEntries);
+          u32 entriesRead = queuedCount;
+          while(gsAtomicCompareAndSwap(&audioBuffer->queuedCount, queuedCount, queuedCount - entriesRead) != queuedCount)
+          {
+            queuedCount = gsAtomicLoad(&audioBuffer->queuedCount);
+          }
+        }
+      }
 
-              u32 entriesRead = queuedCount;
-              while(gsAtomicCompareAndSwap(&audioBuffer->queuedCount, queuedCount, queuedCount - entriesRead) != queuedCount)
-                {
-                  queuedCount = gsAtomicLoad(&audioBuffer->queuedCount);
-                }
-            }
+      // NOTE: copy plugin input audio to the grain buffer
 
-          // NOTE: copy plugin input audio to the grain buffer
-          u32 framesToRead = audioBuffer->framesToWrite;
-          r32 inputBufferReadSpeed = ((audioBuffer->inputSampleRate != 0) ?
-                                      (r32)INTERNAL_SAMPLE_RATE/(r32)audioBuffer->inputSampleRate : 1.f);
-          r32 scaledFramesToRead = inputBufferReadSpeed*framesToRead;
-          UNUSED(scaledFramesToRead);
+      // TODO: move this state onto the pluginstate and initialize it at init time
+      InputMixStream inputMixer = {};
+      inputMixer.stream.refill = mixInputSamples;
+      inputMixer.refillArena = scratch.arena;
+      inputMixer.pluginState = pluginState;
+      inputMixer.audioBuffer = audioBuffer;
 
-          //AudioRingBuffer *gbuff = &pluginState->grainBuffer;
-#if FINGERTIPS
-          PlayingSound *loadedSound = &pluginState->loadedSound;
-#endif
-          logFormatString("samples to read: %lu", framesToRead);
+      BufferStream inputMixerClone = {};
+      inputMixer.clone = &inputMixerClone;
 
-          r32 *inputMixBuffersArray = arenaPushArray(scratch.arena, 2*framesToRead, r32,
-                                                     arenaFlagsZeroAlign(4*sizeof(r32)));
-          r32 *inputMixBuffers[2] = {};
-          inputMixBuffers[0] = inputMixBuffersArray + (0 * framesToRead);
-          inputMixBuffers[1] = inputMixBuffersArray + (1 * framesToRead);
+      pluginState->grainManager.sampleSource = &inputMixer.stream;
 
-          const void *genericInputFrames[2] = {};
-          genericInputFrames[0] = audioBuffer->inputBuffer[0];
-          genericInputFrames[1] = audioBuffer->inputBuffer[1];
+      OutputMixStream outputMixer = {};
+      outputMixer.stream.refill = mixOutputSamples;
+      outputMixer.grainSource = &pluginState->grainManager.stream;
+      outputMixer.inputSource = &inputMixerClone;
+      outputMixer.pluginState = pluginState;
+      outputMixer.audioBuffer = audioBuffer;
 
-          for(u32 frameIndex = 0; frameIndex < framesToRead; ++frameIndex)
-            {
-#if FINGERTIPS
-              bool soundIsPlaying = pluginReadBooleanParameter(&pluginState->soundIsPlaying);
-              r32 currentTime = (r32)loadedSound->samplesPlayed + inputBufferReadSpeed*(r32)frameIndex;
-              u32 soundReadIndex = (u32)currentTime;
-              r32 soundReadFrac = currentTime - (r32)soundReadIndex;
-#endif
+      pluginState->grainManager.refillArena = scratch.arena;
+      outputMixer.stream.refill(&outputMixer.stream);
 
-              for(u32 channelIndex = 0; channelIndex < audioBuffer->inputChannels; ++channelIndex)
-                {
-                  r32 mixedVal = 0.f;
-#if FINGERTIPS
-                  if(soundIsPlaying)
-                    {
-                      if(currentTime < loadedSound->sound.sampleCount)
-                        {
-                          r32 loadedSoundSample0 =
-                            loadedSound->sound.samples[channelIndex][soundReadIndex];
-                          r32 loadedSoundSample1 =
-                            loadedSound->sound.samples[channelIndex][soundReadIndex + 1];
-                          r32 loadedSoundSample =
-                            lerp(loadedSoundSample0, loadedSoundSample1, soundReadFrac);
+      //writeSamplesToAudioRingBuffer(gbuff, inputMixBuffers[0], inputMixBuffers[1], framesToRead);
 
-                          mixedVal += 0.5f*loadedSoundSample;
-                        }
-                      else
-                        {
-                          pluginSetBooleanParameter(&pluginState->soundIsPlaying, false);
-                          loadedSound->samplesPlayed = 0;// + pluginState->start_pos);
-                        }
-                    }
-#endif
+      // NOTE: grain playback
+      //GrainManager* gManager = &pluginState->grainManager;
+      //u32 framesToWrite = audioBuffer->framesToWrite;
 
-                  switch(audioBuffer->inputFormat)
-                    {
-                    case AudioFormat_s16:
-                      {
-                        s16 *inputFrames = (s16 *)genericInputFrames[channelIndex];
-                        r32 inputSample = (r32)*inputFrames/(r32)S16_MAX;
-                        inputSample = clampToRange(inputSample, -1.f, 1.f);
-                        mixedVal += 0.5f*inputSample;
+      // TODO: don't pre-update parameters and store the values in arrays;
+      // update parameters when their values are needed
+      // NOTE: parameter updates
+      // r32 *paramValsArray = arenaPushArray(scratch.arena, 8 * framesToWrite, r32,
+      //                                      arenaFlagsZeroNoAlign());
+      // r32 *volumeParamVals  = paramValsArray + (0 * framesToWrite);
+      // r32 *densityParamVals = paramValsArray + (1 * framesToWrite);
+      // r32 *panParamVals     = paramValsArray + (2 * framesToWrite);
+      // r32 *sizeParamVals    = paramValsArray + (3 * framesToWrite);
+      // r32 *windowParamVals  = paramValsArray + (4 * framesToWrite);
+      // r32 *spreadParamVals  = paramValsArray + (5 * framesToWrite);
+      // r32 *mixParamVals     = paramValsArray + (6 * framesToWrite);
+      // r32 *offsetParamVals  = paramValsArray + (7 * framesToWrite);
+      // for(u32 frameIdx = 0; frameIdx < framesToWrite; ++frameIdx)
+      // {
+      //   volumeParamVals[frameIdx] =
+      //     pluginUpdateFloatParameter(pluginState->parameters + PluginParameter_volume);
+      //   densityParamVals[frameIdx] =
+      //     pluginUpdateFloatParameter(pluginState->parameters + PluginParameter_density);
+      //   panParamVals[frameIdx] =
+      //     pluginUpdateFloatParameter(pluginState->parameters + PluginParameter_pan);
+      //   sizeParamVals[frameIdx] =
+      //     pluginUpdateFloatParameter(pluginState->parameters + PluginParameter_size);
+      //   windowParamVals[frameIdx] =
+      //     pluginUpdateFloatParameter(pluginState->parameters + PluginParameter_window);
+      //   spreadParamVals[frameIdx] =
+      //     pluginUpdateFloatParameter(pluginState->parameters + PluginParameter_spread);
+      //   mixParamVals[frameIdx] =
+      //     pluginUpdateFloatParameter(pluginState->parameters + PluginParameter_mix);
+      //   offsetParamVals[frameIdx] =
+      //     pluginUpdateFloatParameter(pluginState->parameters + PluginParameter_offset);
+      // }
 
-                        genericInputFrames[channelIndex] = (u8 *)inputFrames + audioBuffer->inputStride;
-                      } break;
-
-                    case AudioFormat_r32:
-                      {
-                        r32 *inputFrames = (r32 *)genericInputFrames[channelIndex];
-                        r32 inputSample = *inputFrames;
-                        inputSample = clampToRange(inputSample, -1.f, 1.f);
-                        mixedVal += 0.5f*inputSample;
-
-                        genericInputFrames[channelIndex] = (u8 *)inputFrames + audioBuffer->inputStride;
-                      } break;
-
-                      // default: {ASSERT(!"invalid input format");} break;
-                    default: {} break;
-                    }
-
-                  inputMixBuffers[channelIndex][frameIndex] = mixedVal;
-                }
-            }
-
-          bool soundIsPlaying = pluginReadBooleanParameter(&pluginState->soundIsPlaying);
-          if(soundIsPlaying)
-            {
-#if FINGERTIPS
-              loadedSound->samplesPlayed += scaledFramesToRead;
-#endif
-            }
-
-          // TODO: input stream !!
-
-          //writeSamplesToAudioRingBuffer(gbuff, inputMixBuffers[0], inputMixBuffers[1], framesToRead);
-
-          // NOTE: grain playback
-          GrainManager* gManager = &pluginState->grainManager;
-          u32 framesToWrite = audioBuffer->framesToWrite;
-
-          // TODO: don't pre-update parameters and store the values in arrays;
-          // update parameters when their values are needed
-          // NOTE: parameter updates
-          r32 *paramValsArray = arenaPushArray(scratch.arena, 8 * framesToWrite, r32,
-                                               arenaFlagsZeroNoAlign());
-          r32 *volumeParamVals  = paramValsArray + (0 * framesToWrite);
-          r32 *densityParamVals = paramValsArray + (1 * framesToWrite);
-          r32 *panParamVals     = paramValsArray + (2 * framesToWrite);
-          r32 *sizeParamVals    = paramValsArray + (3 * framesToWrite);
-          r32 *windowParamVals  = paramValsArray + (4 * framesToWrite);
-          r32 *spreadParamVals  = paramValsArray + (5 * framesToWrite);
-          r32 *mixParamVals     = paramValsArray + (6 * framesToWrite);
-          r32 *offsetParamVals  = paramValsArray + (7 * framesToWrite);
-          for(u32 frameIdx = 0; frameIdx < framesToWrite; ++frameIdx)
-            {
-              volumeParamVals[frameIdx] =
-                pluginUpdateFloatParameter(pluginState->parameters + PluginParameter_volume);
-              densityParamVals[frameIdx] =
-                pluginUpdateFloatParameter(pluginState->parameters + PluginParameter_density);
-              panParamVals[frameIdx] =
-                pluginUpdateFloatParameter(pluginState->parameters + PluginParameter_pan);
-              sizeParamVals[frameIdx] =
-                pluginUpdateFloatParameter(pluginState->parameters + PluginParameter_size);
-              windowParamVals[frameIdx] =
-                pluginUpdateFloatParameter(pluginState->parameters + PluginParameter_window);
-              spreadParamVals[frameIdx] =
-                pluginUpdateFloatParameter(pluginState->parameters + PluginParameter_spread);
-              mixParamVals[frameIdx] =
-                pluginUpdateFloatParameter(pluginState->parameters + PluginParameter_mix);
-              offsetParamVals[frameIdx] =
-                pluginUpdateFloatParameter(pluginState->parameters + PluginParameter_offset);
-            }
-
-          // u32 targetOffset = (u32)offsetParamVals[0];
+      // u32 targetOffset = (u32)offsetParamVals[0];
 //           r32 *grainMixBuffersArray = arenaPushArray(scratch.arena, 2 * framesToWrite, r32,
 //                                                      arenaFlagsZeroNoAlign());
 //           r32 *grainMixBuffers[2] = {};
@@ -1831,103 +2033,11 @@ gsAudioProcess(PluginMemory *memory, PluginAudioBuffer *audioBuffer)
 //           UNUSED(grainMixBuffersIntL);
 //           UNUSED(grainMixBuffersIntR);
 
-          // TODO: output stream !!
-          // NOTE: audio output
-          r32 formatVolumeFactor = 1.f;
-          switch(audioBuffer->outputFormat)
-            {
-            case AudioFormat_s16:
-              {
-                formatVolumeFactor = 32000.f;
-              } break;
-            case AudioFormat_r32: break;
-            default: { ASSERT(!"invalid audio format"); } break;
-            }
+      // TODO: output stream !!
+      // NOTE: audio output
 
-          void *genericOutputFrames[2] = {};
-          genericOutputFrames[0] = (void*)audioBuffer->outputBuffer[0];
-          genericOutputFrames[1] = (void*)audioBuffer->outputBuffer[1];
-          logFormatString("genericOutputFrames = %p, %p",
-                          genericOutputFrames[0], genericOutputFrames[1]);
-          // NOTE: DEBUG
-          usz genericOutputFramesIntL = INT_FROM_PTR(genericOutputFrames[0]);
-          usz genericOutputFramesIntR = INT_FROM_PTR(genericOutputFrames[1]);
-          UNUSED(genericOutputFramesIntL);
-          UNUSED(genericOutputFramesIntR);
 
-          u8 *atMidiBuffer = audioBuffer->midiBuffer;
-
-          logFormatString("samples to write: %lu", audioBuffer->framesToWrite);
-          for(u32 frameIndex = 0; frameIndex < audioBuffer->framesToWrite; ++frameIndex)
-            {
-              atMidiBuffer = midi::parseMidiMessage(atMidiBuffer, pluginState,
-                                                    audioBuffer->midiMessageCount, frameIndex);
-
-              r32 volume = formatVolumeFactor * volumeParamVals[frameIndex];
-              r32 mixParam = mixParamVals[frameIndex];
-              r32 panner = panParamVals[frameIndex];
-              for(u32 channelIndex = 0; channelIndex < audioBuffer->outputChannels; ++channelIndex)
-                {
-#if 0
-                  if(grainMixBuffersIntL != INT_FROM_PTR(grainMixBuffers[0]) ||
-                     grainMixBuffersIntR != INT_FROM_PTR(grainMixBuffers[1]))
-                    {
-                      logFormatString("grain mix buffers (%p, %p) got fucked up "
-                                      "at sample %u, channel %u",
-                                      grainMixBuffers[0], grainMixBuffers[1],
-                                      frameIndex, channelIndex);
-                    }
-#endif
-
-                  r32 mixedVal = 0.f;
-                  r32 grainVal = grainMixBuffers[channelIndex][frameIndex];
-                  r32 leftGrainVal = grainMixBuffers[0][frameIndex];
-                  r32 rightGrainVal = grainMixBuffers[1][frameIndex];
-                  r32 stereoWidth = spreadParamVals[frameIndex];
-                  if (channelIndex < 2) {
-                    // NOTE: Make sure we only process left and right channels
-                    r32 tmp = 1.0f / MAX(1.0f + stereoWidth, 2.0f);
-                    r32 coef_M = 1.0f * tmp;
-                    r32 coef_S = stereoWidth * tmp;
-
-                    r32 mid = (leftGrainVal + rightGrainVal) * coef_M;
-                    r32 sides = (rightGrainVal - leftGrainVal) * coef_S;
-
-                    // Update grain value based on channel
-                    if (channelIndex == 0) {
-                      grainVal = mid - sides; // Left channel
-                      grainVal = grainVal * (1 - panner);
-                    }
-                    else {
-                      grainVal = mid + sides; // Right channel
-                      grainVal = grainVal * (1 + panner);
-                    }
-                  }
-
-                  mixedVal += lerp(inputMixBuffers[channelIndex][frameIndex], grainVal, mixParam);
-                  //logFormatString("mixedVal: %.2f", mixedVal);
-
-                  switch(audioBuffer->outputFormat)
-                    {
-                    case AudioFormat_r32:
-                      {
-                        r32 *audioFrames = (r32 *)genericOutputFrames[channelIndex];
-                        *audioFrames = volume*mixedVal;
-                        genericOutputFrames[channelIndex] = (u8 *)audioFrames + audioBuffer->outputStride;
-                      } break;
-                    case AudioFormat_s16:
-                      {
-                        s16 *audioFrames = (s16 *)genericOutputFrames[channelIndex];
-                        *audioFrames = (s16)(volume*mixedVal);
-                        genericOutputFrames[channelIndex] = (u8 *)audioFrames + audioBuffer->outputStride;
-                      } break;
-
-                    default: ASSERT(!"ERROR: invalid audio output format");
-                    }
-                }
-            }
-
-          arenaReleaseScratch(scratch);
-        }
+      arenaReleaseScratch(scratch);
     }
+  }
 }

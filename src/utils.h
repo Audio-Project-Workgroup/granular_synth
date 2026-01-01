@@ -108,21 +108,21 @@ static inline u32 lsbHelper(u64 num) { u32 idx = 0; _BitScanForward64((unsigned 
 #define DLL_REMOVE__NP(f, l, d, next, prev) do {((f)==(d) ? ((f)==(l) ? ((f)=(l)=(0)) : ((f)=(f)->next, (f)->prev=0)) : (l)==(d) ? ((l)=(l)->prev, (l)->next=0) : ((d)->next->prev=(d)->prev, (d)->prev->next=(d)->next));} while(0)
 #define DLL_REMOVE(f, l, d) DLL_REMOVE__NP(f, l, d, next, prev)
 
-#define LINKED_LIST_APPEND(head, new) do {	\
-    new->next = head;				\
-    head = new;					\
+#define LINKED_LIST_APPEND(head, new) do {      \
+    new->next = head;                           \
+    head = new;                                 \
   } while(0)
 
 #define DLINKED_LIST_APPEND(sentinel, new) do { \
-    new->next = sentinel;			\
-    new->prev = sentinel->prev;			\
-    new->next->prev = new;			\
-    new->prev->next = new;			\
+    new->next = sentinel;                       \
+    new->prev = sentinel->prev;                 \
+    new->next->prev = new;                      \
+    new->prev->next = new;                      \
   } while(0)
 
-#define DLINKED_LIST_REMOVE(sentinel, dead) do {	\
-    (dead)->prev->next = (dead)->next;			\
-    (dead)->next->prev = (dead)->prev;			\
+#define DLINKED_LIST_REMOVE(sentinel, dead) do {        \
+    (dead)->prev->next = (dead)->next;                  \
+    (dead)->next->prev = (dead)->prev;                  \
   } while(0)
 
 #if defined(HOST_LAYER)
@@ -148,7 +148,7 @@ safeTruncateU64(u64 val)
 static inline u32
 lowestOrderBit(u32 num)
 {
-  u32 result = 0;  
+  u32 result = 0;
   u32 lowestBit = num & -num;
   while(lowestBit > 1)
     {
@@ -190,16 +190,16 @@ inline bool
 stringsAreEqual(u8 *s1, u8 *s2)
 {
   bool result = true;
-  
+
   u8 *atS1 = s1;
   u8 *atS2 = s2;
   while(*atS1 && *atS2)
     {
       if(*atS1 != *atS2)
-	{
-	  result = false;
-	  break;
-	}
+        {
+          result = false;
+          break;
+        }
 
       ++atS1;
       ++atS2;
@@ -221,13 +221,13 @@ smallestNotInSortedArray(u32 *array, u32 length)
     {
       u32 val = array[i];
       if(result == val)
-	{
-	  ++result;
-	}
+        {
+          ++result;
+        }
       else
-	{
-	  break;
-	}
+        {
+          break;
+        }
     }
 
   return(result);
@@ -241,29 +241,29 @@ separateExtensionAndFilepath(char *filepath, char *resultPath, char *resultExten
   while(*at)
     {
       if(*at != '.')
-	{
-	  *dest++ = *at++;
-	}
+        {
+          *dest++ = *at++;
+        }
       else
-	{
-	  if(*(at + 1))
-	    {
-	      if(*(at + 1) == '.')
-		{
-		  *dest++ = *at++;
-		  *dest++ = *at++;
-		}
-	      else
-		{
-		  dest = resultExtension;
-		  ++at;
-		}
-	    }
-	  else
-	    {
-	      break;
-	    }
-	}
+        {
+          if(*(at + 1))
+            {
+              if(*(at + 1) == '.')
+                {
+                  *dest++ = *at++;
+                  *dest++ = *at++;
+                }
+              else
+                {
+                  dest = resultExtension;
+                  ++at;
+                }
+            }
+          else
+            {
+              break;
+            }
+        }
     }
 }
 
@@ -280,9 +280,9 @@ inline v4
 colorV4FromU32(u32 c)
 {
   v4 result=  {(r32)((c & (0xFF << 3*8)) >> 3*8)/255.f,
-	       (r32)((c & (0xFF << 2*8)) >> 2*8)/255.f,
-	       (r32)((c & (0xFF << 1*8)) >> 1*8)/255.f,
-	       (r32)((c & (0xFF << 0*8)) >> 0*8)/255.f};
+               (r32)((c & (0xFF << 2*8)) >> 2*8)/255.f,
+               (r32)((c & (0xFF << 1*8)) >> 1*8)/255.f,
+               (r32)((c & (0xFF << 0*8)) >> 0*8)/255.f};
 
   return(result);
 }
@@ -291,10 +291,9 @@ inline u32
 colorU32FromV4(v4 c)
 {
   u32 result = ((roundR32ToU32(c.a*255.f) << 3*8) |
-		(roundR32ToU32(c.b*255.f) << 2*8) |
-		(roundR32ToU32(c.g*255.f) << 1*8) |
-		(roundR32ToU32(c.r*255.f) << 0*8));
+                (roundR32ToU32(c.b*255.f) << 2*8) |
+                (roundR32ToU32(c.g*255.f) << 1*8) |
+                (roundR32ToU32(c.r*255.f) << 0*8));
 
   return(result);
 }
-

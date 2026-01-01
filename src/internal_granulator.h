@@ -17,12 +17,6 @@ struct Grain
   b32 isFinished;
 };
 
-struct SamplePair
-{
-  r32 left;
-  r32 right;
-};
-
 struct GrainViewEntry
 {
   u32 startIndex;
@@ -60,7 +54,7 @@ struct GrainStateView
 
 struct GrainManager
 {
-  BufferStream self; // NOTE: must always be the first member (so we can do casting tricks)
+  BufferStream stream; // NOTE: must always be the first member (so we can do casting tricks)
   BufferStream *sampleSource;
 
   Arena *grainAllocator;

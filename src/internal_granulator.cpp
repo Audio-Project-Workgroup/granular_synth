@@ -315,7 +315,7 @@ static BUFFER_STREAM_REFILL_PROC(grainManagerRefill)
   ASSERT(stream->at == stream->end);
 
   GrainManager *grainManager = (GrainManager*)stream;
-  arenaEnd(grainManager->refillArena);
+  //arenaEnd(grainManager->refillArena);
 
   // NOTE: refill our input buffers if needed
   BufferStream *sampleSource  = grainManager->sampleSource;
@@ -373,8 +373,8 @@ initializeGrainManager(PluginState *pluginState)
   result.grainCount = 0;
   result.grainFreeList = 0;
 
-  result.self.refill = grainManagerRefill;
-  result.sampleSource = inputMixBuffer;
+  result.stream.refill = grainManagerRefill;
+  //result.sampleSource = inputMixBuffer;
 
   result.parameters = pluginState->parameters;
   result.grainStateView = &pluginState->grainStateView;
