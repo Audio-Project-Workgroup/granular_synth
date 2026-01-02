@@ -242,9 +242,19 @@ gsInitializePluginState(PluginMemory *memoryBlock)
             arenaPushString(pluginState->permanentArena, memoryBlock->inputDeviceNames[i]);
         }
 
+      // NOTE: input/output stream initialization
+      {
+        pluginState->inputStream.stream.refill = mixInputSamples;
+        pluginState->inputStream.pluginState = pluginState;
+        pluginState->inputStream.clone = &pluginState->inputStreamClone;
+
+        pluginState->outputStream.stream.refill = mixOutputSamples;
+        pluginState->outputStream.inputSource = &pluginState->inputStreamClone;
+        pluginState->outputStream.grainSource = &pluginState->grainManager.stream;
+        pluginState->outputStream.pluginState = pluginState;
+      }
+
       // NOTE: grain buffer initialization
-      //u32 grainBufferCount = 1ULL << 16;
-      //pluginState->grainBuffer = initializeGrainBuffer(pluginState, grainBufferCount);
       pluginState->grainManager = initializeGrainManager(pluginState);
 
       // NOTE: grain view initialization
@@ -254,14 +264,8 @@ gsInitializePluginState(PluginMemory *memoryBlock)
       grainStateView->viewBufferSamples =
         arenaPushArray(pluginState->permanentArena, pluginState->grainManager.grainBufferCount,
                        SamplePair, arenaFlagsNoZeroAlign(4*sizeof(SamplePair)));
-      // grainStateView->viewBuffer.samples[0] =
-      //   arenaPushArray(pluginState->permanentArena, grainStateView->viewBuffer.capacity, r32,
-      //                  arenaFlagsNoZeroAlign(4*sizeof(r32)));
-      // grainStateView->viewBuffer.samples[1] =
-      //   arenaPushArray(pluginState->permanentArena, grainStateView->viewBuffer.capacity, r32,
-      //                  arenaFlagsNoZeroAlign(4*sizeof(r32)));
-      grainStateView->viewBufferReadIndex = 0;//pluginState->grainBuffer.readIndex;
-      grainStateView->viewBufferWriteIndex = 1;//pluginState->grainBuffer.writeIndex;
+      grainStateView->viewBufferReadIndex = 0;
+      grainStateView->viewBufferWriteIndex = 1;
 
       u32 grainViewSampleCapacity = 4096;
       for(u32 i = 0; i < ARRAY_COUNT(grainStateView->views); ++i)
@@ -270,10 +274,6 @@ gsInitializePluginState(PluginMemory *memoryBlock)
           view->sampleCapacity = grainViewSampleCapacity;
           view->bufferSamples =
             arenaPushArray(pluginState->permanentArena, grainViewSampleCapacity, SamplePair);
-          // view->bufferSamples[0] =
-          //   arenaPushArray(pluginState->permanentArena, grainViewSampleCapacity, r32);
-          // view->bufferSamples[1] =
-          //   arenaPushArray(pluginState->permanentArena, grainViewSampleCapacity, r32);
         }
 
       // NOTE: file loading, embedded grain caching
@@ -1639,17 +1639,8 @@ gsRenderNewFrame(PluginMemory *memory, PluginInput *input, RenderCommands *rende
 // audio
 //
 
-struct OutputMixStream
-{
-  BufferStream stream; // NOTE: must be the first member for casting reasons
-  BufferStream *grainSource; // NOTE: grain process
-  BufferStream *inputSource;
-
-  PluginAudioBuffer *audioBuffer;
-  PluginState *pluginState;
-};
-
-static BUFFER_STREAM_REFILL_PROC(mixOutputSamples)
+static void
+mixOutputSamples(BufferStream *stream)
 {
   ASSERT(stream->at == stream->end);
 
@@ -1668,6 +1659,7 @@ static BUFFER_STREAM_REFILL_PROC(mixOutputSamples)
 
   if(grainSource->at == grainSource->end) grainSource->refill(grainSource);
   ASSERT(inputSource->at == inputSource->start);
+  ASSERT(grainSource->at == grainSource->start);
 
   r32 formatVolumeFactor = 1.f;
   switch(audioBuffer->outputFormat)
@@ -1705,9 +1697,6 @@ static BUFFER_STREAM_REFILL_PROC(mixOutputSamples)
     SamplePair grainSample = *(SamplePair*)grainSource->at;
     SamplePair inputSample = *(SamplePair*)inputSource->at;
 
-    // r32 volume = formatVolumeFactor * volumeParamVals[frameIndex];
-    // r32 mixParam = mixParamVals[frameIndex];
-    // r32 panner = panParamVals[frameIndex];
     r32 volume = formatVolumeFactor * pluginUpdateFloatParameter(volumeParam);
     r32 mix = pluginUpdateFloatParameter(mixParam);
     r32 panner = pluginUpdateFloatParameter(panParam);
@@ -1726,10 +1715,8 @@ static BUFFER_STREAM_REFILL_PROC(mixOutputSamples)
 #endif
 
       r32 mixedVal = 0.f;
-      //r32 grainVal = grainMixBuffers[channelIndex][frameIndex];
-      r32 leftGrainVal = grainSample.left;//grainMixBuffers[0][frameIndex];
-      r32 rightGrainVal = grainSample.right;//grainMixBuffers[1][frameIndex];
-      //r32 stereoWidth = spreadParamVals[frameIndex];
+      r32 leftGrainVal = grainSample.left;
+      r32 rightGrainVal = grainSample.right;
       r32 grainVal = 0.f;
       if (channelIndex < 2) {
         // NOTE: Make sure we only process left and right channels
@@ -1751,7 +1738,6 @@ static BUFFER_STREAM_REFILL_PROC(mixOutputSamples)
         }
       }
 
-      //mixedVal += lerp(inputMixBuffers[channelIndex][frameIndex], grainVal, mixParam);
       mixedVal += lerp(inputSample.c[channelIndex], grainVal, mix);
       //logFormatString("mixedVal: %.2f", mixedVal);
 
@@ -1774,22 +1760,16 @@ static BUFFER_STREAM_REFILL_PROC(mixOutputSamples)
       }
     }
   }
+
+  ASSERT(grainSource->at == grainSource->end);
+  ASSERT(inputSource->at == inputSource->end);
 }
 
-// TODO: manage refill arenas in the input and the grain streams !!
-
-struct InputMixStream
+static void
+mixInputSamples(BufferStream *stream)
 {
-  BufferStream stream; // NOTE: must be the first member for casting reasons
-  BufferStream *clone; // NOTE: copy of state after refill because this stream has multiple consumers
-  Arena *refillArena;
+  ASSERT(stream->at == stream->end);
 
-  PluginAudioBuffer *audioBuffer;
-  PluginState *pluginState;
-};
-
-static BUFFER_STREAM_REFILL_PROC(mixInputSamples)
-{
   InputMixStream *mix = (InputMixStream*)stream;
 
   Arena *refillArena = mix->refillArena;
@@ -1798,15 +1778,8 @@ static BUFFER_STREAM_REFILL_PROC(mixInputSamples)
   PluginState *pluginState = mix->pluginState;
 
   u32 framesToRead = audioBuffer->framesToWrite;
-
-  //AudioRingBuffer *gbuff = &pluginState->grainBuffer;
   logFormatString("samples to read: %lu", framesToRead);
 
-  // r32 *inputMixBuffersArray = arenaPushArray(mix->refillArena, 2*framesToRead, r32,
-  //                                            arenaFlagsZeroAlign(4*sizeof(r32)));
-  // r32 *inputMixBuffers[2] = {};
-  // inputMixBuffers[0] = inputMixBuffersArray + (0 * framesToRead);
-  // inputMixBuffers[1] = inputMixBuffersArray + (1 * framesToRead);
   SamplePair *samplesStart = arenaPushArray(refillArena, framesToRead, SamplePair,
                                             arenaFlagsZeroAlign(4*sizeof(SamplePair)));
   SamplePair *samplesEnd = samplesStart + framesToRead;
@@ -1816,12 +1789,14 @@ static BUFFER_STREAM_REFILL_PROC(mixInputSamples)
   genericInputFrames[1] = audioBuffer->inputBuffer[1];
 
 #if FINGERTIPS
+  r32 mixFactor = 0.5f;
   {
-    // TODO: sample rate convert to the audio input sample rate, not the old internal sample rate!
+    // TODO: sample rate convert to the audio input sample rate, not the "internal" sample rate!
     r32 inputBufferReadSpeed = ((audioBuffer->inputSampleRate != 0) ?
                                 (r32)INTERNAL_SAMPLE_RATE/(r32)audioBuffer->inputSampleRate : 1.f);
     r32 scaledFramesToRead = inputBufferReadSpeed*framesToRead;
 
+    // TODO: turn playing sound into a buffer stream ?
     PlayingSound *loadedSound = &pluginState->loadedSound;
     SamplePair *samplesAt = samplesStart;
     for(u32 frameIndex = 0; frameIndex < framesToRead; ++frameIndex, ++samplesAt)
@@ -1837,12 +1812,9 @@ static BUFFER_STREAM_REFILL_PROC(mixInputSamples)
         {
           for(u32 channelIndex = 0; channelIndex < audioBuffer->inputChannels; ++channelIndex)
           {
-            r32 loadedSoundSample0 =
-              loadedSound->sound.samples[channelIndex][soundReadIndex];
-            r32 loadedSoundSample1 =
-              loadedSound->sound.samples[channelIndex][soundReadIndex + 1];
-            r32 loadedSoundSample =
-              lerp(loadedSoundSample0, loadedSoundSample1, soundReadFrac);
+            r32 loadedSoundSample0 = loadedSound->sound.samples[channelIndex][soundReadIndex];
+            r32 loadedSoundSample1 = loadedSound->sound.samples[channelIndex][soundReadIndex + 1];
+            r32 loadedSoundSample = lerp(loadedSoundSample0, loadedSoundSample1, soundReadFrac);
 
             samplesAt->c[channelIndex] += 0.5f*loadedSoundSample;
           }
@@ -1861,6 +1833,8 @@ static BUFFER_STREAM_REFILL_PROC(mixInputSamples)
       loadedSound->samplesPlayed += scaledFramesToRead;
     }
   }
+#else
+  r32 mixFactor = 1.f;
 #endif
 
   // NOTE: mix input samples
@@ -1875,8 +1849,8 @@ static BUFFER_STREAM_REFILL_PROC(mixInputSamples)
           for(u32 channelIndex = 0; channelIndex < audioBuffer->inputChannels; ++channelIndex)
           {
             s16 inputSample = *(s16*)genericInputFrames[channelIndex];
-            samplesAt->c[channelIndex] += 0.5f * clampToRange((r32)inputSample/(r32)S16_MAX, -1.f, 1.f);
-            genericInputFrames[channelIndex] = (u8*)genericInputFrames + audioBuffer->inputStride;
+            samplesAt->c[channelIndex] += mixFactor * clampToRange((r32)inputSample/(r32)S16_MAX, -1.f, 1.f);
+            genericInputFrames[channelIndex] = (u8*)genericInputFrames[channelIndex] + audioBuffer->inputStride;
           }
         }
       }break;
@@ -1888,8 +1862,8 @@ static BUFFER_STREAM_REFILL_PROC(mixInputSamples)
           for(u32 channelIndex = 0; channelIndex < audioBuffer->inputChannels; ++channelIndex)
           {
             r32 inputSample = *(r32*)genericInputFrames[channelIndex];
-            samplesAt->c[channelIndex] += 0.5f * clampToRange(inputSample, -1.f, 1.f);
-            genericInputFrames[channelIndex] = (u8*)genericInputFrames + audioBuffer->inputStride;
+            samplesAt->c[channelIndex] += mixFactor * clampToRange(inputSample, -1.f, 1.f);
+            genericInputFrames[channelIndex] = (u8*)genericInputFrames[channelIndex] + audioBuffer->inputStride;
           }
         }
       }break;
@@ -1947,95 +1921,17 @@ gsAudioProcess(PluginMemory *memory, PluginAudioBuffer *audioBuffer)
         }
       }
 
-      // NOTE: copy plugin input audio to the grain buffer
-
-      // TODO: move this state onto the pluginstate and initialize it at init time
-      InputMixStream inputMixer = {};
-      inputMixer.stream.refill = mixInputSamples;
-      inputMixer.refillArena = scratch.arena;
-      inputMixer.pluginState = pluginState;
-      inputMixer.audioBuffer = audioBuffer;
-
-      BufferStream inputMixerClone = {};
-      inputMixer.clone = &inputMixerClone;
-
-      pluginState->grainManager.sampleSource = &inputMixer.stream;
-
-      OutputMixStream outputMixer = {};
-      outputMixer.stream.refill = mixOutputSamples;
-      outputMixer.grainSource = &pluginState->grainManager.stream;
-      outputMixer.inputSource = &inputMixerClone;
-      outputMixer.pluginState = pluginState;
-      outputMixer.audioBuffer = audioBuffer;
+      // NOTE: process audio
+      InputMixStream *inputStream = &pluginState->inputStream;
+      inputStream->refillArena = scratch.arena;
+      inputStream->audioBuffer = audioBuffer;
 
       pluginState->grainManager.refillArena = scratch.arena;
-      outputMixer.stream.refill(&outputMixer.stream);
 
-      //writeSamplesToAudioRingBuffer(gbuff, inputMixBuffers[0], inputMixBuffers[1], framesToRead);
+      OutputMixStream *outputStream = &pluginState->outputStream;
+      outputStream->audioBuffer = audioBuffer;
 
-      // NOTE: grain playback
-      //GrainManager* gManager = &pluginState->grainManager;
-      //u32 framesToWrite = audioBuffer->framesToWrite;
-
-      // TODO: don't pre-update parameters and store the values in arrays;
-      // update parameters when their values are needed
-      // NOTE: parameter updates
-      // r32 *paramValsArray = arenaPushArray(scratch.arena, 8 * framesToWrite, r32,
-      //                                      arenaFlagsZeroNoAlign());
-      // r32 *volumeParamVals  = paramValsArray + (0 * framesToWrite);
-      // r32 *densityParamVals = paramValsArray + (1 * framesToWrite);
-      // r32 *panParamVals     = paramValsArray + (2 * framesToWrite);
-      // r32 *sizeParamVals    = paramValsArray + (3 * framesToWrite);
-      // r32 *windowParamVals  = paramValsArray + (4 * framesToWrite);
-      // r32 *spreadParamVals  = paramValsArray + (5 * framesToWrite);
-      // r32 *mixParamVals     = paramValsArray + (6 * framesToWrite);
-      // r32 *offsetParamVals  = paramValsArray + (7 * framesToWrite);
-      // for(u32 frameIdx = 0; frameIdx < framesToWrite; ++frameIdx)
-      // {
-      //   volumeParamVals[frameIdx] =
-      //     pluginUpdateFloatParameter(pluginState->parameters + PluginParameter_volume);
-      //   densityParamVals[frameIdx] =
-      //     pluginUpdateFloatParameter(pluginState->parameters + PluginParameter_density);
-      //   panParamVals[frameIdx] =
-      //     pluginUpdateFloatParameter(pluginState->parameters + PluginParameter_pan);
-      //   sizeParamVals[frameIdx] =
-      //     pluginUpdateFloatParameter(pluginState->parameters + PluginParameter_size);
-      //   windowParamVals[frameIdx] =
-      //     pluginUpdateFloatParameter(pluginState->parameters + PluginParameter_window);
-      //   spreadParamVals[frameIdx] =
-      //     pluginUpdateFloatParameter(pluginState->parameters + PluginParameter_spread);
-      //   mixParamVals[frameIdx] =
-      //     pluginUpdateFloatParameter(pluginState->parameters + PluginParameter_mix);
-      //   offsetParamVals[frameIdx] =
-      //     pluginUpdateFloatParameter(pluginState->parameters + PluginParameter_offset);
-      // }
-
-      // u32 targetOffset = (u32)offsetParamVals[0];
-//           r32 *grainMixBuffersArray = arenaPushArray(scratch.arena, 2 * framesToWrite, r32,
-//                                                      arenaFlagsZeroNoAlign());
-//           r32 *grainMixBuffers[2] = {};
-//           grainMixBuffers[0] = grainMixBuffersArray + (0 * framesToWrite);
-//           grainMixBuffers[1] = grainMixBuffersArray + (1 * framesToWrite);
-//           synthesize(grainMixBuffers[0], grainMixBuffers[1],
-//                      gManager, &pluginState->grainStateView,
-//                      densityParamVals, sizeParamVals, windowParamVals, spreadParamVals,
-//                      targetOffset,
-//                      framesToWrite);
-//           logFormatString("grainMixBuffers = %p, %p",
-//                           grainMixBuffers[0], grainMixBuffers[1]);
-//           // NOTE: DEBUG
-//           usz grainMixBuffersIntL = INT_FROM_PTR(grainMixBuffers[0]);
-//           usz grainMixBuffersIntR = INT_FROM_PTR(grainMixBuffers[1]);
-// #if OS_WASM
-//           DEBUG_POINTER_INITIALIZE(audio__grainMixBuffersL, grainMixBuffers[0]);
-//           DEBUG_POINTER_INITIALIZE(audio__grainMixBuffersR, grainMixBuffers[1]);
-// #endif
-//           UNUSED(grainMixBuffersIntL);
-//           UNUSED(grainMixBuffersIntR);
-
-      // TODO: output stream !!
-      // NOTE: audio output
-
+      outputStream->stream.refill(&outputStream->stream);
 
       arenaReleaseScratch(scratch);
     }

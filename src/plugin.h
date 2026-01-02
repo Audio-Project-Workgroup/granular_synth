@@ -306,17 +306,43 @@ struct PlayingSound
   r32 samplesPlayed;
 };
 
+// NOTE: stream refill procedures
+static BUFFER_STREAM_REFILL_PROC(mixInputSamples);
+static BUFFER_STREAM_REFILL_PROC(grainManagerRefill);
+static BUFFER_STREAM_REFILL_PROC(mixOutputSamples);
+
+// NOTE: streams
+struct OutputMixStream
+{
+  BufferStream stream; // NOTE: must be the first member for casting reasons
+  BufferStream *grainSource; // NOTE: grain process
+  BufferStream *inputSource;
+
+  PluginAudioBuffer *audioBuffer;
+  PluginState *pluginState;
+};
+
+struct InputMixStream
+{
+  BufferStream stream; // NOTE: must be the first member for casting reasons
+  BufferStream *clone; // NOTE: copy of state after refill because this stream has multiple consumers
+  Arena *refillArena;
+
+  PluginAudioBuffer *audioBuffer;
+  PluginState *pluginState;
+};
+
+// NOTE: plugin state
+
 INTROSPECT
 struct PluginState
 {
   PluginFloatParameter parameters[PluginParameter_count];
 
   u64 osTimerFreq;
-  //Arena *grainArena;
   Arena *permanentArena;
   Arena *audioArena;
   Arena *frameArena;
-  //Arena *framePermanentArena;
 
   PluginHost pluginHost;
   PluginMode pluginMode;
@@ -330,6 +356,10 @@ struct PluginState
   String8 inputDeviceNames[32];
   u32 inputDeviceCount;
   u32 selectedInputDeviceIndex;
+
+  OutputMixStream outputStream;
+  InputMixStream inputStream;
+  BufferStream inputStreamClone;
 
   LoadedGrainPackfile loadedGrainPackfile;
   FileGrainState silo;

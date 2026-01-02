@@ -24,7 +24,7 @@ typedef double   r64;
 #define U32_MAX (0xFFFFFFFF)
 #define U64_MAX (0xFFFFFFFFFFFFFFFF)
 
-#define u8_MAX  U8_MAX 
+#define u8_MAX  U8_MAX
 #define u16_MAX U16_MAX
 #define u32_MAX U32_MAX
 #define u64_MAX U64_MAX
@@ -34,12 +34,15 @@ typedef double   r64;
 #define S32_MAX (0x7FFFFFFF)
 #define S64_MAX (0x7FFFFFFFFFFFFFFF)
 
-#define s8_MAX  S8_MAX 
+#define s8_MAX  S8_MAX
 #define s16_MAX S16_MAX
 #define s32_MAX S32_MAX
 #define s64_MAX S64_MAX
 
-#define r32_MAX FLT_MAX;
+#define R32_MAX (FLT_MAX)
+#define R32_MIN (FLT_MIN)
+#define r32_MAX R32_MAX
+#define r32_MIN R32_MIN
 
 #define S8_MIN  (0X80)
 #define S16_MIN (0x8000)
@@ -81,7 +84,7 @@ union v2
   {
     r32 x, y;
   };
-  
+
   r32 E[2];
 };
 
@@ -91,7 +94,7 @@ union v2s32
   {
     s32 x, y;
   };
-  
+
   struct
   {
     s32 width, height;
@@ -108,20 +111,20 @@ union v3
     {
       struct
       {
-	r32 x, y;
+        r32 x, y;
       };
-      
+
       v2 xy;
     };
-    
+
     r32 z;
   };
-  
+
   struct
   {
     r32 r, g, b;
   };
-  
+
   r32 E[3];
 };
 
@@ -139,9 +142,9 @@ union v4
     {
       struct
       {
-	r32 x, y, z;
+        r32 x, y, z;
       };
-      
+
       v3 xyz;
     };
 
@@ -154,9 +157,9 @@ union v4
     {
       struct
       {
-	r32 r, g, b;
+        r32 r, g, b;
       };
-      
+
       v3 rgb;
     };
 
@@ -184,7 +187,7 @@ union RangeU32
   {
     u32 min, max;
   };
-  
+
   u32 E[2];
 };
 
@@ -211,13 +214,13 @@ struct Rect2S32
 };
 
 enum Corner
-{  
+{
   Corner_00,
   Corner_01,
   Corner_10,
   Corner_11,
   Corner_Count,
-  
+
   Corner_invalid,
 };
 
@@ -233,7 +236,7 @@ struct LoadedSound
 {
   u32 sampleCount;
   u32 channelCount;
-  
+
   r32 *samples[2];
 };
 
@@ -255,7 +258,7 @@ struct LoadedFont
 {
   RangeU32 characterRange;
 
-  r32 verticalAdvance; 
+  r32 verticalAdvance;
 
   //r32 horizontalAdvance;
   PluginAsset *glyphs;
