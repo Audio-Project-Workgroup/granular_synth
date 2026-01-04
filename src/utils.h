@@ -88,7 +88,7 @@ static inline u32 lsbHelper(u64 num) { u32 idx = 0; _BitScanForward64((unsigned 
 
 #define LOG2(num) MSB(num)
 #define ROUND_UP_POW_2(num) (1ULL << (MSB((num) - 1) + 1))
-#define IS_POWER_OF_2(num) (num == ROUND_UP_POW_2(num))
+#define IS_POWER_OF_2(num) (((num) & ((num) - 1)) == 0) // NOTE: IS_POWER_OF_2(0) == true
 
 #define CYCLIC_ARRAY_INDEX(i, len) ((i < len) ? ((i < 0) ? (i + len) : i) : (i - len))
 
